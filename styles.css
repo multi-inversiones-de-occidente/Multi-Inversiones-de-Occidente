@@ -1,0 +1,177 @@
+/* Estilos globales */
+body {
+  margin: 0;
+  font-family: 'Arial', sans-serif;
+  background-color: #121212;
+  color: #ffffff;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background-color: #1e1e1e;
+}
+
+.logo img {
+  height: 140px;
+}
+
+.navbar ul {
+  list-style: none;
+  display: flex;
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar a {
+  text-decoration: none;
+  color: #ffffff;
+  font-size: 16px;
+  transition: color 0.3s;
+}
+
+.navbar a:hover {
+  color: #67C8F1;
+}
+
+/* Hero (Video Banner) */
+.hero {
+  margin: 0;
+  padding: 0;
+  /* Quita el padding extra si lo tenías para que no ocupe demasiado espacio */
+}
+
+.hero-container {
+  position: relative;
+  width: 100%;
+  height: 450px; /* Ajusta la altura para el banner */
+  overflow: hidden;
+}
+
+.hero-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Ajusta el video sin deformarlo, recortando lo que sobre */
+}
+
+.hero-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  background-color: rgba(0,0,0,0.5); /* Fondo negro semitransparente */
+  padding: 20px 40px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.hero-content h1 {
+  font-size: 2rem;
+  margin: 0;
+  color: #F8AF40;
+}
+
+.hero-content p {
+  margin: 15px 0;
+  font-size: 1rem;
+}
+
+.btn-primary {
+  background-color: #67C8F1;
+  color: #ffffff;
+  text-decoration: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 16px;
+}
+
+/* Servicios */
+.services {
+  text-align: center;
+  padding: 50px;
+  background-color: #1e1e1e;
+}
+
+.services-container {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.service-card {
+  background-color: #242424;
+  border-radius: 10px;
+  padding: 20px;
+  width: 300px;
+  text-align: center;
+}
+
+.service-icon {
+  font-size: 40px;
+  color: #F8AF40;
+  margin-bottom: 10px;
+}
+
+/* Sobre Nosotros */
+.about {
+  padding: 50px;
+  background-color: #121212;
+}
+
+.about-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.about-text {
+  max-width: 600px;
+  text-align: center;
+}
+
+/* Contacto */
+.contact {
+  padding: 50px;
+  text-align: center;
+  background-color: #242424;
+}
+
+.contact-info {
+  margin-top: 20px;
+}
+
+.contact-info i {
+  color: #F8AF40;
+  margin-right: 10px;
+}
+
+/* Footer */
+footer {
+  padding: 20px;
+  text-align: center;
+  background-color: #1e1e1e;
+}
+
+.social-links i {
+  font-size: 20px;
+  margin: 0 10px;
+  color: #ffffff;
+  transition: color 0.3s;
+}
+
+.social-links i:hover {
+  color: #67C8F1;
+}
+
+/* Resaltado */
+.highlight {
+  color: #67C8F1;
+}

@@ -1,24 +1,24 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Inicio de Sesión – Multi Inversiones</title>
   <link rel="stylesheet" href="styles.css"/>
   <link rel="icon" href="assets/logo_multinversiones.png" type="image/png"/>
   <style>
-    /* (Tus estilos de login anteriores) */
-    body { background-color: #121212; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-    .login-card { background-color: #1e1e1e; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); width: 100%; max-width: 400px; text-align: center; color: #fff; }
-    .login-card img { height: 80px; margin-bottom: 20px; }
-    .login-card h2 { margin-bottom: 30px; font-weight: 700; color: #F8AF40; }
-    .form-group { margin-bottom: 20px; text-align: left; }
-    .form-group label { display: block; margin-bottom: 5px; font-size: 0.9rem; }
-    .form-group input { width: 100%; padding: 10px; border: none; border-radius: 5px; background-color: #2a2a2a; color: #fff; font-size: 1rem; }
-    .form-group input::placeholder { color: #bbb; }
-    .login-card button { width: 100%; padding: 12px; background-color: #67C8F1; border: none; border-radius: 5px; font-size: 1rem; font-weight: 600; color: #fff; cursor: pointer; }
-    .login-card button:disabled { opacity: 0.6; cursor: default; }
-    .login-card .error { color: #f44336; margin-top: 15px; font-size: 0.9rem; }
+    /* Tus estilos de login… */
+    body { background:#121212; display:flex;align-items:center;justify-content:center;height:100vh;margin:0 }
+    .login-card { background:#1e1e1e;padding:40px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.5);width:100%;max-width:400px;text-align:center;color:#fff }
+    .login-card img { height:80px;margin-bottom:20px }
+    .login-card h2 { margin-bottom:30px;font-weight:700;color:#F8AF40 }
+    .form-group { margin-bottom:20px;text-align:left }
+    .form-group label { display:block;margin-bottom:5px;font-size:.9rem }
+    .form-group input { width:100%;padding:10px;border:none;border-radius:5px;background:#2a2a2a;color:#fff;font-size:1rem }
+    .form-group input::placeholder { color:#bbb }
+    .login-card button { width:100%;padding:12px;background:#67C8F1;border:none;border-radius:5px;font-size:1rem;font-weight:600;color:#fff;cursor:pointer }
+    .login-card button:disabled { opacity:.6;cursor:default }
+    .login-card .error { color:#f44336;margin-top:15px;font-size:.9rem }
   </style>
 </head>
 <body>
@@ -41,13 +41,13 @@
   </div>
 
   <script type="module">
-    // 1) Importa lo que necesites
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-auth.js";
-    import { getFirestore } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-firestore.js";
-    import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-messaging.js";
+    // 1) Importa desde la misma 9.20.0
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+    import { getFirestore } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-messaging.js";
 
-    // 2) Configura e inicializa
+    // 2) Configuración & init
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -62,7 +62,7 @@
     const db        = getFirestore(app);
     const messaging = getMessaging(app);
 
-    // 3) Lógica de login
+    // 3) Lógica login
     const form   = document.getElementById('login-form');
     const btn    = document.getElementById('btn-login');
     const errMsg = document.getElementById('error-message');
@@ -80,21 +80,16 @@
         const { user } = await signInWithEmailAndPassword(auth, email, password);
         const uid = user.uid;
 
-        // Obtén rol de Firestore
         const userSnap = await db.collection('users').doc(uid).get();
         if (!userSnap.exists) throw new Error('Usuario no encontrado.');
 
         const { rol } = userSnap.data();
 
-        // Actualiza token FCM
         try {
           const token = await getToken(messaging);
-          if (token) {
-            await db.collection('users').doc(uid).update({ notificationToken: token });
-          }
+          if (token) await db.collection('users').doc(uid).update({ notificationToken: token });
         } catch (_) {}
 
-        // Redirige
         const rutas = {
           user:             'usuario.html',
           analista_credito: 'analista_credito_panel.html',
@@ -114,5 +109,6 @@
       }
     });
   </script>
+
 </body>
 </html>

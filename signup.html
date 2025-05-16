@@ -7,35 +7,18 @@
   <link rel="stylesheet" href="styles.css"/>
   <link rel="icon" href="assets/logo_multinversiones.png" type="image/png"/>
   <style>
-    body {
-      background-color: #121212;
-      display: flex; align-items: center; justify-content: center;
-      height: 100vh; margin: 0;
-    }
-    .register-card {
-      background-color: #1e1e1e; padding: 40px;
-      border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-      width: 100%; max-width: 420px; color: #fff; text-align: center;
-    }
+    /* (Misma hoja de estilos que tenías antes) */
+    body { background-color: #121212; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+    .register-card { background-color: #1e1e1e; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); width: 100%; max-width: 420px; color: #fff; text-align: center; }
     .register-card img { height: 80px; margin-bottom: 20px; }
     .register-card h2 { color: #F8AF40; margin-bottom: 30px; font-weight: 700; }
     .form-group { margin-bottom: 20px; text-align: left; }
     .form-group label { display: block; margin-bottom: 5px; font-size: 0.9rem; color: #fff; }
-    .form-group input,
-    .form-group select {
-      width: 100%; padding: 10px; border: none; border-radius: 5px;
-      background-color: #2a2a2a; color: #fff; font-size: 1rem;
-    }
+    .form-group input, .form-group select { width: 100%; padding: 10px; border: none; border-radius: 5px; background-color: #2a2a2a; color: #fff; font-size: 1rem; }
     .form-group input::placeholder { color: #bbb; }
-    .register-card button {
-      width: 100%; padding: 12px; background-color: #67C8F1;
-      border: none; border-radius: 5px; font-size: 1rem;
-      font-weight: 600; color: #fff; cursor: pointer;
-    }
+    .register-card button { width: 100%; padding: 12px; background-color: #67C8F1; border: none; border-radius: 5px; font-size: 1rem; font-weight: 600; color: #fff; cursor: pointer; }
     .register-card button:disabled { opacity: 0.6; cursor: default; }
-    .error {
-      color: #f44336; margin-top: 15px; font-size: 0.9rem; text-align: left;
-    }
+    .error { color: #f44336; margin-top: 15px; font-size: 0.9rem; text-align: left; }
   </style>
 </head>
 <body>
@@ -84,16 +67,81 @@
     </form>
   </div>
 
-  <!-- 1) SDKs globales Firebase v10 con crossorigin -->
-  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-app.js" crossorigin="anonymous"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-auth.js" crossorigin="anonymous"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-firestore.js" crossorigin="anonymous"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-messaging.js" crossorigin="anonymous"></script>
+  <script type="module">
+    // 1) Importa los módulos que necesitas
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-firestore.js";
+    import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-messaging.js";
 
-  <!-- 2) Inicialización de Firebase -->
-  <script src="/js/firebase-init.js" crossorigin="anonymous"></script>
+    // 2) Tu configuración exacta de Firebase Console
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
 
-  <!-- 3) Lógica de registro -->
-  <script src="/js/signup.js" crossorigin="anonymous"></script>
+    // 3) Inicializa Firebase
+    const app       = initializeApp(firebaseConfig);
+    const auth      = getAuth(app);
+    const db        = getFirestore(app);
+    const messaging = getMessaging(app);
+
+    // 4) Lógica de registro
+    const form     = document.getElementById('register-form');
+    const btn      = document.getElementById('btn-register');
+    const errorDiv = document.getElementById('error-message');
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      errorDiv.textContent = '';
+      btn.disabled   = true;
+      btn.textContent = 'Registrando…';
+
+      const nombre       = form.nombre.value.trim();
+      const email        = form.email.value.trim();
+      const pass         = form.password.value;
+      const pass2        = form['confirm-password'].value;
+      const genero       = form.genero.value;
+      const departamento = form.departamento.value;
+
+      if (pass !== pass2) {
+        errorDiv.textContent = 'Las contraseñas no coinciden.';
+        btn.disabled   = false;
+        btn.textContent = 'Registrarse';
+        return;
+      }
+
+      try {
+        const { user } = await createUserWithEmailAndPassword(auth, email, pass);
+        const uid = user.uid;
+
+        let token = null;
+        try { token = await getToken(messaging); } catch (_) {}
+
+        await setDoc(doc(db, 'users', uid), {
+          nombre,
+          email,
+          rol: 'user',
+          departamento,
+          genero,
+          estrellas: 5,
+          fecha_registro: serverTimestamp(),
+          notificationToken: token
+        });
+
+        window.location.href = 'login.html';
+      } catch (err) {
+        errorDiv.textContent = err.message || 'Error al registrar.';
+      } finally {
+        btn.disabled   = false;
+        btn.textContent = 'Registrarse';
+      }
+    });
+  </script>
 </body>
 </html>

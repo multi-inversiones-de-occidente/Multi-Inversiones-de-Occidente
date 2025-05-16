@@ -1,8 +1,8 @@
 // js/signup.js
 
-const form       = document.getElementById('register-form');
-const btn        = document.getElementById('btn-register');
-const errorDiv   = document.getElementById('error-message');
+const form     = document.getElementById('register-form');
+const btn      = document.getElementById('btn-register');
+const errorDiv = document.getElementById('error-message');
 
 form.addEventListener('submit', async e => {
   e.preventDefault();
@@ -26,14 +26,12 @@ form.addEventListener('submit', async e => {
 
   try {
     // 1) Crear usuario en Auth
-    const cred = await auth.createUserWithEmailAndPassword(email, pass);
-    const uid  = cred.user.uid;
+    const { user } = await auth.createUserWithEmailAndPassword(email, pass);
+    const uid = user.uid;
 
-    // 2) Token (FCM opcional)
+    // 2) Obtener token FCM (opcional)
     let token = null;
-    try {
-      token = await messaging.getToken();
-    } catch (_) {}
+    try { token = await messaging.getToken(); } catch (_) {}
 
     // 3) Guardar perfil en Firestore
     await db.collection('users').doc(uid).set({

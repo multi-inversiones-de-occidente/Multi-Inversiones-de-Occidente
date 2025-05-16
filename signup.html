@@ -7,20 +7,20 @@
   <link rel="stylesheet" href="styles.css"/>
   <link rel="icon" href="assets/logo_multinversiones.png" type="image/png"/>
 
-  <!-- 1) SDKs “compat” de Firebase (sin type="module") -->
+  <!-- 1) Carga los SDK “compat” de Firebase ANTES de tu init -->
   <script defer src="https://www.gstatic.com/firebasejs/10.6.1/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.6.1/firebase-auth-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.6.1/firebase-firestore-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.6.1/firebase-messaging-compat.js"></script>
 
-  <!-- 2) Inicialización de Firebase -->
+  <!-- 2) Luego, inicializa Firebase -->
   <script defer src="js/firebase-init.js"></script>
 
-  <!-- 3) Lógica de registro -->
+  <!-- 3) Por último, tu lógica de signup -->
   <script defer src="js/signup.js"></script>
-  
+
   <style>
-    /* Estilos para signup (idénticos a login) */
+    /* Estilos iguales a los anteriores */
     body {
       background-color: #121212;
       display: flex; align-items: center; justify-content: center;

@@ -1,6 +1,6 @@
 // js/firebase-init.js
 
-// Copia aquí la config EXACTA de Firebase Console
+// 1) Configuración copiada tal cual de Firebase Console
 const firebaseConfig = {
   apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
   authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -11,10 +11,10 @@ const firebaseConfig = {
   measurementId: "G-H4E31XHG1Y"
 };
 
-// Inicializa Firebase compat
+// 2) Inicializa Firebase “compat”
 firebase.initializeApp(firebaseConfig);
 
-// Exponer las instancias globales
+// 3) Exponer instancias globales
 window.auth      = firebase.auth();
 window.db        = firebase.firestore();
 window.messaging = firebase.messaging();

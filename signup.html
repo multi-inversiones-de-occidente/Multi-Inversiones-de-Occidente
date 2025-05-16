@@ -4,22 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Registro – Multi Inversiones</title>
-
-  <!-- CSS global -->
   <link rel="stylesheet" href="styles.css">
   <link rel="icon" href="assets/logo_multinversiones.png" type="image/png">
 
-  <!-- FontAwesome (CDN sin CORS) -->
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
-
-  <!-- Firebase “compat” SDKs -->
+  <!-- 1. SDKs “compat” de Firebase -->
   <script defer src="https://www.gstatic.com/firebasejs/10.6.1/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.6.1/firebase-auth-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.6.1/firebase-firestore-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.6.1/firebase-messaging-compat.js"></script>
 
+  <!-- 2. Inicialización de Firebase (mismo que en login) -->
+  <script defer src="js/firebase-init.js"></script>
+
+  <!-- 3. Lógica de Registro -->
+  <script defer src="js/signup.js"></script>
+
   <style>
-    /* Estilos para signup.html */
+    /* Estilos para signup (idénticos a login) */
     body {
       background-color: #121212;
       display: flex;
@@ -137,84 +138,5 @@
       <div class="error" id="error-message"></div>
     </form>
   </div>
-
-  <script>
-    // ─── Configuración de Firebase ──────────────────────────────────────────────
-    const firebaseConfig = {
-      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
-      authDomain: "multinversiones-38e13.firebaseapp.com",
-      projectId: "multinversiones-38e13",
-      storageBucket: "multinversiones-38e13.appspot.com",
-      messagingSenderId: "380001917078",
-      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
-      measurementId: "G-H4E31XHG1Y"
-    };
-
-    // ─── Inicializa Firebase ───────────────────────────────────────────────────
-    firebase.initializeApp(firebaseConfig);
-    const auth      = firebase.auth();
-    const db        = firebase.firestore();
-    const messaging = firebase.messaging();
-
-    // ─── Lógica de registro ────────────────────────────────────────────────────
-    window.addEventListener('DOMContentLoaded', () => {
-      const form       = document.getElementById('register-form');
-      const btn        = document.getElementById('btn-register');
-      const errorDiv   = document.getElementById('error-message');
-
-      form.addEventListener('submit', async e => {
-        e.preventDefault();
-        errorDiv.textContent = '';
-        btn.disabled = true;
-        btn.textContent = 'Registrando…';
-
-        const nombre       = document.getElementById('nombre').value.trim();
-        const email        = document.getElementById('email').value.trim();
-        const pass         = document.getElementById('password').value;
-        const pass2        = document.getElementById('confirm-password').value;
-        const genero       = document.getElementById('genero').value;
-        const departamento = document.getElementById('departamento').value;
-
-        if (pass !== pass2) {
-          errorDiv.textContent = 'Las contraseñas no coinciden.';
-          btn.disabled = false;
-          btn.textContent = 'Registrarse';
-          return;
-        }
-
-        try {
-          // 1) Crear usuario en Auth
-          const cred = await auth.createUserWithEmailAndPassword(email, pass);
-          const uid  = cred.user.uid;
-
-          // 2) Obtener token FCM (opcional)
-          let token = null;
-          try {
-            token = await messaging.getToken();
-          } catch (_) {}
-
-          // 3) Guardar perfil en Firestore
-          await db.collection('users').doc(uid).set({
-            nombre,
-            email,
-            rol: 'user',
-            departamento,
-            genero,
-            estrellas: 5,
-            fecha_registro: firebase.firestore.FieldValue.serverTimestamp(),
-            notificationToken: token
-          });
-
-          // 4) Redirigir a login
-          window.location.href = 'login.html';
-        } catch (err) {
-          errorDiv.textContent = err.message || 'Error al registrar.';
-        } finally {
-          btn.disabled = false;
-          btn.textContent = 'Registrarse';
-        }
-      });
-    });
-  </script>
 </body>
 </html>

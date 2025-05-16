@@ -6,19 +6,15 @@
   <title>Registro – Multi Inversiones</title>
   <link rel="stylesheet" href="styles.css"/>
   <link rel="icon" href="assets/logo_multinversiones.png" type="image/png"/>
-
   <style>
-    /* Estilos idénticos a los previos */
     body {
       background-color: #121212;
       display: flex; align-items: center; justify-content: center;
       height: 100vh; margin: 0;
     }
     .register-card {
-      background-color: #1e1e1e;
-      padding: 40px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      background-color: #1e1e1e; padding: 40px;
+      border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
       width: 100%; max-width: 420px; color: #fff; text-align: center;
     }
     .register-card img { height: 80px; margin-bottom: 20px; }
@@ -38,8 +34,7 @@
     }
     .register-card button:disabled { opacity: 0.6; cursor: default; }
     .error {
-      color: #f44336; margin-top: 15px; font-size: 0.9rem;
-      text-align: left;
+      color: #f44336; margin-top: 15px; font-size: 0.9rem; text-align: left;
     }
   </style>
 </head>
@@ -89,17 +84,16 @@
     </form>
   </div>
 
-  <!-- 1) SDKs “compat” de Firebase: **URLs ABSOLUTAS** -->
-  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-messaging-compat.js"></script>
+  <!-- 1) SDKs globales Firebase v10 -->
+  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-messaging.js"></script>
 
-  <!-- 2) Inicialización de Firebase -->
+  <!-- 2) Inicialización -->
   <script src="/js/firebase-init.js"></script>
 
-  <!-- 3) Lógica de Registro -->
+  <!-- 3) Lógica de registro -->
   <script src="/js/signup.js"></script>
 </body>
 </html>
-

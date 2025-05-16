@@ -1,0 +1,59 @@
+// js/signup.js
+
+const form       = document.getElementById('register-form');
+const btn        = document.getElementById('btn-register');
+const errorDiv   = document.getElementById('error-message');
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  errorDiv.textContent = '';
+  btn.disabled   = true;
+  btn.textContent = 'Registrando…';
+
+  const nombre       = form.nombre.value.trim();
+  const email        = form.email.value.trim();
+  const pass         = form.password.value;
+  const pass2        = form['confirm-password'].value;
+  const genero       = form.genero.value;
+  const departamento = form.departamento.value;
+
+  if (pass !== pass2) {
+    errorDiv.textContent = 'Las contraseñas no coinciden.';
+    btn.disabled   = false;
+    btn.textContent = 'Registrarse';
+    return;
+  }
+
+  try {
+    // 1) Crear usuario en Auth
+    const cred = await auth.createUserWithEmailAndPassword(email, pass);
+    const uid  = cred.user.uid;
+
+    // 2) Token (FCM opcional)
+    let token = null;
+    try {
+      token = await messaging.getToken();
+    } catch (_) {}
+
+    // 3) Guardar perfil en Firestore
+    await db.collection('users').doc(uid).set({
+      nombre,
+      email,
+      rol: 'user',
+      departamento,
+      genero,
+      estrellas: 5,
+      fecha_registro: firebase.firestore.FieldValue.serverTimestamp(),
+      notificationToken: token
+    });
+
+    // 4) Redirigir a login
+    window.location.href = 'login.html';
+
+  } catch (err) {
+    errorDiv.textContent = err.message || 'Error al registrar.';
+  } finally {
+    btn.disabled   = false;
+    btn.textContent = 'Registrarse';
+  }
+});

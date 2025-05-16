@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Configuración – Multi Inversiones</title>
+  <link rel="icon" href="assets/logo_multinversiones.png" type="image/png"/>
+  <style>
+    /* Reset y base */
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Segoe UI',sans-serif; background:#0d0d0d; color:#f0f0f0; }
+    a, button, input, select { font:inherit; color:inherit; }
+
+    header {
+      background:#111; padding:1rem 2rem;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    header h1 { font-size:1.8rem; color:#67C8F1; }
+    header #btn-back {
+      background:#444; border:none; padding:.6rem 1rem; border-radius:8px;
+      display:flex; align-items:center; gap:.5rem; transition:background .2s;
+    }
+    header #btn-back:hover { background:#555; }
+
+    main { max-width:700px; margin:2rem auto; padding:0 1rem; }
+    section { margin-bottom:2.5rem; }
+
+    .section-title {
+      font-size:1.5rem; margin-bottom:1rem; color:#67C8F1;
+    }
+
+    /* Perfil */
+    .avatar-wrapper {
+      text-align:center; margin-bottom:2rem;
+    }
+    #avatar-preview {
+      width:100px; height:100px; border-radius:50%; object-fit:cover;
+      border:3px solid rgba(255,255,255,.3); margin-bottom:1rem;
+    }
+    .file-input {
+      display:none;
+    }
+    .btn-upload {
+      background:#67C8F1; border:none; padding:.6rem 1rem; border-radius:8px;
+      cursor:pointer; transition:background .2s;
+    }
+    .btn-upload:hover { background:#5ab0d8; }
+
+    /* Formulario */
+    .form-group {
+      margin-bottom:1.5rem;
+    }
+    .form-group label {
+      display:block; margin-bottom:.5rem; font-size:1rem;
+    }
+    .form-group input,
+    .form-group select {
+      width:100%; padding:.8rem 1rem; border:none; border-radius:8px;
+      background:#1f1f1f; color:#f0f0f0;
+    }
+
+    /* Botones */
+    .btn-save, .btn-delete {
+      width:100%; display:flex; align-items:center; justify-content:center;
+      padding:1rem; border:none; border-radius:12px; font-size:1rem;
+      font-weight:600; gap:.5rem; cursor:pointer; transition:background .2s;
+    }
+    .btn-save { background:#28a745; color:#fff; margin-bottom:1rem; }
+    .btn-save:hover { background:#218838; }
+    .btn-delete { background:#dc3545; color:#fff; }
+    .btn-delete:hover { background:#c82333; }
+
+    /* Footer */
+    footer { text-align:center; padding:1rem; font-size:.85rem; color:#777; }
+  </style>
+  <!-- FontAwesome -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+</head>
+<body>
+
+  <header>
+    <button id="btn-back"><i class="fas fa-arrow-left"></i> Volver</button>
+    <h1>Configuración</h1>
+    <div style="width:60px"></div>
+  </header>
+
+  <main>
+    <!-- Perfil -->
+    <section>
+      <h2 class="section-title">Foto de Perfil</h2>
+      <div class="avatar-wrapper">
+        <img id="avatar-preview" src="assets/avatar_masculino.jpg" alt="Avatar"/>
+        <input type="file" id="file-picker" class="file-input" accept="image/*"/>
+        <button class="btn-upload" id="btn-upload">
+          <i class="fas fa-upload"></i> Seleccionar imagen
+        </button>
+      </div>
+    </section>
+
+    <!-- Datos -->
+    <section>
+      <h2 class="section-title">Datos Personales</h2>
+      <div class="form-group">
+        <label for="select-dept">Departamento / Agencia</label>
+        <select id="select-dept">
+          <option value="">Selecciona...</option>
+          <option>Ahuachapán</option>
+          <option>Juayúa</option>
+          <option>Chalchuapa</option>
+          <option>Santa Ana</option>
+          <option>Sonsonate</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="input-phone">Teléfono</label>
+        <input type="tel" id="input-phone" placeholder="+503 1234-5678"/>
+      </div>
+      <div class="form-group">
+        <label for="select-gender">Género</label>
+        <select id="select-gender">
+          <option value="">Selecciona...</option>
+          <option>Masculino</option>
+          <option>Femenino</option>
+          <option>Otro</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Acciones -->
+    <section>
+      <button class="btn-save" id="btn-save">
+        <i class="fas fa-save"></i> Guardar Cambios
+      </button>
+      <button class="btn-delete" id="btn-delete">
+        <i class="fas fa-trash-alt"></i> Eliminar Cuenta
+      </button>
+    </section>
+  </main>
+
+  <footer>&copy; 2025 Multi Inversiones de Occidente</footer>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, deleteUser } from 
+      "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc, updateDoc, deleteDoc, query, where, collection, getDocs } from 
+      "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from 
+      "https://www.gstatic.com/firebasejs/9.20.0/firebase-storage.js";
+
+    const cfg = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app   = initializeApp(cfg);
+    const auth  = getAuth(app);
+    const db    = getFirestore(app);
+    const storage = getStorage(app);
+
+    let currentUid, currentDoc;
+
+    onAuthStateChanged(auth, async user => {
+      if (!user) return window.location.href = 'login.html';
+      currentUid = user.uid;
+      currentDoc = doc(db, 'users', currentUid);
+
+      // Cargar datos
+      const snap = await getDoc(currentDoc);
+      const data = snap.data()||{};
+      document.getElementById('input-phone').value = data.telefono||'';
+      document.getElementById('select-dept').value = data.department||'';
+      document.getElementById('select-gender').value = data.genero||'';
+      if (data.photoUrl) document.getElementById('avatar-preview').src = data.photoUrl;
+    });
+
+    // Imagen
+    const picker = document.getElementById('file-picker');
+    document.getElementById('btn-upload').onclick = () => picker.click();
+    let selectedFile = null;
+    picker.onchange = () => {
+      const file = picker.files[0];
+      if (!file) return;
+      selectedFile = file;
+      document.getElementById('avatar-preview').src = URL.createObjectURL(file);
+    };
+
+    // Guardar
+    document.getElementById('btn-save').onclick = async () => {
+      const dept   = document.getElementById('select-dept').value;
+      const phone  = document.getElementById('input-phone').value.trim();
+      const gender = document.getElementById('select-gender').value;
+      if (!dept || !phone || !gender) {
+        return alert('Por favor completa todos los campos.');
+      }
+      let photoUrl = null;
+      if (selectedFile) {
+        const filename = `${currentUid}_profile.jpg`;
+        const stRef = ref(storage, `profiles/${filename}`);
+        await uploadBytes(stRef, selectedFile);
+        photoUrl = await getDownloadURL(stRef);
+      }
+      const updates = {
+        department: dept,
+        telefono: phone,
+        genero: gender
+      };
+      if (photoUrl) updates.photoUrl = photoUrl;
+      await updateDoc(currentDoc, updates);
+      alert('Datos actualizados');
+    };
+
+    // Eliminar cuenta
+    document.getElementById('btn-delete').onclick = async () => {
+      // Verificar créditos activos
+      const q = query(collection(db,'creditos'), where('clienteID','==', currentUid));
+      const snap = await getDocs(q);
+      const activo = snap.docs.some(d=>['Activo','Mora Temprana','Mora Moderada','Mora Severa','Riesgo Alto']
+        .includes(d.data().estadoCredito));
+      if (activo) return alert('No puedes eliminar cuenta con créditos activos.');
+
+      const reason = prompt('Motivo de eliminación:');
+      if (!reason) return alert('Motivo obligatorio.');
+
+      await deleteDoc(currentDoc);
+      await deleteUser(auth.currentUser);
+      alert('Cuenta eliminada');
+      window.location.href = 'login.html';
+    };
+
+    // Back
+    document.getElementById('btn-back').onclick = () => history.back();
+  </script>
+</body>
+</html>

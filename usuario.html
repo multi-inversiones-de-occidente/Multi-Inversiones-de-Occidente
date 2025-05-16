@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Panel de Usuario – Multi Inversiones</title>
+  <link rel="icon" href="assets/logo_multinversiones.png" type="image/png"/>
+  <style>
+    /* Reset básico */
+    * { box-sizing: border-box; margin:0; padding:0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: #eee; }
+    a { text-decoration: none; color: inherit; }
+    button { font: inherit; }
+
+    /* Layout */
+    header { background: #111; padding: 1rem; display: flex; align-items: center; justify-content: space-between; }
+    header img { height: 40px; }
+    header h1 { font-size: 1.2rem; }
+
+    main { padding: 1.5rem; }
+
+    .welcome { 
+      background: linear-gradient(135deg,#2e1e5b,#4b3573); 
+      padding:1.5rem; border-radius:12px; display:flex; align-items:center; gap:1rem; 
+      margin-bottom:2rem;
+    }
+    .welcome img { width:72px; height:72px; border-radius:50%; object-fit:cover; }
+    .welcome h2 { font-size:1.5rem; }
+
+    .grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+      gap:1rem;
+    }
+    .card {
+      background: #1e1e1e;
+      border-radius:12px;
+      padding:1rem;
+      text-align:center;
+      transition:transform .2s, background .2s;
+      cursor:pointer;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      background: #333;
+    }
+    .card i {
+      font-size:2rem;
+      margin-bottom:.5rem;
+      color:#67c8f1;
+    }
+    .card span {
+      display:block;
+      font-weight:600;
+      margin-top:.3rem;
+    }
+
+    /* Footer */
+    footer { text-align:center; padding:1rem; font-size:.85rem; color:#777; }
+  </style>
+  <!-- FontAwesome para iconos rápidos -->
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <header>
+    <img src="assets/logo_multinversiones.png" alt="Logo"/>
+    <h1>Panel de Usuario</h1>
+    <button id="btn-logout" style="background:none;border:none;color:#eee;cursor:pointer;font-size:1.2rem;">
+      <i class="fas fa-sign-out-alt"></i>
+    </button>
+  </header>
+
+  <main>
+    <!-- Bienvenida -->
+    <section class="welcome">
+      <img id="avatar" src="assets/avatar_masculino.jpg" alt="Avatar"/>
+      <h2 id="greeting">¡Bienvenido, Usuario!</h2>
+    </section>
+
+    <!-- Cuadrícula de funciones -->
+    <section class="grid">
+      <div class="card" data-href="perfil_usuario.html">
+        <i class="fas fa-user-circle"></i>
+        <span>Perfil de Usuario</span>
+      </div>
+      <div class="card" data-href="credit_request_page.html">
+        <i class="fas fa-hand-holding-usd"></i>
+        <span>Solicitar Crédito</span>
+      </div>
+      <div class="card" data-href="credicash_prendario.html">
+        <i class="fas fa-lock"></i>
+        <span>Crédito Prendario</span>
+      </div>
+      <div class="card" data-href="simular_cuota_page.html">
+        <i class="fas fa-calculator"></i>
+        <span>Simular Cuota</span>
+      </div>
+      <div class="card" data-href="historial_page.html">
+        <i class="fas fa-history"></i>
+        <span>Historial Crediticio</span>
+      </div>
+      <div class="card" data-href="refinanciamiento_page.html">
+        <i class="fas fa-sync-alt"></i>
+        <span>Refinanciamiento</span>
+      </div>
+      <div class="card" data-href="credicel_tienda_page.html">
+        <i class="fas fa-store"></i>
+        <span>Tienda Credicel</span>
+      </div>
+      <div class="card" data-href="amubela2_tienda_page.html">
+        <i class="fas fa-couch"></i>
+        <span>Tienda Amubela2</span>
+      </div>
+    </section>
+  </main>
+
+  <footer>&copy; 2025 Multi Inversiones de Occidente</footer>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    // 1) Estado de autenticación
+    onAuthStateChanged(auth, user => {
+      if (!user) {
+        window.location.href = "login.html";
+        return;
+      }
+      // Muestra nombre y avatar
+      document.getElementById("greeting").textContent = `¡Bienvenido, ${user.displayName||user.email}!`;
+      if (user.photoURL) {
+        document.getElementById("avatar").src = user.photoURL;
+      }
+    });
+
+    // 2) Cerrar sesión
+    document.getElementById("btn-logout")
+      .addEventListener("click", () => signOut(auth).then(() => {
+        window.location.href = "login.html";
+      }));
+
+    // 3) Navegación de tarjetas
+    document.querySelectorAll(".card").forEach(el => {
+      el.addEventListener("click", () => {
+        window.location.href = el.dataset.href;
+      });
+    });
+  </script>
+</body>
+</html>

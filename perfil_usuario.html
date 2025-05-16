@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Perfil de Usuario – Multi Inversiones</title>
+  <link rel="icon" href="assets/logo_multinversiones.png" type="image/png"/>
+  <style>
+    /* Reset y base */
+    * { box-sizing: border-box; margin:0; padding:0; }
+    body { font-family:'Segoe UI',sans-serif; background:#0d0d0d; color:#f0f0f0; }
+    a, button { text-decoration:none; color:inherit; border:none; cursor:pointer; }
+
+    /* Header */
+    header {
+      background:#111; display:flex; align-items:center; justify-content:space-between;
+      padding:1rem 2rem;
+    }
+    header h1 { font-size:1.8rem; color:#67C8F1; }
+    #btn-settings {
+      background:#67C8F1; padding:.6rem 1rem; border-radius:8px;
+      display:flex; align-items:center; gap:.5rem; font-size:1rem; font-weight:600;
+    }
+    #btn-settings i { font-size:1.2rem; }
+
+    /* Main */
+    main { max-width:800px; margin:2rem auto; padding:0 1rem; }
+
+    /* Avatar & nombre */
+    .profile-header {
+      display:flex; align-items:center; gap:1.5rem; margin-bottom:2rem;
+      background:linear-gradient(135deg,#2e1e5b,#4b3573); padding:1.5rem; border-radius:12px;
+    }
+    .profile-header img {
+      width:100px; height:100px; border-radius:50%; object-fit:cover;
+      border:3px solid rgba(255,255,255,.3);
+    }
+    .profile-header h2 { font-size:2.2rem; }
+
+    /* Rating */
+    .rating {
+      text-align:center; margin-bottom:2rem;
+    }
+    .rating h3 { color:#FFD700; font-size:1.4rem; margin-bottom:.5rem; }
+    .stars {
+      display:flex; justify-content:center; gap:.2rem; margin-bottom:.5rem;
+    }
+    .stars i { font-size:2rem; color:#FFD700; }
+    .rating p {
+      font-size:1.1rem; color:#ccc;
+    }
+
+    /* Info */
+    .info {
+      background:#1f1f1f; border-radius:12px; padding:1.5rem; margin-bottom:2rem;
+    }
+    .info h3 { font-size:1.5rem; margin-bottom:1rem; color:#67C8F1; }
+    .info p { font-size:1rem; margin-bottom:.75rem; color:#ddd; }
+
+    /* Footer */
+    footer { text-align:center; padding:1rem; font-size:.85rem; color:#777; }
+  </style>
+  <!-- FontAwesome -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+</head>
+<body>
+
+  <header>
+    <h1>Perfil de Usuario</h1>
+    <button id="btn-settings">
+      <i class="fas fa-cog"></i> Configuración
+    </button>
+  </header>
+
+  <main>
+    <div class="profile-header">
+      <img id="avatar" src="assets/avatar_masculino.jpg" alt="Avatar usuario">
+      <h2 id="username">Cargando...</h2>
+    </div>
+
+    <section class="rating">
+      <h3>Calificación de Usuario</h3>
+      <div class="stars" id="stars">
+        <!-- Estrellas aquí -->
+      </div>
+      <p id="percent">--%</p>
+      <p id="bank-rating"></p>
+    </section>
+
+    <section class="info">
+      <h3>Información Personal</h3>
+      <p><strong>Correo:</strong> <span id="email">--</span></p>
+      <p><strong>Teléfono:</strong> <span id="phone">--</span></p>
+      <p><strong>Departamento/Agencia:</strong> <span id="dept">--</span></p>
+      <p><strong>Género:</strong> <span id="gender">--</span></p>
+    </section>
+  </main>
+
+  <footer>&copy; 2025 Multi Inversiones de Occidente</footer>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs, doc, getDoc } from
+      "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from
+      "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    const auth = getAuth(app);
+
+    // Función para calcular rating
+    async function getCreditRating(uid) {
+      const q = query(collection(db, 'creditos'), where('clienteID','==',uid));
+      const snap = await getDocs(q);
+      let total=0, atras=0;
+      snap.forEach(doc => {
+        const amort = doc.data().amortizacion || [];
+        total += amort.length;
+        amort.forEach(c => { if(c.estado==='Atrasado') atras++; });
+      });
+      const ratio = total>0?atras/total:0;
+      let stars = Math.max(0, 5 - ratio*5);
+      stars = Math.round(stars*10)/10;
+      let grade;
+      if(ratio<=0.05) grade='A1';
+      else if(ratio<=0.1) grade='A2';
+      else if(ratio<=0.2) grade='B1';
+      else if(ratio<=0.3) grade='B2';
+      else grade='C';
+      return { stars, grade };
+    }
+
+    onAuthStateChanged(auth, async user => {
+      if(!user) return window.location.href='login.html';
+      const uid = user.uid;
+      // Traer datos usuario
+      const uSnap = await getDoc(doc(db,'users',uid));
+      const data = uSnap.data()||{};
+      const name = data.nombre||user.email;
+      const email = data.email||'--';
+      const phone = data.telefono||'--';
+      const dept  = data.departamento||'--';
+      const gender= data.genero||'--';
+      const avatar = data.photoUrl || (gender==='Femenino'
+        ? 'assets/avatar_femenino.jpg' : 'assets/avatar_masculino.jpg');
+
+      document.getElementById('username').textContent = name;
+      document.getElementById('email').textContent    = email;
+      document.getElementById('phone').textContent    = phone;
+      document.getElementById('dept').textContent     = dept;
+      document.getElementById('gender').textContent   = gender;
+      document.getElementById('avatar').src           = avatar;
+
+      // Calificación
+      const { stars, grade } = await getCreditRating(uid);
+      const fullStars = Math.floor(stars);
+      const starContainer = document.getElementById('stars');
+      for(let i=1; i<=5; i++) {
+        const icon = document.createElement('i');
+        icon.className = i<=fullStars ? 'fas fa-star' : 'far fa-star';
+        starContainer.append(icon);
+      }
+      const percent = Math.round(stars/5*100);
+      document.getElementById('percent').textContent = `${percent}%`;
+      document.getElementById('bank-rating').textContent = `Calificación Bancaria: ${grade}`;
+    });
+
+    document.getElementById('btn-settings').onclick = () =>
+      window.location.href = 'configuracion.html';
+  </script>
+</body>
+</html>

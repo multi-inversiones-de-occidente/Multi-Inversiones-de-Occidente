@@ -7,18 +7,19 @@
   <link rel="stylesheet" href="styles.css"/>
   <link rel="icon" href="assets/logo_multinversiones.png" type="image/png"/>
   <style>
-    /* (Misma hoja de estilos que tenías antes) */
-    body { background-color: #121212; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-    .register-card { background-color: #1e1e1e; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); width: 100%; max-width: 420px; color: #fff; text-align: center; }
-    .register-card img { height: 80px; margin-bottom: 20px; }
-    .register-card h2 { color: #F8AF40; margin-bottom: 30px; font-weight: 700; }
-    .form-group { margin-bottom: 20px; text-align: left; }
-    .form-group label { display: block; margin-bottom: 5px; font-size: 0.9rem; color: #fff; }
-    .form-group input, .form-group select { width: 100%; padding: 10px; border: none; border-radius: 5px; background-color: #2a2a2a; color: #fff; font-size: 1rem; }
-    .form-group input::placeholder { color: #bbb; }
-    .register-card button { width: 100%; padding: 12px; background-color: #67C8F1; border: none; border-radius: 5px; font-size: 1rem; font-weight: 600; color: #fff; cursor: pointer; }
-    .register-card button:disabled { opacity: 0.6; cursor: default; }
-    .error { color: #f44336; margin-top: 15px; font-size: 0.9rem; text-align: left; }
+    /* Tus estilos de antes… */
+    body { background: #121212; display: flex; align-items: center; justify-content: center; height:100vh; margin:0; }
+    .register-card { background:#1e1e1e; padding:40px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.5); width:100%;max-width:420px;color:#fff;text-align:center }
+    .register-card img { height:80px;margin-bottom:20px }
+    .register-card h2 { color:#F8AF40;margin-bottom:30px;font-weight:700 }
+    .form-group { margin-bottom:20px;text-align:left }
+    .form-group label { display:block;margin-bottom:5px;font-size:.9rem;color:#fff }
+    .form-group input,
+    .form-group select { width:100%;padding:10px;border:none;border-radius:5px;background:#2a2a2a;color:#fff;font-size:1rem }
+    .form-group input::placeholder { color:#bbb }
+    .register-card button { width:100%;padding:12px;background:#67C8F1;border:none;border-radius:5px;font-size:1rem;font-weight:600;color:#fff;cursor:pointer }
+    .register-card button:disabled { opacity:.6;cursor:default }
+    .error { color:#f44336;margin-top:15px;font-size:.9rem;text-align:left }
   </style>
 </head>
 <body>
@@ -68,13 +69,13 @@
   </div>
 
   <script type="module">
-    // 1) Importa los módulos que necesitas
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-firestore.js";
-    import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-messaging.js";
+    // 1) Importa desde la versión 9.20.0 (que sí existe en el CDN)
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+    import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-messaging.js";
 
-    // 2) Tu configuración exacta de Firebase Console
+    // 2) Tu configuración EXACTA de Firebase Console
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -143,5 +144,6 @@
       }
     });
   </script>
+
 </body>
 </html>

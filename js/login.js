@@ -10,22 +10,18 @@ form.addEventListener('submit', async e => {
   btn.disabled   = true;
   btn.textContent = 'Cargando…';
 
-  const email    = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value.trim();
+  const email    = form.email.value.trim();
+  const password = form.password.value.trim();
 
   try {
-    // 1) Autenticar usuario
     const { user } = await auth.signInWithEmailAndPassword(email, password);
     const uid = user.uid;
 
-    // 2) Traer datos de Firestore
     const userDoc = await db.collection('users').doc(uid).get();
-    if (!userDoc.exists) {
-      throw new Error('No se encontró información del usuario.');
-    }
+    if (!userDoc.exists) throw new Error('No se encontró información del usuario.');
+
     const { rol } = userDoc.data();
 
-    // 3) (Opcional) Actualizar token FCM
     try {
       const token = await messaging.getToken();
       if (token) {
@@ -33,7 +29,6 @@ form.addEventListener('submit', async e => {
       }
     } catch (_) {}
 
-    // 4) Redirigir según rol
     const rutas = {
       user:             'usuario.html',
       analista_credito: 'analista_credito_panel.html',
@@ -43,7 +38,7 @@ form.addEventListener('submit', async e => {
       ejecutivo:        'ejecutivo_panel.html',
       gerente:          'gerente_panel.html'
     };
-    window.location.href = rutas[rol] || 'usuario.html';
+    window.location.href = rutas[rol] || 'login.html';
 
   } catch (err) {
     errMsg.textContent = err.message || 'Error al iniciar sesión.';

@@ -25,15 +25,15 @@ form.addEventListener('submit', async e => {
   }
 
   try {
-    // 1) Crear usuario en Auth
+    // 1) Crear usuario
     const { user } = await auth.createUserWithEmailAndPassword(email, pass);
     const uid = user.uid;
 
-    // 2) Obtener token FCM (opcional)
+    // 2) Token FCM (opcional)
     let token = null;
     try { token = await messaging.getToken(); } catch (_) {}
 
-    // 3) Guardar perfil en Firestore
+    // 3) Guardar perfil
     await db.collection('users').doc(uid).set({
       nombre,
       email,
@@ -45,7 +45,7 @@ form.addEventListener('submit', async e => {
       notificationToken: token
     });
 
-    // 4) Redirigir a login
+    // 4) Redirigir
     window.location.href = 'login.html';
 
   } catch (err) {

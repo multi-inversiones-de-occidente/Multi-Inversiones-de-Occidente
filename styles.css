@@ -18,6 +18,13 @@ body {
   height: 140px;
 }
 
+/* NAVBAR: enlaces y botones */
+.navbar {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+}
+
 .navbar ul {
   list-style: none;
   display: flex;
@@ -37,17 +44,54 @@ body {
   color: #67C8F1;
 }
 
+/* Contenedor de botones de login/registro */
+.nav-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+/* Botón Iniciar Sesión */
+.btn-login {
+  display: inline-block;
+  background-color: #67C8F1;
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 5px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: opacity 0.3s ease;
+}
+.btn-login:hover {
+  opacity: 0.8;
+}
+
+/* Botón Registrarse */
+.btn-signup {
+  display: inline-block;
+  background-color: transparent;
+  color: #67C8F1;
+  border: 1px solid #67C8F1;
+  padding: 8px 16px;
+  border-radius: 5px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+.btn-signup:hover {
+  background-color: #67C8F1;
+  color: #ffffff;
+}
+
 /* Hero (Video Banner) */
 .hero {
   margin: 0;
   padding: 0;
-  /* Quita el padding extra si lo tenías para que no ocupe demasiado espacio */
 }
 
 .hero-container {
   position: relative;
   width: 100%;
-  height: 450px; /* Ajusta la altura para el banner */
+  height: 450px;
   overflow: hidden;
 }
 
@@ -57,7 +101,7 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover; /* Ajusta el video sin deformarlo, recortando lo que sobre */
+  object-fit: cover;
 }
 
 .hero-content {
@@ -66,7 +110,7 @@ body {
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 1;
-  background-color: rgba(0,0,0,0.5); /* Fondo negro semitransparente */
+  background-color: rgba(0,0,0,0.5);
   padding: 20px 40px;
   border-radius: 8px;
   text-align: center;
@@ -160,13 +204,20 @@ footer {
   background-color: #1e1e1e;
 }
 
+.social-links {
+  list-style: none;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  padding: 0;
+  margin: 10px 0 0;
+}
+
 .social-links i {
   font-size: 20px;
-  margin: 0 10px;
   color: #ffffff;
   transition: color 0.3s;
 }
-
 .social-links i:hover {
   color: #67C8F1;
 }

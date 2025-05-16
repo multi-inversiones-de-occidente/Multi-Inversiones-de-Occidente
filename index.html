@@ -16,6 +16,47 @@
   
   <!-- FontAwesome: reemplazamos el Kit con CDN para evitar CORS -->
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+
+  <!-- Estilos para sección de descarga -->
+  <style>
+    #download-app {
+      background: #151515;
+      padding: 3rem 1.5rem;
+      text-align: center;
+      margin: 4rem 0;
+      border-radius: 12px;
+    }
+    #download-app h2 {
+      font-size: 2rem;
+      color: #67C8F1;
+      margin-bottom: 1rem;
+    }
+    #download-app p {
+      font-size: 1.1rem;
+      color: #ddd;
+      margin-bottom: 2rem;
+    }
+    .download-button {
+      display: inline-flex;
+      align-items: center;
+      background: #fff;
+      color: #000;
+      padding: 0.8rem 1.2rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background .2s, transform .2s;
+    }
+    .download-button img {
+      height: 32px;
+      margin-right: 0.8rem;
+    }
+    .download-button:hover {
+      background: #f0f0f0;
+      transform: translateY(-2px);
+    }
+  </style>
 </head>
 <body>
   <header class="header">
@@ -93,6 +134,17 @@
         <p><i class="fas fa-phone-alt"></i> +503 1234-5678</p>
         <p><i class="fas fa-envelope"></i> contacto@multinversiones.com</p>
       </div>
+    </section>
+
+    <!-- Descarga Nuestra App -->
+    <section id="download-app">
+      <h2>¡Descarga Nuestra App!</h2>
+      <p>Lleva Multi Inversiones de Occidente en tu bolsillo. Solicita créditos, simula cuotas y mucho más desde tu móvil.</p>
+      <a href="https://github.com/TU_USUARIO/TU_REPO/raw/main/assets/multiinversiones.apk"
+         class="download-button" download>
+        <img src="assets/playstore.png" alt="Play Store Logo">
+        Descargar APK
+      </a>
     </section>
   </main>
 

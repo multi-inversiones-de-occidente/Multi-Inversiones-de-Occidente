@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Historial Crediticio – Multi Inversiones</title>
+  <link rel="icon" href="assets/logo_multinversiones.png" type="image/png"/>
+  <style>
+    /* Reset y base */
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Segoe UI',sans-serif; background:#0d0d0d; color:#f0f0f0; }
+    a, button { text-decoration:none; color:inherit; border:none; background:none; cursor:pointer; }
+
+    /* Header */
+    header {
+      background:#2e1e5b; color:#fff;
+      display:flex; align-items:center; justify-content:space-between;
+      padding:1rem 2rem;
+    }
+    header h1 { font-size:1.8rem; }
+    #btn-back {
+      font-size:1.2rem; color:#fff;
+    }
+
+    /* Main */
+    main { max-width:1000px; margin:2rem auto; padding:0 1rem; }
+
+    .card {
+      background:#1f1f1f; border-radius:12px; margin-bottom:1.5rem;
+      overflow:hidden; box-shadow:0 4px 10px rgba(0,0,0,.5);
+    }
+    .card-header {
+      display:flex; justify-content:space-between; align-items:center;
+      padding:1rem 1.5rem; cursor:pointer;
+    }
+    .card-header h2 { font-size:1.3rem; color:#67C8F1; }
+    .card-header span {
+      font-size:1rem; color:#ddd;
+    }
+    .card-header i {
+      transition:transform .3s;
+    }
+    .card.expanded .card-header i {
+      transform:rotate(180deg);
+    }
+    .card-body {
+      display:none; padding:1rem 1.5rem; background:#2a2a2a;
+    }
+    .card.expanded .card-body {
+      display:block;
+    }
+    .section-title {
+      font-size:1.4rem; color:#67C8F1; margin:2rem 0 1rem;
+    }
+    .subsection {
+      margin-bottom:1rem;
+    }
+    .subsection h3 {
+      font-size:1.1rem; color:#ffd700; margin-bottom:.5rem;
+    }
+    .subsection p {
+      font-size:1rem; color:#ccc; margin:0.25rem 0;
+    }
+
+    /* Footer */
+    footer { text-align:center; padding:1rem; font-size:.85rem; color:#777; }
+  </style>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+</head>
+<body>
+
+  <header>
+    <button id="btn-back"><i class="fas fa-arrow-left"></i> Volver</button>
+    <h1>Historial Crediticio</h1>
+    <div style="width:2rem"></div>
+  </header>
+
+  <main>
+    <section id="no-data" class="section-title">Cargando créditos activos…</section>
+    <div id="cards-container"></div>
+  </main>
+
+  <footer>&copy; 2025 Multi Inversiones de Occidente</footer>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import {
+      getFirestore, collection, query, where,
+      onSnapshot, orderBy, limit, getDocs
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    const cfg = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app = initializeApp(cfg);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    const container = document.getElementById('cards-container');
+    const noData    = document.getElementById('no-data');
+
+    onAuthStateChanged(auth, user => {
+      if(!user) return window.location.href='login.html';
+      const uid = user.uid;
+
+      // Query créditos activos
+      const q = query(
+        collection(db,'creditos'),
+        where('clienteID','==',uid),
+        where('estadoCredito','==','Activo')
+      );
+      onSnapshot(q, snap => {
+        container.innerHTML = '';
+        if(snap.empty) {
+          noData.textContent = 'No tienes créditos activos.';
+          return;
+        }
+        noData.textContent = '';
+        snap.docs.forEach(doc => {
+          const d = doc.data();
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `
+            <div class="card-header">
+              <h2>Línea: ${d.lineaDeCredito||'N/A'}</h2>
+              <span>Saldo: ${d.saldoActual||'N/A'}</span>
+              <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="card-body">
+              <div class="subsection">
+                <h3>Detalles</h3>
+                <p>Monto Aprobado: ${d.montoAprobado||'N/A'}</p>
+                <p>Saldo Inicial: ${d.saldoInicial||'N/A'}</p>
+                <p>Nº Cuotas: ${d.numeroCuotas||'N/A'}</p>
+                <p>Inicio: ${d.fechaInicio||'N/A'}</p>
+              </div>
+              <div class="subsection" id="last-payment-${doc.id}">
+                <h3>Último Pago Registrado</h3>
+                <p>Cargando…</p>
+              </div>
+              <div class="subsection">
+                <h3>Amortización</h3>
+                ${ (d.amortizacion||[]).length
+                  ? d.amortizacion.map(item=>`
+                    <p>Cuota ${item.numeroCuota}: ${item.cuota} — ${item.estado}</p>
+                  `).join('')
+                  : '<p>No hay detalles de amortización.</p>'
+                }
+              </div>
+            </div>`;
+          // Toggle expand
+          card.querySelector('.card-header').onclick = ()=> {
+            card.classList.toggle('expanded');
+          };
+          container.append(card);
+
+          // Cargar último pago
+          (async()=>{
+            const pagosQ = query(
+              collection(db,'pagos'),
+              where('creditoID','==',doc.id),
+              orderBy('fechaPago','desc'),
+              limit(1)
+            );
+            const pagosSnap = await getDocs(pagosQ);
+            const sec = document.querySelector(`#last-payment-${doc.id}`);
+            sec.innerHTML = '';
+            if(pagosSnap.empty) {
+              sec.innerHTML = '<p>No se ha registrado ningún pago.</p>';
+            } else {
+              const pd = pagosSnap.docs[0].data();
+              sec.innerHTML = `
+                <p>Fecha: ${pd.fechaPago||'N/A'}</p>
+                <p>Monto: ${pd.montoPagado||'N/A'}</p>
+                <p>Capital: ${pd.pagoCapital||'N/A'}</p>
+                <p>Interés: ${pd.pagoInteres||'N/A'}</p>
+                <p>Multas: ${pd.pagoMultas||'N/A'}</p>
+                <p>Saldo Restante: ${pd.saldoRestante||'N/A'}</p>`;
+            }
+          })();
+        });
+      });
+    });
+
+    document.getElementById('btn-back').onclick = ()=>history.back();
+  </script>
+</body>
+</html>

@@ -8,57 +8,103 @@
   <style>
     /* Reset básico */
     * { box-sizing: border-box; margin:0; padding:0; }
-    body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: #eee; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0d0d0d; color: #f0f0f0; }
+
     a { text-decoration: none; color: inherit; }
     button { font: inherit; }
 
-    /* Layout */
-    header { background: #111; padding: 1rem; display: flex; align-items: center; justify-content: space-between; }
-    header img { height: 40px; }
-    header h1 { font-size: 1.2rem; }
-
-    main { padding: 1.5rem; }
-
-    .welcome { 
-      background: linear-gradient(135deg,#2e1e5b,#4b3573); 
-      padding:1.5rem; border-radius:12px; display:flex; align-items:center; gap:1rem; 
-      margin-bottom:2rem;
+    /* Header */
+    header {
+      background: #111;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
-    .welcome img { width:72px; height:72px; border-radius:50%; object-fit:cover; }
-    .welcome h2 { font-size:1.5rem; }
+    header img { height: 50px; }
+    header h1 { font-size: 1.5rem; color: #67C8F1; }
 
+    /* Main */
+    main { padding: 2rem; max-width: 1200px; margin: auto; }
+
+    /* Bienvenida */
+    .welcome {
+      background: linear-gradient(135deg, #2e1e5b, #4b3573);
+      padding:1.5rem 2rem;
+      border-radius:12px;
+      display:flex;
+      align-items:center;
+      gap:1.5rem;
+      margin-bottom:2.5rem;
+    }
+    .welcome img {
+      width:80px;
+      height:80px;
+      border-radius:50%;
+      object-fit:cover;
+      border: 3px solid #fff3;
+    }
+    .welcome h2 {
+      font-size:2rem;
+      color:#fff;
+    }
+
+    /* Grid de funciones */
     .grid {
       display:grid;
-      grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
-      gap:1rem;
+      grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+      gap:1.5rem;
     }
     .card {
-      background: #1e1e1e;
-      border-radius:12px;
-      padding:1rem;
+      background: #1f1f1f;
+      border-radius:16px;
+      padding:2rem 1rem;
       text-align:center;
-      transition:transform .2s, background .2s;
+      transition:transform .3s, background .3s;
       cursor:pointer;
+      box-shadow:0 4px 10px rgba(0,0,0,0.5);
     }
     .card:hover {
-      transform: translateY(-4px);
+      transform: translateY(-6px);
       background: #333;
     }
     .card i {
-      font-size:2rem;
-      margin-bottom:.5rem;
-      color:#67c8f1;
+      font-size:3rem;
+      margin-bottom:1rem;
+      color:#67C8F1;
     }
     .card span {
       display:block;
-      font-weight:600;
-      margin-top:.3rem;
+      font-weight:700;
+      margin-top:.5rem;
+      font-size:1.1rem;
+      color:#eee;
+    }
+
+    /* Logout button */
+    #btn-logout {
+      background: #e74c3c;
+      border: none;
+      color: #fff;
+      padding: 0.6rem 1rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: background .2s;
+    }
+    #btn-logout:hover {
+      background: #c0392b;
     }
 
     /* Footer */
-    footer { text-align:center; padding:1rem; font-size:.85rem; color:#777; }
+    footer {
+      text-align:center;
+      padding:1rem;
+      font-size:.85rem;
+      color:#777;
+      margin-top:3rem;
+    }
   </style>
-  <!-- FontAwesome para iconos rápidos -->
+  <!-- FontAwesome para iconos -->
   <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
 <body>
@@ -66,8 +112,8 @@
   <header>
     <img src="assets/logo_multinversiones.png" alt="Logo"/>
     <h1>Panel de Usuario</h1>
-    <button id="btn-logout" style="background:none;border:none;color:#eee;cursor:pointer;font-size:1.2rem;">
-      <i class="fas fa-sign-out-alt"></i>
+    <button id="btn-logout">
+      <i class="fas fa-sign-out-alt"></i> Cerrar sesión
     </button>
   </header>
 
@@ -133,26 +179,25 @@
     const app  = initializeApp(firebaseConfig);
     const auth = getAuth(app);
 
-    // 1) Estado de autenticación
+    // Detectar estado de sesión
     onAuthStateChanged(auth, user => {
       if (!user) {
         window.location.href = "login.html";
         return;
       }
-      // Muestra nombre y avatar
-      document.getElementById("greeting").textContent = `¡Bienvenido, ${user.displayName||user.email}!`;
+      // Mostrar nombre y avatar
+      document.getElementById("greeting").textContent =
+        `¡Bienvenido, ${user.displayName || user.email}!`;
       if (user.photoURL) {
         document.getElementById("avatar").src = user.photoURL;
       }
     });
 
-    // 2) Cerrar sesión
-    document.getElementById("btn-logout")
-      .addEventListener("click", () => signOut(auth).then(() => {
-        window.location.href = "login.html";
-      }));
+    // Cerrar sesión
+    document.getElementById("btn-logout").onclick = () =>
+      signOut(auth).then(() => window.location.href = "login.html");
 
-    // 3) Navegación de tarjetas
+    // Navegación de tarjetas
     document.querySelectorAll(".card").forEach(el => {
       el.addEventListener("click", () => {
         window.location.href = el.dataset.href;

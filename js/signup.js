@@ -1,4 +1,5 @@
 // js/signup.js
+
 const form     = document.getElementById('register-form');
 const btn      = document.getElementById('btn-register');
 const errorDiv = document.getElementById('error-message');
@@ -26,8 +27,10 @@ form.addEventListener('submit', async e => {
   try {
     const { user } = await auth.createUserWithEmailAndPassword(email, pass);
     const uid = user.uid;
+
     let token = null;
-    try { token = await messaging.getToken(); } catch {}
+    try { token = await messaging.getToken(); } catch (_) {}
+
     await db.collection('users').doc(uid).set({
       nombre,
       email,
@@ -38,6 +41,7 @@ form.addEventListener('submit', async e => {
       fecha_registro: firebase.firestore.FieldValue.serverTimestamp(),
       notificationToken: token
     });
+
     window.location.href = 'login.html';
   } catch (err) {
     errorDiv.textContent = err.message || 'Error al registrar.';
@@ -46,3 +50,4 @@ form.addEventListener('submit', async e => {
     btn.textContent = 'Registrarse';
   }
 });
+

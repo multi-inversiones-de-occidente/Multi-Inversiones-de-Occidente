@@ -1,5 +1,4 @@
 // js/signup.js
-
 const form     = document.getElementById('register-form');
 const btn      = document.getElementById('btn-register');
 const errorDiv = document.getElementById('error-message');
@@ -25,15 +24,10 @@ form.addEventListener('submit', async e => {
   }
 
   try {
-    // 1) Crear usuario
     const { user } = await auth.createUserWithEmailAndPassword(email, pass);
     const uid = user.uid;
-
-    // 2) Token FCM (opcional)
     let token = null;
-    try { token = await messaging.getToken(); } catch (_) {}
-
-    // 3) Guardar perfil
+    try { token = await messaging.getToken(); } catch {}
     await db.collection('users').doc(uid).set({
       nombre,
       email,
@@ -44,10 +38,7 @@ form.addEventListener('submit', async e => {
       fecha_registro: firebase.firestore.FieldValue.serverTimestamp(),
       notificationToken: token
     });
-
-    // 4) Redirigir
     window.location.href = 'login.html';
-
   } catch (err) {
     errorDiv.textContent = err.message || 'Error al registrar.';
   } finally {

@@ -21,55 +21,62 @@
       align-items: center;
       justify-content: space-between;
     }
-    header img { height: 50px; }
-    header h1 { font-size: 1.5rem; color: #67C8F1; }
+    header img {
+      height: 70px;                /* Logo más grande */
+      width: auto;
+    }
+    header h1 {
+      font-size: 2rem;             /* Jerarquía principal */
+      color: #67C8F1;
+      margin-left: 1rem;
+    }
 
     /* Main */
-    main { padding: 2rem; max-width: 1200px; margin: auto; }
+    main { padding: 2.5rem; max-width: 1280px; margin: auto; }
 
     /* Bienvenida */
     .welcome {
       background: linear-gradient(135deg, #2e1e5b, #4b3573);
-      padding:1.5rem 2rem;
+      padding:2rem 2.5rem;
       border-radius:12px;
       display:flex;
       align-items:center;
-      gap:1.5rem;
-      margin-bottom:2.5rem;
+      gap:2rem;
+      margin-bottom:3rem;
     }
     .welcome img {
-      width:80px;
-      height:80px;
+      width:100px;                /* Avatar más grande */
+      height:100px;
       border-radius:50%;
       object-fit:cover;
-      border: 3px solid #fff3;
+      border: 4px solid #fff3;
     }
     .welcome h2 {
-      font-size:2rem;
+      font-size:2.5rem;           /* Jerarquía secundaria */
       color:#fff;
     }
 
     /* Grid de funciones */
     .grid {
       display:grid;
-      grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
-      gap:1.5rem;
+      grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+      gap:2rem;
     }
     .card {
       background: #1f1f1f;
       border-radius:16px;
-      padding:2rem 1rem;
+      padding:2.5rem 1.5rem;
       text-align:center;
       transition:transform .3s, background .3s;
       cursor:pointer;
-      box-shadow:0 4px 10px rgba(0,0,0,0.5);
+      box-shadow:0 6px 15px rgba(0,0,0,0.5);
     }
     .card:hover {
-      transform: translateY(-6px);
+      transform: translateY(-8px);
       background: #333;
     }
     .card i {
-      font-size:3rem;
+      font-size:3.5rem;           /* Icono destacado */
       margin-bottom:1rem;
       color:#67C8F1;
     }
@@ -77,8 +84,14 @@
       display:block;
       font-weight:700;
       margin-top:.5rem;
-      font-size:1.1rem;
+      font-size:1.2rem;
       color:#eee;
+    }
+    .card p {
+      margin-top:0.5rem;
+      font-size:0.9rem;           /* Texto descriptivo */
+      color:#ccc;
+      line-height:1.3;
     }
 
     /* Logout button */
@@ -86,10 +99,16 @@
       background: #e74c3c;
       border: none;
       color: #fff;
-      padding: 0.6rem 1rem;
+      padding: 0.8rem 1.2rem;
       border-radius: 8px;
-      font-size: 1rem;
+      font-size: 1.1rem;
       transition: background .2s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    #btn-logout i {
+      font-size:1.2rem;
     }
     #btn-logout:hover {
       background: #c0392b;
@@ -98,10 +117,10 @@
     /* Footer */
     footer {
       text-align:center;
-      padding:1rem;
+      padding:1.5rem;
       font-size:.85rem;
       color:#777;
-      margin-top:3rem;
+      margin-top:4rem;
     }
   </style>
   <!-- FontAwesome para iconos -->
@@ -110,10 +129,13 @@
 <body>
 
   <header>
-    <img src="assets/logo_multinversiones.png" alt="Logo"/>
-    <h1>Panel de Usuario</h1>
+    <div style="display:flex; align-items:center;">
+      <img src="assets/logo_multinversiones.png" alt="Logo"/>
+      <h1>Panel de Usuario</h1>
+    </div>
     <button id="btn-logout">
-      <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+      <i class="fas fa-sign-out-alt"></i>
+      Cerrar sesión
     </button>
   </header>
 
@@ -129,34 +151,42 @@
       <div class="card" data-href="perfil_usuario.html">
         <i class="fas fa-user-circle"></i>
         <span>Perfil de Usuario</span>
+        <p>Revisa y actualiza tus datos personales y de contacto.</p>
       </div>
       <div class="card" data-href="credit_request_page.html">
         <i class="fas fa-hand-holding-usd"></i>
         <span>Solicitar Crédito</span>
+        <p>Inicia tu trámite para obtener un préstamo adaptado a ti.</p>
       </div>
       <div class="card" data-href="credicash_prendario.html">
         <i class="fas fa-lock"></i>
         <span>Crédito Prendario</span>
+        <p>Accede a financiamiento usando bienes como garantía.</p>
       </div>
       <div class="card" data-href="simular_cuota_page.html">
         <i class="fas fa-calculator"></i>
         <span>Simular Cuota</span>
+        <p>Calcula tu cuota mensual antes de comprometerte.</p>
       </div>
       <div class="card" data-href="historial_page.html">
         <i class="fas fa-history"></i>
         <span>Historial Crediticio</span>
+        <p>Consulta todas tus operaciones y pagos anteriores.</p>
       </div>
       <div class="card" data-href="refinanciamiento_page.html">
         <i class="fas fa-sync-alt"></i>
         <span>Refinanciamiento</span>
+        <p>Revisa opciones para mejorar tus condiciones de pago.</p>
       </div>
       <div class="card" data-href="credicel_tienda_page.html">
         <i class="fas fa-store"></i>
         <span>Tienda Credicel</span>
+        <p>Explora productos y promociones en línea.</p>
       </div>
       <div class="card" data-href="amubela2_tienda_page.html">
         <i class="fas fa-couch"></i>
         <span>Tienda Amubela2</span>
+        <p>Descubre muebles y artículos de hogar financiados.</p>
       </div>
     </section>
   </main>

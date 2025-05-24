@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Panel Ejecutivo – Multi Inversiones</title>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app  = initializeApp(firebaseConfig);
+    const db   = getFirestore(app);
+    const auth = getAuth(app);
+
+    // Suscribe un badge a la longitud de documentos
+    function suscribirBadge(idBadge, coleccion, filtros = []) {
+      const q = query(collection(db, coleccion), ...filtros);
+      onSnapshot(q, snap => {
+        document.getElementById(idBadge).textContent = snap.docs.length;
+      }, err => {
+        console.error("Error en", coleccion, err);
+        document.getElementById(idBadge).textContent = "!";
+      });
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      // Control de autenticación
+      onAuthStateChanged(auth, user => {
+        if (!user) return location.href = "login.html";
+        document.getElementById("usuario-nombre").textContent = user.email;
+      });
+
+      // Solicitudes aprobadas por línea
+      suscribirBadge(
+        "badge-exe-credicash",
+        "solicitud_de_credito",
+        [ where("estado","==","Aprobado"), where("creditLine","==","Credicash") ]
+      );
+      suscribirBadge(
+        "badge-exe-credicel",
+        "solicitud_de_credito",
+        [ where("estado","==","Aprobado"), where("creditLine","==","Credicel") ]
+      );
+      suscribirBadge(
+        "badge-exe-amuebla2",
+        "solicitud_de_credito",
+        [ where("estado","==","Aprobado"), where("creditLine","==","Amuebla2") ]
+      );
+    });
+  </script>
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    body {
+      margin:0; font-family:Arial,sans-serif;
+      background: radial-gradient(circle,#000,#111);
+      color:#fff;
+    }
+    header {
+      background:#000; padding:1rem; text-align:center;
+      font-size:1.5rem;
+    }
+    .container {
+      max-width:800px; margin:0 auto; padding:2rem 1rem;
+    }
+    h1,h2 { margin:1rem 0 0.5rem; }
+    p { margin-bottom:1rem; }
+
+    .btn-panel {
+      position:relative;
+      display:flex; align-items:center;
+      background:rgba(255,255,255,0.1);
+      border-radius:8px; padding:1rem; margin-bottom:1rem;
+      text-decoration:none; color:#fff;
+    }
+    .btn-panel .icon { font-size:1.75rem; margin-right:.75rem; }
+    .btn-panel .text { flex:1; }
+    .btn-panel .arrow { font-size:1rem; color:#aaa; }
+    .badge {
+      position:absolute; top:-8px; right:-8px;
+      background:#e74c3c; color:#fff;
+      width:24px; height:24px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      font-size:.75rem; font-weight:bold;
+    }
+  </style>
+</head>
+<body>
+
+  <header>Panel Ejecutivo</header>
+
+  <div class="container">
+    <h1 id="usuario-nombre">Bienvenido, usuario</h1>
+    <p>Solicitudes Aprobadas por Línea:</p>
+
+    <!-- Credicash -->
+    <a href="solicitudes_aprobadas_credicash_page.html" class="btn-panel">
+      <i class="fas fa-check-circle icon"></i>
+      <div class="text">
+        <strong>Solicitudes Aprobadas Credicash</strong><br>
+        Ver solicitudes aprobadas de Credicash.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+      <span id="badge-exe-credicash" class="badge">0</span>
+    </a>
+
+    <!-- Credicel -->
+    <a href="solicitudes_aprobadas_credicel_page.html" class="btn-panel">
+      <i class="fas fa-check-circle icon"></i>
+      <div class="text">
+        <strong>Solicitudes Aprobadas Credicel</strong><br>
+        Ver solicitudes aprobadas de Credicel.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+      <span id="badge-exe-credicel" class="badge">0</span>
+    </a>
+
+    <!-- Amuebla2 -->
+    <a href="solicitudes_aprobadas_amuebla2_page.html" class="btn-panel">
+      <i class="fas fa-check-circle icon"></i>
+      <div class="text">
+        <strong>Solicitudes Aprobadas Amuebla2</strong><br>
+        Ver solicitudes aprobadas de Amuebla2.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+      <span id="badge-exe-amuebla2" class="badge">0</span>
+    </a>
+  </div>
+
+</body>
+</html>

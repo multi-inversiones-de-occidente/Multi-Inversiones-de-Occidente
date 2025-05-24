@@ -8,17 +8,18 @@
   <meta name="author" content="Multinversiones">
   <title>Multinversiones</title>
   
-  <!-- Estilos -->
+  <!-- Estilos generales -->
   <link rel="stylesheet" href="styles.css">
   
   <!-- Favicon -->
   <link rel="icon" href="assets/logo_multinversiones.png" type="image/png">
   
-  <!-- FontAwesome: reemplazamos el Kit con CDN para evitar CORS -->
+  <!-- FontAwesome via CDN -->
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
 
-  <!-- Estilos para sección de descarga -->
+  <!-- Estilos inline (descarga + responsive móvil) -->
   <style>
+    /* Sección Descarga App (visible en todos los dispositivos) */
     #download-app {
       background: #151515;
       padding: 3rem 1.5rem;
@@ -55,6 +56,67 @@
     .download-button:hover {
       background: #f0f0f0;
       transform: translateY(-2px);
+    }
+
+    /* ====== ESTILOS RESPONSIVE: SOLO PARA MÓVILES ====== */
+    @media (max-width: 768px) {
+      body {
+        padding: 0 1rem;
+      }
+      /* Navegación vertical */
+      .navbar ul {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+      }
+      .nav-buttons {
+        display: flex;
+        flex-direction: column;
+        margin-top: 1rem;
+        gap: 0.5rem;
+      }
+      /* Hero apilado */
+      .hero-container {
+        display: flex;
+        flex-direction: column;
+      }
+      .hero-video {
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+      }
+      .hero-content {
+        padding: 1rem 0;
+      }
+      /* Servicios apilados */
+      .services-container {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+      }
+      /* Ajustes de tarjetas y secciones */
+      .service-card {
+        padding: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-radius: 8px;
+      }
+      .about-container,
+      .contact-info,
+      .footer-container {
+        padding: 1rem;
+      }
+      .contact-info p {
+        margin: 0.5rem 0;
+      }
+      /* Botón de descarga a pantalla completa */
+      #download-app {
+        padding: 2rem 1rem;
+      }
+      .download-button {
+        width: 100%;
+        justify-content: center;
+      }
     }
   </style>
 </head>

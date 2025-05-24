@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel – Analista de Crédito</title>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app  = initializeApp(firebaseConfig);
+    const db   = getFirestore(app);
+    const auth = getAuth(app);
+
+    // Suscribe la cuenta en vivo de documentos a un badge
+    function suscribirBadge(idBadge, coleccion, filtros = []) {
+      const q = query(collection(db, coleccion), ...filtros);
+      onSnapshot(q, snap => {
+        document.getElementById(idBadge).textContent = snap.docs.length;
+      }, error => {
+        document.getElementById(idBadge).textContent = "!";
+        console.error("Error en", coleccion, error);
+      });
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      // Control de autenticación
+      onAuthStateChanged(auth, user => {
+        if (!user) location.href = "login.html";
+        else document.getElementById("usuario-nombre").textContent = user.email;
+      });
+
+      // Autorizaciones
+      suscribirBadge("badge-aut-credicel",   "autorizaciones", [ where("creditLine","==","Credicel") ]);
+      suscribirBadge("badge-aut-amuebla2",   "autorizaciones", [ where("creditLine","==","Amuebla2") ]);
+      suscribirBadge("badge-aut-credicash",  "autorizaciones", [ where("creditLine","==","Credicash") ]);
+      suscribirBadge("badge-aut-prendarias", "autorizaciones", [ where("creditLine","==","CreditoPrendario") ]);
+      // Solicitudes
+      suscribirBadge("badge-req-credicel",   "solicitud_de_credito", [ where("creditLine","==","Credicel") ]);
+      suscribirBadge("badge-req-amuebla2",   "solicitud_de_credito", [ where("creditLine","==","Amuebla2") ]);
+      suscribirBadge("badge-req-credicash",  "solicitud_de_credito", [ where("creditLine","==","Credicash") ]);
+      // Archivos
+      suscribirBadge("badge-arc-aut", "archivo_autorizaciones", [ orderBy("fecha","desc") ]);
+      suscribirBadge("badge-arc-req", "archivo_solicitudes",     [ orderBy("fecha","desc") ]);
+    });
+  </script>
+
+  <!-- Estilos generales -->
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    body {
+      margin: 0; font-family: Arial, sans-serif;
+      background: radial-gradient(circle,#000,#111);
+      color: #fff;
+    }
+    header {
+      background:#000; padding:1rem; text-align:center;
+      font-size:1.5rem;
+    }
+    .container {
+      max-width:800px; margin:0 auto; padding:2rem;
+    }
+    h1,h2 { margin:1rem 0 0.5rem; }
+    p { margin-bottom:1rem; }
+
+    .btn-panel {
+      position:relative;
+      display:flex; align-items:center;
+      background:rgba(255,255,255,0.1);
+      border-radius:8px; padding:1rem; margin-bottom:1rem;
+      text-decoration:none; color:#fff;
+    }
+    .btn-panel .icon { font-size:1.75rem; margin-right:.75rem; }
+    .btn-panel .text { flex:1; }
+    .btn-panel .arrow { font-size:1rem; color:#aaa; }
+    .badge {
+      position:absolute; top:-8px; right:-8px;
+      background:#e74c3c; color:#fff;
+      width:24px; height:24px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      font-size:.75rem; font-weight:bold;
+    }
+
+    .divider { height:1px; background:rgba(255,255,255,0.2); margin:2rem 0; }
+  </style>
+</head>
+<body>
+
+  <header>Panel – Analista de Crédito</header>
+
+  <div class="container">
+    <h1 id="usuario-nombre">Bienvenido, usuario</h1>
+    <p>Gestiona las autorizaciones y solicitudes de crédito:</p>
+
+    <!-- Autorizaciones -->
+    <a href="autorizaciones_credicel_page.html" class="btn-panel">
+      <i class="fas fa-file-signature icon"></i>
+      <div class="text">
+        <strong>Autorizaciones Credicel</strong><br>
+        Revisa las autorizaciones de Credicel.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+      <span id="badge-aut-credicel" class="badge">0</span>
+    </a>
+
+    <a href="autorizaciones_amuebla2_page.html" class="btn-panel">
+      <i class="fas fa-file-signature icon"></i>
+      <div class="text">
+        <strong>Autorizaciones Amuebla2</strong><br>
+        Revisa las autorizaciones de Amuebla2.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+      <span id="badge-aut-amuebla2" class="badge">0</span>
+    </a>
+
+    <a href="autorizaciones_page.html" class="btn-panel">
+      <i class="fas fa-file-signature icon"></i>
+      <div class="text">
+        <strong>Autorizaciones Credicash</strong><br>
+        Revisa las autorizaciones de Credicash.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+      <span id="badge-aut-credicash" class="badge">0</span>
+    </a>
+
+    <a href="autorizaciones_prendarias_page.html" class="btn-panel">
+      <i class="fas fa-shield-alt icon"></i>
+      <div class="text">
+        <strong>Autorizaciones Prendarias</strong><br>
+        Revisa las autorizaciones Prendarias.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+      <span id="badge-aut-prendarias" class="badge">0</span>
+    </a>
+
+    <!-- Solicitudes -->
+    <a href="solicitudes_credicel_page.html" class="btn-panel">
+      <i class="fas fa-file-invoice-dollar icon"></i>
+      <div class="text">
+        <strong>Solicitudes Credicel</strong><br>
+        Consulta las solicitudes de Credicel.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+      <span id="badge-req-credicel" class="badge">0</span>
+    </a>
+
+    <a href="solicitudes_amuebla2_page.html" class="btn-panel">
+      <i class="fas fa-file-invoice-dollar icon"></i>
+      <div class="text">
+        <strong>Solicitudes Amuebla2</strong><br>
+        Consulta las solicitudes de Amuebla2.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+      <span id="badge-req-amuebla2" class="badge">0</span>
+    </a>
+
+    <a href="solicitudes_credito_page.html" class="btn-panel">
+      <i class="fas fa-file-invoice-dollar icon"></i>
+      <div class="text">
+        <strong>Solicitudes Credicash</strong><br>
+        Consulta las solicitudes de Credicash.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+      <span id="badge-req-credicash" class="badge">0</span>
+    </a>
+
+    <!-- Archivos -->
+    <div class="divider"></div>
+    <h2>Archivos</h2>
+
+    <a href="archivo_autorizaciones_page.html" class="btn-panel">
+      <i class="fas fa-archive icon"></i>
+      <div class="text">
+        <strong>Archivo Autorizaciones</strong><br>
+        Revisa las autorizaciones archivadas.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+      <span id="badge-arc-aut" class="badge">0</span>
+    </a>
+
+    <a href="archivo_solicitudes_page.html" class="btn-panel">
+      <i class="fas fa-archive icon"></i>
+      <div class="text">
+        <strong>Archivo Solicitudes</strong><br>
+        Revisa las solicitudes archivadas.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+      <span id="badge-arc-req" class="badge">0</span>
+    </a>
+  </div>
+
+</body>
+</html>

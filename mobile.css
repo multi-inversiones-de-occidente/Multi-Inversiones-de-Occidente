@@ -151,3 +151,10 @@ body {
   margin: 0 0.5rem;
   font-size: 1.2rem;
 }
+
+/* Ocultar completamente el header de escritorio en móvil */
+@media only screen and (max-width: 768px) {
+  header.desktop-only {
+    display: none !important;
+  }
+}

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Panel de Caja – Multi Inversiones</title>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app  = initializeApp(firebaseConfig);
+    const db   = getFirestore(app);
+    const auth = getAuth(app);
+
+    // Suscribe un badge a la longitud de documentos
+    function suscribirBadge(idBadge, col, filtros=[]) {
+      const q = query(collection(db, col), ...filtros);
+      onSnapshot(q, snap => {
+        document.getElementById(idBadge).textContent = snap.docs.length;
+      }, err => {
+        console.error("Error en", col, err);
+        document.getElementById(idBadge).textContent = "!";
+      });
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      // Redirigir si no está autenticado
+      onAuthStateChanged(auth, user => {
+        if (!user) return location.href = "login.html";
+        document.getElementById("usuario-nombre").textContent = user.email;
+      });
+
+      // Solicitudes aprobadas
+      suscribirBadge(
+        "badge-app-credicash",
+        "solicitud_de_credito",
+        [ where("estado","==","Aprobado"), where("creditLine","==","Credicash") ]
+      );
+      suscribirBadge(
+        "badge-app-credicel",
+        "solicitud_de_credito",
+        [ where("estado","==","Aprobado"), where("creditLine","==","Credicel") ]
+      );
+      suscribirBadge(
+        "badge-app-amuebla2",
+        "solicitud_de_credito",
+        [ where("estado","==","Aprobado"), where("creditLine","==","Amuebla2") ]
+      );
+    });
+  </script>
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    body {
+      margin:0; font-family:Arial,sans-serif;
+      background: radial-gradient(circle,#000,#111);
+      color:#fff;
+    }
+    header {
+      background:#000; padding:1rem; text-align:center;
+      font-size:1.5rem;
+    }
+    .container {
+      max-width:800px; margin:0 auto; padding:2rem 1rem;
+    }
+    h1,h2 { margin:1rem 0 0.5rem; }
+    p { margin-bottom:1rem; }
+    .btn-panel {
+      position:relative;
+      display:flex; align-items:center;
+      background:rgba(255,255,255,0.1);
+      border-radius:8px; padding:1rem; margin-bottom:1rem;
+      text-decoration:none; color:#fff;
+    }
+    .btn-panel .icon { font-size:1.75rem; margin-right:.75rem; }
+    .btn-panel .text { flex:1; }
+    .btn-panel .arrow { font-size:1rem; color:#aaa; }
+    .badge {
+      position:absolute; top:-8px; right:-8px;
+      background:#e74c3c; color:#fff;
+      width:24px; height:24px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      font-size:.75rem; font-weight:bold;
+    }
+  </style>
+</head>
+<body>
+
+  <header>Panel de Caja</header>
+
+  <div class="container">
+    <h1 id="usuario-nombre">Bienvenido, usuario</h1>
+    <p>Selecciona una opción para gestionar la caja:</p>
+
+    <!-- Aprobadas Credicash -->
+    <a href="solicitudes_aprobadas_credicash_page.html" class="btn-panel">
+      <i class="fas fa-check-circle icon"></i>
+      <div class="text">
+        <strong>Solicitudes Aprobadas Credicash</strong><br>
+        Consulta las aprobadas de Credicash.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+      <span id="badge-app-credicash" class="badge">0</span>
+    </a>
+
+    <!-- Aprobadas Credicel -->
+    <a href="solicitudes_aprobadas_credicel_page.html" class="btn-panel">
+      <i class="fas fa-check-circle icon"></i>
+      <div class="text">
+        <strong>Solicitudes Aprobadas Credicel</strong><br>
+        Consulta las aprobadas de Credicel.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+      <span id="badge-app-credicel" class="badge">0</span>
+    </a>
+
+    <!-- Aprobadas Amuebla2 -->
+    <a href="solicitudes_aprobadas_amuebla2_page.html" class="btn-panel">
+      <i class="fas fa-check-circle icon"></i>
+      <div class="text">
+        <strong>Solicitudes Aprobadas Amuebla2</strong><br>
+        Consulta las aprobadas de Amuebla2.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+      <span id="badge-app-amuebla2" class="badge">0</span>
+    </a>
+
+    <!-- Recepción de Pagos -->
+    <a href="pagos_page.html" class="btn-panel">
+      <i class="fas fa-money-bill-wave icon"></i>
+      <div class="text">
+        <strong>Recepción de Pagos</strong><br>
+        Registra los pagos realizados por clientes.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+    </a>
+
+    <!-- Movimientos de Caja -->
+    <a href="movimientos_caja_page.html" class="btn-panel">
+      <i class="fas fa-exchange-alt icon"></i>
+      <div class="text">
+        <strong>Movimientos de Caja</strong><br>
+        Administra ingresos y egresos de caja.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+    </a>
+
+    <!-- Ver Movimientos de Caja -->
+    <a href="ver_movimientos_caja_page.html" class="btn-panel">
+      <i class="fas fa-list-alt icon"></i>
+      <div class="text">
+        <strong>Ver Movimientos de Caja</strong><br>
+        Consulta el historial de movimientos.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+    </a>
+
+    <!-- Configurar Impresora -->
+    <a href="printer_config_page.html" class="btn-panel">
+      <i class="fas fa-print icon"></i>
+      <div class="text">
+        <strong>Configurar Impresora</strong><br>
+        Administra la configuración de impresión.
+      </div>
+      <i class="fas fa-chevron-right arrow"></i>
+    </a>
+  </div>
+
+</body>
+</html>

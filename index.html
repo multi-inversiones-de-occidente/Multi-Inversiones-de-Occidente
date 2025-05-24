@@ -8,62 +8,63 @@
   <meta name="author" content="Multinversiones">
   <title>Multinversiones</title>
   
-  <!-- Estilos generales (escritorio) -->
+  <!-- Escritorio -->
   <link rel="stylesheet" href="styles.css">
+  <!-- Móvil -->
+  <link rel="stylesheet" href="mobile.css" media="only screen and (max-width: 768px)">
   <!-- Favicon -->
   <link rel="icon" href="assets/logo_multinversiones.png" type="image/png">
-  <!-- Estilos móviles específicos -->
-  <link rel="stylesheet" href="mobile.css" media="only screen and (max-width: 768px)">
   <!-- FontAwesome -->
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
 
-  <!-- Inline: descarga-app, visibilidad y corrección menú escritorio -->
   <style>
-    /* Descarga App (todos) */
-    #download-app {
-      background: #151515;
-      padding: 3rem 1.5rem;
-      text-align: center;
-      margin: 4rem 0;
-      border-radius: 12px;
-    }
-    #download-app h2 {
-      font-size: 2rem;
-      color: #67C8F1;
-      margin-bottom: 1rem;
-    }
-    #download-app p {
-      font-size: 1.1rem;
-      color: #ddd;
-      margin-bottom: 2rem;
-    }
-    .download-button {
-      display: inline-flex;
-      align-items: center;
-      background: #fff;
-      color: #000;
-      padding: 0.8rem 1.2rem;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-weight: 600;
-      text-decoration: none;
-      transition: background .2s, transform .2s;
-    }
-    .download-button img {
-      height: 32px;
-      margin-right: 0.8rem;
-    }
-    .download-button:hover {
-      background: #f0f0f0;
-      transform: translateY(-2px);
-    }
-
     /* Visibilidad según dispositivo */
     .desktop-only { display: block; }
     .mobile-only  { display: none; }
     @media (max-width: 768px) {
       .desktop-only { display: none; }
       .mobile-only  { display: block; }
+    }
+
+    /* Descarga App: solo en escritorio */
+    @media (min-width: 769px) {
+      #download-app {
+        background: #151515;
+        padding: 3rem 1.5rem;
+        text-align: center;
+        margin: 4rem 0;
+        border-radius: 12px;
+      }
+      #download-app h2 {
+        font-size: 2rem;
+        color: #67C8F1;
+        margin-bottom: 1rem;
+      }
+      #download-app p {
+        font-size: 1.1rem;
+        color: #ddd;
+        margin-bottom: 2rem;
+      }
+      .download-button {
+        display: inline-flex;
+        align-items: center;
+        background: #fff;
+        color: #000;
+        padding: 0.8rem 1.2rem;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: background .2s, transform .2s;
+      }
+      .download-button img {
+        height: 32px;
+        margin-right: 0.8rem;
+      }
+      .download-button:hover {
+        background: #f0f0f0;
+        transform: translateY(-2px);
+      }
     }
 
     /* Alineación menú escritorio */
@@ -77,14 +78,17 @@
       gap: 1.5rem;
       list-style: none;
       margin: 0;
+      padding: 0;
     }
     header.header .nav-buttons {
+      display: flex;
+      gap: 1rem;
       margin-left: 2rem;
     }
   </style>
 </head>
 <body>
-  <!-- ========== DESKTOP ========== -->
+  <!-- ========= DESKTOP ========= -->
   <header class="desktop-only header">
     <div class="logo">
       <img src="assets/logo_multinversiones.png" alt="Logo Multinversiones">
@@ -104,11 +108,11 @@
   </header>
 
   <main class="desktop-only">
-    <!-- Hero Section -->
+    <!-- Hero -->
     <section class="hero" id="inicio">
       <div class="hero-container">
         <video class="hero-video" autoplay muted loop playsinline>
-          <source src="assets/video-trailer.mp4" type="video/mp4" />
+          <source src="assets/video-trailer.mp4" type="video/mp4">
           Tu navegador no soporta reproducción de video.
         </video>
         <div class="hero-content">
@@ -119,7 +123,7 @@
       </div>
     </section>
 
-    <!-- Servicios Section -->
+    <!-- Servicios -->
     <section class="services" id="servicios">
       <h2>Nuestros Servicios</h2>
       <div class="services-container">
@@ -141,7 +145,7 @@
       </div>
     </section>
 
-    <!-- Sobre Nosotros Section -->
+    <!-- Sobre Nosotros -->
     <section class="about" id="nosotros">
       <div class="about-container">
         <div class="about-text">
@@ -152,7 +156,7 @@
       </div>
     </section>
 
-    <!-- Contacto Section -->
+    <!-- Contacto -->
     <section class="contact" id="contacto">
       <h2>Contáctanos</h2>
       <p>¿Tienes alguna duda? Estamos aquí para ayudarte. Llámanos o envíanos un mensaje.</p>
@@ -162,17 +166,13 @@
       </div>
     </section>
 
-    <!-- Descarga Nuestra App -->
+    <!-- Descarga App (desktop-only) -->
     <section id="download-app">
       <h2>¡Descarga Nuestra App!</h2>
-      <p>
-        Lleva Multi Inversiones de Occidente en tu bolsillo.  
-        Solicita créditos, simula cuotas y mucho más desde tu móvil.
-      </p>
+      <p>Lleva Multi Inversiones de Occidente en tu bolsillo. Solicita créditos, simula cuotas y mucho más desde tu móvil.</p>
       <a
         href="https://github.com/multi-inversiones-de-occidente/Multi-Inversiones-de-Occidente/releases/download/v1.0.0/app-release.aab"
-        class="download-button"
-        download="app-release.aab"
+        class="download-button" download="app-release.aab"
       >
         <img src="assets/playstore.png" alt="Play Store Logo">
         Descargar App
@@ -191,7 +191,7 @@
     </div>
   </footer>
 
- <!-- VISTA MÓVIL (diseño moderno y completo) -->
+  <!-- ========= MOBILE ========= -->
   <header class="mobile-only">
     <div class="mobile-header">
       <img src="assets/logo_multinversiones.png" alt="Logo" class="mobile-logo">
@@ -203,19 +203,20 @@
         <li><a href="#servicios"><i class="fas fa-calculator"></i> Servicios</a></li>
         <li><a href="#nosotros"><i class="fas fa-info-circle"></i> Sobre Nosotros</a></li>
         <li><a href="#contacto"><i class="fas fa-phone"></i> Contacto</a></li>
-        <li><a href="login.html"><i class="fas fa-sign-in-alt"></i> Iniciar Sesión</a></li>
         <li><a href="signup.html"><i class="fas fa-user-plus"></i> Registrarse</a></li>
       </ul>
     </nav>
   </header>
 
   <main class="mobile-only">
+    <!-- Hero móvil -->
     <section id="inicio" class="hero-mobile">
       <h1>Bienvenido a <span class="highlight">Multi Inversiones de Occidente</span></h1>
       <p>Créditos rápidos, confiables y adaptados a tus necesidades.</p>
       <a href="#servicios" class="btn-mobile"><i class="fas fa-arrow-down"></i> Conoce Más</a>
     </section>
 
+    <!-- Servicios móvil -->
     <section id="servicios" class="mob-services">
       <h2><i class="fas fa-heartbeat"></i> Nuestros Servicios</h2>
       <div class="service-list">
@@ -243,23 +244,27 @@
       </div>
     </section>
 
+    <!-- Sobre Nosotros móvil -->
     <section id="nosotros" class="mob-about">
       <h2><i class="fas fa-building"></i> Sobre Nosotros</h2>
       <p>En <span class="highlight">Multinversiones</span> ofrecemos soluciones financieras rápidas y confiables. Con años de experiencia, ayudamos a miles de personas a alcanzar sus metas y mejorar su calidad de vida.</p>
     </section>
 
+    <!-- Contacto móvil -->
     <section id="contacto" class="mob-contact">
       <h2><i class="fas fa-phone"></i> Contáctanos</h2>
       <p><i class="fas fa-phone-alt"></i> +503 1234-5678</p>
       <p><i class="fas fa-envelope"></i> contacto@multinversiones.com</p>
     </section>
 
-    <section id="download-app" class="mob-download">
+    <!-- Descarga App móvil -->
+    <section class="mob-download">
       <h2><i class="fas fa-download"></i> ¡Descarga Nuestra App!</h2>
       <p>Lleva Multi Inversiones de Occidente en tu bolsillo. Solicita créditos, simula cuotas y mucho más desde tu móvil.</p>
       <a
         href="https://github.com/multi-inversiones-de-occidente/Multi-Inversiones-de-Occidente/releases/download/v1.0.0/app-release.aab"
-        class="btn-mobile" download="app-release.aab"
+        class="btn-mobile"
+        download="app-release.aab"
       >
         <i class="fab fa-android"></i> Descargar App
       </a>

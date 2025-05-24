@@ -8,83 +8,26 @@
   <meta name="author" content="Multinversiones">
   <title>Multinversiones</title>
   
-  <!-- Estilos generales -->
+  <!-- Estilos generales (escritorio) -->
   <link rel="stylesheet" href="styles.css">
-  <!-- Favicon -->
-  <link rel="icon" href="assets/logo_multinversiones.png" type="image/png">
-  <!-- Móvil (sin tocar) -->
+  <!-- Estilos móviles específicos -->
   <link rel="stylesheet" href="mobile.css" media="only screen and (max-width: 768px)">
-  <!-- FontAwesome -->
+
+  <!-- FontAwesome via CDN -->
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
 
-  <!-- Inline: download-app + visibilidad + corrección menú escritorio -->
+  <!-- Clases de visibilidad según dispositivo -->
   <style>
-    /* Descarga App (todos) */
-    #download-app {
-      background: #151515;
-      padding: 3rem 1.5rem;
-      text-align: center;
-      margin: 4rem 0;
-      border-radius: 12px;
-    }
-    #download-app h2 {
-      font-size: 2rem;
-      color: #67C8F1;
-      margin-bottom: 1rem;
-    }
-    #download-app p {
-      font-size: 1.1rem;
-      color: #ddd;
-      margin-bottom: 2rem;
-    }
-    .download-button {
-      display: inline-flex;
-      align-items: center;
-      background: #fff;
-      color: #000;
-      padding: 0.8rem 1.2rem;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-weight: 600;
-      text-decoration: none;
-      transition: background .2s, transform .2s;
-    }
-    .download-button img {
-      height: 32px;
-      margin-right: 0.8rem;
-    }
-    .download-button:hover {
-      background: #f0f0f0;
-      transform: translateY(-2px);
-    }
-
-    /* Visibilidad */
     .desktop-only { display: block; }
     .mobile-only  { display: none;  }
     @media (max-width: 768px) {
       .desktop-only { display: none; }
       .mobile-only  { display: block; }
     }
-
-    /* Alineación menú escritorio */
-    header.header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    header.header .navbar ul {
-      display: flex;
-      gap: 1.5rem;
-      list-style: none;
-      margin: 0;
-    }
-    header.header .nav-buttons {
-      margin-left: 2rem;
-    }
   </style>
 </head>
 <body>
-  <!-- ========== DESKTOP ========== -->
+  <!-- VISTA ESCRITORIO (sin cambios) -->
   <header class="desktop-only header">
     <div class="logo">
       <img src="assets/logo_multinversiones.png" alt="Logo Multinversiones">
@@ -101,10 +44,6 @@
         <a href="signup.html" class="btn-signup">Registrarse</a>
       </div>
     </nav>
-  </header>
-
-  <main class="desktop-only">
-    <!-- Hero Section -->
     <section class="hero" id="inicio">
       <div class="hero-container">
         <video class="hero-video" autoplay muted loop playsinline>
@@ -118,8 +57,9 @@
         </div>
       </div>
     </section>
+  </header>
 
-    <!-- Servicios Section -->
+  <main class="desktop-only">
     <section class="services" id="servicios">
       <h2>Nuestros Servicios</h2>
       <div class="services-container">
@@ -141,38 +81,28 @@
       </div>
     </section>
 
-    <!-- Sobre Nosotros Section -->
     <section class="about" id="nosotros">
+      <h2>Sobre Nosotros</h2>
       <div class="about-container">
-        <div class="about-text">
-          <h2>Sobre Nosotros</h2>
-          <p>En <span class="highlight">Multinversiones</span>, nos comprometemos a ofrecer soluciones financieras rápidas y confiables. Con años de experiencia, ayudamos a miles de personas a alcanzar sus metas y mejorar su calidad de vida.</p>
-          <a href="#contacto" class="btn btn-secondary">Contáctanos</a>
-        </div>
+        <p>En <span class="highlight">Multinversiones</span>, nos comprometemos a ofrecer soluciones financieras rápidas y confiables. Con años de experiencia, ayudamos a miles de personas a alcanzar sus metas y mejorar su calidad de vida.</p>
+        <a href="#contacto" class="btn btn-secondary">Contáctanos</a>
       </div>
     </section>
 
-    <!-- Contacto Section -->
     <section class="contact" id="contacto">
       <h2>Contáctanos</h2>
-      <p>¿Tienes alguna duda? Estamos aquí para ayudarte. Llámanos o envíanos un mensaje.</p>
       <div class="contact-info">
         <p><i class="fas fa-phone-alt"></i> +503 1234-5678</p>
         <p><i class="fas fa-envelope"></i> contacto@multinversiones.com</p>
       </div>
     </section>
 
-    <!-- Descarga Nuestra App -->
     <section id="download-app">
       <h2>¡Descarga Nuestra App!</h2>
-      <p>
-        Lleva Multi Inversiones de Occidente en tu bolsillo.  
-        Solicita créditos, simula cuotas y mucho más desde tu móvil.
-      </p>
+      <p>Lleva Multi Inversiones de Occidente en tu bolsillo. Solicita créditos, simula cuotas y mucho más desde tu móvil.</p>
       <a
         href="https://github.com/multi-inversiones-de-occidente/Multi-Inversiones-de-Occidente/releases/download/v1.0.0/app-release.aab"
-        class="download-button"
-        download="app-release.aab"
+        class="download-button" download="app-release.aab"
       >
         <img src="assets/playstore.png" alt="Play Store Logo">
         Descargar App
@@ -191,7 +121,7 @@
     </div>
   </footer>
 
-  <!-- ========== MOBILE (exacto al código que enviaste) ========== -->
+  <!-- VISTA MÓVIL (diseño moderno y completo) -->
   <header class="mobile-only">
     <div class="mobile-header">
       <img src="assets/logo_multinversiones.png" alt="Logo" class="mobile-logo">
@@ -203,6 +133,7 @@
         <li><a href="#servicios"><i class="fas fa-calculator"></i> Servicios</a></li>
         <li><a href="#nosotros"><i class="fas fa-info-circle"></i> Sobre Nosotros</a></li>
         <li><a href="#contacto"><i class="fas fa-phone"></i> Contacto</a></li>
+        <li><a href="login.html"><i class="fas fa-sign-in-alt"></i> Iniciar Sesión</a></li>
         <li><a href="signup.html"><i class="fas fa-user-plus"></i> Registrarse</a></li>
       </ul>
     </nav>

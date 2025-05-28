@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pagar Cuota en Línea</title>
+  <!-- Firebase (versión compat para simplicidad) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+    .container {
+      background: #fff;
+      margin: 2rem;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 400px;
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 1.5rem;
+      color: #333;
+      text-align: center;
+    }
+    label {
+      display: block;
+      margin: 1rem 0 0.5rem;
+      color: #555;
+    }
+    input {
+      width: 100%;
+      padding: 0.6rem;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      margin-top: 1.5rem;
+      width: 100%;
+      padding: 0.8rem;
+      font-size: 1rem;
+      background: #28a745;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    button:hover {
+      background: #218838;
+    }
+    .success, .error {
+      margin-top: 1rem;
+      padding: 0.8rem;
+      border-radius: 4px;
+      text-align: center;
+      font-weight: bold;
+    }
+    .success { background: #d4edda; color: #155724; }
+    .error   { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Pagar Cuota en Línea</h1>
+    <form id="payment-form">
+      <label for="card-name">Nombre en la tarjeta</label>
+      <input type="text" id="card-name" required />
+
+      <label for="card-number">Número de tarjeta</label>
+      <input type="text" id="card-number" maxlength="19" placeholder="0000 0000 0000 0000" required />
+
+      <label for="card-expiry">Fecha de expiración (MM/AA)</label>
+      <input type="text" id="card-expiry" maxlength="5" placeholder="MM/AA" required />
+
+      <label for="card-cvv">CVV</label>
+      <input type="text" id="card-cvv" maxlength="4" placeholder="123" required />
+
+      <label for="amount">Monto a pagar</label>
+      <input type="number" id="amount" step="0.01" min="0.01" required />
+
+      <button type="submit">Pagar Ahora</button>
+    </form>
+
+    <div id="message"></div>
+  </div>
+
+  <script>
+    // Configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    // Inicializar Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+
+    const form = document.getElementById('payment-form');
+    const msg  = document.getElementById('message');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.innerHTML = '';
+      // Recoger datos del formulario
+      const name   = document.getElementById('card-name').value.trim();
+      const number = document.getElementById('card-number').value.replace(/\s+/g,'');
+      const expiry = document.getElementById('card-expiry').value.trim();
+      const cvv    = document.getElementById('card-cvv').value.trim();
+      const amount = parseFloat(document.getElementById('amount').value).toFixed(2);
+      
+      // Validación básica
+      if (!name || number.length < 12 || !expiry || cvv.length < 3 || isNaN(amount) || amount <= 0) {
+        msg.innerHTML = '<div class="error">Por favor verifica los datos ingresados.</div>';
+        return;
+      }
+
+      try {
+        // Enmascarar número de tarjeta (sólo últimos 4 dígitos)
+        const last4 = number.slice(-4).padStart(number.length, '*');
+
+        // Guardar en Firestore
+        await db.collection('pagos').add({
+          nombreTarjeta: name,
+          tarjetaLast4: last4,
+          expiracion: expiry,
+          monto: amount,
+          fecha: new Date().toISOString()
+        });
+
+        msg.innerHTML = '<div class="success">Pago realizado exitosamente.</div>';
+        form.reset();
+      } catch (error) {
+        console.error('Error al procesar el pago:', error);
+        msg.innerHTML = '<div class="error">Error al procesar el pago. Intenta de nuevo.</div>';
+      }
+    });
+  </script>
+
+</body>
+</html>

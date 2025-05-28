@@ -85,6 +85,23 @@
       gap: 1rem;
       margin-left: 2rem;
     }
+
+    /* Botón Pagar Cuota en Línea */
+    .btn-pagar {
+      display: inline-block;
+      background: #28a745;
+      color: #fff;
+      padding: 0.75rem 1.5rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border-radius: 30px;
+      text-decoration: none;
+      transition: background .3s, transform .3s;
+    }
+    .btn-pagar:hover {
+      background: #218838;
+      transform: translateY(-2px);
+    }
   </style>
 </head>
 <body>
@@ -103,6 +120,7 @@
       <div class="nav-buttons">
         <a href="login.html" class="btn-login">Iniciar Sesión</a>
         <a href="signup.html" class="btn-signup">Registrarse</a>
+        <a href="pagodecuotaenlinea.html" class="btn-pagar">Pagar Cuota en Línea</a>
       </div>
     </nav>
   </header>
@@ -203,6 +221,7 @@
         <li><a href="#contacto"><i class="fas fa-phone"></i> Contacto</a></li>
         <li><a href="login.html"><i class="fas fa-sign-in-alt"></i> Iniciar Sesión</a></li>
         <li><a href="signup.html"><i class="fas fa-user-plus"></i> Registrarse</a></li>
+        <li><a href="pagodecuotaenlinea.html" class="btn-pagar"><i class="fas fa-credit-card"></i> Pagar Cuota en Línea</a></li>
       </ul>
     </nav>
   </header>
@@ -231,23 +250,9 @@
           <div>
             <h3>Préstamos Personalizados</h3>
             <p>Accede a préstamos rápidos y confiables para tus necesidades.</p>
-          </div>
+          
         </div>
-        <div class="service-item">
-          <i class="fas fa-map-marker-alt"></i>
-          <div>
-            <h3>Nuestras Agencias</h3>
-            <p>Encuentra la agencia más cercana para atención personalizada.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Sobre Nosotros móvil -->
-    <section id="nosotros" class="mob-about">
-      <h2><i class="fas fa-building"></i> Sobre Nosotros</h2>
-      <p>En <span class="highlight">Multinversiones</span> ofrecemos soluciones financieras rápidas y confiables. Con años de experiencia, ayudamos a miles de personas a alcanzar sus metas y mejorar su calidad de vida.</p>
-    </section>
+      </section>
 
     <!-- Contacto móvil -->
     <section id="contacto" class="mob-contact">
@@ -277,3 +282,4 @@
   </footer>
 </body>
 </html>
+

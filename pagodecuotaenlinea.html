@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pagar Cuota en Línea</title>
-  <!-- Firebase (versión compat para simplicidad) -->
+  <!-- Firebase compat -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
@@ -12,11 +12,8 @@
     body {
       font-family: Arial, sans-serif;
       background: #f5f5f5;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
+      margin: 0; padding: 0;
+      display: flex; justify-content: center; align-items: flex-start;
       min-height: 100vh;
     }
     .container {
@@ -25,12 +22,10 @@
       padding: 2rem;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      width: 100%;
-      max-width: 400px;
+      width: 100%; max-width: 400px;
     }
-    h1 {
-      margin-top: 0;
-      font-size: 1.5rem;
+    h1, h2 {
+      margin: 0 0 1rem;
       color: #333;
       text-align: center;
     }
@@ -47,7 +42,7 @@
       border-radius: 4px;
     }
     button {
-      margin-top: 1.5rem;
+      margin-top: 1rem;
       width: 100%;
       padding: 0.8rem;
       font-size: 1rem;
@@ -58,8 +53,33 @@
       cursor: pointer;
       transition: background .2s;
     }
-    button:hover {
-      background: #218838;
+    button:hover { background: #218838; }
+    #search-btn {
+      background: #007bff;
+    }
+    #search-btn:hover {
+      background: #0069d9;
+    }
+    #results .result-item {
+      background: #fafafa;
+      padding: 0.5rem;
+      margin: 0.5rem 0;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #results .result-item button {
+      background: #007bff;
+      padding: 0.4rem 0.8rem;
+      border: none;
+      border-radius: 4px;
+      color: #fff;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    #results .result-item button:hover {
+      background: #0069d9;
     }
     .success, .error {
       margin-top: 1rem;
@@ -76,24 +96,39 @@
 
   <div class="container">
     <h1>Pagar Cuota en Línea</h1>
-    <form id="payment-form">
-      <label for="card-name">Nombre en la tarjeta</label>
-      <input type="text" id="card-name" required />
 
-      <label for="card-number">Número de tarjeta</label>
-      <input type="text" id="card-number" maxlength="19" placeholder="0000 0000 0000 0000" required />
+    <div id="search-section">
+      <label for="search-query">Buscar Cliente (Nombre o DUI):</label>
+      <input id="search-query" type="text" placeholder="Ingresa nombre o DUI">
+      <button id="search-btn">Buscar</button>
+      <div id="results"></div>
+    </div>
 
-      <label for="card-expiry">Fecha de expiración (MM/AA)</label>
-      <input type="text" id="card-expiry" maxlength="5" placeholder="MM/AA" required />
+    <div id="payment-section" style="display:none;">
+      <h2>Pago para: <span id="client-info"></span></h2>
+      <form id="payment-form">
+        <!-- ocultos para enlazar pago -->
+        <input type="hidden" id="credit-id">
+        <input type="hidden" id="cliente-id">
 
-      <label for="card-cvv">CVV</label>
-      <input type="text" id="card-cvv" maxlength="4" placeholder="123" required />
+        <label for="card-name">Nombre en la tarjeta</label>
+        <input type="text" id="card-name" required />
 
-      <label for="amount">Monto a pagar</label>
-      <input type="number" id="amount" step="0.01" min="0.01" required />
+        <label for="card-number">Número de tarjeta</label>
+        <input type="text" id="card-number" maxlength="19" placeholder="0000 0000 0000 0000" required />
 
-      <button type="submit">Pagar Ahora</button>
-    </form>
+        <label for="card-expiry">Fecha de expiración (MM/AA)</label>
+        <input type="text" id="card-expiry" maxlength="5" placeholder="MM/AA" required />
+
+        <label for="card-cvv">CVV</label>
+        <input type="text" id="card-cvv" maxlength="4" placeholder="123" required />
+
+        <label for="amount">Monto a pagar</label>
+        <input type="number" id="amount" step="0.01" min="0.01" required />
+
+        <button type="submit">Pagar Ahora</button>
+      </form>
+    </div>
 
     <div id="message"></div>
   </div>
@@ -109,51 +144,108 @@
       appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
       measurementId: "G-H4E31XHG1Y"
     };
-    // Inicializar Firebase
     firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+    const db   = firebase.firestore();
     const auth = firebase.auth();
 
-    const form = document.getElementById('payment-form');
-    const msg  = document.getElementById('message');
+    const searchBtn      = document.getElementById('search-btn');
+    const searchInput    = document.getElementById('search-query');
+    const resultsDiv     = document.getElementById('results');
+    const paymentSection = document.getElementById('payment-section');
+    const searchSection  = document.getElementById('search-section');
+    const clientInfoSpan = document.getElementById('client-info');
+    const form           = document.getElementById('payment-form');
+    const msgDiv         = document.getElementById('message');
 
+    // Buscar créditos activos
+    searchBtn.addEventListener('click', async () => {
+      const q = searchInput.value.trim().toLowerCase();
+      resultsDiv.innerHTML = '';
+      msgDiv.innerHTML = '';
+      if (!q) return;
+      const snap = await db.collection('creditos')
+                           .where('estadoCredito','==','Activo')
+                           .get();
+      const matches = snap.docs.filter(doc => {
+        const d = doc.data();
+        return d.nombre.toLowerCase().includes(q)
+            || (d.numeroDui||'').includes(q);
+      });
+      if (matches.length === 0) {
+        resultsDiv.innerHTML = '<p>No se encontraron clientes.</p>';
+        return;
+      }
+      matches.forEach(doc => {
+        const d = doc.data();
+        const item = document.createElement('div');
+        item.className = 'result-item';
+        item.innerHTML = `
+          <span>${d.nombre} (DUI: ${d.numeroDui})</span>
+          <button data-id="${doc.id}" 
+                  data-cliente="${d.clienteID}" 
+                  data-nombre="${d.nombre}" 
+                  data-dui="${d.numeroDui}">
+            Seleccionar
+          </button>`;
+        const btn = item.querySelector('button');
+        btn.addEventListener('click', () => {
+          selectClient(
+            btn.dataset.id,
+            btn.dataset.cliente,
+            btn.dataset.nombre,
+            btn.dataset.dui
+          );
+        });
+        resultsDiv.appendChild(item);
+      });
+    });
+
+    // Mostrar formulario de pago para el cliente seleccionado
+    function selectClient(creditId, clienteId, nombre, dui) {
+      searchSection.style.display = 'none';
+      paymentSection.style.display = 'block';
+      clientInfoSpan.textContent = `${nombre} – DUI: ${dui}`;
+      document.getElementById('credit-id').value  = creditId;
+      document.getElementById('cliente-id').value = clienteId;
+    }
+
+    // Procesar el pago
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      msg.innerHTML = '';
-      // Recoger datos del formulario
+      msgDiv.innerHTML = '';
       const name   = document.getElementById('card-name').value.trim();
       const number = document.getElementById('card-number').value.replace(/\s+/g,'');
       const expiry = document.getElementById('card-expiry').value.trim();
       const cvv    = document.getElementById('card-cvv').value.trim();
       const amount = parseFloat(document.getElementById('amount').value).toFixed(2);
-      
-      // Validación básica
-      if (!name || number.length < 12 || !expiry || cvv.length < 3 || isNaN(amount) || amount <= 0) {
-        msg.innerHTML = '<div class="error">Por favor verifica los datos ingresados.</div>';
+      const creditId  = document.getElementById('credit-id').value;
+      const clienteId = document.getElementById('cliente-id').value;
+
+      if (!name || number.length<12 || !expiry || cvv.length<3 || isNaN(amount)||amount<=0) {
+        msgDiv.innerHTML = '<div class="error">Verifica los datos ingresados.</div>';
         return;
       }
 
       try {
-        // Enmascarar número de tarjeta (sólo últimos 4 dígitos)
-        const last4 = number.slice(-4).padStart(number.length, '*');
-
-        // Guardar en Firestore
+        const last4 = number.slice(-4).padStart(number.length,'*');
         await db.collection('pagos').add({
+          creditoID: creditId,
+          clienteID: clienteId,
           nombreTarjeta: name,
           tarjetaLast4: last4,
           expiracion: expiry,
           monto: amount,
           fecha: new Date().toISOString()
         });
-
-        msg.innerHTML = '<div class="success">Pago realizado exitosamente.</div>';
+        msgDiv.innerHTML = '<div class="success">Pago realizado exitosamente.</div>';
         form.reset();
-      } catch (error) {
-        console.error('Error al procesar el pago:', error);
-        msg.innerHTML = '<div class="error">Error al procesar el pago. Intenta de nuevo.</div>';
+      } catch(error) {
+        console.error(error);
+        msgDiv.innerHTML = '<div class="error">Error al procesar el pago.</div>';
       }
     });
   </script>
 
 </body>
 </html>
+

@@ -9,87 +9,30 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f5f5f5;
-      margin: 0; padding: 0;
-      display: flex; justify-content: center; align-items: flex-start;
-      min-height: 100vh;
-    }
-    .container {
-      background: #fff;
-      margin: 2rem;
-      padding: 2rem;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      width: 100%; max-width: 400px;
-    }
-    h1, h2 {
-      margin: 0 0 1rem;
-      color: #333;
-      text-align: center;
-    }
-    label {
-      display: block;
-      margin: 1rem 0 0.5rem;
-      color: #555;
-    }
-    input {
-      width: 100%;
-      padding: 0.6rem;
-      font-size: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    button {
-      margin-top: 1rem;
-      width: 100%;
-      padding: 0.8rem;
-      font-size: 1rem;
-      background: #28a745;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: background .2s;
-    }
-    button:hover { background: #218838; }
-    #search-btn {
-      background: #007bff;
-    }
-    #search-btn:hover {
-      background: #0069d9;
-    }
-    #results .result-item {
-      background: #fafafa;
-      padding: 0.5rem;
-      margin: 0.5rem 0;
-      border-radius: 4px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    #results .result-item button {
-      background: #007bff;
-      padding: 0.4rem 0.8rem;
-      border: none;
-      border-radius: 4px;
-      color: #fff;
-      cursor: pointer;
-      transition: background .2s;
-    }
-    #results .result-item button:hover {
-      background: #0069d9;
-    }
-    .success, .error {
-      margin-top: 1rem;
-      padding: 0.8rem;
-      border-radius: 4px;
-      text-align: center;
-      font-weight: bold;
-    }
-    .success { background: #d4edda; color: #155724; }
-    .error   { background: #f8d7da; color: #721c24; }
+    body { font-family: Arial,sans-serif; background:#f5f5f5; margin:0; padding:0;
+           display:flex; justify-content:center; align-items:flex-start; min-height:100vh; }
+    .container { background:#fff; margin:2rem; padding:2rem; border-radius:8px;
+                 box-shadow:0 2px 8px rgba(0,0,0,0.1); width:100%; max-width:400px; }
+    h1,h2 { text-align:center; color:#333; margin-bottom:1rem; }
+    label { display:block; margin:1rem 0 0.5rem; color:#555; }
+    input { width:100%; padding:0.6rem; font-size:1rem; border:1px solid #ccc;
+            border-radius:4px; }
+    button { margin-top:1rem; width:100%; padding:0.8rem; font-size:1rem;
+             border:none; border-radius:4px; cursor:pointer; transition:background .2s; }
+    #search-btn { background:#007bff; color:#fff; }
+    #search-btn:hover { background:#0069d9; }
+    button[type=submit] { background:#28a745; color:#fff; }
+    button[type=submit]:hover { background:#218838; }
+    #results .result-item { background:#fafafa; padding:0.5rem; margin:0.5rem 0;
+                            border-radius:4px; display:flex; justify-content:space-between; }
+    #results .result-item button { background:#007bff; color:#fff; padding:0.4rem 0.8rem;
+                                    border:none; border-radius:4px; cursor:pointer;
+                                    transition:background .2s; }
+    #results .result-item button:hover { background:#0069d9; }
+    .success, .error { margin-top:1rem; padding:0.8rem; border-radius:4px;
+                       text-align:center; font-weight:bold; }
+    .success { background:#d4edda; color:#155724; }
+    .error   { background:#f8d7da; color:#721c24; }
   </style>
 </head>
 <body>
@@ -98,16 +41,15 @@
     <h1>Pagar Cuota en Línea</h1>
 
     <div id="search-section">
-      <label for="search-query">Buscar Cliente (Nombre o DUI):</label>
+      <label for="search-query">Buscar Crédito (Nombre o DUI):</label>
       <input id="search-query" type="text" placeholder="Ingresa nombre o DUI">
       <button id="search-btn">Buscar</button>
       <div id="results"></div>
     </div>
 
     <div id="payment-section" style="display:none;">
-      <h2>Pago para: <span id="client-info"></span></h2>
+      <h2>Cliente: <span id="client-info"></span></h2>
       <form id="payment-form">
-        <!-- ocultos para enlazar pago -->
         <input type="hidden" id="credit-id">
         <input type="hidden" id="cliente-id">
 
@@ -134,7 +76,7 @@
   </div>
 
   <script>
-    // Configuración de Firebase
+    // 1) Configuración de Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -148,104 +90,115 @@
     const db   = firebase.firestore();
     const auth = firebase.auth();
 
-    const searchBtn      = document.getElementById('search-btn');
-    const searchInput    = document.getElementById('search-query');
-    const resultsDiv     = document.getElementById('results');
-    const paymentSection = document.getElementById('payment-section');
-    const searchSection  = document.getElementById('search-section');
-    const clientInfoSpan = document.getElementById('client-info');
-    const form           = document.getElementById('payment-form');
-    const msgDiv         = document.getElementById('message');
-
-    // Buscar créditos activos
-    searchBtn.addEventListener('click', async () => {
-      const q = searchInput.value.trim().toLowerCase();
-      resultsDiv.innerHTML = '';
-      msgDiv.innerHTML = '';
-      if (!q) return;
-      const snap = await db.collection('creditos')
-                           .where('estadoCredito','==','Activo')
-                           .get();
-      const matches = snap.docs.filter(doc => {
-        const d = doc.data();
-        return d.nombre.toLowerCase().includes(q)
-            || (d.numeroDui||'').includes(q);
+    // 2) Autenticación anónima
+    const msgDiv = document.getElementById('message');
+    auth.signInAnonymously()
+      .then(() => {
+        // Solo tras autenticarnos, configuramos los handlers
+        setupHandlers();
+      })
+      .catch(err => {
+        msgDiv.innerHTML = `<div class="error">Error de autenticación: ${err.message}</div>`;
       });
-      if (matches.length === 0) {
-        resultsDiv.innerHTML = '<p>No se encontraron clientes.</p>';
-        return;
+
+    function setupHandlers() {
+      const searchBtn      = document.getElementById('search-btn');
+      const searchInput    = document.getElementById('search-query');
+      const resultsDiv     = document.getElementById('results');
+      const paymentSection = document.getElementById('payment-section');
+      const searchSection  = document.getElementById('search-section');
+      const clientInfoSpan = document.getElementById('client-info');
+      const form           = document.getElementById('payment-form');
+
+      // 3) Búsqueda de créditos activos
+      searchBtn.addEventListener('click', async () => {
+        const q = searchInput.value.trim().toLowerCase();
+        resultsDiv.innerHTML = '';
+        msgDiv.innerHTML = '';
+        if (!q) return;
+        try {
+          const snap = await db.collection('creditos')
+                               .where('estadoCredito','==','Activo')
+                               .get();
+          const matches = snap.docs.filter(doc => {
+            const d = doc.data();
+            return d.nombre.toLowerCase().includes(q)
+                || (d.numeroDui||'').includes(q);
+          });
+          if (matches.length === 0) {
+            resultsDiv.innerHTML = '<p>No se encontraron créditos.</p>';
+            return;
+          }
+          matches.forEach(doc => {
+            const d = doc.data();
+            const item = document.createElement('div');
+            item.className = 'result-item';
+            item.innerHTML = `
+              <span>${d.nombre} (DUI: ${d.numeroDui})</span>
+              <button data-id="${doc.id}"
+                      data-cliente="${d.clienteID}"
+                      data-nombre="${d.nombre}"
+                      data-dui="${d.numeroDui}">
+                Seleccionar
+              </button>`;
+            item.querySelector('button').addEventListener('click', e => {
+              selectClient(e.target);
+            });
+            resultsDiv.appendChild(item);
+          });
+        } catch (e) {
+          msgDiv.innerHTML = `<div class="error">Error al buscar: ${e.message}</div>`;
+        }
+      });
+
+      // 4) Mostrar formulario al seleccionar crédito
+      function selectClient(btn) {
+        const creditId  = btn.dataset.id;
+        const clienteId = btn.dataset.cliente;
+        const nombre    = btn.dataset.nombre;
+        const dui       = btn.dataset.dui;
+        searchSection.style.display  = 'none';
+        paymentSection.style.display = 'block';
+        clientInfoSpan.textContent   = `${nombre} – DUI: ${dui}`;
+        document.getElementById('credit-id').value  = creditId;
+        document.getElementById('cliente-id').value = clienteId;
       }
-      matches.forEach(doc => {
-        const d = doc.data();
-        const item = document.createElement('div');
-        item.className = 'result-item';
-        item.innerHTML = `
-          <span>${d.nombre} (DUI: ${d.numeroDui})</span>
-          <button data-id="${doc.id}" 
-                  data-cliente="${d.clienteID}" 
-                  data-nombre="${d.nombre}" 
-                  data-dui="${d.numeroDui}">
-            Seleccionar
-          </button>`;
-        const btn = item.querySelector('button');
-        btn.addEventListener('click', () => {
-          selectClient(
-            btn.dataset.id,
-            btn.dataset.cliente,
-            btn.dataset.nombre,
-            btn.dataset.dui
-          );
-        });
-        resultsDiv.appendChild(item);
-      });
-    });
 
-    // Mostrar formulario de pago para el cliente seleccionado
-    function selectClient(creditId, clienteId, nombre, dui) {
-      searchSection.style.display = 'none';
-      paymentSection.style.display = 'block';
-      clientInfoSpan.textContent = `${nombre} – DUI: ${dui}`;
-      document.getElementById('credit-id').value  = creditId;
-      document.getElementById('cliente-id').value = clienteId;
+      // 5) Procesar el pago
+      form.addEventListener('submit', async e => {
+        e.preventDefault();
+        msgDiv.innerHTML = '';
+        const name   = document.getElementById('card-name').value.trim();
+        const number = document.getElementById('card-number').value.replace(/\s+/g,'');
+        const expiry = document.getElementById('card-expiry').value.trim();
+        const cvv    = document.getElementById('card-cvv').value.trim();
+        const amount = parseFloat(document.getElementById('amount').value).toFixed(2);
+        const creditId  = document.getElementById('credit-id').value;
+        const clienteId = document.getElementById('cliente-id').value;
+
+        if (!name || number.length<12 || !expiry || cvv.length<3 || isNaN(amount)||amount<=0) {
+          msgDiv.innerHTML = '<div class="error">Verifica los datos ingresados.</div>';
+          return;
+        }
+        try {
+          const last4 = number.slice(-4).padStart(number.length,'*');
+          await db.collection('pagos').add({
+            creditoID:     creditId,
+            clienteID:     clienteId,
+            nombreTarjeta: name,
+            tarjetaLast4:  last4,
+            expiracion:    expiry,
+            monto:         amount,
+            fecha:         new Date().toISOString()
+          });
+          msgDiv.innerHTML = '<div class="success">Pago realizado exitosamente.</div>';
+          form.reset();
+        } catch (err) {
+          msgDiv.innerHTML = `<div class="error">Error al procesar el pago: ${err.message}</div>`;
+        }
+      });
     }
-
-    // Procesar el pago
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      msgDiv.innerHTML = '';
-      const name   = document.getElementById('card-name').value.trim();
-      const number = document.getElementById('card-number').value.replace(/\s+/g,'');
-      const expiry = document.getElementById('card-expiry').value.trim();
-      const cvv    = document.getElementById('card-cvv').value.trim();
-      const amount = parseFloat(document.getElementById('amount').value).toFixed(2);
-      const creditId  = document.getElementById('credit-id').value;
-      const clienteId = document.getElementById('cliente-id').value;
-
-      if (!name || number.length<12 || !expiry || cvv.length<3 || isNaN(amount)||amount<=0) {
-        msgDiv.innerHTML = '<div class="error">Verifica los datos ingresados.</div>';
-        return;
-      }
-
-      try {
-        const last4 = number.slice(-4).padStart(number.length,'*');
-        await db.collection('pagos').add({
-          creditoID: creditId,
-          clienteID: clienteId,
-          nombreTarjeta: name,
-          tarjetaLast4: last4,
-          expiracion: expiry,
-          monto: amount,
-          fecha: new Date().toISOString()
-        });
-        msgDiv.innerHTML = '<div class="success">Pago realizado exitosamente.</div>';
-        form.reset();
-      } catch(error) {
-        console.error(error);
-        msgDiv.innerHTML = '<div class="error">Error al procesar el pago.</div>';
-      }
-    });
   </script>
 
 </body>
 </html>
-

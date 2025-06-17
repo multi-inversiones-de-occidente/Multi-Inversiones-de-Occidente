@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Panel – Analista de Crédito</title>
 
@@ -24,9 +24,11 @@
     const db   = getFirestore(app);
     const auth = getAuth(app);
 
-    // Suscribe la cuenta en vivo de documentos a un badge
     function suscribirBadge(idBadge, coleccion, filtros = []) {
-      const q = query(collection(db, coleccion), ...filtros);
+      // Si no hay filtros, solo consulta la colección
+      const q = filtros.length > 0
+        ? query(collection(db, coleccion), ...filtros)
+        : collection(db, coleccion);
       onSnapshot(q, snap => {
         document.getElementById(idBadge).textContent = snap.docs.length;
       }, error => {
@@ -51,51 +53,121 @@
       suscribirBadge("badge-req-credicel",   "solicitud_de_credito", [ where("creditLine","==","Credicel") ]);
       suscribirBadge("badge-req-amuebla2",   "solicitud_de_credito", [ where("creditLine","==","Amuebla2") ]);
       suscribirBadge("badge-req-credicash",  "solicitud_de_credito", [ where("creditLine","==","Credicash") ]);
-      // Archivos
-      suscribirBadge("badge-arc-aut", "archivo_autorizaciones", [ orderBy("fecha","desc") ]);
-      suscribirBadge("badge-arc-req", "archivo_solicitudes",     [ orderBy("fecha","desc") ]);
+      // Archivos (aquí quité el orderBy, ya que orderBy sin limit no es necesario para contar)
+      suscribirBadge("badge-arc-aut", "archivo_autorizaciones", []);
+      suscribirBadge("badge-arc-req", "archivo_solicitudes",     []);
     });
   </script>
 
-  <!-- Estilos generales -->
-  <link rel="stylesheet" href="styles.css">
+  <!-- Estilos modernos -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
   <style>
     body {
       margin: 0; font-family: Arial, sans-serif;
       background: radial-gradient(circle,#000,#111);
       color: #fff;
+      min-height: 100vh;
     }
     header {
       background:#000; padding:1rem; text-align:center;
       font-size:1.5rem;
+      letter-spacing:1px;
     }
     .container {
-      max-width:800px; margin:0 auto; padding:2rem;
+      max-width:950px; margin:0 auto; padding:2.4rem 1rem 2rem 1rem;
+      display: flex; flex-direction: column; align-items: center;
     }
-    h1,h2 { margin:1rem 0 0.5rem; }
-    p { margin-bottom:1rem; }
+    h1 { 
+      margin:1rem 0 0.2rem 0; 
+      font-size:2.15rem;
+      font-weight:800;
+      text-align:center;
+    }
+    .mensaje-bienvenida {
+      font-size:1.09rem;
+      color:#F8AF40;
+      margin-bottom: 2.1rem;
+      margin-top: 0.4rem;
+      font-weight:600;
+      text-align:center;
+      line-height:1.35;
+      max-width: 630px;
+    }
 
-    .btn-panel {
-      position:relative;
-      display:flex; align-items:center;
-      background:rgba(255,255,255,0.1);
-      border-radius:8px; padding:1rem; margin-bottom:1rem;
-      text-decoration:none; color:#fff;
+    .section-label {
+      color: #67C8F1;
+      font-size: 1.22rem;
+      margin: 2.2rem 0 0.8rem 0;
+      font-weight: 700;
+      text-align: left;
+      width: 100%;
+      letter-spacing: 0.5px;
     }
-    .btn-panel .icon { font-size:1.75rem; margin-right:.75rem; }
-    .btn-panel .text { flex:1; }
-    .btn-panel .arrow { font-size:1rem; color:#aaa; }
-    .badge {
-      position:absolute; top:-8px; right:-8px;
+    .grid-botones {
+      width:100%;
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
+      gap:1.3rem;
+    }
+    .divider {
+      height:1px; background:rgba(255,255,255,0.14); margin:2.3rem 0 1.5rem 0;
+      width:100%;
+      border-radius: 1px;
+    }
+    .btn-grande {
+      background: linear-gradient(90deg, #67C8F1 0%, #13b66b 100%);
+      color: #212121;
+      font-weight: bold;
+      font-size: 1.13rem;
+      border: none;
+      border-radius: 18px;
+      box-shadow: 0 4px 22px #13b66a2b;
+      padding: 2rem 1.2rem 2rem 1.2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: background .18s, color .18s, transform .14s;
+      position: relative;
+      outline: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .7rem;
+      min-width:0;
+      user-select: none;
+      text-decoration: none;
+    }
+    .btn-grande:active,
+    .btn-grande:hover {
+      background: linear-gradient(90deg, #13b66b 70%, #67C8F1 100%);
+      color: #222;
+      transform: scale(1.03);
+      box-shadow: 0 8px 26px #0a644188;
+      text-decoration: none;
+    }
+    .btn-grande i {
+      font-size: 2.1rem;
+      margin-bottom: 8px;
+      color: #212121;
+      opacity: .89;
+      transition: color .14s;
+    }
+    .btn-grande:hover i { color: #0c7451; }
+    .btn-grande .badge {
+      position: absolute; top: 14px; right: 15px;
       background:#e74c3c; color:#fff;
-      width:24px; height:24px; border-radius:50%;
+      width:28px; height:28px; border-radius:50%;
       display:flex; align-items:center; justify-content:center;
-      font-size:.75rem; font-weight:bold;
+      font-size:.85rem; font-weight:700;
+      box-shadow:0 1px 8px #0002;
     }
-
-    .divider { height:1px; background:rgba(255,255,255,0.2); margin:2rem 0; }
+    @media (max-width: 600px) {
+      .container { padding:1.1rem 1vw; }
+      h1 { font-size: 1.09rem;}
+      .mensaje-bienvenida { font-size: .97rem; }
+      .grid-botones { gap:0.8rem; }
+      .btn-grande { padding: 1.3rem 0.6rem 1.3rem 0.6rem; font-size: .93rem;}
+      .btn-grande i { font-size:1.35rem; }
+    }
   </style>
 </head>
 <body>
@@ -104,104 +176,70 @@
 
   <div class="container">
     <h1 id="usuario-nombre">Bienvenido, usuario</h1>
-    <p>Gestiona las autorizaciones y solicitudes de crédito:</p>
+    <div class="mensaje-bienvenida">
+      Consulta y gestiona autorizaciones y solicitudes en tiempo real.<br>
+      <span style="color:#67C8F1;font-weight:700;">¡Todo lo que ves proviene directamente de la base de datos en vivo!</span>
+    </div>
 
-    <!-- Autorizaciones -->
-    <a href="autorizaciones_credicel_page.html" class="btn-panel">
-      <i class="fas fa-file-signature icon"></i>
-      <div class="text">
-        <strong>Autorizaciones Credicel</strong><br>
-        Revisa las autorizaciones de Credicel.
-      </div>
-      <i class="fas fa-chevron-right arrow"></i>
-      <span id="badge-aut-credicel" class="badge">0</span>
-    </a>
+    <div class="section-label">Autorizaciones Activas</div>
+    <div class="grid-botones">
+      <a href="autorizaciones_credicel_page.html" class="btn-grande">
+        <i class="fas fa-file-signature"></i>
+        Autorizaciones Credicel
+        <span id="badge-aut-credicel" class="badge">0</span>
+      </a>
+      <a href="autorizaciones_amuebla2_page.html" class="btn-grande">
+        <i class="fas fa-file-signature"></i>
+        Autorizaciones Amuebla2
+        <span id="badge-aut-amuebla2" class="badge">0</span>
+      </a>
+      <a href="autorizaciones_page.html" class="btn-grande">
+        <i class="fas fa-file-signature"></i>
+        Autorizaciones Credicash
+        <span id="badge-aut-credicash" class="badge">0</span>
+      </a>
+      <a href="autorizaciones_prendarias_page.html" class="btn-grande">
+        <i class="fas fa-shield-alt"></i>
+        Autorizaciones Prendarias
+        <span id="badge-aut-prendarias" class="badge">0</span>
+      </a>
+    </div>
 
-    <a href="autorizaciones_amuebla2_page.html" class="btn-panel">
-      <i class="fas fa-file-signature icon"></i>
-      <div class="text">
-        <strong>Autorizaciones Amuebla2</strong><br>
-        Revisa las autorizaciones de Amuebla2.
-      </div>
-      <i class="fas fa-chevron-right arrow"></i>
-      <span id="badge-aut-amuebla2" class="badge">0</span>
-    </a>
+    <div class="section-label" style="margin-top:2.4rem;">Solicitudes Activas</div>
+    <div class="grid-botones">
+      <a href="solicitudes_credicel_page.html" class="btn-grande">
+        <i class="fas fa-file-invoice-dollar"></i>
+        Solicitudes Credicel
+        <span id="badge-req-credicel" class="badge">0</span>
+      </a>
+      <a href="solicitudes_amuebla2_page.html" class="btn-grande">
+        <i class="fas fa-file-invoice-dollar"></i>
+        Solicitudes Amuebla2
+        <span id="badge-req-amuebla2" class="badge">0</span>
+      </a>
+      <a href="solicitudes_credito_page.html" class="btn-grande">
+        <i class="fas fa-file-invoice-dollar"></i>
+        Solicitudes Credicash
+        <span id="badge-req-credicash" class="badge">0</span>
+      </a>
+    </div>
 
-    <a href="autorizaciones_page.html" class="btn-panel">
-      <i class="fas fa-file-signature icon"></i>
-      <div class="text">
-        <strong>Autorizaciones Credicash</strong><br>
-        Revisa las autorizaciones de Credicash.
-      </div>
-      <i class="fas fa-chevron-right arrow"></i>
-      <span id="badge-aut-credicash" class="badge">0</span>
-    </a>
-
-    <a href="autorizaciones_prendarias_page.html" class="btn-panel">
-      <i class="fas fa-shield-alt icon"></i>
-      <div class="text">
-        <strong>Autorizaciones Prendarias</strong><br>
-        Revisa las autorizaciones Prendarias.
-      </div>
-      <i class="fas fa-chevron-right arrow"></i>
-      <span id="badge-aut-prendarias" class="badge">0</span>
-    </a>
-
-    <!-- Solicitudes -->
-    <a href="solicitudes_credicel_page.html" class="btn-panel">
-      <i class="fas fa-file-invoice-dollar icon"></i>
-      <div class="text">
-        <strong>Solicitudes Credicel</strong><br>
-        Consulta las solicitudes de Credicel.
-      </div>
-      <i class="fas fa-chevron-right arrow"></i>
-      <span id="badge-req-credicel" class="badge">0</span>
-    </a>
-
-    <a href="solicitudes_amuebla2_page.html" class="btn-panel">
-      <i class="fas fa-file-invoice-dollar icon"></i>
-      <div class="text">
-        <strong>Solicitudes Amuebla2</strong><br>
-        Consulta las solicitudes de Amuebla2.
-      </div>
-      <i class="fas fa-chevron-right arrow"></i>
-      <span id="badge-req-amuebla2" class="badge">0</span>
-    </a>
-
-    <a href="solicitudes_credito_page.html" class="btn-panel">
-      <i class="fas fa-file-invoice-dollar icon"></i>
-      <div class="text">
-        <strong>Solicitudes Credicash</strong><br>
-        Consulta las solicitudes de Credicash.
-      </div>
-      <i class="fas fa-chevron-right arrow"></i>
-      <span id="badge-req-credicash" class="badge">0</span>
-    </a>
-
-    <!-- Archivos -->
     <div class="divider"></div>
-    <h2>Archivos</h2>
-
-    <a href="archivo_autorizaciones_page.html" class="btn-panel">
-      <i class="fas fa-archive icon"></i>
-      <div class="text">
-        <strong>Archivo Autorizaciones</strong><br>
-        Revisa las autorizaciones archivadas.
-      </div>
-      <i class="fas fa-chevron-right arrow"></i>
-      <span id="badge-arc-aut" class="badge">0</span>
-    </a>
-
-    <a href="archivo_solicitudes_page.html" class="btn-panel">
-      <i class="fas fa-archive icon"></i>
-      <div class="text">
-        <strong>Archivo Solicitudes</strong><br>
-        Revisa las solicitudes archivadas.
-      </div>
-      <i class="fas fa-chevron-right arrow"></i>
-      <span id="badge-arc-req" class="badge">0</span>
-    </a>
+    <div class="section-label">Archivos</div>
+    <div class="grid-botones">
+      <a href="archivo_autorizaciones_page.html" class="btn-grande">
+        <i class="fas fa-archive"></i>
+        Archivo Autorizaciones
+        <span id="badge-arc-aut" class="badge">0</span>
+      </a>
+      <a href="archivo_solicitudes_page.html" class="btn-grande">
+        <i class="fas fa-archive"></i>
+        Archivo Solicitudes
+        <span id="badge-arc-req" class="badge">0</span>
+      </a>
+    </div>
   </div>
 
 </body>
 </html>
+

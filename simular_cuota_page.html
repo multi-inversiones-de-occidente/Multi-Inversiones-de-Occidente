@@ -8,6 +8,8 @@
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
+    html, body { height: 100%; }
+    *, *:before, *:after { box-sizing: border-box; }
     body {
       background: #0d0d0d;
       min-height: 100vh;
@@ -17,17 +19,20 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      min-width: 100vw;
+      width: 100vw;
     }
     .simulador-container {
       background: #181830;
       margin: 32px 8px;
-      padding: 36px 24px 30px 24px;
+      padding: 36px 16px 30px 16px;
       border-radius: 18px;
       box-shadow: 0 8px 24px #0004;
       max-width: 420px;
       width: 100%;
       text-align: center;
       animation: popin .7s;
+      overflow: hidden;
     }
     @keyframes popin {
       0% { transform: scale(.96) translateY(32px); opacity:0; }
@@ -37,6 +42,8 @@
       height: 74px;
       margin-bottom: 16px;
       user-select: none;
+      max-width: 100%;
+      width: auto;
     }
     h1 {
       color: #F8AF40;
@@ -45,11 +52,15 @@
       letter-spacing: 1px;
       margin-bottom: 25px;
       margin-top: 6px;
+      word-break: break-word;
     }
     .form-group {
       margin-bottom: 22px;
       text-align: left;
       position: relative;
+      max-width: 100%;
+      width: 100%;
+      overflow: hidden;
     }
     .form-group label {
       font-size: 1.06rem;
@@ -57,6 +68,7 @@
       margin-bottom: 6px;
       font-weight: 600;
       display: block;
+      word-break: break-word;
     }
     .form-group input,
     .form-group select {
@@ -71,6 +83,15 @@
       margin-top: 1px;
       transition: box-shadow .2s;
       box-shadow: 0 2px 8px #0001 inset;
+      display: block;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+    }
+    .form-group input[type="number"]::-webkit-inner-spin-button,
+    .form-group input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
     }
     .form-group .material-icons {
       position: absolute;
@@ -81,8 +102,9 @@
       color: #67C8F1;
       opacity: .84;
       pointer-events: none;
+      max-width: 24px;
+      min-width: 20px;
     }
-    /* Prima visible solo si aplica */
     .prima-label {
       font-size: .98rem;
       color: #F8AF40;
@@ -132,6 +154,7 @@
       min-height: 48px;
       transition: background .2s;
       animation: fadein .7s;
+      word-break: break-word;
     }
     @keyframes fadein {
       0% { opacity: 0; transform: translateY(25px);}
@@ -147,6 +170,7 @@
       margin-bottom: 9px;
       min-height: 0;
       animation: shake .5s;
+      word-break: break-word;
     }
     @keyframes shake {
       0% { transform: translateX(-7px);}
@@ -156,11 +180,14 @@
     }
     @media (max-width: 540px) {
       .simulador-container {
-        max-width: 98vw;
-        padding: 16px 3vw 20px 3vw;
+        max-width: 99vw;
+        padding: 10vw 2vw 7vw 2vw;
       }
-      h1 { font-size: 1.23rem; }
+      h1 { font-size: 1.15rem; }
       .resultado-cuota { font-size: 1.01rem; }
+      .form-group label { font-size: .98rem;}
+      .form-group input,
+      .form-group select { font-size: .98rem; padding: 10px 8px 10px 38px;}
     }
   </style>
 </head>
@@ -173,7 +200,7 @@
       <div class="form-group">
         <span class="material-icons">attach_money</span>
         <label for="monto">Monto del Crédito</label>
-        <input type="number" id="monto" min="50" max="5000" step="0.01" placeholder="Ejemplo: 1000" required>
+        <input type="number" id="monto" min="50" max="5000" step="0.01" placeholder="Ejemplo: 1000" required autocomplete="off">
       </div>
       <!-- Frecuencia de pago -->
       <div class="form-group">
@@ -190,14 +217,7 @@
       <div class="form-group">
         <span class="material-icons">calendar_month</span>
         <label for="plazo">Plazo del Crédito</label>
-        <select id="plazo">
-          <!-- 1 a 12 meses -->
-          <script>
-            for(let i=1; i<=12; i++) {
-              document.write(`<option value="${i}">${i} mes${i>1?'es':''}</option>`);
-            }
-          </script>
-        </select>
+        <select id="plazo"></select>
       </div>
       <!-- Tipo de crédito -->
       <div class="form-group">
@@ -234,6 +254,15 @@
     <div id="resultado" class="resultado-cuota" style="display:none;"></div>
   </div>
   <script>
+    // Generar opciones de plazo de 1 a 12 meses
+    const plazoSel = document.getElementById('plazo');
+    for(let i=1; i<=12; i++) {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = i + ' mes' + (i > 1 ? 'es' : '');
+      plazoSel.appendChild(opt);
+    }
+
     // Tasas anuales
     const tasas = {
       'CrediCash': 192 / 100,
@@ -309,7 +338,6 @@
         cuota = montoEfectivo * (interesPorPeriodo / (1 - pow));
       }
 
-      // Resultado
       resultadoDiv.style.display = 'block';
       resultadoDiv.textContent = `La cuota (${freq.toLowerCase()}) es: $${isFinite(cuota) ? cuota.toFixed(2) : '0.00'}`;
     };
@@ -324,3 +352,4 @@
   </script>
 </body>
 </html>
+

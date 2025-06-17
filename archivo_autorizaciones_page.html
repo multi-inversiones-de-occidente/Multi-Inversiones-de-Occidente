@@ -41,9 +41,7 @@
         const fecha = doc.fecha
           ? (typeof doc.fecha === 'string'
               ? doc.fecha
-              : doc.fecha.toDate
-                  ? doc.fecha.toDate().toLocaleString('es-SV')
-                  : '')
+              : (doc.fecha.toDate ? doc.fecha.toDate().toLocaleString('es-SV') : ''))
           : '';
         const estado = doc.estado || '';
         tbody.innerHTML += `
@@ -79,7 +77,8 @@
       });
 
       // Carga de autorizaciones archivadas
-      const ref = collection(db, "archivo_autorizaciones");
+      // NOMBRE EXACTO DE LA COLECCIÓN:
+      const ref = collection(db, "Archivo Autorizaciones");
       const q = query(ref, orderBy("fecha", "desc"));
       onSnapshot(q, snap => {
         autorizaciones = snap.docs.map(d => ({
@@ -208,3 +207,4 @@
   </div>
 </body>
 </html>
+

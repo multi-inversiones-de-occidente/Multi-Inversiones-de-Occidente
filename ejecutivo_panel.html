@@ -69,91 +69,94 @@
       margin:0; font-family:Arial,sans-serif;
       background: radial-gradient(circle,#000,#111);
       color:#fff;
+      min-height: 100vh;
     }
     header {
       background:#000; padding:1rem; text-align:center;
       font-size:1.5rem;
+      letter-spacing:1px;
     }
     .container {
-      max-width:800px; margin:0 auto; padding:2rem 1rem;
+      max-width:900px; margin:0 auto; padding:2.5rem 1rem 2rem 1rem;
+      display: flex; flex-direction: column; align-items: center;
     }
-    h1,h2 { margin:1rem 0 0.5rem; }
-    p { margin-bottom:1rem; }
+    h1 { 
+      margin:1rem 0 0.2rem 0; 
+      font-size:2.4rem;
+      font-weight:800;
+      letter-spacing:.5px;
+      text-align:center;
+    }
+    .mensaje-bienvenida {
+      font-size:1.13rem;
+      color:#F8AF40;
+      margin-bottom: 2.3rem;
+      margin-top: 0.4rem;
+      font-weight:600;
+      text-align:center;
+      line-height:1.4;
+      max-width: 620px;
+    }
 
-    /* BOTONES GRANDES NUEVOS */
-    .btns-nuevos {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1.4rem;
-      margin-bottom: 2.5rem;
-      justify-content: center;
+    /* Grid botones grandes */
+    .grid-botones {
+      width:100%;
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
+      gap:1.7rem;
+      margin-bottom:2.7rem;
     }
-    .btn-nuevo {
-      flex: 1 1 220px;
-      min-width: 220px;
-      max-width: 330px;
-      background: linear-gradient(90deg, #67C8F1, #13b66b 95%);
+    .btn-grande {
+      background: linear-gradient(90deg, #67C8F1 0%, #13b66b 100%);
       color: #212121;
       font-weight: bold;
-      font-size: 1.3rem;
+      font-size: 1.25rem;
       border: none;
-      border-radius: 15px;
-      box-shadow: 0 4px 20px #13b66a33;
-      padding: 2.1rem 1.2rem 2rem 1.2rem;
-      margin: 0 0.3rem;
+      border-radius: 18px;
+      box-shadow: 0 4px 22px #13b66a2b;
+      padding: 2.25rem 1.3rem 2.1rem 1.3rem;
       text-align: center;
       cursor: pointer;
-      transition: background .18s, color .18s, transform .15s;
+      transition: background .19s, color .19s, transform .15s;
       position: relative;
       outline: none;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: .6rem;
+      gap: .7rem;
+      min-width:0;
       user-select: none;
     }
-    .btn-nuevo:active,
-    .btn-nuevo:hover {
-      background: linear-gradient(90deg, #13b66b 75%, #67C8F1 100%);
+    .btn-grande:active,
+    .btn-grande:hover {
+      background: linear-gradient(90deg, #13b66b 70%, #67C8F1 100%);
       color: #222;
       transform: scale(1.03);
+      box-shadow: 0 8px 26px #0a644188;
     }
-    .btn-nuevo i {
-      font-size: 2.8rem;
-      margin-bottom: 7px;
+    .btn-grande i {
+      font-size: 2.7rem;
+      margin-bottom: 9px;
       color: #212121;
-      opacity: .8;
-      transition: color .16s;
+      opacity: .89;
+      transition: color .15s;
     }
-    .btn-nuevo:hover i { color: #0c7451; }
-
-    /* Panel botones existentes */
-    .btn-panel {
-      position:relative;
-      display:flex; align-items:center;
-      background:rgba(255,255,255,0.10);
-      border-radius:8px; padding:1rem; margin-bottom:1rem;
-      text-decoration:none; color:#fff;
-      transition: background .18s;
-    }
-    .btn-panel .icon { font-size:1.75rem; margin-right:.75rem; }
-    .btn-panel .text { flex:1; }
-    .btn-panel .arrow { font-size:1rem; color:#aaa; }
-    .badge {
-      position:absolute; top:-8px; right:-8px;
+    .btn-grande:hover i { color: #0c7451; }
+    .btn-grande .badge {
+      position: absolute; top: 16px; right: 18px;
       background:#e74c3c; color:#fff;
-      width:24px; height:24px; border-radius:50%;
+      width:28px; height:28px; border-radius:50%;
       display:flex; align-items:center; justify-content:center;
-      font-size:.75rem; font-weight:bold;
+      font-size:.85rem; font-weight:700;
+      box-shadow:0 1px 8px #0002;
     }
-    .btn-panel:hover {
-      background:rgba(103,200,241,0.08);
-    }
-
-    @media (max-width: 660px) {
-      .btns-nuevos { flex-direction: column; gap: 1.1rem; }
-      .btn-nuevo { min-width: 95vw; max-width: 98vw; }
-      .container { padding: 2rem 3vw;}
+    @media (max-width: 600px) {
+      .container { padding:1.2rem 1vw; }
+      h1 { font-size: 1.35rem;}
+      .mensaje-bienvenida { font-size: .97rem; }
+      .grid-botones { gap:1.08rem; }
+      .btn-grande { padding: 1.7rem 0.6rem 1.4rem 0.6rem; font-size: 1rem;}
+      .btn-grande i { font-size:2rem; }
     }
   </style>
 </head>
@@ -163,57 +166,41 @@
 
   <div class="container">
     <h1 id="usuario-nombre">Bienvenido, usuario</h1>
+    <div class="mensaje-bienvenida">
+      ¡Hola! Estás en tu Panel Ejecutivo.<br>
+      Desde aquí puedes gestionar **autorizaciones**, **aperturas** y **solicitudes de crédito**, así como revisar fácilmente los movimientos y aprobaciones más recientes.<br>
+      <span style="color:#67C8F1;font-weight:700;">¡Gestiona todo de forma rápida, segura y sin complicaciones!</span>
+    </div>
 
-    <!-- NUEVOS BOTONES GRANDES -->
-    <div class="btns-nuevos">
-      <a href="autorizaciones_page.html" class="btn-nuevo">
+    <div class="grid-botones">
+      <a href="autorizaciones_page.html" class="btn-grande">
         <i class="fas fa-user-shield"></i>
         Autorizaciones
       </a>
-      <a href="solicitud_credito_page.html" class="btn-nuevo">
+      <a href="solicitud_credito_page.html" class="btn-grande">
         <i class="fas fa-file-signature"></i>
         Solicitud de Crédito
       </a>
-      <a href="apertura_credito_page.html" class="btn-nuevo">
+      <a href="apertura_credito_page.html" class="btn-grande">
         <i class="fas fa-unlock-alt"></i>
         Apertura Crédito
       </a>
+      <a href="solicitudes_aprobadas_credicash_page.html" class="btn-grande">
+        <i class="fas fa-check-circle"></i>
+        Solicitudes Aprobadas Credicash
+        <span id="badge-exe-credicash" class="badge">0</span>
+      </a>
+      <a href="solicitudes_aprobadas_credicel_page.html" class="btn-grande">
+        <i class="fas fa-check-circle"></i>
+        Solicitudes Aprobadas Credicel
+        <span id="badge-exe-credicel" class="badge">0</span>
+      </a>
+      <a href="solicitudes_aprobadas_amuebla2_page.html" class="btn-grande">
+        <i class="fas fa-check-circle"></i>
+        Solicitudes Aprobadas Amuebla2
+        <span id="badge-exe-amuebla2" class="badge">0</span>
+      </a>
     </div>
-
-    <p>Solicitudes Aprobadas por Línea:</p>
-
-    <!-- Credicash -->
-    <a href="solicitudes_aprobadas_credicash_page.html" class="btn-panel">
-      <i class="fas fa-check-circle icon"></i>
-      <div class="text">
-        <strong>Solicitudes Aprobadas Credicash</strong><br>
-        Ver solicitudes aprobadas de Credicash.
-      </div>
-      <i class="fas fa-chevron-right arrow"></i>
-      <span id="badge-exe-credicash" class="badge">0</span>
-    </a>
-
-    <!-- Credicel -->
-    <a href="solicitudes_aprobadas_credicel_page.html" class="btn-panel">
-      <i class="fas fa-check-circle icon"></i>
-      <div class="text">
-        <strong>Solicitudes Aprobadas Credicel</strong><br>
-        Ver solicitudes aprobadas de Credicel.
-      </div>
-      <i class="fas fa-chevron-right arrow"></i>
-      <span id="badge-exe-credicel" class="badge">0</span>
-    </a>
-
-    <!-- Amuebla2 -->
-    <a href="solicitudes_aprobadas_amuebla2_page.html" class="btn-panel">
-      <i class="fas fa-check-circle icon"></i>
-      <div class="text">
-        <strong>Solicitudes Aprobadas Amuebla2</strong><br>
-        Ver solicitudes aprobadas de Amuebla2.
-      </div>
-      <i class="fas fa-chevron-right arrow"></i>
-      <span id="badge-exe-amuebla2" class="badge">0</span>
-    </a>
   </div>
 
 </body>

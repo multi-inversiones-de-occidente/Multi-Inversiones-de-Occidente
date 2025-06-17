@@ -62,7 +62,6 @@
   </script>
 
   <!-- Estilos -->
-  <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <style>
@@ -81,12 +80,61 @@
     h1,h2 { margin:1rem 0 0.5rem; }
     p { margin-bottom:1rem; }
 
+    /* BOTONES GRANDES NUEVOS */
+    .btns-nuevos {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.4rem;
+      margin-bottom: 2.5rem;
+      justify-content: center;
+    }
+    .btn-nuevo {
+      flex: 1 1 220px;
+      min-width: 220px;
+      max-width: 330px;
+      background: linear-gradient(90deg, #67C8F1, #13b66b 95%);
+      color: #212121;
+      font-weight: bold;
+      font-size: 1.3rem;
+      border: none;
+      border-radius: 15px;
+      box-shadow: 0 4px 20px #13b66a33;
+      padding: 2.1rem 1.2rem 2rem 1.2rem;
+      margin: 0 0.3rem;
+      text-align: center;
+      cursor: pointer;
+      transition: background .18s, color .18s, transform .15s;
+      position: relative;
+      outline: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .6rem;
+      user-select: none;
+    }
+    .btn-nuevo:active,
+    .btn-nuevo:hover {
+      background: linear-gradient(90deg, #13b66b 75%, #67C8F1 100%);
+      color: #222;
+      transform: scale(1.03);
+    }
+    .btn-nuevo i {
+      font-size: 2.8rem;
+      margin-bottom: 7px;
+      color: #212121;
+      opacity: .8;
+      transition: color .16s;
+    }
+    .btn-nuevo:hover i { color: #0c7451; }
+
+    /* Panel botones existentes */
     .btn-panel {
       position:relative;
       display:flex; align-items:center;
-      background:rgba(255,255,255,0.1);
+      background:rgba(255,255,255,0.10);
       border-radius:8px; padding:1rem; margin-bottom:1rem;
       text-decoration:none; color:#fff;
+      transition: background .18s;
     }
     .btn-panel .icon { font-size:1.75rem; margin-right:.75rem; }
     .btn-panel .text { flex:1; }
@@ -98,6 +146,15 @@
       display:flex; align-items:center; justify-content:center;
       font-size:.75rem; font-weight:bold;
     }
+    .btn-panel:hover {
+      background:rgba(103,200,241,0.08);
+    }
+
+    @media (max-width: 660px) {
+      .btns-nuevos { flex-direction: column; gap: 1.1rem; }
+      .btn-nuevo { min-width: 95vw; max-width: 98vw; }
+      .container { padding: 2rem 3vw;}
+    }
   </style>
 </head>
 <body>
@@ -106,6 +163,23 @@
 
   <div class="container">
     <h1 id="usuario-nombre">Bienvenido, usuario</h1>
+
+    <!-- NUEVOS BOTONES GRANDES -->
+    <div class="btns-nuevos">
+      <a href="autorizaciones_page.html" class="btn-nuevo">
+        <i class="fas fa-user-shield"></i>
+        Autorizaciones
+      </a>
+      <a href="solicitud_credito_page.html" class="btn-nuevo">
+        <i class="fas fa-file-signature"></i>
+        Solicitud de Crédito
+      </a>
+      <a href="apertura_credito_page.html" class="btn-nuevo">
+        <i class="fas fa-unlock-alt"></i>
+        Apertura Crédito
+      </a>
+    </div>
+
     <p>Solicitudes Aprobadas por Línea:</p>
 
     <!-- Credicash -->

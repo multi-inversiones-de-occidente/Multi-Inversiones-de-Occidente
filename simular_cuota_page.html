@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Simular Cuota – Multi Inversiones</title>
+  <link rel="icon" href="assets/logo_multinversiones.png" type="image/png"/>
+  <!-- Google Material Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    body {
+      background: #0d0d0d;
+      min-height: 100vh;
+      color: #fff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .simulador-container {
+      background: #181830;
+      margin: 32px 8px;
+      padding: 36px 24px 30px 24px;
+      border-radius: 18px;
+      box-shadow: 0 8px 24px #0004;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      animation: popin .7s;
+    }
+    @keyframes popin {
+      0% { transform: scale(.96) translateY(32px); opacity:0; }
+      100% { transform: scale(1) translateY(0); opacity:1; }
+    }
+    .simulador-container img {
+      height: 74px;
+      margin-bottom: 16px;
+      user-select: none;
+    }
+    h1 {
+      color: #F8AF40;
+      font-size: 2.1rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      margin-bottom: 25px;
+      margin-top: 6px;
+    }
+    .form-group {
+      margin-bottom: 22px;
+      text-align: left;
+      position: relative;
+    }
+    .form-group label {
+      font-size: 1.06rem;
+      color: #fff;
+      margin-bottom: 6px;
+      font-weight: 600;
+      display: block;
+    }
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 12px 14px 12px 44px;
+      border: none;
+      border-radius: 9px;
+      background: #232350;
+      color: #fff;
+      font-size: 1.08rem;
+      outline: none;
+      margin-top: 1px;
+      transition: box-shadow .2s;
+      box-shadow: 0 2px 8px #0001 inset;
+    }
+    .form-group .material-icons {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 1.36rem;
+      color: #67C8F1;
+      opacity: .84;
+      pointer-events: none;
+    }
+    /* Prima visible solo si aplica */
+    .prima-label {
+      font-size: .98rem;
+      color: #F8AF40;
+      font-weight: 700;
+      margin-top: 7px;
+      margin-bottom: 2px;
+      display: block;
+      text-align: left;
+    }
+    .prima-monto {
+      color: #40e573;
+      font-size: 1.12rem;
+      font-weight: bold;
+      margin-bottom: 12px;
+      display: block;
+      text-align: left;
+    }
+    .btn-calcular {
+      width: 90%;
+      max-width: 300px;
+      margin: 22px auto 10px auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 0;
+      background: linear-gradient(90deg, #13b66b 75%, #67C8F1 100%);
+      color: #fff;
+      font-weight: bold;
+      font-size: 1.17rem;
+      border: none;
+      border-radius: 40px;
+      box-shadow: 0 3px 14px #13b66a44;
+      cursor: pointer;
+      transition: background .18s, box-shadow .18s;
+      gap: 10px;
+    }
+    .btn-calcular:active { background: #189653; }
+    .resultado-cuota {
+      margin-top: 18px;
+      color: #fff;
+      background: #262677;
+      border-radius: 9px;
+      padding: 17px 13px 13px 13px;
+      font-size: 1.26rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      min-height: 48px;
+      transition: background .2s;
+      animation: fadein .7s;
+    }
+    @keyframes fadein {
+      0% { opacity: 0; transform: translateY(25px);}
+      100% { opacity: 1; transform: none;}
+    }
+    .error-message {
+      color: #ff5c66;
+      background: #240b13;
+      border-radius: 7px;
+      padding: 9px 11px;
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 9px;
+      min-height: 0;
+      animation: shake .5s;
+    }
+    @keyframes shake {
+      0% { transform: translateX(-7px);}
+      40% { transform: translateX(7px);}
+      60% { transform: translateX(-3px);}
+      100% { transform: none;}
+    }
+    @media (max-width: 540px) {
+      .simulador-container {
+        max-width: 98vw;
+        padding: 16px 3vw 20px 3vw;
+      }
+      h1 { font-size: 1.23rem; }
+      .resultado-cuota { font-size: 1.01rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="simulador-container">
+    <img src="assets/logo_multinversiones.png" alt="Logo Multi Inversiones"/>
+    <h1>Simular Cuota</h1>
+    <form id="form-cuota" autocomplete="off">
+      <!-- Monto -->
+      <div class="form-group">
+        <span class="material-icons">attach_money</span>
+        <label for="monto">Monto del Crédito</label>
+        <input type="number" id="monto" min="50" max="5000" step="0.01" placeholder="Ejemplo: 1000" required>
+      </div>
+      <!-- Frecuencia de pago -->
+      <div class="form-group">
+        <span class="material-icons">event_repeat</span>
+        <label for="frecuencia">Frecuencia de Pago</label>
+        <select id="frecuencia">
+          <option value="Semanales">Semanales</option>
+          <option value="Catorcenales">Catorcenales</option>
+          <option value="Quincenales">Quincenales</option>
+          <option value="Mensuales">Mensuales</option>
+        </select>
+      </div>
+      <!-- Plazo -->
+      <div class="form-group">
+        <span class="material-icons">calendar_month</span>
+        <label for="plazo">Plazo del Crédito</label>
+        <select id="plazo">
+          <!-- 1 a 12 meses -->
+          <script>
+            for(let i=1; i<=12; i++) {
+              document.write(`<option value="${i}">${i} mes${i>1?'es':''}</option>`);
+            }
+          </script>
+        </select>
+      </div>
+      <!-- Tipo de crédito -->
+      <div class="form-group">
+        <span class="material-icons">payments</span>
+        <label for="tipoCredito">Tipo de Crédito</label>
+        <select id="tipoCredito">
+          <option value="CrediCash">CrediCash</option>
+          <option value="Credicel">Credicel</option>
+          <option value="Amuebla2">Amuebla2</option>
+        </select>
+      </div>
+      <!-- Prima (solo Credicel o Amuebla2) -->
+      <div id="prima-group" style="display:none;">
+        <div class="form-group" style="margin-bottom:7px;">
+          <span class="material-icons">percent</span>
+          <label for="prima">Prima</label>
+          <select id="prima">
+            <option value="15%">15%</option>
+            <option value="0%">0% (Promoción)</option>
+          </select>
+        </div>
+        <span class="prima-label">Monto de la Prima:</span>
+        <span class="prima-monto" id="prima-monto">$0.00</span>
+      </div>
+      <!-- Error -->
+      <div id="error-message" class="error-message" style="display:none;"></div>
+      <!-- Botón calcular -->
+      <button type="submit" class="btn-calcular">
+        <span class="material-icons">calculate</span>
+        Calcular
+      </button>
+    </form>
+    <!-- Resultado -->
+    <div id="resultado" class="resultado-cuota" style="display:none;"></div>
+  </div>
+  <script>
+    // Tasas anuales
+    const tasas = {
+      'CrediCash': 192 / 100,
+      'Credicel': 150 / 100,
+      'Amuebla2': 132 / 100,
+    };
+
+    // Elementos
+    const form      = document.getElementById('form-cuota');
+    const montoIn   = document.getElementById('monto');
+    const frecuencia= document.getElementById('frecuencia');
+    const plazo     = document.getElementById('plazo');
+    const tipoCredito= document.getElementById('tipoCredito');
+    const primaGroup= document.getElementById('prima-group');
+    const primaSel  = document.getElementById('prima');
+    const primaMonto= document.getElementById('prima-monto');
+    const errorDiv  = document.getElementById('error-message');
+    const resultadoDiv = document.getElementById('resultado');
+
+    // Mostrar/Ocultar Prima
+    tipoCredito.addEventListener('change', actualizarPrima);
+    montoIn.addEventListener('input', actualizarPrima);
+    primaSel.addEventListener('change', actualizarPrima);
+
+    function actualizarPrima() {
+      const tipo = tipoCredito.value;
+      const monto = parseFloat(montoIn.value) || 0;
+      if (tipo === 'Credicel' || tipo === 'Amuebla2') {
+        primaGroup.style.display = '';
+        const porcentaje = primaSel.value === '15%' ? 0.15 : 0;
+        primaMonto.textContent = '$' + (monto * porcentaje).toFixed(2);
+      } else {
+        primaGroup.style.display = 'none';
+      }
+    }
+
+    // Cálculo de cuota
+    form.onsubmit = e => {
+      e.preventDefault();
+      errorDiv.style.display = 'none';
+      resultadoDiv.style.display = 'none';
+
+      const monto = parseFloat(montoIn.value);
+      if (!monto || monto < 50) {
+        mostrarError('Por favor, ingresa un monto válido (mínimo $50).');
+        return;
+      }
+
+      const tipo = tipoCredito.value;
+      const tasaAnual = tasas[tipo];
+      const freq = frecuencia.value;
+      const meses = parseInt(plazo.value);
+
+      // Pagos anuales
+      const pagosAnuales = {
+        'Semanales': 52,
+        'Catorcenales': 26,
+        'Quincenales': 24,
+        'Mensuales': 12
+      }[freq] || 12;
+      const interesPorPeriodo = tasaAnual / pagosAnuales;
+      const totalPagos = meses * Math.floor(pagosAnuales / 12);
+
+      // Prima
+      let montoEfectivo = monto;
+      if (tipo === 'Credicel' || tipo === 'Amuebla2') {
+        montoEfectivo = primaSel.value === '15%' ? monto * 0.85 : monto;
+      }
+      // Cuota (fórmula francesa)
+      const pow = Math.pow(1 + interesPorPeriodo, -totalPagos);
+      let cuota = 0;
+      if (interesPorPeriodo > 0 && totalPagos > 0) {
+        cuota = montoEfectivo * (interesPorPeriodo / (1 - pow));
+      }
+
+      // Resultado
+      resultadoDiv.style.display = 'block';
+      resultadoDiv.textContent = `La cuota (${freq.toLowerCase()}) es: $${isFinite(cuota) ? cuota.toFixed(2) : '0.00'}`;
+    };
+
+    function mostrarError(msj) {
+      errorDiv.textContent = msj;
+      errorDiv.style.display = 'block';
+    }
+
+    // Inicialización
+    actualizarPrima();
+  </script>
+</body>
+</html>

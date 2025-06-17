@@ -8,7 +8,7 @@
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -25,7 +25,6 @@
     const auth = getAuth(app);
 
     function suscribirBadge(idBadge, coleccion, filtros = []) {
-      // Si no hay filtros, solo consulta la colección
       const q = filtros.length > 0
         ? query(collection(db, coleccion), ...filtros)
         : collection(db, coleccion);
@@ -53,9 +52,9 @@
       suscribirBadge("badge-req-credicel",   "solicitud_de_credito", [ where("creditLine","==","Credicel") ]);
       suscribirBadge("badge-req-amuebla2",   "solicitud_de_credito", [ where("creditLine","==","Amuebla2") ]);
       suscribirBadge("badge-req-credicash",  "solicitud_de_credito", [ where("creditLine","==","Credicash") ]);
-      // Archivos (aquí quité el orderBy, ya que orderBy sin limit no es necesario para contar)
-      suscribirBadge("badge-arc-aut", "archivo_autorizaciones", []);
-      suscribirBadge("badge-arc-req", "archivo_solicitudes",     []);
+      // Archivos (NOMBRES EXACTOS COMO EN FIRESTORE)
+      suscribirBadge("badge-arc-aut", "Archivo Autorizaciones", []);
+      suscribirBadge("badge-arc-req", "Archivo Solicitudes", []);
     });
   </script>
 
@@ -93,7 +92,6 @@
       line-height:1.35;
       max-width: 630px;
     }
-
     .section-label {
       color: #67C8F1;
       font-size: 1.22rem;
@@ -242,4 +240,3 @@
 
 </body>
 </html>
-

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Archivo de Autorizaciones – Multi Inversiones</title>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app  = initializeApp(firebaseConfig);
+    const db   = getFirestore(app);
+    const auth = getAuth(app);
+
+    let autorizaciones = [];
+
+    function renderTable(data) {
+      const tbody = document.getElementById('tabla-autorizaciones');
+      tbody.innerHTML = '';
+
+      if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="color:#ccc;text-align:center;padding:35px 0;">No se encontraron autorizaciones archivadas.</td></tr>`;
+        return;
+      }
+      data.forEach(doc => {
+        const nombre = doc.nombre || 'Sin nombre';
+        const dui = doc.dui || 'Sin DUI';
+        const creditLine = doc.creditLine || '';
+        const fecha = doc.fecha
+          ? (typeof doc.fecha === 'string'
+              ? doc.fecha
+              : doc.fecha.toDate
+                  ? doc.fecha.toDate().toLocaleString('es-SV')
+                  : '')
+          : '';
+        const estado = doc.estado || '';
+        tbody.innerHTML += `
+          <tr>
+            <td><i class="fas fa-file-signature"></i></td>
+            <td>${nombre}</td>
+            <td>${dui}</td>
+            <td>${creditLine}</td>
+            <td>${fecha}</td>
+            <td>${estado}</td>
+          </tr>
+        `;
+      });
+    }
+
+    function applyFilter(term) {
+      const t = term.trim().toLowerCase();
+      if (!t) {
+        renderTable(autorizaciones);
+      } else {
+        const filtered = autorizaciones.filter(doc =>
+          (doc.nombre || '').toLowerCase().includes(t) ||
+          (doc.dui || '').toLowerCase().includes(t)
+        );
+        renderTable(filtered);
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      // Autenticación
+      onAuthStateChanged(auth, user => {
+        if (!user) window.location.href = "login.html";
+      });
+
+      // Carga de autorizaciones archivadas
+      const ref = collection(db, "archivo_autorizaciones");
+      const q = query(ref, orderBy("fecha", "desc"));
+      onSnapshot(q, snap => {
+        autorizaciones = snap.docs.map(d => ({
+          id: d.id,
+          ...d.data()
+        }));
+        applyFilter(document.getElementById('search').value);
+      });
+
+      // Buscador en vivo
+      document.getElementById('search').addEventListener('input', e => {
+        applyFilter(e.target.value);
+      });
+    });
+  </script>
+
+  <!-- FontAwesome para íconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      background: #111;
+      color: #fff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+      margin: 0;
+    }
+    header {
+      background:#000;
+      padding:1rem 0;
+      text-align:center;
+      font-size:1.5rem;
+      letter-spacing:1px;
+      font-weight:700;
+      color: #67C8F1;
+    }
+    .container {
+      max-width: 1100px;
+      margin: 2.2rem auto 0 auto;
+      background: #181818;
+      border-radius: 18px;
+      box-shadow: 0 2px 25px #0005;
+      padding: 2.5rem 2.3rem;
+    }
+    h1 {
+      margin: 0 0 1.2rem 0;
+      font-size: 2rem;
+      color: #F8AF40;
+      font-weight: bold;
+      text-align:center;
+    }
+    .searchbar {
+      width: 100%;
+      max-width: 420px;
+      margin: 0 auto 2.5rem auto;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    .searchbar input {
+      width: 100%;
+      padding: 0.7rem 1.1rem;
+      border-radius: 7px;
+      border: none;
+      font-size: 1.12rem;
+      background: #232323;
+      color: #fff;
+      box-shadow: 0 1px 6px #0002;
+      outline: none;
+    }
+    .searchbar i {
+      color: #67C8F1;
+      font-size: 1.18rem;
+      margin-right: .4rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: .2rem;
+      background: #181818;
+    }
+    th, td {
+      padding: 1rem .7rem;
+      border-bottom: 1px solid #292929;
+      text-align: left;
+      font-size: 1.01rem;
+    }
+    th {
+      background: #212a2c;
+      color: #67C8F1;
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+    tr:hover { background: #232c31; }
+    @media (max-width:700px) {
+      .container { padding: 1.3rem 0.5rem; }
+      th, td { padding: 0.6rem 0.3rem; font-size: 0.97rem;}
+      h1 { font-size: 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>Archivo de Autorizaciones</header>
+  <div class="container">
+    <h1><i class="fas fa-archive"></i> Archivo de Autorizaciones</h1>
+    <div class="searchbar">
+      <i class="fas fa-search"></i>
+      <input id="search" type="text" placeholder="Buscar por nombre o DUI..." autocomplete="off" />
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Nombre</th>
+            <th>DUI</th>
+            <th>Línea</th>
+            <th>Fecha</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-autorizaciones">
+          <tr><td colspan="6" style="color:#ccc;text-align:center;padding:40px 0;">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

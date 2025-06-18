@@ -39,12 +39,12 @@
         tbody.innerHTML += `
           <tr>
             <td><i class="fas fa-check-circle"></i></td>
-            <td>${row.nombre || ''}</td>
-            <td>${row.numeroDui || row.dui || ''}</td>
-            <td>${row.montoAprobado !== undefined ? ('$' + row.montoAprobado) : ''}</td>
-            <td>${row.cuota !== undefined ? ('$' + row.cuota) : ''}</td>
-            <td>${row.frecuenciaPago ? (row.frecuenciaPago + ' x ' + (row.numeroCuotas ?? '')) : ''}</td>
-            <td>${row.fechaAsignacion || ''}</td>
+            <td>${row.nombre}</td>
+            <td>${row.numeroDui}</td>
+            <td>${row.montoAprobado}</td>
+            <td>${row.cuota}</td>
+            <td>${row.frecuenciaPago} x ${row.numeroCuotas}</td>
+            <td>${row.fechaAsignacion}</td>
           </tr>
         `;
       });
@@ -57,8 +57,8 @@
         renderTable(asignaciones);
       } else {
         const filtered = asignaciones.filter(row =>
-          ((row.nombre || '').toLowerCase().includes(t)) ||
-          ((row.numeroDui || row.dui || '').toLowerCase().includes(t))
+          (row.nombre || '').toLowerCase().includes(t) ||
+          (row.numeroDui || '').toLowerCase().includes(t)
         );
         renderTable(filtered);
       }
@@ -71,51 +71,47 @@
           return;
         }
 
-        // Consulta todas las asignaciones de Credicash para este usuario
+        // Consulta todas las asignaciones para el usuario
         const asignQuery = query(
           collection(db, "asignacion_de_cuota"),
           where("AsignacionID", "==", user.uid),
-          where("creditLine", "==", "Credicash"),
           orderBy("fechaAsignacion", "desc")
         );
 
         // Escuchar en tiempo real los cambios
         onSnapshot(asignQuery, async (snap) => {
           asignaciones = [];
-          for (let i = 0; i < snap.docs.length; i++) {
-            const asignData = snap.docs[i].data();
-            let solicitudData = {};
-            if (asignData.solicitudID) {
-              try {
-                const solRef = doc(db, "Archivo Solicitudes", asignData.solicitudID);
-                const solSnap = await getDoc(solRef);
-                if (solSnap.exists()) {
-                  solicitudData = solSnap.data();
-                  // Solo mostrar si está aprobada y es Credicash
-                  if (
-                    solicitudData.estado !== 'Aprobado' ||
-                    solicitudData.creditLine !== 'Credicash'
-                  ) continue;
-                } else {
-                  continue;
-                }
-              } catch (err) { continue; }
-            } else {
-              continue;
+          // Usamos un array de promesas para hacer el fetch de todas las solicitudes en paralelo
+          const promesas = snap.docs.map(async (asignDoc) => {
+            const asignData = asignDoc.data();
+            const solicitudID = asignData.solicitudID;
+            if (!solicitudID) return null;
+            try {
+              const solRef = doc(db, "Archivo Solicitudes", solicitudID);
+              const solSnap = await getDoc(solRef);
+              if (!solSnap.exists()) return null;
+              const solData = solSnap.data();
+              // SOLO mostrar Credicash y Aprobado
+              if (solData.creditLine !== "Credicash" || solData.estado !== "Aprobado") return null;
+              return {
+                nombre: solData.nombre || '',
+                numeroDui: solData.numeroDui || solData.dui || '',
+                montoAprobado: asignData.montoAprobado ?? '',
+                cuota: asignData.cuota ?? '',
+                frecuenciaPago: asignData.frecuenciaPago ?? '',
+                numeroCuotas: asignData.numeroCuotas ?? '',
+                fechaAsignacion: asignData.fechaAsignacion && asignData.fechaAsignacion.toDate
+                  ? asignData.fechaAsignacion.toDate().toLocaleString('es-SV')
+                  : '',
+              };
+            } catch (err) {
+              // Si ocurre un error, simplemente lo ignoramos para ese documento
+              return null;
             }
-            asignaciones.push({
-              nombre: solicitudData.nombre || '',
-              numeroDui: solicitudData.numeroDui || solicitudData.dui || '',
-              dui: solicitudData.dui || '', // fallback extra
-              montoAprobado: asignData.montoAprobado ?? '',
-              cuota: asignData.cuota ?? '',
-              frecuenciaPago: asignData.frecuenciaPago ?? '',
-              numeroCuotas: asignData.numeroCuotas ?? '',
-              fechaAsignacion: asignData.fechaAsignacion && asignData.fechaAsignacion.toDate
-                ? asignData.fechaAsignacion.toDate().toLocaleString('es-SV')
-                : '',
-            });
-          }
+          });
+          // Espera que todas las promesas terminen
+          const resultados = await Promise.all(promesas);
+          asignaciones = resultados.filter(item => !!item); // Solo los válidos
           applyFilter(document.getElementById('search').value);
         });
 
@@ -240,3 +236,4 @@
   </div>
 </body>
 </html>
+

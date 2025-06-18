@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Apertura de Crédito – Multi Inversiones</title>
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, doc, getDoc, addDoc, limit, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    // Configuración Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    let solicitudData = null;
+    let asignacionData = null;
+    let amortizacion = [];
+    let guardando = false;
+    let solicitudID = null;
+
+    // Utilidad para obtener parámetros GET
+    function getQueryParam(key) {
+      return new URLSearchParams(window.location.search).get(key);
+    }
+
+    function setLoading(msg = "Cargando...") {
+      document.getElementById('main-content').innerHTML = `<div style="color:#fff;text-align:center;padding:70px 0;">${msg}</div>`;
+    }
+
+    // Mostrar info y controles
+    function renderMain() {
+      if (!solicitudData) {
+        setLoading("Solicitud no encontrada");
+        return;
+      }
+
+      let html = `
+        <div style="margin-bottom: 22px;">
+          <label style="color:#aaa;font-size:14px;">Línea de Crédito</label>
+          <input type="text" value="${solicitudData.creditLine ?? ''}" disabled style="width:100%;padding:8px;margin-top:3px;border-radius:8px;background:#191919;color:#fff;border:1px solid #222;font-size:16px;">
+        </div>
+        <div class="info-row">Nombre: ${solicitudData.nombre ?? ''}</div>
+        <div class="info-row">Apellido: ${solicitudData.apellido ?? ''}</div>
+        <div class="info-row">Monto Solicitado: $${solicitudData.montoAprobado ?? ''}</div>
+      `;
+
+      if (!asignacionData) {
+        html += `<div style="margin-top:30px;color:#aaa;">Asignación: No disponible</div>`;
+      } else {
+        html += `
+          <div class="info-row">Frecuencia de Pago: ${asignacionData.frecuenciaPago ?? ''}</div>
+          <div class="info-row">Número de Cuotas: ${asignacionData.numeroCuotas ?? ''}</div>
+          <div class="info-row">Cuota Aprobada: $${asignacionData.cuota ?? ''}</div>
+        `;
+      }
+
+      html += `
+        <div style="margin:30px 0 15px 0;">
+          <button id="guardar-credito-btn" ${guardando || !asignacionData ? "disabled" : ""} style="background:#13b66b;border:none;color:#fff;font-weight:bold;padding:15px 0;width:100%;font-size:17px;border-radius:10px;cursor:pointer;">
+            ${guardando ? "Guardando..." : "Guardar Crédito"}
+          </button>
+        </div>
+      `;
+
+      // Tabla de amortización
+      if (asignacionData && Array.isArray(amortizacion) && amortizacion.length > 0) {
+        html += `
+          <div style="margin:35px 0 7px 0;font-weight:bold;font-size:18px;color:#fff;">Tabla de Amortización:</div>
+          <div style="overflow-x:auto;">
+            <table style="min-width:700px;background:#191919;">
+              <thead>
+                <tr>
+                  <th>N°</th>
+                  <th>Fecha</th>
+                  <th>Cuota</th>
+                  <th>Interés</th>
+                  <th>Capital</th>
+                  <th>Saldo</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${
+                  amortizacion.map(row => `
+                    <tr>
+                      <td>${row.numeroCuota ?? ''}</td>
+                      <td>${row.fecha ? String(row.fecha).split("T")[0] : ''}</td>
+                      <td>$${row.cuota ?? ''}</td>
+                      <td>$${row.interes ?? ''}</td>
+                      <td>$${row.capital ?? ''}</td>
+                      <td>$${row.saldo ?? ''}</td>
+                    </tr>
+                  `).join('')
+                }
+              </tbody>
+            </table>
+          </div>
+        `;
+      } else if (!asignacionData) {
+        html += ``;
+      } else {
+        html += `<div style="margin-top:18px;color:#aaa;">No hay amortización disponible.</div>`;
+      }
+
+      document.getElementById('main-content').innerHTML = html;
+
+      // Event listener para guardar
+      const btn = document.getElementById("guardar-credito-btn");
+      if (btn) {
+        btn.addEventListener("click", async () => {
+          if (guardando) return;
+          guardando = true;
+          renderMain();
+          await guardarCredito();
+          guardando = false;
+          renderMain();
+        });
+      }
+    }
+
+    async function fetchSolicitudYAsignacion() {
+      setLoading();
+      try {
+        solicitudID = getQueryParam('id');
+        if (!solicitudID) {
+          setLoading("No se especificó una solicitud.");
+          return;
+        }
+        // Solicitud
+        const solRef = doc(db, "Archivo Solicitudes", solicitudID);
+        const solSnap = await getDoc(solRef);
+        if (!solSnap.exists()) throw new Error("Solicitud no encontrada");
+        solicitudData = solSnap.data();
+
+        // Asignación (solo una)
+        const asignSnap = await getDocs(
+          query(
+            collection(db, "asignacion_de_cuota"),
+            where("solicitudID", "==", solicitudID),
+            limit(1)
+          )
+        );
+        if (!asignSnap.empty) {
+          asignacionData = asignSnap.docs[0].data();
+          const rawAmort = Array.isArray(asignacionData.amortizacion)
+            ? asignacionData.amortizacion : [];
+          amortizacion = rawAmort.map(e => (typeof e === "object" ? e : {}));
+        } else {
+          asignacionData = null;
+          amortizacion = [];
+        }
+        renderMain();
+      } catch (e) {
+        setLoading("Error cargando datos: " + (e.message || e));
+      }
+    }
+
+    async function guardarCredito() {
+      // Validaciones
+      if (!solicitudData || !asignacionData) {
+        alert("No hay datos completos para guardar el crédito.");
+        return;
+      }
+      // Prepara campos
+      const montoAprobado = Number(asignacionData.montoAprobado) || 0;
+      const frecuenciaPago = asignacionData.frecuenciaPago || "";
+      const numeroCuotas = Number(asignacionData.numeroCuotas) || 0;
+      const cuotaAprobada = Number(asignacionData.cuota) || 0;
+      const asignadoNombre = asignacionData.asignadoA || "";
+      const agenciaAsignada = asignacionData.agenciaAsignada || "";
+      const numeroDui = solicitudData.numeroDui || '';
+      const direccion = solicitudData.direccion || '';
+      const telefono = solicitudData.telefono || '';
+      const papeleriaDescontada = 5.0;
+      const saldoInicial = montoAprobado;
+      const saldoActual = montoAprobado;
+      const clienteID = solicitudData.clienteID || "";
+
+      try {
+        await addDoc(collection(db, "creditos"), {
+          clienteID: clienteID,
+          nombre: solicitudData.nombre || "",
+          apellido: solicitudData.apellido || "",
+          numeroDui: numeroDui,
+          direccion: direccion,
+          telefono: telefono,
+          papeleriaDescontada: papeleriaDescontada,
+          montoAprobado: montoAprobado,
+          saldoInicial: saldoInicial.toFixed(2),
+          saldoActual: saldoActual.toFixed(2),
+          interesActual: 0.0,
+          capitalAtrasado: 0.0,
+          multasAcumuladas: 0.0,
+          paraPonerseAlDia: 0.0,
+          cuotasAtrasadas: 0,
+          lineaDeCredito: solicitudData.creditLine || "Credicash",
+          frecuenciaPago: frecuenciaPago,
+          numeroCuotas: numeroCuotas,
+          cuotaAprobada: cuotaAprobada,
+          estadoCredito: "Activo",
+          fechaInicio: new Date().toISOString(),
+          ultimaActualizacion: new Date().toISOString(),
+          amortizacion: amortizacion,
+          asignadoA: asignadoNombre,
+          agenciaAsignada: agenciaAsignada
+        });
+        alert("Crédito guardado correctamente.");
+      } catch (e) {
+        alert("Error guardando crédito: " + (e.message || e));
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      onAuthStateChanged(auth, user => {
+        if (!user) {
+          setLoading("No autenticado. Redirigiendo...");
+          setTimeout(() => window.location.href = "login.html", 1200);
+          return;
+        }
+        fetchSolicitudYAsignacion();
+      });
+    });
+  </script>
+  <style>
+    body {
+      background: #101212;
+      color: #fff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+      margin: 0;
+    }
+    header {
+      background: #000;
+      padding: 1rem 0;
+      text-align: center;
+      font-size: 1.45rem;
+      letter-spacing: 1px;
+      font-weight: 700;
+      color: #67C8F1;
+    }
+    .container {
+      max-width: 660px;
+      margin: 2.5rem auto 0 auto;
+      background: #191919;
+      border-radius: 18px;
+      box-shadow: 0 2px 25px #0005;
+      padding: 2.3rem 2.2rem;
+      min-height: 320px;
+    }
+    h1 {
+      margin: 0 0 1.2rem 0;
+      font-size: 2rem;
+      color: #F8AF40;
+      font-weight: bold;
+      text-align: center;
+    }
+    .info-row {
+      margin-bottom: 10px;
+      color: #eaeaea;
+      font-size: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      background: #181818;
+    }
+    th, td {
+      padding: 0.7rem .7rem;
+      border-bottom: 1px solid #222;
+      text-align: left;
+      font-size: 1rem;
+    }
+    th {
+      background: #222a2c;
+      color: #67C8F1;
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+    tr:hover { background: #232c31; }
+    @media (max-width:750px) {
+      .container { padding: 1.2rem 0.7rem; }
+      h1 { font-size: 1.25rem; }
+      .info-row { font-size: 15px;}
+      table { min-width:600px;}
+    }
+  </style>
+</head>
+<body>
+  <header>Apertura de Crédito</header>
+  <div class="container">
+    <h1>Apertura de Crédito</h1>
+    <div id="main-content" style="min-height:240px;">Cargando...</div>
+  </div>
+</body>
+</html>

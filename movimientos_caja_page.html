@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nuevo Movimiento de Caja – Multi Inversiones</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background: #101212; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
+    header { background: #000; padding: 1rem 0; text-align: center; font-size: 1.45rem; letter-spacing: 1px; font-weight: 700; color: #67C8F1;}
+    .container { max-width: 470px; margin: 2.5rem auto 0 auto; background: #1b1c1e; border-radius: 16px; box-shadow: 0 2px 22px #0008; padding: 2.2rem 1.6rem 1.7rem 1.6rem;}
+    .titulo { font-size: 1.4rem; font-weight: bold; margin-bottom: 10px;}
+    .input-main, .select-main, .input-observ { width: 100%; background: #23272c; color: #fff; border: 1.7px solid #3c3f43; border-radius: 10px; font-size: 1.12rem; padding: 12px 14px; margin-bottom: 0.9em; outline: none; box-sizing: border-box;}
+    .select-main option { color: #23272c; background: #fff;}
+    .input-observ { min-height: 54px; resize: vertical;}
+    .label { color: #67C8F1; font-weight: 600; margin-bottom: 5px; display: block;}
+    .btn-main { width: 100%; background: #13b66b; color: #fff; border: none; border-radius: 9px; font-size: 1.13rem; font-weight: 600; padding: 13px 0; cursor: pointer; margin-top: 1.35em; margin-bottom: 0.6em; transition: background .17s;}
+    .btn-main:active, .btn-main:hover { background: #0b854c;}
+    .error { color: #e74c3c; font-size: 1.01rem; margin-bottom: 10px;}
+    .ok-msg { color: #13b66b; text-align: center; font-weight: bold; margin-bottom: 18px; font-size: 1.13rem;}
+    .usuario-label { color: #F8AF40; margin-bottom: 0.8em; font-weight: 600;}
+    .fecha-row { color: #b5c9d8; font-size: 1.08rem; margin-bottom: 25px;}
+    @media (max-width:600px){.container{padding:1.3rem .7rem;}}
+  </style>
+</head>
+<body>
+  <header>Nuevo Movimiento de Caja</header>
+  <div class="container">
+    <div class="titulo">Registrar Movimiento</div>
+    <div id="usuario" class="usuario-label"></div>
+    <form id="form-mov-caja" autocomplete="off">
+      <label class="label" for="movimiento">Tipo de Movimiento</label>
+      <select id="movimiento" class="select-main" required>
+        <option value="" disabled selected>Selecciona un movimiento</option>
+        <option value="Requisición de efectivo" data-tipo="Ingreso">Requisición de efectivo</option>
+        <option value="Abono a fechas anteriores" data-tipo="Ingreso">Abono a fechas anteriores</option>
+        <option value="Otros ingresos" data-tipo="Ingreso">Otros ingresos</option>
+        <option value="Análisis financiero" data-tipo="Ingreso">Análisis financiero</option>
+        <option value="Devolución a bóveda" data-tipo="Egreso">Devolución a bóveda</option>
+        <option value="Desembolso" data-tipo="Egreso">Desembolso</option>
+        <option value="Comisiones" data-tipo="Egreso">Comisiones</option>
+        <option value="Otros gastos" data-tipo="Egreso">Otros gastos</option>
+        <option value="Adelanto salarial" data-tipo="Egreso">Adelanto salarial</option>
+        <option value="Pago de teléfono e Internet" data-tipo="Egreso">Pago de teléfono e Internet</option>
+        <option value="Pago de energía" data-tipo="Egreso">Pago de energía</option>
+        <option value="Pago de anda" data-tipo="Egreso">Pago de anda</option>
+        <option value="Viáticos" data-tipo="Egreso">Viáticos</option>
+        <option value="Pago de alquiler" data-tipo="Egreso">Pago de alquiler</option>
+        <option value="Pago de abogados" data-tipo="Egreso">Pago de abogados</option>
+      </select>
+      <div id="movimiento-error" class="error" style="display:none;"></div>
+
+      <label class="label" for="monto">Monto</label>
+      <input id="monto" class="input-main" type="number" min="0.01" step="0.01" placeholder="0.00" required/>
+      <div id="monto-error" class="error" style="display:none;"></div>
+
+      <label class="label" for="observaciones">Observaciones</label>
+      <textarea id="observaciones" class="input-observ" placeholder="Escribe aquí las observaciones..."></textarea>
+
+      <div class="fecha-row" id="fecha-row"></div>
+      <button type="submit" class="btn-main">Registrar Movimiento</button>
+      <div id="ok-msg" class="ok-msg" style="display:none;"></div>
+    </form>
+  </div>
+
+  <!-- Firebase & lógica -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDoc, doc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    let usuarioActual = "Usuario desconocido";
+    let userId = null;
+    let userAgencia = "Desconocida";
+
+    // Fecha actual
+    function getFechaLocalStr() {
+      const d = new Date();
+      return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+    }
+    document.getElementById("fecha-row").textContent = "Fecha: " + getFechaLocalStr();
+
+    // Auth
+    onAuthStateChanged(auth, async user => {
+      if (!user) return location.href = "login.html";
+      usuarioActual = user.displayName || user.email || "Usuario desconocido";
+      userId = user.uid;
+      document.getElementById("usuario").textContent = "Gestión realizada por: " + usuarioActual;
+
+      // Obtener agencia (department)
+      try {
+        const docUser = await getDoc(doc(db, "users", user.uid));
+        if (docUser.exists() && docUser.data().department) {
+          userAgencia = docUser.data().department;
+        }
+      } catch (e) {}
+    });
+
+    // Validación y registro
+    document.getElementById("form-mov-caja").onsubmit = async function(e) {
+      e.preventDefault();
+      // Limpia errores previos
+      document.getElementById("movimiento-error").style.display = "none";
+      document.getElementById("monto-error").style.display = "none";
+      document.getElementById("ok-msg").style.display = "none";
+
+      // Valida movimiento
+      const movimientoSel = document.getElementById("movimiento").value;
+      const montoSel = document.getElementById("monto").value;
+      if (!movimientoSel) {
+        document.getElementById("movimiento-error").textContent = "Selecciona un movimiento";
+        document.getElementById("movimiento-error").style.display = "block";
+        return;
+      }
+      if (!montoSel || isNaN(montoSel) || parseFloat(montoSel) <= 0) {
+        document.getElementById("monto-error").textContent = "Ingresa un monto válido";
+        document.getElementById("monto-error").style.display = "block";
+        return;
+      }
+      const optionSel = document.querySelector(`#movimiento option[value="${movimientoSel}"]`);
+      const tipoReal = optionSel ? optionSel.getAttribute("data-tipo") : "Ingreso";
+      const observaciones = document.getElementById("observaciones").value.trim();
+
+      // Registro en Firestore
+      await addDoc(collection(db, "movimientosCaja"), {
+        descripcion: movimientoSel,
+        tipo: tipoReal,
+        monto: parseFloat(montoSel),
+        observaciones: observaciones,
+        fecha: new Date().toISOString(),
+        usuario: usuarioActual,
+        agencia: userAgencia,
+      });
+
+      document.getElementById("ok-msg").textContent = "Movimiento registrado exitosamente";
+      document.getElementById("ok-msg").style.display = "block";
+      document.getElementById("form-mov-caja").reset();
+      document.getElementById("fecha-row").textContent = "Fecha: " + getFechaLocalStr();
+    };
+  </script>
+</body>
+</html>

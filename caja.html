@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Panel de Caja – Multi Inversiones</title>
-
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
@@ -24,12 +23,13 @@
     const db   = getFirestore(app);
     const auth = getAuth(app);
 
-    function suscribirBadge(idBadge, col, filtros=[]) {
-      const q = query(collection(db, col), ...filtros);
+    // Función para suscribir el badge con todos los filtros requeridos
+    function suscribirBadge(idBadge, filtros=[]) {
+      const q = query(collection(db, "Archivo Solicitudes"), ...filtros);
       onSnapshot(q, snap => {
         document.getElementById(idBadge).textContent = snap.docs.length;
       }, err => {
-        console.error("Error en", col, err);
+        console.error("Error en Archivo Solicitudes", err);
         document.getElementById(idBadge).textContent = "!";
       });
     }
@@ -38,23 +38,34 @@
       onAuthStateChanged(auth, user => {
         if (!user) return location.href = "login.html";
         document.getElementById("usuario-nombre").textContent = user.email;
-      });
+        const uid = user.uid;
 
-      suscribirBadge(
-        "badge-app-credicash",
-        "solicitud_de_credito",
-        [ where("estado","==","Aprobado"), where("creditLine","==","Credicash") ]
-      );
-      suscribirBadge(
-        "badge-app-credicel",
-        "solicitud_de_credito",
-        [ where("estado","==","Aprobado"), where("creditLine","==","Credicel") ]
-      );
-      suscribirBadge(
-        "badge-app-amuebla2",
-        "solicitud_de_credito",
-        [ where("estado","==","Aprobado"), where("creditLine","==","Amuebla2") ]
-      );
+        // Filtro SOLO las solicitudes aprobadas y asignadas a este usuario:
+        suscribirBadge(
+          "badge-app-credicash",
+          [
+            where("estado","==","Aprobado"),
+            where("creditLine","==","Credicash"),
+            where("AsignacionID", "==", uid)
+          ]
+        );
+        suscribirBadge(
+          "badge-app-credicel",
+          [
+            where("estado","==","Aprobado"),
+            where("creditLine","==","Credicel"),
+            where("AsignacionID", "==", uid)
+          ]
+        );
+        suscribirBadge(
+          "badge-app-amuebla2",
+          [
+            where("estado","==","Aprobado"),
+            where("creditLine","==","Amuebla2"),
+            where("AsignacionID", "==", uid)
+          ]
+        );
+      });
     });
   </script>
 
@@ -203,5 +214,6 @@
 
 </body>
 </html>
+
 
 

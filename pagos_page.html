@@ -3,194 +3,37 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Pagos – Multi Inversiones</title>
+  <title>Recepción de Pagos – Multi Inversiones</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body {
-      background: #101212;
-      color: #fff;
-      font-family: 'Segoe UI', Arial, sans-serif;
-      margin: 0;
-      min-height: 100vh;
-    }
-    header {
-      background: #000;
-      padding: 1rem 0;
-      text-align: center;
-      font-size: 1.45rem;
-      letter-spacing: 1px;
-      font-weight: 700;
-      color: #67C8F1;
-    }
-    .container {
-      max-width: 600px;
-      margin: 2.5rem auto 0 auto;
-      background: #191919;
-      border-radius: 18px;
-      box-shadow: 0 2px 25px #0005;
-      padding: 2.3rem 2.2rem;
-      min-height: 320px;
-    }
-    .agencia-row {
-      background: #222c2b;
-      padding: 10px 18px 10px 15px;
-      border-radius: 9px;
-      margin-bottom: 17px;
-      font-size: 1.1rem;
-      font-weight: 600;
-      color: #F8AF40;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      box-shadow: 0 1px 7px #0003;
-    }
-    .agencia-row i {
-      color: #67C8F1;
-      font-size: 1.18rem;
-    }
-    .searchbar {
-      margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .searchbar input {
-      flex: 1;
-      background: #212223;
-      padding: 10px 12px;
-      border-radius: 9px;
-      border: 1px solid #333;
-      color: #fff;
-      font-size: 1rem;
-    }
-    .cliente-card {
-      background: #232c31;
-      border-radius: 12px;
-      margin-bottom: 13px;
-      padding: 16px 18px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 2px 12px #0004;
-    }
-    .cliente-info {
-      font-size: 1rem;
-      color: #fff;
-    }
-    .cliente-dui {
-      font-size: 0.98rem;
-      color: #8ae1fc;
-      margin-top: 2px;
-    }
-    .btn-pagar {
-      background: #13b66b;
-      color: #fff;
-      border: none;
-      padding: 11px 24px;
-      border-radius: 9px;
-      font-size: 1.02rem;
-      font-weight: bold;
-      cursor: pointer;
-      transition: background .18s;
-      margin-left: 15px;
-    }
-    .btn-pagar:active, .btn-pagar:hover {
-      background: #0b854c;
-    }
-    /* Modal estilos */
-    .modal-bg {
-      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-      background: #111c;
-      z-index: 9998;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .modal {
-      background: #fff;
-      color: #1d2125;
-      border-radius: 15px;
-      box-shadow: 0 6px 38px #0008;
-      padding: 30px 26px 26px 26px;
-      max-width: 350px;
-      width: 95%;
-      z-index: 9999;
-      position: relative;
-      text-align: left;
-      font-size: 1rem;
-      animation: showmodal .18s;
-    }
+    body { background: #101212; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
+    header { background: #000; padding: 1rem 0; text-align: center; font-size: 1.45rem; letter-spacing: 1px; font-weight: 700; color: #67C8F1;}
+    .container { max-width: 600px; margin: 2.5rem auto 0 auto; background: #191919; border-radius: 18px; box-shadow: 0 2px 25px #0005; padding: 2.3rem 2.2rem; min-height: 320px;}
+    .agencia-row { background: #222c2b; padding: 10px 18px 10px 15px; border-radius: 9px; margin-bottom: 17px; font-size: 1.1rem; font-weight: 600; color: #F8AF40; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 7px #0003;}
+    .agencia-row i { color: #67C8F1; font-size: 1.18rem;}
+    .searchbar { margin-bottom: 20px; display: flex; align-items: center; gap: 8px;}
+    .searchbar input { flex: 1; background: #212223; padding: 10px 12px; border-radius: 9px; border: 1px solid #333; color: #fff; font-size: 1rem;}
+    .cliente-card { background: #232c31; border-radius: 12px; margin-bottom: 13px; padding: 16px 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 12px #0004;}
+    .cliente-info { font-size: 1rem; color: #fff;}
+    .cliente-dui { font-size: 0.98rem; color: #8ae1fc; margin-top: 2px;}
+    .btn-pagar { background: #13b66b; color: #fff; border: none; padding: 11px 24px; border-radius: 9px; font-size: 1.02rem; font-weight: bold; cursor: pointer; transition: background .18s; margin-left: 15px;}
+    .btn-pagar:active, .btn-pagar:hover { background: #0b854c; }
+    .modal-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #111c; z-index: 9998; display: flex; align-items: center; justify-content: center;}
+    .modal { background: #fff; color: #1d2125; border-radius: 15px; box-shadow: 0 6px 38px #0008; padding: 30px 26px 26px 26px; max-width: 350px; width: 95%; z-index: 9999; position: relative; text-align: left; font-size: 1rem; animation: showmodal .18s;}
     @keyframes showmodal { from { transform: scale(.93); opacity:.6;} to {transform:none;opacity:1;} }
-    .modal-title {
-      font-size: 1.22rem;
-      font-weight: bold;
-      margin-bottom: 6px;
-      color: #1d2125;
-    }
-    .modal-sub {
-      color: #6a7d8a;
-      font-size: 1rem;
-      margin-bottom: 19px;
-    }
+    .modal-title { font-size: 1.22rem; font-weight: bold; margin-bottom: 6px; color: #1d2125;}
+    .modal-sub { color: #6a7d8a; font-size: 1rem; margin-bottom: 19px;}
     .modal-row { margin-bottom: 18px; }
-    .input-group {
-      display: flex;
-      align-items: center;
-      background: #f5f8fb;
-      border-radius: 8px;
-      padding-left: 10px;
-      border: 1px solid #dedede;
-    }
-    .input-group span {
-      color: #13b66b;
-      font-size: 1.15rem;
-      font-weight: bold;
-      margin-right: 5px;
-    }
-    .input-group input {
-      border: none;
-      background: transparent;
-      padding: 10px 6px 10px 0;
-      color: #222;
-      font-size: 1.12rem;
-      outline: none;
-      width: 100%;
-    }
-    .modal-btns {
-      display: flex;
-      gap: 13px;
-      margin-top: 10px;
-      justify-content: flex-end;
-    }
-    .modal-btn-cancel {
-      background: #e74c3c;
-      color: #fff;
-      border: none;
-      padding: 10px 18px;
-      border-radius: 7px;
-      cursor: pointer;
-      font-weight: bold;
-      transition: background .17s;
-    }
+    .input-group { display: flex; align-items: center; background: #f5f8fb; border-radius: 8px; padding-left: 10px; border: 1px solid #dedede;}
+    .input-group span { color: #13b66b; font-size: 1.15rem; font-weight: bold; margin-right: 5px;}
+    .input-group input { border: none; background: transparent; padding: 10px 6px 10px 0; color: #222; font-size: 1.12rem; outline: none; width: 100%;}
+    .modal-btns { display: flex; gap: 13px; margin-top: 10px; justify-content: flex-end;}
+    .modal-btn-cancel { background: #e74c3c; color: #fff; border: none; padding: 10px 18px; border-radius: 7px; cursor: pointer; font-weight: bold; transition: background .17s;}
     .modal-btn-cancel:hover { background: #bb2c1a; }
-    .modal-btn-pay {
-      background: #13b66b;
-      color: #fff;
-      border: none;
-      padding: 10px 22px;
-      border-radius: 7px;
-      cursor: pointer;
-      font-weight: bold;
-      transition: background .16s;
-    }
-    .modal-btn-pay:disabled {
-      opacity: .45;
-      cursor: not-allowed;
-    }
+    .modal-btn-pay { background: #13b66b; color: #fff; border: none; padding: 10px 22px; border-radius: 7px; cursor: pointer; font-weight: bold; transition: background .16s;}
+    .modal-btn-pay:disabled { opacity: .45; cursor: not-allowed;}
     .modal-btn-pay:hover:not(:disabled) { background: #0b854c; }
-    .modal-error {
-      color: #e74c3c;
-      font-size: 0.98rem;
-      margin-bottom: 7px;
-    }
+    .modal-error { color: #e74c3c; font-size: 0.98rem; margin-bottom: 7px;}
   </style>
 </head>
 <body>
@@ -211,8 +54,18 @@
   <!-- Firebase & lógica -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, doc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    // --- Helpers add/update (compatibilidad con modular) ---
+    window.firebaseAddDoc = async function(collectionName, data) {
+      const col = collection(db, collectionName);
+      return await addDoc(col, data);
+    };
+    window.firebaseUpdateDoc = async function(collectionName, docId, data) {
+      const docRef = doc(db, collectionName, docId);
+      await updateDoc(docRef, data);
+    };
 
     // Configuración Firebase
     const firebaseConfig = {
@@ -279,12 +132,12 @@
       const creditosRef = collection(db, "creditos");
       const q = query(creditosRef, where("estadoCredito", "==", "Activo"), where("agenciaAsignada", "==", userDepartment));
       const snap = await getDocs(q);
-      snap.forEach(doc => {
-        const d = doc.data();
+      snap.forEach(docSnap => {
+        const d = docSnap.data();
         const nombre = (d.nombre || '').toLowerCase();
         const dui = (d.numeroDui || '').toLowerCase();
         if (nombre.includes(term.toLowerCase()) || dui.includes(term.toLowerCase())) {
-          clientes.push({ id: doc.id, ...d });
+          clientes.push({ id: docSnap.id, ...d });
         }
       });
       if (!clientes.length) {
@@ -313,7 +166,7 @@
       });
     }
 
-    // --- Modal de Pago Mejorado (sin JS inline) ---
+    // --- Modal de Pago Mejorado ---
     function mostrarDialogoPago(cliente) {
       let modalRoot = document.getElementById("modal-root");
       let monto = "";
@@ -321,25 +174,9 @@
 
       function closeModal() { modalRoot.innerHTML = ""; }
 
-      function pagarHandler() {
-        const montoValue = document.getElementById("monto-input").value.trim();
-        const montoNum = parseFloat(montoValue);
-        if (isNaN(montoNum) || montoNum <= 0) {
-          errorMsg = "Ingresa un monto válido mayor a $0.00";
-          render();
-          setTimeout(() => {
-            document.getElementById("monto-input").focus();
-          }, 50);
-          return;
-        }
-        closeModal();
-        // Aquí debes integrar la lógica real de pago y actualización en Firebase
-        alert(`Pago de $${montoNum.toFixed(2)} realizado para ${cliente.nombre} (${cliente.numeroDui}).`);
-      }
-
       function render() {
         modalRoot.innerHTML = `
-          <div class="modal-bg" id="modal-bg">
+          <div class="modal-bg" onclick="event.target===this && (${closeModal.toString()})();">
             <div class="modal">
               <div class="modal-title">
                 <i class="fas fa-coins" style="color:#13b66b;"></i> Pago a ${cliente.nombre}
@@ -362,17 +199,125 @@
             </div>
           </div>
         `;
-        // Asignar eventos después del render
         document.getElementById("cancelar-pago").onclick = closeModal;
-        document.getElementById("pagar-btn").onclick = pagarHandler;
-        document.getElementById("modal-bg").onclick = function(e) {
-          if (e.target === this) closeModal();
+        document.getElementById("pagar-btn").onclick = () => {
+          const montoValue = document.getElementById("monto-input").value.trim();
+          const montoNum = parseFloat(montoValue);
+          if (isNaN(montoNum) || montoNum <= 0) {
+            errorMsg = "Ingresa un monto válido mayor a $0.00";
+            render();
+            setTimeout(() => {
+              document.getElementById("monto-input").focus();
+            }, 50);
+            return;
+          }
+          realizarPago(cliente, montoNum);
+          closeModal();
         };
         document.getElementById("monto-input").onkeydown = e => {
           if (e.key === "Enter") document.getElementById("pagar-btn").click();
         };
       }
       render();
+    }
+
+    // --- Lógica real para el pago, igual a Flutter ---
+    async function realizarPago(cliente, montoNum) {
+      try {
+        // 1. Obtener usuario y agencia
+        const user = auth.currentUser;
+        const usersRef = collection(db, "users");
+        const userSnap = await getDocs(query(usersRef, where("__name__", "==", user.uid)));
+        const userData = userSnap.docs[0].data();
+        const cajeroNombre = userData.nombre_autorizacion || userData.nombre || "Sin Nombre";
+        const sucursal = userData.department || "N/A";
+        const fechaPago = new Date().toISOString();
+
+        // 2. Leer el crédito actualizado
+        const creditoSnap = await getDocs(query(collection(db, "creditos"), where("__name__", "==", cliente.id)));
+        if (creditoSnap.empty) throw new Error("Crédito no encontrado.");
+        const creditoData = creditoSnap.docs[0].data();
+
+        let saldoActual = parseFloat(creditoData.saldoActual || 0);
+        let interesActual = parseFloat(creditoData.interesActual || 0);
+        let multasAcumuladas = parseFloat(creditoData.multasAcumuladas || 0);
+
+        let restante = montoNum;
+        let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
+
+        if (restante >= multasAcumuladas) {
+          restante -= multasAcumuladas;
+          pagoMultas = multasAcumuladas;
+          multasAcumuladas = 0;
+        } else {
+          multasAcumuladas -= restante;
+          pagoMultas = restante;
+          restante = 0;
+        }
+
+        if (restante > 0) {
+          if (restante >= interesActual) {
+            restante -= interesActual;
+            pagoInteres = interesActual;
+            interesActual = 0;
+          } else {
+            interesActual -= restante;
+            pagoInteres = restante;
+            restante = 0;
+          }
+        }
+
+        if (restante > 0) {
+          if (restante >= saldoActual) {
+            restante -= saldoActual;
+            pagoCapital = saldoActual;
+            saldoActual = 0;
+          } else {
+            saldoActual -= restante;
+            pagoCapital = restante;
+            restante = 0;
+          }
+        }
+
+        if (saldoActual < 0.01) saldoActual = 0;
+        let nuevoSaldoActual = saldoActual + interesActual;
+
+        // 3. Correlativo simple (5 dígitos aleatorio, solo para demo)
+        const correlativo = Math.floor(Math.random() * 90000) + 10000;
+        const correlativoStr = correlativo.toString().padStart(5, '0');
+
+        // 4. Guardar pago en 'pagos'
+        await window.firebaseAddDoc("pagos", {
+          clienteID: creditoData.clienteID,
+          creditoID: cliente.id,
+          nombres: creditoData.nombre,
+          montoPagado: montoNum,
+          fechaPago: fechaPago,
+          pagoMultas: pagoMultas.toFixed(2),
+          pagoInteres: pagoInteres.toFixed(2),
+          pagoCapital: pagoCapital.toFixed(2),
+          saldoRestante: nuevoSaldoActual.toFixed(2),
+          cajeroID: user.uid,
+          cajeroNombre: cajeroNombre,
+          sucursal: sucursal,
+          correlativo: correlativoStr,
+          timestamp: new Date()
+        });
+
+        // 5. Actualizar crédito
+        await window.firebaseUpdateDoc("creditos", cliente.id, {
+          saldoActual: saldoActual.toFixed(2),
+          interesActual: interesActual.toFixed(2),
+          multasAcumuladas: multasAcumuladas.toFixed(2),
+          ultimaActualizacion: fechaPago,
+          estadoCredito: saldoActual == 0 ? "Pagado" : creditoData.estadoCredito
+        });
+
+        // 6. Redirigir al ticket (simula comprobante)
+        window.location.href = `ticket_page.html?correlativo=${correlativoStr}&cliente=${encodeURIComponent(creditoData.nombre)}&monto=${montoNum.toFixed(2)}&agencia=${encodeURIComponent(sucursal)}&fecha=${encodeURIComponent(fechaPago)}&pagoCapital=${pagoCapital.toFixed(2)}&pagoInteres=${pagoInteres.toFixed(2)}&pagoMultas=${pagoMultas.toFixed(2)}&saldoRestante=${nuevoSaldoActual.toFixed(2)}`;
+      } catch (e) {
+        alert("Error al realizar el pago: " + e.message);
+      }
     }
 
     // --- Cargar agencia usuario y setear buscador ---
@@ -385,3 +330,4 @@
   </script>
 </body>
 </html>
+

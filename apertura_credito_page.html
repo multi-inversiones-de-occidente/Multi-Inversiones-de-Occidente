@@ -133,7 +133,7 @@
     async function fetchSolicitudYAsignacion() {
       setLoading();
       try {
-        solicitudID = getQueryParam('id');
+        solicitudID = getQueryParam('solicitudID');  // <-- CORRECTO: debe ser "solicitudID"
         if (!solicitudID) {
           setLoading("No se especificó una solicitud.");
           return;
@@ -168,12 +168,10 @@
     }
 
     async function guardarCredito() {
-      // Validaciones
       if (!solicitudData || !asignacionData) {
         alert("No hay datos completos para guardar el crédito.");
         return;
       }
-      // Prepara campos
       const montoAprobado = Number(asignacionData.montoAprobado) || 0;
       const frecuenciaPago = asignacionData.frecuenciaPago || "";
       const numeroCuotas = Number(asignacionData.numeroCuotas) || 0;
@@ -306,3 +304,4 @@
   </div>
 </body>
 </html>
+

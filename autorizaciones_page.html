@@ -34,6 +34,14 @@
       text-align: center;
       letter-spacing: .7px;
     }
+    .usuario-info {
+      text-align: right;
+      color: #67C8F1;
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1.3rem;
+      margin-top: -1rem;
+    }
     .autorizacion-card {
       background: linear-gradient(90deg, #6a7afd 0%, #5944d7 100%);
       border-radius: 18px;
@@ -95,6 +103,7 @@
 <body>
   <header>Autorizaciones de Información Crediticia - Credicash</header>
   <div class="container">
+    <div class="usuario-info" id="usuario-info"></div>
     <div class="titulo">Lista de Autorizaciones Credicash</div>
     <div id="lista-autorizaciones"></div>
     <div id="estado-mensaje" class="center"></div>
@@ -104,7 +113,9 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
-    // Tu configuración de Firebase
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    // Configuración de Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -116,13 +127,14 @@
     };
     const app = initializeApp(firebaseConfig);
     const db  = getFirestore(app);
+    const auth = getAuth(app);
 
     const lista = document.getElementById('lista-autorizaciones');
     const mensaje = document.getElementById('estado-mensaje');
+    const usuarioInfo = document.getElementById('usuario-info');
 
     function cargarAutorizaciones() {
       mensaje.textContent = "Cargando autorizaciones…";
-      // Solo las de Credicash, ordenadas por fecha descendente
       const q = query(
         collection(db, "autorizaciones"),
         where("creditLine", "==", "Credicash"),
@@ -139,17 +151,13 @@
           const data = doc.data();
           const nombre = data.nombre || "Sin nombre";
           const dui = data.dui || "Sin DUI";
-          // Puedes pasar el id por la URL para la página de detalle
           const id = doc.id;
           const creditLine = data.creditLine || "";
-
-          // Tarjeta de autorización
           const card = document.createElement("div");
           card.className = "autorizacion-card";
           card.onclick = () => {
             window.location.href = `detalle_autorizacion_page.html?id=${id}&nombre=${encodeURIComponent(nombre)}&creditLine=${encodeURIComponent(creditLine)}`;
           };
-
           card.innerHTML = `
             <div class="datos">
               <div class="nombre">${nombre}</div>
@@ -165,7 +173,16 @@
       });
     }
 
-    cargarAutorizaciones();
+    // Esperar a que el usuario esté autenticado antes de mostrar datos
+    onAuthStateChanged(auth, user => {
+      if (!user) {
+        window.location.href = "login.html"; // Cambia si usas otra página de login
+      } else {
+        usuarioInfo.textContent = `Sesión: ${user.email}`;
+        cargarAutorizaciones();
+      }
+    });
   </script>
 </body>
 </html>
+

@@ -3,11 +3,204 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Recepción de Pagos – Multi Inversiones</title>
-  <!-- Firebase SDKs -->
+  <title>Pagos – Multi Inversiones</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      background: #101212;
+      color: #fff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+    }
+    header {
+      background: #000;
+      padding: 1rem 0;
+      text-align: center;
+      font-size: 1.45rem;
+      letter-spacing: 1px;
+      font-weight: 700;
+      color: #67C8F1;
+    }
+    .container {
+      max-width: 600px;
+      margin: 2.5rem auto 0 auto;
+      background: #191919;
+      border-radius: 18px;
+      box-shadow: 0 2px 25px #0005;
+      padding: 2.3rem 2.2rem;
+      min-height: 320px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      padding: 11px 14px;
+      border-radius: 9px;
+      background: #232323;
+      color: #fff;
+      border: 1px solid #333;
+      font-size: 1.08rem;
+      margin-top: 4px;
+    }
+    .searchbar {
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .searchbar input {
+      flex: 1;
+      background: #212223;
+    }
+    .cliente-card {
+      background: #232c31;
+      border-radius: 12px;
+      margin-bottom: 13px;
+      padding: 16px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 12px #0004;
+    }
+    .cliente-info {
+      font-size: 1rem;
+      color: #fff;
+    }
+    .cliente-dui {
+      font-size: 0.98rem;
+      color: #8ae1fc;
+      margin-top: 2px;
+    }
+    .btn-pagar {
+      background: #13b66b;
+      color: #fff;
+      border: none;
+      padding: 11px 24px;
+      border-radius: 9px;
+      font-size: 1.02rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background .18s;
+      margin-left: 15px;
+    }
+    .btn-pagar:active, .btn-pagar:hover {
+      background: #0b854c;
+    }
+    /* Modal estilos */
+    .modal-bg {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: #111c;
+      z-index: 9998;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal {
+      background: #fff;
+      color: #1d2125;
+      border-radius: 15px;
+      box-shadow: 0 6px 38px #0008;
+      padding: 30px 26px 26px 26px;
+      max-width: 350px;
+      width: 95%;
+      z-index: 9999;
+      position: relative;
+      text-align: left;
+      font-size: 1rem;
+      animation: showmodal .18s;
+    }
+    @keyframes showmodal { from { transform: scale(.93); opacity:.6;} to {transform:none;opacity:1;} }
+    .modal-title {
+      font-size: 1.22rem;
+      font-weight: bold;
+      margin-bottom: 6px;
+      color: #1d2125;
+    }
+    .modal-sub {
+      color: #6a7d8a;
+      font-size: 1rem;
+      margin-bottom: 19px;
+    }
+    .modal-row { margin-bottom: 18px; }
+    .input-group {
+      display: flex;
+      align-items: center;
+      background: #f5f8fb;
+      border-radius: 8px;
+      padding-left: 10px;
+      border: 1px solid #dedede;
+    }
+    .input-group span {
+      color: #13b66b;
+      font-size: 1.15rem;
+      font-weight: bold;
+      margin-right: 5px;
+    }
+    .input-group input {
+      border: none;
+      background: transparent;
+      padding: 10px 6px 10px 0;
+      color: #222;
+      font-size: 1.12rem;
+      outline: none;
+      width: 100%;
+    }
+    .modal-btns {
+      display: flex;
+      gap: 13px;
+      margin-top: 10px;
+      justify-content: flex-end;
+    }
+    .modal-btn-cancel {
+      background: #e74c3c;
+      color: #fff;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background .17s;
+    }
+    .modal-btn-cancel:hover { background: #bb2c1a; }
+    .modal-btn-pay {
+      background: #13b66b;
+      color: #fff;
+      border: none;
+      padding: 10px 22px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background .16s;
+    }
+    .modal-btn-pay:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+    .modal-btn-pay:hover:not(:disabled) { background: #0b854c; }
+    .modal-error {
+      color: #e74c3c;
+      font-size: 0.98rem;
+      margin-bottom: 7px;
+    }
+  </style>
+</head>
+<body>
+  <header>Recepción de Pagos</header>
+  <div class="container">
+    <div class="searchbar">
+      <i class="fas fa-search"></i>
+      <input id="buscador" type="text" placeholder="Buscar por nombre o DUI..."/>
+    </div>
+    <div id="clientes-list"></div>
+  </div>
+
+  <!-- Modal dinámico -->
+  <div id="modal-root"></div>
+
+  <!-- Firebase & lógica -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, doc, getDoc, updateDoc, addDoc, runTransaction } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     // Configuración Firebase
@@ -20,249 +213,148 @@
       appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
       measurementId: "G-H4E31XHG1Y"
     };
-
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    let departamentoUsuario = null;
-    let nombreAgencia = null;
-    let userData = null;
+    let userDepartment = null;
 
-    function setLoading(msg = "Cargando...") {
-      document.getElementById("pagos-content").innerHTML =
-        `<div style="color:#555;text-align:center;padding:60px 0;">${msg}</div>`;
-    }
-
-    // Obtiene perfil usuario logueado (department/nombre_agencia)
-    async function cargarAgenciaUsuario(user) {
-      setLoading();
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) {
-        setLoading("Usuario no encontrado.");
-        return null;
-      }
-      userData = userSnap.data();
-      departamentoUsuario = userData.department;
-      nombreAgencia = userData.nombre_agencia || userData.department;
-      renderBuscador();
-    }
-
-    function renderBuscador() {
-      document.getElementById("pagos-content").innerHTML = `
-        <div style="margin-bottom:14px; color:#2a87e1;font-weight:700; font-size:1.13rem">
-          Agencia: ${nombreAgencia}
-        </div>
-        <input id="search-pagos" type="text" placeholder="Buscar por Nombre o DUI" 
-          style="width:100%;max-width:420px;padding:12px 14px;font-size:1.09rem;border-radius:9px;border:1px solid #ccc;background:#fff;margin-bottom:22px;" 
-          autocomplete="off" />
-        <div id="resultados-pagos"></div>
-      `;
-      document.getElementById("search-pagos").addEventListener("input", e => {
-        buscarClientes(e.target.value);
+    // --- Obtiene agency (department) del usuario actual ---
+    function obtenerAgenciaUsuario() {
+      return new Promise((resolve, reject) => {
+        onAuthStateChanged(auth, async user => {
+          if (!user) {
+            window.location.href = "login.html";
+            return;
+          }
+          const usersRef = collection(db, "users");
+          const q = query(usersRef, where("__name__", "==", user.uid));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            const data = snap.docs[0].data();
+            userDepartment = data.department || null;
+            resolve(userDepartment);
+          } else {
+            userDepartment = null;
+            resolve(null);
+          }
+        });
       });
     }
 
-    async function buscarClientes(queryTerm) {
-      const resultadosDiv = document.getElementById("resultados-pagos");
-      resultadosDiv.innerHTML = `<div style="color:#999;text-align:center;padding:25px 0;">Buscando...</div>`;
-      const term = (queryTerm || "").trim().toLowerCase();
-      if (!term) {
-        resultadosDiv.innerHTML = "";
+    // --- Busca clientes filtrados por agency ---
+    async function buscarClientes(term) {
+      const clientesList = document.getElementById("clientes-list");
+      clientesList.innerHTML = "Cargando...";
+      let clientes = [];
+      if (!term.trim()) {
+        clientesList.innerHTML = "";
         return;
       }
-      try {
-        // Traer solo créditos activos de la agencia del usuario logueado
-        const credQ = query(
-          collection(db, "creditos"),
-          where("estadoCredito", "==", "Activo"),
-          where("agenciaAsignada", "==", departamentoUsuario)
-        );
-        const credSnap = await getDocs(credQ);
-        const docs = credSnap.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(c =>
-            (c.nombre || "").toLowerCase().includes(term) ||
-            (c.numeroDui || "").toLowerCase().includes(term)
-          );
-        if (!docs.length) {
-          resultadosDiv.innerHTML = `<div style="color:#999;text-align:center;padding:20px 0;">No se encontraron créditos para esta agencia.</div>`;
-          return;
+      const creditosRef = collection(db, "creditos");
+      const q = query(creditosRef, where("estadoCredito", "==", "Activo"), where("agenciaAsignada", "==", userDepartment));
+      const snap = await getDocs(q);
+      snap.forEach(doc => {
+        const d = doc.data();
+        const nombre = (d.nombre || '').toLowerCase();
+        const dui = (d.numeroDui || '').toLowerCase();
+        if (nombre.includes(term.toLowerCase()) || dui.includes(term.toLowerCase())) {
+          clientes.push({ id: doc.id, ...d });
         }
-        resultadosDiv.innerHTML = docs.map(cliente => `
-          <div class="card-credito">
-            <div>
-              <b>${cliente.nombre}</b><br>
-              DUI: ${cliente.numeroDui}
-            </div>
-            <button class="btn-pagar" data-id="${cliente.id}" data-nombre="${cliente.nombre}">Pagar</button>
+      });
+      if (!clientes.length) {
+        clientesList.innerHTML = `<div style="color:#ccc;text-align:center;padding:34px 0;">No se encontraron clientes para tu agencia.</div>`;
+        return;
+      }
+      // Renderiza
+      clientesList.innerHTML = clientes.map(cliente => `
+        <div class="cliente-card">
+          <div>
+            <div class="cliente-info"><b>${cliente.nombre}</b></div>
+            <div class="cliente-dui">DUI: ${cliente.numeroDui}</div>
           </div>
-        `).join("");
-        document.querySelectorAll(".btn-pagar").forEach(btn => {
-          btn.addEventListener("click", () => mostrarDialogoPago(docs.find(c => c.id === btn.dataset.id)));
-        });
-      } catch (e) {
-        resultadosDiv.innerHTML = `<div style="color:#d43a3a;text-align:center;padding:25px 0;">Error: ${e.message}</div>`;
-      }
-    }
-
-    function mostrarDialogoPago(cliente) {
-      // Diálogo simple (prompt) para monto
-      const monto = prompt(`Pago para ${cliente.nombre}\nIngrese monto a pagar:`);
-      const montoPagado = Number(monto);
-      if (montoPagado && montoPagado > 0) {
-        realizarPago(cliente, montoPagado);
-      } else if (monto !== null) {
-        alert("Monto inválido.");
-      }
-    }
-
-    async function obtenerProximoCorrelativo() {
-      const docRef = doc(db, "counters", "tickets");
-      return await runTransaction(db, async (tx) => {
-        const snap = await tx.get(docRef);
-        let lastNumber = 0;
-        if (!snap.exists()) {
-          tx.set(docRef, { lastNumber: 1 });
-          lastNumber = 1;
-        } else {
-          lastNumber = (snap.data().lastNumber || 0) + 1;
-          tx.update(docRef, { lastNumber });
-        }
-        return lastNumber;
+          <button class="btn-pagar" data-id="${cliente.id}" data-nombre="${cliente.nombre}" data-dui="${cliente.numeroDui}"><i class="fas fa-dollar-sign"></i> Pagar</button>
+        </div>
+      `).join('');
+      // Vincular eventos pagar
+      document.querySelectorAll('.btn-pagar').forEach(btn => {
+        btn.onclick = function() {
+          mostrarDialogoPago({
+            id: btn.getAttribute('data-id'),
+            nombre: btn.getAttribute('data-nombre'),
+            numeroDui: btn.getAttribute('data-dui')
+          });
+        };
       });
     }
 
-    async function realizarPago(cliente, montoPagado) {
-      try {
-        const hoy = new Date();
-        // Reconsultar crédito
-        const docCred = await getDoc(doc(db, "creditos", cliente.id));
-        if (!docCred.exists()) throw new Error("Crédito no encontrado");
-        const creditData = docCred.data();
+    // --- Modal de Pago Mejorado ---
+    function mostrarDialogoPago(cliente) {
+      let modalRoot = document.getElementById("modal-root");
+      let monto = "";
+      let errorMsg = "";
 
-        let capitalPendiente = Number(creditData.saldoActual);
-        let interesActual = Number(creditData.interesActual || 0);
-        let multasAcumuladas = Number(creditData.multasAcumuladas || 0);
+      function closeModal() { modalRoot.innerHTML = ""; }
 
-        let restante = montoPagado;
-        let pagoMultas = 0.0;
-        let pagoInteres = 0.0;
-        let pagoCapital = 0.0;
-
-        if (restante >= multasAcumuladas) {
-          restante -= multasAcumuladas;
-          pagoMultas = multasAcumuladas;
-          multasAcumuladas = 0;
-        } else {
-          multasAcumuladas -= restante;
-          pagoMultas = restante;
-          restante = 0;
-        }
-        if (restante > 0) {
-          if (restante >= interesActual) {
-            restante -= interesActual;
-            pagoInteres = interesActual;
-            interesActual = 0;
-          } else {
-            interesActual -= restante;
-            pagoInteres = restante;
-            restante = 0;
+      function render() {
+        modalRoot.innerHTML = `
+          <div class="modal-bg" onclick="event.target===this && (${closeModal.toString()})();">
+            <div class="modal">
+              <div class="modal-title">
+                <i class="fas fa-coins" style="color:#13b66b;"></i> Pago a ${cliente.nombre}
+              </div>
+              <div class="modal-sub">
+                <i class="fas fa-id-card"></i> DUI: <b>${cliente.numeroDui}</b>
+              </div>
+              <div class="modal-row">
+                <label for="monto-input" style="font-weight:600;margin-bottom:2px;display:block;">Monto a pagar</label>
+                <div class="input-group">
+                  <span>$</span>
+                  <input id="monto-input" type="number" min="0" step="0.01" placeholder="0.00" value="${monto}" autocomplete="off" autofocus/>
+                </div>
+              </div>
+              ${errorMsg ? `<div class="modal-error">${errorMsg}</div>` : ""}
+              <div class="modal-btns">
+                <button class="modal-btn-cancel" id="cancelar-pago">Cancelar</button>
+                <button class="modal-btn-pay" id="pagar-btn">Pagar</button>
+              </div>
+            </div>
+          </div>
+        `;
+        // Eventos
+        document.getElementById("cancelar-pago").onclick = closeModal;
+        document.getElementById("pagar-btn").onclick = () => {
+          const montoValue = document.getElementById("monto-input").value.trim();
+          const montoNum = parseFloat(montoValue);
+          if (isNaN(montoNum) || montoNum <= 0) {
+            errorMsg = "Ingresa un monto válido mayor a $0.00";
+            render();
+            setTimeout(() => {
+              document.getElementById("monto-input").focus();
+            }, 50);
+            return;
           }
-        }
-        if (restante > 0) {
-          if (restante >= capitalPendiente) {
-            restante -= capitalPendiente;
-            pagoCapital = capitalPendiente;
-            capitalPendiente = 0;
-          } else {
-            capitalPendiente -= restante;
-            pagoCapital = restante;
-            restante = 0;
-          }
-        }
-        if (capitalPendiente < 0.01) capitalPendiente = 0;
-        let nuevoSaldoActual = capitalPendiente + interesActual;
-
-        // Correlativo
-        const correlativoRaw = await obtenerProximoCorrelativo();
-        const correlativoStr = correlativoRaw.toString().padStart(5, "0");
-
-        // Registrar el pago
-        await addDoc(collection(db, "pagos"), {
-          clienteID: creditData.clienteID,
-          creditoID: cliente.id,
-          nombres: creditData.nombre,
-          montoPagado: montoPagado,
-          fechaPago: hoy.toISOString(),
-          pagoMultas: pagoMultas.toFixed(2),
-          pagoInteres: pagoInteres.toFixed(2),
-          pagoCapital: pagoCapital.toFixed(2),
-          saldoRestante: nuevoSaldoActual.toFixed(2),
-          cajeroID: auth.currentUser.uid,
-          cajeroNombre: userData.nombre_autorizacion || userData.nombre,
-          sucursal: departamentoUsuario,
-          correlativo: correlativoStr,
-          timestamp: new Date()
-        });
-
-        // Actualizar crédito
-        let nuevaAmortizacion = [];
-        let nuevoEstado = creditData.estadoCredito;
-        if (capitalPendiente === 0) {
-          nuevoEstado = "Pagado";
-        } else if (creditData.amortizacion && Array.isArray(creditData.amortizacion) && creditData.amortizacion.length) {
-          // No recalculamos la tabla aquí por simplicidad, pero puedes agregar el cálculo
-          nuevaAmortizacion = creditData.amortizacion;
-        }
-        await updateDoc(doc(db, "creditos", cliente.id), {
-          saldoActual: capitalPendiente.toFixed(2),
-          interesActual: interesActual.toFixed(2),
-          multasAcumuladas: multasAcumuladas.toFixed(2),
-          estadoCredito: nuevoEstado,
-          ultimaActualizacion: hoy.toISOString(),
-          amortizacion: nuevaAmortizacion,
-        });
-
-        alert("Pago registrado correctamente. Correlativo: " + correlativoStr);
-        document.getElementById("search-pagos").value = "";
-        document.getElementById("resultados-pagos").innerHTML = "";
-      } catch (e) {
-        alert("Error al registrar el pago: " + (e.message || e));
+          // Aquí deberías llamar tu función para realizar el pago y luego cerrar el modal.
+          // realizarPago(cliente.id, montoNum);
+          closeModal();
+          alert(`Pago de $${montoNum.toFixed(2)} realizado para ${cliente.nombre} (${cliente.numeroDui}).`);
+        };
+        // Soporte Enter para pagar
+        document.getElementById("monto-input").onkeydown = e => {
+          if (e.key === "Enter") document.getElementById("pagar-btn").click();
+        };
       }
+      render();
     }
 
-    window.addEventListener("DOMContentLoaded", () => {
-      onAuthStateChanged(auth, user => {
-        if (!user) {
-          setLoading("No autenticado. Redirigiendo...");
-          setTimeout(() => window.location.href = "login.html", 1400);
-          return;
-        }
-        cargarAgenciaUsuario(user);
+    // --- Cargar agencia usuario y setear buscador ---
+    window.addEventListener("DOMContentLoaded", async () => {
+      await obtenerAgenciaUsuario();
+      document.getElementById("buscador").addEventListener("input", e => {
+        buscarClientes(e.target.value);
       });
     });
   </script>
-  <style>
-    body { background: #f6fafd; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; margin: 0; }
-    header { background:#111; color:#fff; font-weight:700; font-size:1.4rem; padding: 1.3rem 0; text-align: center;}
-    .container { max-width: 500px; margin: 2.5rem auto 0 auto; background: #fff; border-radius: 15px; box-shadow: 0 2px 15px #0002; padding: 2.1rem 1.8rem; min-height:320px;}
-    .card-credito { background: #e3f2fd; margin-bottom:15px; padding:18px 13px; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; box-shadow:0 1px 7px #0097fa12;}
-    .btn-pagar { background: #13b66b; color: #fff; border:none; padding:11px 19px; border-radius:7px; font-weight:700; cursor:pointer; font-size: 1rem; transition: background .15s;}
-    .btn-pagar:hover { background:#0c7e4a; }
-    @media (max-width: 600px) {
-      .container { padding: 1rem 2vw;}
-    }
-  </style>
-</head>
-<body>
-  <header>Recepción de Pagos</header>
-  <div class="container">
-    <h2 style="text-align:center;color:#013157;font-size:1.33rem;margin-top:0;margin-bottom:1.5rem;font-weight:700;">Recepción de Pagos</h2>
-    <div id="pagos-content">
-      <div style="color:#666;text-align:center;padding:40px 0;">Cargando...</div>
-    </div>
-  </div>
 </body>
 </html>
+

@@ -39,12 +39,12 @@
         tbody.innerHTML += `
           <tr>
             <td><i class="fas fa-check-circle"></i></td>
-            <td>${row.nombre}</td>
-            <td>${row.numeroDui}</td>
-            <td>${row.montoAprobado}</td>
-            <td>${row.cuota}</td>
-            <td>${row.frecuenciaPago} x ${row.numeroCuotas}</td>
-            <td>${row.fechaAsignacion}</td>
+            <td>${row.nombre || ''}</td>
+            <td>${row.numeroDui || row.dui || ''}</td>
+            <td>${row.montoAprobado !== undefined ? ('$' + row.montoAprobado) : ''}</td>
+            <td>${row.cuota !== undefined ? ('$' + row.cuota) : ''}</td>
+            <td>${row.frecuenciaPago ? (row.frecuenciaPago + ' x ' + (row.numeroCuotas ?? '')) : ''}</td>
+            <td>${row.fechaAsignacion || ''}</td>
           </tr>
         `;
       });
@@ -57,8 +57,8 @@
         renderTable(asignaciones);
       } else {
         const filtered = asignaciones.filter(row =>
-          (row.nombre || '').toLowerCase().includes(t) ||
-          (row.numeroDui || '').toLowerCase().includes(t)
+          ((row.nombre || '').toLowerCase().includes(t)) ||
+          ((row.numeroDui || row.dui || '').toLowerCase().includes(t))
         );
         renderTable(filtered);
       }
@@ -91,12 +91,22 @@
                 const solSnap = await getDoc(solRef);
                 if (solSnap.exists()) {
                   solicitudData = solSnap.data();
+                  // Solo mostrar si está aprobada y es Credicash
+                  if (
+                    solicitudData.estado !== 'Aprobado' ||
+                    solicitudData.creditLine !== 'Credicash'
+                  ) continue;
+                } else {
+                  continue;
                 }
-              } catch (err) { /* Ignorar errores de documento no encontrado */ }
+              } catch (err) { continue; }
+            } else {
+              continue;
             }
             asignaciones.push({
               nombre: solicitudData.nombre || '',
               numeroDui: solicitudData.numeroDui || solicitudData.dui || '',
+              dui: solicitudData.dui || '', // fallback extra
               montoAprobado: asignData.montoAprobado ?? '',
               cuota: asignData.cuota ?? '',
               frecuenciaPago: asignData.frecuenciaPago ?? '',

@@ -156,6 +156,21 @@
       font-size:.85rem; font-weight:700;
       box-shadow:0 1px 8px #0002;
     }
+    /* Botón de revertir pagos estilo rojo */
+    .btn-revertir {
+      background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%);
+      color: #fff !important;
+    }
+    .btn-revertir:active,
+    .btn-revertir:hover {
+      background: linear-gradient(90deg, #c0392b 70%, #8e0800 100%);
+      color: #fff !important;
+      box-shadow: 0 8px 26px #800a0a88;
+    }
+    .btn-revertir i {
+      color: #fff !important;
+      opacity: 1;
+    }
     @media (max-width: 600px) {
       .container { padding:1.2rem 1vw; }
       h1 { font-size: 1.23rem;}
@@ -205,15 +220,14 @@
         <i class="fas fa-list-alt"></i>
         Ver Movimientos de Caja
       </a>
-      <a href="printer_config_page.html" class="btn-grande">
-        <i class="fas fa-print"></i>
-        Configurar Impresora
+      <!-- NUEVO BOTÓN DE REVERTIR PAGOS -->
+      <a href="revertir_pagos_page.html" class="btn-grande btn-revertir">
+        <i class="fas fa-undo"></i>
+        Revertir Pagos
       </a>
     </div>
   </div>
-
 </body>
 </html>
-
 
 

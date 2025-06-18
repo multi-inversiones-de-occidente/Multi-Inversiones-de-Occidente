@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autorizaciones Credicash</title>
+  <!-- Estilos y font awesome para iconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      min-height: 100vh;
+      background: radial-gradient(circle, #111 50%, #222 100%);
+      color: #fff;
+    }
+    header {
+      background: #000;
+      padding: 1rem;
+      font-size: 1.4rem;
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: .6px;
+    }
+    .container {
+      max-width: 740px;
+      margin: 0 auto;
+      padding: 2.4rem 1rem 2rem 1rem;
+    }
+    .titulo {
+      font-size: 1.6rem;
+      font-weight: bold;
+      margin-bottom: 1.1rem;
+      text-align: center;
+      letter-spacing: .7px;
+    }
+    .autorizacion-card {
+      background: linear-gradient(90deg, #6a7afd 0%, #5944d7 100%);
+      border-radius: 18px;
+      box-shadow: 0 4px 18px #181845bb;
+      margin-bottom: 22px;
+      padding: 1.4rem 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: transform 0.12s, box-shadow 0.16s;
+    }
+    .autorizacion-card:hover {
+      transform: scale(1.035);
+      box-shadow: 0 8px 32px #1a1a2e99;
+      background: linear-gradient(90deg, #5944d7 80%, #6a7afd 100%);
+    }
+    .datos {
+      flex: 1;
+    }
+    .nombre {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #fff;
+      margin-bottom: .6rem;
+    }
+    .dui {
+      font-size: .99rem;
+      color: #c5c4e4;
+    }
+    .ver-mas {
+      color: #fff;
+      font-size: 1.5rem;
+      padding: .5rem;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.09);
+      border: none;
+      outline: none;
+      transition: background .13s;
+    }
+    .autorizacion-card:hover .ver-mas {
+      background: #fff2;
+      color: #ffeb3b;
+    }
+    .center {
+      text-align: center;
+      margin-top: 3.3rem;
+      color: #bbb;
+    }
+    @media (max-width: 650px) {
+      .container { padding:1.3rem 3vw; }
+      .titulo { font-size:1.13rem; }
+      .autorizacion-card { padding: 1rem 0.5rem; }
+      .nombre { font-size: 1.06rem; }
+      .dui { font-size: .92rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>Autorizaciones de Información Crediticia - Credicash</header>
+  <div class="container">
+    <div class="titulo">Lista de Autorizaciones Credicash</div>
+    <div id="lista-autorizaciones"></div>
+    <div id="estado-mensaje" class="center"></div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    // Tu configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+
+    const lista = document.getElementById('lista-autorizaciones');
+    const mensaje = document.getElementById('estado-mensaje');
+
+    function cargarAutorizaciones() {
+      mensaje.textContent = "Cargando autorizaciones…";
+      // Solo las de Credicash, ordenadas por fecha descendente
+      const q = query(
+        collection(db, "autorizaciones"),
+        where("creditLine", "==", "Credicash"),
+        orderBy("fecha", "desc")
+      );
+      onSnapshot(q, snap => {
+        lista.innerHTML = "";
+        if (snap.empty) {
+          mensaje.textContent = "No hay autorizaciones disponibles.";
+          return;
+        }
+        mensaje.textContent = "";
+        snap.forEach(doc => {
+          const data = doc.data();
+          const nombre = data.nombre || "Sin nombre";
+          const dui = data.dui || "Sin DUI";
+          // Puedes pasar el id por la URL para la página de detalle
+          const id = doc.id;
+          const creditLine = data.creditLine || "";
+
+          // Tarjeta de autorización
+          const card = document.createElement("div");
+          card.className = "autorizacion-card";
+          card.onclick = () => {
+            window.location.href = `detalle_autorizacion_page.html?id=${id}&nombre=${encodeURIComponent(nombre)}&creditLine=${encodeURIComponent(creditLine)}`;
+          };
+
+          card.innerHTML = `
+            <div class="datos">
+              <div class="nombre">${nombre}</div>
+              <div class="dui">DUI: ${dui}</div>
+            </div>
+            <button class="ver-mas"><i class="fas fa-arrow-right"></i></button>
+          `;
+          lista.appendChild(card);
+        });
+      }, error => {
+        mensaje.textContent = "Error al cargar los datos.";
+        console.error(error);
+      });
+    }
+
+    cargarAutorizaciones();
+  </script>
+</body>
+</html>

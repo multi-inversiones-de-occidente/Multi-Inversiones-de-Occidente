@@ -313,7 +313,7 @@
       });
     }
 
-    // --- Modal de Pago Mejorado ---
+    // --- Modal de Pago Mejorado (sin JS inline) ---
     function mostrarDialogoPago(cliente) {
       let modalRoot = document.getElementById("modal-root");
       let monto = "";
@@ -321,9 +321,25 @@
 
       function closeModal() { modalRoot.innerHTML = ""; }
 
+      function pagarHandler() {
+        const montoValue = document.getElementById("monto-input").value.trim();
+        const montoNum = parseFloat(montoValue);
+        if (isNaN(montoNum) || montoNum <= 0) {
+          errorMsg = "Ingresa un monto válido mayor a $0.00";
+          render();
+          setTimeout(() => {
+            document.getElementById("monto-input").focus();
+          }, 50);
+          return;
+        }
+        closeModal();
+        // Aquí debes integrar la lógica real de pago y actualización en Firebase
+        alert(`Pago de $${montoNum.toFixed(2)} realizado para ${cliente.nombre} (${cliente.numeroDui}).`);
+      }
+
       function render() {
         modalRoot.innerHTML = `
-          <div class="modal-bg" onclick="event.target===this && (${closeModal.toString()})();">
+          <div class="modal-bg" id="modal-bg">
             <div class="modal">
               <div class="modal-title">
                 <i class="fas fa-coins" style="color:#13b66b;"></i> Pago a ${cliente.nombre}
@@ -346,25 +362,12 @@
             </div>
           </div>
         `;
-        // Eventos
+        // Asignar eventos después del render
         document.getElementById("cancelar-pago").onclick = closeModal;
-        document.getElementById("pagar-btn").onclick = () => {
-          const montoValue = document.getElementById("monto-input").value.trim();
-          const montoNum = parseFloat(montoValue);
-          if (isNaN(montoNum) || montoNum <= 0) {
-            errorMsg = "Ingresa un monto válido mayor a $0.00";
-            render();
-            setTimeout(() => {
-              document.getElementById("monto-input").focus();
-            }, 50);
-            return;
-          }
-          // Aquí deberías llamar tu función para realizar el pago y luego cerrar el modal.
-          // realizarPago(cliente.id, montoNum);
-          closeModal();
-          alert(`Pago de $${montoNum.toFixed(2)} realizado para ${cliente.nombre} (${cliente.numeroDui}).`);
+        document.getElementById("pagar-btn").onclick = pagarHandler;
+        document.getElementById("modal-bg").onclick = function(e) {
+          if (e.target === this) closeModal();
         };
-        // Soporte Enter para pagar
         document.getElementById("monto-input").onkeydown = e => {
           if (e.key === "Enter") document.getElementById("pagar-btn").click();
         };
@@ -382,4 +385,3 @@
   </script>
 </body>
 </html>
-

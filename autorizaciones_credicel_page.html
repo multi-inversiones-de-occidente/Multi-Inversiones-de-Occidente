@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Autorizaciones Credicel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;400&display=swap" rel="stylesheet">
+  <style>
+    body {
+      min-height: 100vh;
+      margin: 0;
+      font-family: 'Montserrat', Arial, sans-serif;
+      background: radial-gradient(circle at center, #111 60%, #222 100%);
+      color: #fff;
+    }
+    .appbar {
+      background: #111;
+      color: #fff;
+      padding: 20px 0 20px 32px;
+      font-size: 1.6rem;
+      font-weight: bold;
+      letter-spacing: 1px;
+      box-shadow: 0 2px 8px #0009;
+    }
+    .autorizaciones-list {
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 0;
+    }
+    .autorizacion-card {
+      background: linear-gradient(135deg, #7f53ac, #647dee 80%);
+      border-radius: 16px;
+      margin-bottom: 20px;
+      padding: 22px 20px;
+      box-shadow: 0 4px 12px #0008;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      transition: transform 0.08s;
+    }
+    .autorizacion-card:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 8px 24px #0009;
+    }
+    .autorizacion-info {
+      flex: 1;
+    }
+    .autorizacion-nombre {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 7px;
+    }
+    .autorizacion-dui {
+      color: #e0e0e0;
+      font-size: 0.95rem;
+      font-weight: 400;
+    }
+    .arrow {
+      font-size: 1.5rem;
+      color: #fff;
+      margin-left: 14px;
+    }
+    .loader, .mensaje-error, .mensaje-vacio {
+      text-align: center;
+      padding: 70px 0 40px;
+      color: #fff;
+      font-size: 1.12rem;
+      opacity: 0.92;
+    }
+    .loader {
+      font-size: 1.5rem;
+    }
+    @media (max-width: 620px) {
+      .autorizaciones-list {
+        max-width: 97vw;
+        margin: 24px 0;
+      }
+      .appbar {
+        padding: 20px 0 20px 16px;
+        font-size: 1.18rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="appbar">Autorizaciones Credicel</div>
+  <div id="autorizaciones-list" class="autorizaciones-list"></div>
+
+  <!-- Firebase config e inicialización -->
+  <script>
+    // Tu configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const lista = document.getElementById('autorizaciones-list');
+
+    // Loader al iniciar
+    lista.innerHTML = `<div class="loader">Cargando autorizaciones...</div>`;
+
+    // Stream en tiempo real igual que Flutter
+    db.collection("autorizaciones")
+      .where("creditLine", "==", "Credicel")
+      .orderBy("fecha", "desc")
+      .onSnapshot(snapshot => {
+        if (snapshot.empty) {
+          lista.innerHTML = `<div class="mensaje-vacio">No hay autorizaciones disponibles.</div>`;
+          return;
+        }
+        lista.innerHTML = "";
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const nombre = data.nombre || 'Sin nombre';
+          const dui = data.dui || 'Sin DUI';
+          // Card HTML
+          const card = document.createElement("div");
+          card.className = "autorizacion-card";
+          card.innerHTML = `
+            <div class="autorizacion-info">
+              <div class="autorizacion-nombre">${nombre}</div>
+              <div class="autorizacion-dui">DUI: ${dui}</div>
+            </div>
+            <span class="arrow">&#8594;</span>
+          `;
+          // Click para ver detalles
+          card.onclick = () => {
+            // Aquí rediriges al detalle (puedes usar localStorage/sessionStorage para pasar el id)
+            localStorage.setItem("detalle_autorizacion_id", doc.id);
+            localStorage.setItem("detalle_autorizacion_nombre", nombre);
+            localStorage.setItem("detalle_autorizacion_creditLine", "Credicel");
+            window.location.href = "detalle_autorizacion_page.html";
+          };
+          lista.appendChild(card);
+        });
+      }, err => {
+        lista.innerHTML = `<div class="mensaje-error">Error al cargar autorizaciones.<br>${err.message}</div>`;
+      });
+  </script>
+</body>
+</html>

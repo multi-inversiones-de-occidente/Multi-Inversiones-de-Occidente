@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ver Movimientos de Caja – Multi Inversiones</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background: #101212; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
+    header { background: #000; padding: 1rem 0; text-align: center; font-size: 1.45rem; letter-spacing: 1px; font-weight: 700; color: #67C8F1;}
+    .container { max-width: 700px; margin: 2.5rem auto 0 auto; background: #181a1c; border-radius: 16px; box-shadow: 0 2px 22px #0008; padding: 2.2rem 1.2rem 1.7rem 1.2rem;}
+    .row-fecha { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;}
+    .fecha-label { font-size: 1.11rem; color: #8ae1fc; font-weight: 600;}
+    .fecha-btn { background: none; border: none; color: #fff; font-size: 1.25rem; cursor: pointer;}
+    .mov-card { background: #23272c; border-radius: 12px; margin-bottom: 12px; padding: 16px 18px; box-shadow: 0 1px 7px #0002;}
+    .mov-ingreso { border-left: 5px solid #13b66b;}
+    .mov-egreso { border-left: 5px solid #e74c3c;}
+    .mov-pago { border-left: 5px solid #67C8F1;}
+    .mov-title { font-weight: bold; font-size: 1.05rem; margin-bottom: 6px;}
+    .mov-sub { font-size: .98rem; color: #8ae1fc;}
+    .total-caja { margin-top: 14px; background: #101212; border-radius: 10px; text-align: center; padding: 18px; font-size: 1.32rem; font-weight: bold; color: #fff;}
+    .empty-msg { text-align:center; color:#ccc; padding: 32px 0;}
+    @media (max-width:600px){.container{padding:1.2rem .3rem;}}
+  </style>
+</head>
+<body>
+  <header>Ver Movimientos de Caja</header>
+  <div class="container">
+    <div class="row-fecha">
+      <span id="fecha-label" class="fecha-label"></span>
+      <button id="fecha-btn" class="fecha-btn" title="Cambiar Fecha">
+        <i class="fas fa-calendar-day"></i>
+      </button>
+    </div>
+    <div id="movimientos-list"></div>
+    <div class="total-caja" id="total-caja"></div>
+  </div>
+
+  <!-- Firebase y lógica -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // Utilidades de fechas
+    function formatFecha(date) {
+      return date.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+    function formatHora(fechaIso) {
+      const d = new Date(fechaIso);
+      return d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true });
+    }
+
+    // Estado
+    let selectedDate = new Date();
+
+    // Renderiza fecha
+    function renderFecha() {
+      document.getElementById("fecha-label").textContent = "Fecha: " + formatFecha(selectedDate);
+    }
+
+    // Cargar movimientos
+    async function cargarMovimientos() {
+      const listDiv = document.getElementById("movimientos-list");
+      const totalDiv = document.getElementById("total-caja");
+      listDiv.innerHTML = "Cargando...";
+      totalDiv.textContent = "";
+
+      // Rango del día
+      const y = selectedDate.getFullYear(), m = selectedDate.getMonth(), d = selectedDate.getDate();
+      const startOfDay = new Date(y, m, d, 0, 0, 0, 0);
+      const endOfDay = new Date(y, m, d, 23, 59, 59, 999);
+      const startIso = startOfDay.toISOString();
+      const endIso = endOfDay.toISOString();
+
+      let movimientos = [];
+
+      // 1. Movimientos manuales
+      const movSnap = await getDocs(
+        query(
+          collection(db, "movimientosCaja"),
+          where("fecha", ">=", startIso),
+          where("fecha", "<=", endIso)
+        )
+      );
+      movSnap.forEach(doc => {
+        const d = doc.data();
+        movimientos.push({
+          tipo: d.tipo,
+          descripcion: d.descripcion,
+          monto: Number(d.monto),
+          observaciones: d.observaciones || '',
+          usuario: d.usuario || '',
+          fecha: d.fecha,
+          clase: d.tipo === "Ingreso" ? "mov-ingreso" : "mov-egreso"
+        });
+      });
+
+      // 2. Pagos
+      const pagoSnap = await getDocs(
+        query(
+          collection(db, "pagos"),
+          where("fechaPago", ">=", startIso),
+          where("fechaPago", "<=", endIso)
+        )
+      );
+      pagoSnap.forEach(doc => {
+        const d = doc.data();
+        movimientos.push({
+          tipo: "Ingreso",
+          descripcion: "Pago",
+          monto: Number(d.montoPagado),
+          observaciones: "",
+          usuario: d.cajeroNombre || '',
+          fecha: d.fechaPago,
+          clase: "mov-pago"
+        });
+      });
+
+      // Ordenar por hora descendente
+      movimientos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+      // Calcula total
+      let total = 0.0;
+      movimientos.forEach(mov => {
+        if (mov.tipo === "Ingreso") total += mov.monto;
+        else total -= mov.monto;
+      });
+
+      // Renderiza lista
+      if (movimientos.length === 0) {
+        listDiv.innerHTML = `<div class="empty-msg">No hay movimientos registrados.</div>`;
+      } else {
+        listDiv.innerHTML = movimientos.map(mov => `
+          <div class="mov-card ${mov.clase}">
+            <div class="mov-title">${mov.tipo} - ${mov.descripcion}</div>
+            <div class="mov-sub">Monto: $${mov.monto.toFixed(2)}</div>
+            ${mov.observaciones ? `<div class="mov-sub">Obs: ${mov.observaciones}</div>` : ""}
+            <div class="mov-sub">Usuario: ${mov.usuario}</div>
+            <div class="mov-sub">Hora: ${formatHora(mov.fecha)}</div>
+          </div>
+        `).join('');
+      }
+      totalDiv.textContent = "Total de Caja: $" + total.toFixed(2);
+    }
+
+    // Cambiar fecha
+    document.getElementById("fecha-btn").onclick = async function() {
+      // Simple picker para web: prompt
+      const val = prompt("Ingrese la fecha en formato DD/MM/AAAA", formatFecha(selectedDate));
+      if (!val) return;
+      const [d, m, y] = val.split('/');
+      const parsed = new Date(`${y}-${m}-${d}T00:00:00`);
+      if (isNaN(parsed.getTime())) {
+        alert("Fecha inválida");
+        return;
+      }
+      selectedDate = parsed;
+      renderFecha();
+      cargarMovimientos();
+    };
+
+    // Carga inicial tras login
+    onAuthStateChanged(auth, user => {
+      if (!user) return location.href = "login.html";
+      renderFecha();
+      cargarMovimientos();
+    });
+  </script>
+</body>
+</html>

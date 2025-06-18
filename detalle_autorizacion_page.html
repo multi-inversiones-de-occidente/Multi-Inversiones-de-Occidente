@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detalle de Autorización</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #111; color: #fff; }
+    header {
+      background: #000; padding: 1.2rem; font-size: 1.4rem; font-weight: 700;
+      letter-spacing: .6px; text-align: center;
+    }
+    .container {
+      max-width: 780px; margin: 0 auto; padding: 2.4rem 1rem 2rem 1rem;
+    }
+    .titulo {
+      font-size: 1.35rem; font-weight: bold; margin-bottom: 1.1rem;
+      text-align: left; letter-spacing: .7px;
+    }
+    .dato { color: #67C8F1; font-size: 1.09rem; margin: 8px 0 3px 0; }
+    .valor { color: #fff; font-size: 1.2rem; font-weight: 600; margin-bottom: 1.2rem;}
+    .botones {
+      display: flex; gap: 1.2rem; margin-top: 2rem; margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    .boton-califica, .boton-nocalifica {
+      flex: 1;
+      font-size: 1.13rem; font-weight: bold;
+      border: none; border-radius: 12px;
+      padding: 1.2rem 1rem;
+      cursor: pointer;
+      box-shadow: 0 4px 16px #0003;
+      transition: background .18s, color .15s, transform .13s;
+      margin-bottom: 10px;
+    }
+    .boton-califica {
+      background: linear-gradient(90deg,#34e886,#13b66b 80%);
+      color: #222;
+    }
+    .boton-nocalifica {
+      background: linear-gradient(90deg,#ff3939,#d13b3b 80%);
+      color: #fff;
+    }
+    .boton-califica:hover { background: #19c862; color: #fff;}
+    .boton-nocalifica:hover { background: #bb2222; color: #fff;}
+    .pdf-section { margin: 2rem 0; }
+    .pdf-link {
+      display: inline-block;
+      padding: 0.8rem 1.5rem;
+      border-radius: 11px;
+      background: #23235a;
+      color: #fff; text-decoration: none;
+      font-weight: 700;
+      margin-top: 0.6rem;
+    }
+    .pdf-link i { margin-right: 7px; }
+    .status { margin-top: 2.5rem; text-align: center; color: #ffeb3b; font-size: 1.11rem;}
+    @media (max-width: 650px) {
+      .container { padding:1.3rem 2vw; }
+      .titulo { font-size:1.02rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>Detalle de Autorización</header>
+  <div class="container" id="main-content">
+    Cargando información...
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, doc, getDoc, setDoc, deleteDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+    import { getStorage, ref, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-storage.js";
+
+    // Configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+    const auth = getAuth(app);
+
+    // Obtener parámetros de la URL
+    function getParam(name) {
+      return new URLSearchParams(window.location.search).get(name);
+    }
+    const id = getParam("id");
+    const nombre = decodeURIComponent(getParam("nombre") || "");
+    const creditLine = decodeURIComponent(getParam("creditLine") || "");
+
+    const mainContent = document.getElementById("main-content");
+
+    // Esperar login antes de consultar datos
+    onAuthStateChanged(auth, async user => {
+      if (!user) {
+        window.location.href = "login.html";
+        return;
+      }
+      if (!id) {
+        mainContent.innerHTML = "<div class='status'>No se encontró la autorización.</div>";
+        return;
+      }
+      mainContent.innerHTML = "Cargando información...";
+      try {
+        // Consultar autorización
+        const docRef = doc(db, "autorizaciones", id);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) {
+          mainContent.innerHTML = "<div class='status'>No se encontró la autorización.</div>";
+          return;
+        }
+        const data = docSnap.data();
+        // Extraer datos
+        const monto = Number(data.montoSolicitar) || 0;
+        const clienteID = data.clienteID || "";
+        const dui = data.dui || "";
+        // Buscar PDF
+        let pdfUrl = null;
+        if (clienteID) {
+          try {
+            const pdfRef = ref(storage, `Autorizaciones/${clienteID}/autorizacion.pdf`);
+            pdfUrl = await getDownloadURL(pdfRef);
+          } catch(e) {
+            pdfUrl = null;
+          }
+        }
+        // Renderizar info
+        mainContent.innerHTML = `
+          <div class="titulo">Detalle de ${nombre}</div>
+          <div class="dato">Línea de Crédito:</div>
+          <div class="valor">${creditLine}</div>
+          <div class="dato">Monto a Solicitar:</div>
+          <div class="valor">$${monto.toFixed(2)}</div>
+          <div class="dato">Nombre del Solicitante:</div>
+          <div class="valor">${nombre}</div>
+          <div class="dato">DUI:</div>
+          <div class="valor">${dui}</div>
+          <div class="pdf-section">
+            <div class="dato">PDF de la Autorización:</div>
+            ${
+              pdfUrl
+                ? `<a href="${pdfUrl}" class="pdf-link" target="_blank"><i class="fas fa-file-pdf"></i>Ver PDF</a>`
+                : `<span class="status">No se encontró el archivo PDF.</span>`
+            }
+          </div>
+          <div class="botones">
+            <button class="boton-califica" id="btn-califica">Autorización Calificada</button>
+            <button class="boton-nocalifica" id="btn-nocalifica">Autorización No Calificada</button>
+          </div>
+          <div id="status-msg" class="status"></div>
+        `;
+        // Acciones
+        document.getElementById("btn-califica").onclick = () => actualizarEstado("Calificado", data, user);
+        document.getElementById("btn-nocalifica").onclick = () => actualizarEstado("No Calificado", data, user);
+      } catch(e) {
+        mainContent.innerHTML = "<div class='status'>Error al cargar los datos.</div>";
+        console.error(e);
+      }
+    });
+
+    async function actualizarEstado(nuevoEstado, data, user) {
+      const statusMsg = document.getElementById("status-msg");
+      statusMsg.textContent = "Actualizando estado, por favor espera…";
+      try {
+        // 1. Copiar a "Archivo Autorizaciones"
+        const archiveRef = doc(db, "Archivo Autorizaciones", id);
+        const archivedData = {
+          ...data,
+          estado: nuevoEstado,
+          migratedAt: serverTimestamp(),
+        };
+        await setDoc(archiveRef, archivedData);
+        // 2. Eliminar de "autorizaciones"
+        await deleteDoc(doc(db, "autorizaciones", id));
+        // 3. Actualizar estado del usuario (si clienteID existe)
+        if (data.clienteID) {
+          await updateDoc(doc(db, "users", data.clienteID), { estado: nuevoEstado });
+        }
+        statusMsg.textContent = "¡Autorización migrada correctamente!";
+        setTimeout(() => {
+          window.location.href = "autorizaciones_page.html"; // Regresa al listado
+        }, 1500);
+      } catch(e) {
+        statusMsg.textContent = "Error al actualizar el estado.";
+        console.error(e);
+      }
+    }
+  </script>
+</body>
+</html>

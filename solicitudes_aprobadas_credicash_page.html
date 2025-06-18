@@ -36,8 +36,9 @@
         return;
       }
       data.forEach(row => {
+        // La fila entera será un enlace a la página de detalle usando el ID de la asignación
         tbody.innerHTML += `
-          <tr>
+          <tr class="fila-click" data-id="${row.asignacionID}" style="cursor:pointer;">
             <td><i class="fas fa-check-circle"></i></td>
             <td>${row.nombre}</td>
             <td>${row.numeroDui}</td>
@@ -47,6 +48,16 @@
             <td>${row.fechaAsignacion}</td>
           </tr>
         `;
+      });
+
+      // Agrega eventos click a cada fila
+      document.querySelectorAll(".fila-click").forEach(tr => {
+        tr.addEventListener("click", function() {
+          const id = this.getAttribute("data-id");
+          if (id) {
+            window.location.href = `detalle_aprobaciones_page.html?id=${encodeURIComponent(id)}`;
+          }
+        });
       });
     }
 
@@ -94,6 +105,7 @@
               // SOLO mostrar Credicash y Aprobado
               if (solData.creditLine !== "Credicash" || solData.estado !== "Aprobado") return null;
               return {
+                asignacionID: asignDoc.id, // <---- IMPORTANTE
                 nombre: solData.nombre || '',
                 numeroDui: solData.numeroDui || solData.dui || '',
                 montoAprobado: asignData.montoAprobado ?? '',
@@ -200,6 +212,8 @@
       font-size: 1.1rem;
     }
     tr:hover { background: #232c31; }
+    /* Añade un efecto sutil para indicar clic */
+    .fila-click:hover { background:#24302d; }
     @media (max-width:700px) {
       .container { padding: 1.3rem 0.5rem; }
       th, td { padding: 0.6rem 0.3rem; font-size: 0.97rem;}

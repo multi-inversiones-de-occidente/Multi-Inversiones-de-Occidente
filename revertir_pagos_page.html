@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Revertir Pago – Multi Inversiones</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      background: #101212;
+      color: #fff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+    }
+    header {
+      background: #000;
+      padding: 1rem 0;
+      text-align: center;
+      font-size: 1.45rem;
+      letter-spacing: 1px;
+      font-weight: 700;
+      color: #F8AF40;
+    }
+    .container {
+      max-width: 430px;
+      margin: 2.2rem auto 0 auto;
+      background: #1b1c1e;
+      border-radius: 16px;
+      box-shadow: 0 2px 22px #0008;
+      padding: 2.2rem 1.6rem 1.7rem 1.6rem;
+    }
+    .icon-main {
+      color: #F8AF40;
+      font-size: 48px;
+      text-align: center;
+      width: 100%;
+      display: block;
+      margin-bottom: 0.2em;
+    }
+    .titulo {
+      font-size: 2rem;
+      color: #F8AF40;
+      font-weight: bold;
+      margin-bottom: .3em;
+      text-align: center;
+    }
+    .desc {
+      color: #e6e6e6;
+      font-size: 1.05rem;
+      text-align: center;
+      margin-bottom: 1.7em;
+    }
+    .input-main, .input-motivo {
+      width: 100%;
+      background: #23272c;
+      color: #fff;
+      border: 1.7px solid #3c3f43;
+      border-radius: 10px;
+      font-size: 1.12rem;
+      padding: 12px 14px;
+      margin-bottom: 0.95em;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .input-motivo {
+      min-height: 56px;
+      resize: vertical;
+    }
+    .btn-main {
+      width: 100%;
+      background: #F8AF40;
+      color: #1a1813;
+      border: none;
+      border-radius: 9px;
+      font-size: 1.12rem;
+      font-weight: 600;
+      padding: 13px 0;
+      cursor: pointer;
+      margin-bottom: 1.25em;
+      transition: background .16s;
+    }
+    .btn-main:active, .btn-main:hover {
+      background: #e6891e;
+    }
+    .card-pago {
+      background: #fff;
+      color: #181818;
+      border-radius: 13px;
+      margin-top: 17px;
+      padding: 21px 19px 15px 19px;
+      box-shadow: 0 2px 12px #0004;
+      font-size: 1.03rem;
+    }
+    .card-pago .estado {
+      font-weight: bold;
+      margin-left: 7px;
+    }
+    .card-pago .anulado {
+      color: #d30013;
+    }
+    .card-pago .vigente {
+      color: #18bb18;
+    }
+    .btn-revertir {
+      width: 100%;
+      background: #e74c3c;
+      color: #fff;
+      border: none;
+      border-radius: 9px;
+      font-size: 1.08rem;
+      font-weight: 600;
+      padding: 13px 0;
+      cursor: pointer;
+      margin-top: 14px;
+      transition: background .15s;
+      display: flex; align-items: center; justify-content: center; gap:8px;
+    }
+    .btn-revertir[disabled] { background: #a89e99; cursor: not-allowed; opacity: .55; }
+    .spinner { display:inline-block; width:20px; height:20px; border-radius:50%; border:3px solid #fff3; border-top:3px solid #fff; animation:spin 1s linear infinite;}
+    @keyframes spin {100%{transform:rotate(360deg);}}
+    .modal-bg {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: #181e21cc;
+      z-index: 9998;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal {
+      background: #fff;
+      color: #222;
+      border-radius: 15px;
+      box-shadow: 0 6px 38px #0008;
+      padding: 26px 23px 20px 23px;
+      max-width: 340px;
+      width: 95%;
+      z-index: 9999;
+      position: relative;
+      text-align: left;
+      font-size: 1rem;
+      animation: showmodal .18s;
+    }
+    @keyframes showmodal { from { transform: scale(.93); opacity:.6;} to {transform:none;opacity:1;} }
+    .modal label {font-weight: bold;}
+    .modal input {
+      width: 100%;
+      background: #f5f8fb;
+      border: 1.2px solid #dadada;
+      color: #111;
+      font-size: 1.12rem;
+      padding: 11px 10px;
+      margin-bottom: 12px;
+      border-radius: 8px;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .modal-btns {
+      display: flex;
+      gap: 13px;
+      margin-top: 8px;
+      justify-content: flex-end;
+    }
+    .modal-btn-cancel {
+      background: #e74c3c;
+      color: #fff;
+      border: none;
+      padding: 9px 16px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background .17s;
+    }
+    .modal-btn-cancel:hover { background: #bb2c1a; }
+    .modal-btn-ok {
+      background: #F8AF40;
+      color: #1a1813;
+      border: none;
+      padding: 9px 18px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background .17s;
+    }
+    .modal-error {
+      color: #d30013;
+      font-size: 0.99rem;
+      margin-bottom: 9px;
+      font-weight: 500;
+    }
+    @media (max-width:600px) {.container{padding:1.3rem .6rem;}}
+  </style>
+</head>
+<body>
+  <header>Revertir Pago</header>
+  <div class="container">
+    <span class="icon-main"><i class="fas fa-undo"></i></span>
+    <div class="titulo">Reversión de Pagos</div>
+    <div class="desc">
+      Ingresa el número de ticket del pago a reversar.<br>
+      <b>Solo el gerente puede autorizar la reversión.</b>
+    </div>
+    <input id="correlativo" class="input-main" type="number" placeholder="Correlativo de Ticket" maxlength="8" autocomplete="off"/>
+    <button id="buscar-btn" class="btn-main"><i class="fas fa-search"></i> Buscar Pago</button>
+    <div id="pago-card"></div>
+  </div>
+  <div id="modal-root"></div>
+
+  <!-- Firebase & lógica -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs, doc, getDoc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    let pagoDoc = null, pagoData = null, userId = null;
+    let isReverting = false;
+
+    // --- PIN GERENTE MODAL ---
+    function showGerentePinDialog() {
+      return new Promise((resolve) => {
+        let modalRoot = document.getElementById("modal-root");
+        let errorMsg = "";
+        let pin = "";
+        async function onOk() {
+          const pinValue = document.getElementById("gerente-pin-input").value.trim();
+          if (!pinValue) {
+            errorMsg = "Debes ingresar el PIN del gerente.";
+            render();
+            return;
+          }
+          // Hash SHA256 (simple, solo en frontend para demo)
+          const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pinValue));
+          const hashHex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+          // Buscar gerente
+          const q = query(collection(db, "users"), where("rol", "==", "gerente"));
+          const snap = await getDocs(q);
+          if (snap.empty) {
+            errorMsg = "No hay gerente configurado.";
+            render();
+            return;
+          }
+          const gerente = snap.docs[0].data();
+          const gerenteHash = gerente.internalPassword;
+          if (gerenteHash === hashHex) {
+            closeModal();
+            resolve(true);
+          } else {
+            errorMsg = "PIN incorrecto";
+            render();
+          }
+        }
+        function closeModal() { modalRoot.innerHTML = ""; resolve(false);}
+        function render() {
+          modalRoot.innerHTML = `
+            <div class="modal-bg">
+              <div class="modal">
+                <label>PIN del gerente</label>
+                <input type="password" id="gerente-pin-input" maxlength="10" autocomplete="off" placeholder="PIN" style="font-size:1.18rem;"/>
+                ${errorMsg ? `<div class="modal-error">${errorMsg}</div>` : ""}
+                <div class="modal-btns">
+                  <button class="modal-btn-cancel" id="cancelar-pin">Cancelar</button>
+                  <button class="modal-btn-ok" id="autorizar-pin">Autorizar</button>
+                </div>
+              </div>
+            </div>
+          `;
+          document.getElementById("cancelar-pin").onclick = closeModal;
+          document.getElementById("autorizar-pin").onclick = onOk;
+          document.getElementById("gerente-pin-input").onkeydown = e => { if (e.key === "Enter") onOk(); };
+          setTimeout(() => document.getElementById("gerente-pin-input").focus(), 30);
+        }
+        render();
+      });
+    }
+
+    function showSuccessDialog(msg) {
+      let modalRoot = document.getElementById("modal-root");
+      modalRoot.innerHTML = `
+        <div class="modal-bg">
+          <div class="modal">
+            <div style="font-size:1.13rem;color:#18bb18;font-weight:bold;margin-bottom:6px;"><i class="fas fa-check-circle"></i> ¡Reversión exitosa!</div>
+            <div style="margin-bottom:18px;">${msg}</div>
+            <div class="modal-btns">
+              <button class="modal-btn-ok" id="ok-success">OK</button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.getElementById("ok-success").onclick = () => {
+        modalRoot.innerHTML = "";
+        document.getElementById("pago-card").innerHTML = "";
+        document.getElementById("correlativo").value = "";
+      };
+    }
+
+    // --- Buscar Pago ---
+    async function buscarPago() {
+      document.getElementById("pago-card").innerHTML = "";
+      const correlativo = document.getElementById("correlativo").value.trim();
+      if (!correlativo) return;
+
+      document.getElementById("buscar-btn").disabled = true;
+      document.getElementById("buscar-btn").innerHTML = '<span class="spinner"></span> Buscando...';
+      pagoDoc = pagoData = null;
+
+      const pagosQ = query(collection(db, "pagos"), where("correlativo", "==", correlativo));
+      const pagosSnap = await getDocs(pagosQ);
+      document.getElementById("buscar-btn").disabled = false;
+      document.getElementById("buscar-btn").innerHTML = '<i class="fas fa-search"></i> Buscar Pago';
+
+      if (pagosSnap.empty) {
+        document.getElementById("pago-card").innerHTML = `<div style="color:#d30013;font-weight:bold;text-align:center;padding:22px;">No se encontró ningún pago con ese correlativo</div>`;
+        return;
+      }
+      pagoDoc = pagosSnap.docs[0];
+      pagoData = pagoDoc.data();
+
+      renderPagoInfo();
+    }
+
+    // --- Render Card Pago ---
+    function renderPagoInfo() {
+      const card = document.getElementById("pago-card");
+      if (!pagoData) return;
+
+      card.innerHTML = `
+        <div class="card-pago">
+          <div><b>Ticket:</b> ${pagoData.correlativo}</div>
+          <div><b>Cliente:</b> ${pagoData.nombres}</div>
+          <div><b>Monto pagado:</b> $${parseFloat(pagoData.montoPagado).toFixed(2)}</div>
+          <div><b>Fecha de pago:</b> ${pagoData.fechaPago ? pagoData.fechaPago.replace("T", " ").substring(0,16) : ""}</div>
+          <div><b>Agencia:</b> ${pagoData.sucursal}</div>
+          <div style="margin:8px 0 6px 0;">
+            <i class="fas ${pagoData.anulado ? 'fa-times-circle anulado' : 'fa-check-circle vigente'}"></i>
+            <span class="estado ${pagoData.anulado ? 'anulado' : 'vigente'}">
+              ESTADO: ${pagoData.anulado ? 'ANULADO' : 'VIGENTE'}
+            </span>
+          </div>
+          <label for="motivo">Motivo de reversión (obligatorio):</label>
+          <textarea id="motivo" class="input-motivo" maxlength="100" ${pagoData.anulado ? "disabled" : ""}></textarea>
+          <button class="btn-revertir" id="revertir-btn" ${pagoData.anulado ? "disabled" : ""}><i class="fas fa-undo"></i>Revertir Pago</button>
+        </div>
+      `;
+      document.getElementById("revertir-btn").onclick = revertirPago;
+    }
+
+    // --- Revertir Pago ---
+    async function revertirPago() {
+      if (!pagoData || pagoData.anulado) return;
+      const motivo = document.getElementById("motivo").value.trim();
+      if (!motivo) {
+        document.getElementById("motivo").style.borderColor = "#d30013";
+        document.getElementById("motivo").focus();
+        return;
+      }
+
+      // Bloquea botón
+      const btn = document.getElementById("revertir-btn");
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner"></span> Revirtiendo...`;
+
+      // 1. Validación de gerente
+      const autorizado = await showGerentePinDialog();
+      if (!autorizado) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
+        return;
+      }
+
+      // 2. Validaciones extra
+      // Verifica pagos posteriores
+      const posterioresQ = query(
+        collection(db, "pagos"),
+        where("creditoID", "==", pagoData.creditoID),
+        where("fechaPago", ">", pagoData.fechaPago)
+      );
+      const posterioresSnap = await getDocs(posterioresQ);
+      if (!posterioresSnap.empty) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
+        alert("No puedes revertir pagos con abonos posteriores.");
+        return;
+      }
+
+      // 3. Obtener y restaurar crédito
+      const creditoRef = doc(db, "creditos", pagoData.creditoID);
+      const creditoSnap = await getDoc(creditoRef);
+      if (!creditoSnap.exists()) {
+        alert("No se encontró el crédito.");
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
+        return;
+      }
+      const credito = creditoSnap.data();
+      const nuevoCapital = parseFloat(credito.saldoActual) + parseFloat(pagoData.pagoCapital);
+      const nuevoInteres = parseFloat(credito.interesActual) + parseFloat(pagoData.pagoInteres);
+      const nuevasMultas = parseFloat(credito.multasAcumuladas) + parseFloat(pagoData.pagoMultas);
+
+      await updateDoc(creditoRef, {
+        saldoActual: nuevoCapital.toFixed(2),
+        interesActual: nuevoInteres.toFixed(2),
+        multasAcumuladas: nuevasMultas.toFixed(2),
+        estadoCredito: 'Activo',
+      });
+
+      // 4. Marca pago como anulado y log de reversa
+      await updateDoc(doc(db, "pagos", pagoDoc.id), {
+        anulado: true,
+        fechaReversion: new Date().toISOString(),
+        usuarioReversion: userId,
+        motivoReversion: motivo,
+      });
+
+      // 5. Registra egreso en caja
+      await addDoc(collection(db, "movimientos_caja"), {
+        tipoMovimiento: 'Egreso',
+        monto: -parseFloat(pagoData.montoPagado),
+        fecha: new Date().toISOString(),
+        referencia: 'Reversión de pago ' + pagoDoc.id,
+        usuarioID: userId,
+      });
+
+      btn.disabled = false;
+      btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
+
+      showSuccessDialog("El pago fue reversado correctamente.");
+    }
+
+    // --- Firebase Auth para saber userID ---
+    onAuthStateChanged(auth, user => {
+      if (!user) return location.href = "login.html";
+      userId = user.uid;
+    });
+
+    document.getElementById("buscar-btn").onclick = buscarPago;
+    document.getElementById("correlativo").onkeydown = e => { if (e.key === "Enter") buscarPago(); };
+  </script>
+</body>
+</html>

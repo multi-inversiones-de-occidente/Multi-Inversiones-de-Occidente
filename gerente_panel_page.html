@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Gerente</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      margin: 0; font-family: Arial, sans-serif;
+      background: radial-gradient(circle, #000, #111);
+      color: #fff; min-height: 100vh;
+    }
+    header {
+      background: #000; padding: 1rem;
+      text-align: center; font-size: 1.5rem;
+      font-weight: 700; letter-spacing: 1px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2.4rem 1rem 2rem 1rem;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    h1 {
+      margin: 1rem 0 .2rem 0;
+      font-size: 2.15rem;
+      font-weight: 800;
+      letter-spacing: .6px;
+      text-align: center;
+    }
+    .mensaje-bienvenida {
+      font-size: 1.09rem;
+      color: #F8AF40;
+      margin-bottom: 2.1rem;
+      margin-top: 0.4rem;
+      font-weight: 600;
+      text-align: center;
+      line-height: 1.35;
+      max-width: 630px;
+    }
+    .grid-botones {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px,1fr));
+      gap: 1.3rem;
+      margin-bottom: 2.2rem;
+    }
+    .btn-grande {
+      background: linear-gradient(90deg, #67C8F1 0%, #13b66b 100%);
+      color: #212121;
+      font-weight: bold;
+      font-size: 1.13rem;
+      border: none;
+      border-radius: 18px;
+      box-shadow: 0 4px 22px #13b66a2b;
+      padding: 2rem 1.2rem 2rem 1.2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: background .18s, color .18s, transform .14s;
+      position: relative;
+      outline: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .7rem;
+      min-width: 0;
+      user-select: none;
+      text-decoration: none;
+    }
+    .btn-grande:active,
+    .btn-grande:hover {
+      background: linear-gradient(90deg, #13b66b 70%, #67C8F1 100%);
+      color: #222;
+      transform: scale(1.03);
+      box-shadow: 0 8px 26px #0a644188;
+      text-decoration: none;
+    }
+    .btn-grande i {
+      font-size: 2.1rem;
+      margin-bottom: 8px;
+      color: #212121;
+      opacity: .89;
+      transition: color .14s;
+    }
+    .btn-grande:hover i { color: #0c7451; }
+    .btn-grande .badge {
+      position: absolute; top: 14px; right: 15px;
+      background: #e74c3c; color: #fff;
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .85rem; font-weight: 700;
+      box-shadow: 0 1px 8px #0002;
+    }
+    /* Botón revertir estilo rojo */
+    .btn-revertir {
+      background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%);
+      color: #fff !important;
+    }
+    .btn-revertir:active,
+    .btn-revertir:hover {
+      background: linear-gradient(90deg, #c0392b 70%, #8e0800 100%);
+      color: #fff !important;
+      box-shadow: 0 8px 26px #800a0a88;
+    }
+    .btn-revertir i {
+      color: #fff !important;
+      opacity: 1;
+    }
+    /* Otros colores específicos */
+    .btn-caja { background: linear-gradient(90deg, #67C8F1 0%, #13b66b 100%);}
+    .btn-mora-usuario { background: linear-gradient(90deg, #7a42f1 0%, #5933d7 100%);}
+    .btn-mora-agencia { background: linear-gradient(90deg, #304ffe 0%, #5c6bc0 100%);}
+    .btn-pin { background: linear-gradient(90deg, #f8af40 0%, #ffa726 100%);}
+    .btn-caja i { color: #134e3b; }
+    .btn-mora-usuario i { color: #fff;}
+    .btn-mora-agencia i { color: #fff;}
+    .btn-pin i { color: #fff59d;}
+    .btn-pin, .btn-pin i { color: #222; }
+    @media (max-width: 600px) {
+      .container { padding:1.1rem 1vw; }
+      h1 { font-size: 1.09rem;}
+      .mensaje-bienvenida { font-size: .97rem; }
+      .grid-botones { gap:0.8rem; }
+      .btn-grande { padding: 1.3rem 0.6rem 1.3rem 0.6rem; font-size: .93rem;}
+      .btn-grande i { font-size:1.35rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>Panel de Gerente</header>
+
+  <div class="container">
+    <h1 id="usuario-nombre">Bienvenido, usuario</h1>
+    <div class="mensaje-bienvenida">
+      Acceso rápido a las funciones del gerente.<br>
+      <span style="color:#67C8F1;font-weight:700;">Visualiza movimientos, tasas de mora y administra tu PIN interno de manera eficiente.</span>
+    </div>
+    <div class="grid-botones">
+      <a href="detalle_gerente_caja_page.html" class="btn-grande btn-caja">
+        <i class="fas fa-wallet"></i>
+        Ver Movimientos de Caja
+      </a>
+      <a href="tasa_mora_usuario_page.html" class="btn-grande btn-mora-usuario">
+        <i class="fas fa-user-check"></i>
+        Tasa de Mora por Usuario
+      </a>
+      <a href="tasa_mora_agencia_page.html" class="btn-grande btn-mora-agencia">
+        <i class="fas fa-city"></i>
+        Tasa de Mora por Agencia
+      </a>
+      <a href="revertir_credito_page.html" class="btn-grande btn-revertir">
+        <i class="fas fa-undo"></i>
+        Revertir Créditos
+      </a>
+      <a href="gerente_password_page.html" class="btn-grande btn-pin">
+        <i class="fas fa-key"></i>
+        Administrar PIN Interno
+      </a>
+    </div>
+  </div>
+</body>
+</html>

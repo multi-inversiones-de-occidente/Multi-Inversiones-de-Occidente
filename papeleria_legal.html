@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Papelería Legal</title>
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    // Configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // Utilidad para extraer parámetros de la URL
+    function getParam(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name);
+    }
+
+    async function loadResumenPapeleria() {
+      const asignacionID = getParam("id");
+      if (!asignacionID) {
+        document.getElementById('papeleria-contenido').innerHTML = `<div class="error">ID de asignación no especificado en la URL.</div>`;
+        return;
+      }
+      onAuthStateChanged(auth, async user => {
+        if (!user) {
+          window.location.href = "login.html";
+          return;
+        }
+        try {
+          // 1) Leer la asignación para personalizar info (si lo deseas, para más adelante)
+          const asignRef = doc(db, "asignacion_de_cuota", asignacionID);
+          const asignSnap = await getDoc(asignRef);
+          if (!asignSnap.exists()) throw new Error("Asignación no encontrada.");
+          const asignData = asignSnap.data();
+
+          // 2) Mostrar los botones para acceder a cada documento
+          let html = `
+            <h2>Papelería Legal</h2>
+            <div class="papeleria-btns">
+              <a href="hoja_apertura.html?id=${asignacionID}" class="btn-papeleria">
+                <i class="fas fa-file-contract"></i>
+                Hoja de Apertura
+              </a>
+              <a href="pagare_sin_protesto.html?id=${asignacionID}" class="btn-papeleria">
+                <i class="fas fa-file-signature"></i>
+                Pagaré sin Protesto
+              </a>
+              <a href="plan_pagos.html?id=${asignacionID}" class="btn-papeleria">
+                <i class="fas fa-file-invoice-dollar"></i>
+                Plan de Pagos
+              </a>
+            </div>
+            <div style="height:34px"></div>
+            <div style="text-align:center;color:#aaa;">Seleccione el documento legal que desea visualizar e imprimir.</div>
+          `;
+          document.getElementById('papeleria-contenido').innerHTML = html;
+        } catch (err) {
+          document.getElementById('papeleria-contenido').innerHTML = `<div class="error">Error: ${err.message}</div>`;
+        }
+      });
+    }
+    window.addEventListener("DOMContentLoaded", loadResumenPapeleria);
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background: #111; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; margin: 0; }
+    header {
+      background:#000; padding:1rem 0;
+      text-align:center; font-size:1.5rem;
+      letter-spacing:1px; font-weight:700;
+      color: #67C8F1;
+    }
+    .container {
+      max-width: 580px; margin:2.2rem auto 0 auto;
+      background: #181818;
+      border-radius: 18px; box-shadow: 0 2px 25px #0005;
+      padding: 2.4rem 1.6rem 1.8rem 1.6rem;
+    }
+    h1 { color: #F8AF40; font-size:2rem; text-align:center; font-weight:bold; margin-top:0; margin-bottom:1.5rem;}
+    h2 { color:#67C8F1; font-size:1.13rem; margin:1.2rem 0 1.5rem 0; letter-spacing:.5px; text-align:center;}
+    .papeleria-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+      margin: 0 auto;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.2rem;
+    }
+    .btn-papeleria {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #212a2c;
+      color: #F8AF40;
+      text-decoration: none;
+      font-size: 1.18rem;
+      font-weight: 600;
+      padding: 1.3em 2.6em;
+      border-radius: 13px;
+      box-shadow: 0 2px 7px #0004;
+      transition: background 0.13s, color 0.13s, transform 0.09s;
+      border: 2px solid #444;
+    }
+    .btn-papeleria i {
+      font-size: 2.4rem;
+      margin-bottom: 0.37em;
+      color: #67C8F1;
+    }
+    .btn-papeleria:hover {
+      background: #252c36;
+      color: #fff;
+      transform: scale(1.04);
+      border-color: #67C8F1;
+    }
+    .error { color:#f55; font-size:1.13rem; padding:24px 0; text-align:center;}
+    @media (max-width:680px) {
+      .container { padding: 1.2rem 0.5rem;}
+      .btn-papeleria { font-size:1rem; padding: 1em 1em;}
+    }
+  </style>
+</head>
+<body>
+  <header>Papelería Legal</header>
+  <div class="container">
+    <h1><i class="fas fa-file-alt"></i> Papelería Legal</h1>
+    <div id="papeleria-contenido">
+      <div style="color:#ccc;text-align:center;padding:38px 0;">Cargando información...</div>
+    </div>
+  </div>
+</body>
+</html>

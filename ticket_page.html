@@ -102,11 +102,31 @@
       .container { max-width: 98vw; padding: 1.2rem 2vw; }
       .ticket-title { font-size: 1.1rem;}
     }
+    /* --- SOLO IMPRIMIR EL TICKET --- */
+    @media print {
+      body, html {
+        background: #fff !important;
+        margin: 0 !important; padding: 0 !important;
+      }
+      header, .volver-btn {
+        display: none !important;
+      }
+      .container {
+        box-shadow: none !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        background: #fff !important;
+        width: 100vw !important;
+        max-width: 100vw !important;
+        min-width: 0 !important;
+        padding: 0.7cm 0.5cm !important;
+      }
+    }
   </style>
 </head>
 <body>
   <header>Ticket de Pago</header>
-  <div class="container">
+  <div class="container" id="ticket-print">
     <div class="ticket-header">
       <img src="assets/logo_mi_bw.png" class="ticket-logo" alt="Multi Inversiones"/>
       <div style="font-size:1rem;color:#13b66b;font-weight:600;">
@@ -136,7 +156,6 @@
     </div>
     <a class="volver-btn" href="pagos_page.html"><i class="fas fa-arrow-left"></i> Volver al Panel de Caja</a>
   </div>
-
   <script>
     // --- Extrae parámetros de la URL y los muestra en el comprobante ---
     function getParam(name) {
@@ -165,6 +184,10 @@
     document.getElementById('pagoInteres').textContent   = parseFloat(getParam('pagoInteres') || '0').toFixed(2);
     document.getElementById('pagoMultas').textContent    = parseFloat(getParam('pagoMultas') || '0').toFixed(2);
     document.getElementById('saldoRestante').textContent = parseFloat(getParam('saldoRestante') || '0').toFixed(2);
+
+    // Opcional: imprime automáticamente al cargar la página
+    // window.onload = () => window.print();
   </script>
 </body>
 </html>
+

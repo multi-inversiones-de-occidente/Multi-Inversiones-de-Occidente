@@ -59,8 +59,25 @@
     .comprobante-btns { text-align: center;}
     .btn-imprimir { background: #253045; color: #fff; font-size:1.13rem; padding:9px 34px; border-radius:9px; border:none; cursor:pointer; font-weight:600; margin-top:10px;}
     .btn-imprimir:hover { background: #67C8F1; color:#222;}
-    @media print { .btn-imprimir, .btn-main { display: none !important; } .comprobante-bg { box-shadow: none !important; } }
     @media (max-width:600px){.container{padding:1.3rem .7rem;}}
+
+    /* SOLO imprime el comprobante/ticket */
+    @media print {
+      body * { visibility: hidden !important; }
+      #comprobante-bg, #comprobante-bg * { visibility: visible !important; }
+      #comprobante-bg {
+        position: absolute !important;
+        left: 0; right: 0;
+        top: 0;
+        margin: auto !important;
+        box-shadow: none !important;
+        background: #fff !important;
+        color: #181818 !important;
+      }
+      .btn-imprimir {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 <body>

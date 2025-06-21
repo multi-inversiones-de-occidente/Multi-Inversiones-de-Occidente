@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Hoja de Apertura</title>
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    // Configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // Diccionario de direcciones y teléfonos de agencias
+    const agenciasInfo = {
+      'Ahuachapán': {
+        direccion: '6ª AV. NORTE Y 8ª CALLE PONIENTE N° 3-8A, AHUACHAPÁN, AHUACHAPÁN',
+        telefono: '2406-5099'
+      },
+      'Santa Ana': {
+        direccion: 'Av. Independencia Sur y 7a Calle Oriente #15, Santa Ana',
+        telefono: '2447-1010'
+      },
+      'Juayúa': {
+        direccion: 'Calle Principal, Barrio El Calvario, Juayúa',
+        telefono: '2457-5656'
+      }
+      // Agrega más agencias si es necesario...
+    };
+
+    function getParam(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name);
+    }
+
+    async function loadHojaApertura() {
+      const asignacionID = getParam("id");
+      if (!asignacionID) {
+        document.getElementById('hoja-apertura').innerHTML = `<div class="error">ID de asignación no especificado en la URL.</div>`;
+        return;
+      }
+      onAuthStateChanged(auth, async user => {
+        if (!user) {
+          window.location.href = "login.html";
+          return;
+        }
+        try {
+          // 1) Leer la asignación
+          const asignRef = doc(db, "asignacion_de_cuota", asignacionID);
+          const asignSnap = await getDoc(asignRef);
+          if (!asignSnap.exists()) throw new Error("Asignación no encontrada.");
+          const asignData = asignSnap.data();
+
+          // 2) Leer la solicitud original
+          const solicitudID = asignData.solicitudID;
+          const solRef = doc(db, "Archivo Solicitudes", solicitudID);
+          const solSnap = await getDoc(solRef);
+          if (!solSnap.exists()) throw new Error("Solicitud original no encontrada.");
+          const solData = solSnap.data();
+
+          // 3) Tomar datos de agencia
+          const agencia = asignData.agenciaAsignada || 'Ahuachapán';
+          const infoAgencia = agenciasInfo[agencia] || {direccion: '', telefono: ''};
+
+          // 4) Preparar variables y valores
+          const fechaApertura = asignData.fechaAprobacion 
+            ? (asignData.fechaAprobacion.toDate 
+                ? asignData.fechaAprobacion.toDate().toLocaleDateString("es-SV")
+                : asignData.fechaAprobacion)
+            : '';
+          const fechaVencimiento = (asignData.fechaVencimiento && asignData.fechaVencimiento.toDate)
+            ? asignData.fechaVencimiento.toDate().toLocaleDateString("es-SV")
+            : (asignData.fechaVencimiento || '');
+
+          const monto = asignData.montoAprobado || solData.montoSolicitado || '';
+          const cuota = asignData.cuota || '';
+          const lineaCredito = solData.lineaCredito || '';
+          const destino = solData.destinoCredito || '';
+          const garantia = solData.garantia || '';
+          const comision = "0.00";
+          const totalDeducciones = "0.00";
+          const liquidoRecibir = monto;
+          const sector = solData.sector || '';
+          const tasaMora = solData.tasaMora || '';
+          const plazo = asignData.numeroCuotas || '';
+          const frecuenciaPago = asignData.frecuenciaPago || '';
+          const nombreEjecutivo = asignData.asignadoA || '';
+          const nombreCliente = `${solData.nombre || ''} ${solData.apellido || ''}`;
+          const clienteID = asignacionID;
+
+          // 5) Renderizar el documento
+          let html = `
+            <div class="doc-wrap" id="print-section">
+              <div class="doc-header">
+                <div class="empresa">M.I. DE OCCIDENTE S.A. DE C.V.</div>
+                <div class="direccion">${infoAgencia.direccion}</div>
+                <div class="telefono">Tel: ${infoAgencia.telefono}</div>
+              </div>
+              <div class="doc-title">HOJA DE APERTURA</div>
+              <div class="fecha-apertura"><b>Fecha:</b> ${fechaApertura}</div>
+              <hr style="margin: 14px 0;">
+              <table class="doc-table">
+                <tr><td><b>CLIENTE:</b></td><td>${clienteID} &nbsp;&nbsp; ${nombreCliente}</td></tr>
+                <tr><td><b>LÍNEA DE CRÉDITO:</b></td><td>${lineaCredito}</td></tr>
+                <tr><td><b>Monto:</b></td><td>$${monto}</td></tr>
+                <tr><td><b>Destino:</b></td><td>${destino}</td></tr>
+                <tr><td><b>Cuota:</b></td><td>$${cuota}</td></tr>
+                <tr><td><b>Apertura:</b></td><td>${fechaApertura}</td></tr>
+                <tr><td><b>Garantía:</b></td><td>${garantia}</td></tr>
+                <tr><td><b>Comisión en Cuota:</b></td><td>$${comision}</td></tr>
+                <tr><td><b>Vencimiento:</b></td><td>${fechaVencimiento}</td></tr>
+                <tr><td><b>Sector:</b></td><td>${sector}</td></tr>
+                <tr><td><b>Tasa Mora:</b></td><td>${tasaMora}</td></tr>
+                <tr><td><b>Plazo:</b></td><td>${plazo}</td></tr>
+                <tr><td><b>Frecuencia de Pago:</b></td><td>${frecuenciaPago}</td></tr>
+                <tr><td><b>Ejecutivo:</b></td><td>${nombreEjecutivo}</td></tr>
+              </table>
+              <br>
+              <div><b>DETALLE DE DEDUCCIONES</b></div>
+              <table class="deducciones-table">
+                <thead>
+                  <tr>
+                    <th>Tipo</th>
+                    <th>Cuenta</th>
+                    <th>Nombre/Descripción</th>
+                    <th>Porcentaje</th>
+                    <th>Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>0%</td>
+                    <td>$${totalDeducciones}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="total-deducciones"><b>Total de Deducciones:</b> $${totalDeducciones}</div>
+              <div class="liquido"><b>LÍQUIDO A RECIBIR:</b> $${liquidoRecibir}</div>
+              <br><br><br>
+              <div class="firmas">
+                <div class="firma-ejecutivo">
+                  _______________________<br>
+                  ${nombreEjecutivo}<br>
+                  EJECUTIVO
+                </div>
+                <div class="firma-cliente">
+                  _______________________<br>
+                  ${nombreCliente}<br>
+                  CLIENTE
+                </div>
+              </div>
+              <br>
+              <div style="text-align:center;font-size:1.02rem;font-weight:500;color:#555;">DESEMBOLSO</div>
+            </div>
+            <div style="text-align:center;margin-top:26px;">
+              <button class="btn-imprimir" onclick="window.print()"><i class="fas fa-print"></i> Imprimir</button>
+            </div>
+          `;
+          document.getElementById('hoja-apertura').innerHTML = html;
+        } catch (err) {
+          document.getElementById('hoja-apertura').innerHTML = `<div class="error">Error: ${err.message}</div>`;
+        }
+      });
+    }
+    window.addEventListener("DOMContentLoaded", loadHojaApertura);
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background: #fff; color: #181818; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; margin: 0; }
+    .container {
+      max-width: 660px; margin:2.5rem auto 0 auto;
+      background: #fff;
+      border-radius: 12px; box-shadow: 0 2px 18px #0003;
+      padding: 2.6rem 2.4rem 1.5rem 2.4rem;
+    }
+    .doc-wrap { background: #fff; color:#181818; }
+    .doc-header { text-align:center; margin-bottom:1rem; }
+    .empresa { font-size:1.2rem;font-weight:700;margin-bottom:2px;}
+    .direccion { font-size:1rem;margin-bottom:2px;}
+    .telefono { font-size:1rem;}
+    .doc-title { text-align:center; font-size:1.15rem; font-weight:700; color:#06569e; margin-bottom:6px; }
+    .fecha-apertura { text-align:right; font-size:1rem; color:#444; margin-bottom:3px; }
+    .doc-table { width:100%; border-collapse:collapse; font-size:1rem; margin-bottom: 14px;}
+    .doc-table td { padding: 4px 8px 3px 3px; }
+    .doc-table td:first-child { width:220px; color:#0e6182;font-weight:600; }
+    .deducciones-table { width:100%; border-collapse:collapse; font-size:1rem; margin-top:6px;}
+    .deducciones-table th, .deducciones-table td { border: 1px solid #b8c0c9; padding:3px 6px; text-align:center;}
+    .deducciones-table th { background: #e9f2fa; color:#003c78; font-size:1em;}
+    .total-deducciones, .liquido { margin-top:8px; font-size:1.04rem; font-weight:600;}
+    .firmas { display:flex; justify-content:space-between; margin-top:45px; }
+    .firma-ejecutivo, .firma-cliente { text-align:center; width:46%; font-size:1rem;}
+    .btn-imprimir {
+      background: #253045; color: #fff; font-size:1.17rem; padding:10px 32px;
+      border-radius:9px; border:none; cursor:pointer; font-weight:600;
+      box-shadow: 0 2px 8px #0002; transition:background .14s;
+      margin-top:10px;
+    }
+    .btn-imprimir:hover { background: #67C8F1; color:#222;}
+    .error { color:#f55; font-size:1.13rem; padding:24px 0; text-align:center;}
+    @media (max-width:720px) {
+      .container { padding: 0.7rem 0.2rem;}
+      .doc-table td:first-child { width:140px;}
+      .firmas { flex-direction:column; gap:34px;}
+      .firma-ejecutivo, .firma-cliente { width:100%;}
+    }
+    @media print {
+      body { background:#fff !important; }
+      .container, #hoja-apertura { box-shadow:none !important; }
+      .btn-imprimir { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 style="color:#F8AF40;text-align:center;font-size:1.65rem;margin-bottom:1.5rem;">
+      <i class="fas fa-file-contract"></i> Hoja de Apertura
+    </h1>
+    <div id="hoja-apertura">
+      <div style="color:#888;text-align:center;padding:38px 0;">Cargando hoja de apertura...</div>
+    </div>
+  </div>
+</body>
+</html>

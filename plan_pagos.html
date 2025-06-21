@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Plan de Pagos</title>
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    // Configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // Diccionario de direcciones y teléfonos de agencias
+    const agenciasInfo = {
+      'Ahuachapán': {
+        direccion: '6ª AV. NORTE Y 8ª CALLE PONIENTE N° 3-8A, AHUACHAPÁN, AHUACHAPÁN',
+        telefono: '2406-5099'
+      },
+      'Santa Ana': {
+        direccion: 'Av. Independencia Sur y 7a Calle Oriente #15, Santa Ana',
+        telefono: '2447-1010'
+      },
+      'Juayúa': {
+        direccion: 'Calle Principal, Barrio El Calvario, Juayúa',
+        telefono: '2457-5656'
+      }
+      // Agrega más agencias si es necesario...
+    };
+
+    function getParam(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name);
+    }
+
+    async function loadPlanPagos() {
+      const asignacionID = getParam("id");
+      if (!asignacionID) {
+        document.getElementById('plan-pagos').innerHTML = `<div class="error">ID de asignación no especificado en la URL.</div>`;
+        return;
+      }
+      onAuthStateChanged(auth, async user => {
+        if (!user) {
+          window.location.href = "login.html";
+          return;
+        }
+        try {
+          // 1) Leer la asignación
+          const asignRef = doc(db, "asignacion_de_cuota", asignacionID);
+          const asignSnap = await getDoc(asignRef);
+          if (!asignSnap.exists()) throw new Error("Asignación no encontrada.");
+          const asignData = asignSnap.data();
+
+          // 2) Leer la solicitud original
+          const solicitudID = asignData.solicitudID;
+          const solRef = doc(db, "Archivo Solicitudes", solicitudID);
+          const solSnap = await getDoc(solRef);
+          if (!solSnap.exists()) throw new Error("Solicitud original no encontrada.");
+          const solData = solSnap.data();
+
+          // 3) Datos de agencia
+          const agencia = asignData.agenciaAsignada || 'Ahuachapán';
+          const infoAgencia = agenciasInfo[agencia] || {direccion: '', telefono: ''};
+
+          // 4) Datos generales para encabezado
+          const fechaEmision = new Date().toLocaleDateString('es-SV');
+          const nombreEjecutivo = asignData.asignadoA || '';
+          const nombreCliente = `${solData.nombre || ''} ${solData.apellido || ''}`;
+          const numeroPrestamo = asignacionID;
+          const monto = asignData.montoAprobado || solData.montoSolicitado || '';
+          const cuota = asignData.cuota || '';
+          const plazo = asignData.numeroCuotas || '';
+
+          // 5) Plan de pagos (amortización)
+          const amortizacion = Array.isArray(asignData.amortizacion) ? asignData.amortizacion : [];
+
+          // Cálculos de totales (si existen campos Seg/Vida y Seg/Deuda)
+          let totalCapital = 0, totalSegVida = 0, totalSegDeuda = 0;
+          amortizacion.forEach(row => {
+            totalCapital += Number(row.capital || 0);
+            totalSegVida += Number(row.segVida || 0);
+            totalSegDeuda += Number(row.segDeuda || 0);
+          });
+
+          // Renderizar tabla de pagos
+          let tablaPagos = amortizacion.map((row, i) => `
+            <tr>
+              <td>${row.numeroCuota ?? i+1}</td>
+              <td>${(row.fecha && row.fecha.toDate ? row.fecha.toDate().toLocaleDateString("es-SV") : (typeof row.fecha === "string" ? row.fecha.split("T")[0] : ''))}</td>
+              <td>$${row.cuota ?? ''}</td>
+              <td>$${row.capital ?? ''}</td>
+              <td>$${row.segVida ?? '0.00'}</td>
+              <td>$${row.segDeuda ?? '0.00'}</td>
+              <td>$${row.saldo ?? ''}</td>
+            </tr>
+          `).join('');
+
+          // 6) Renderizar el documento
+          let html = `
+            <div class="doc-wrap" id="print-section">
+              <div class="doc-header">
+                <div class="empresa">M.I. DE OCCIDENTE S.A. DE C.V.</div>
+                <div class="direccion">${infoAgencia.direccion}</div>
+                <div class="telefono">Tel: ${infoAgencia.telefono}</div>
+              </div>
+              <div class="doc-title">INFORME DE PLAN DE PAGOS</div>
+              <div class="plan-meta">
+                <div><b>Fecha de Emisión:</b> ${fechaEmision}</div>
+                <div><b>Nombre Cliente:</b> ${nombreCliente}</div>
+                <div><b>Número de Préstamo:</b> ${numeroPrestamo}</div>
+                <div><b>Monto:</b> $${monto}</div>
+                <div><b>Cuota:</b> $${cuota}</div>
+                <div><b>Plazo:</b> ${plazo}</div>
+              </div>
+              <br>
+              <table class="plan-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Fecha</th>
+                    <th>Cuota</th>
+                    <th>Capital</th>
+                    <th>Seg/Vida</th>
+                    <th>Seg/Deuda</th>
+                    <th>Saldo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tablaPagos}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="3"><b>Total:</b></td>
+                    <td><b>$${totalCapital.toFixed(2)}</b></td>
+                    <td><b>$${totalSegVida.toFixed(2)}</b></td>
+                    <td><b>$${totalSegDeuda.toFixed(2)}</b></td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+              <br>
+              <div class="ejecutivo-firma" style="text-align:right;margin-top:40px;">
+                <div style="padding-bottom:25px;">______________________________</div>
+                <div>${nombreEjecutivo}</div>
+                <div style="font-size:0.98rem;color:#444;">Ejecutivo</div>
+              </div>
+            </div>
+            <div style="text-align:center;margin-top:26px;">
+              <button class="btn-imprimir" onclick="window.print()"><i class="fas fa-print"></i> Imprimir</button>
+            </div>
+          `;
+          document.getElementById('plan-pagos').innerHTML = html;
+        } catch (err) {
+          document.getElementById('plan-pagos').innerHTML = `<div class="error">Error: ${err.message}</div>`;
+        }
+      });
+    }
+    window.addEventListener("DOMContentLoaded", loadPlanPagos);
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background: #fff; color: #181818; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; margin: 0; }
+    .container {
+      max-width: 950px; margin:2.5rem auto 0 auto;
+      background: #fff;
+      border-radius: 12px; box-shadow: 0 2px 18px #0003;
+      padding: 2.3rem 1.6rem 1.3rem 1.6rem;
+    }
+    .doc-wrap { background: #fff; color:#181818; }
+    .doc-header { text-align:center; margin-bottom:1.1rem; }
+    .empresa { font-size:1.19rem;font-weight:700;margin-bottom:2px;}
+    .direccion { font-size:1rem;margin-bottom:2px;}
+    .telefono { font-size:1rem;}
+    .doc-title { text-align:center; font-size:1.11rem; font-weight:700; color:#06569e; margin-bottom:18px; }
+    .plan-meta { font-size:1.03rem; display: flex; flex-wrap: wrap; gap:26px; margin-bottom:14px;}
+    .plan-meta > div { min-width:210px; margin-bottom:6px;}
+    .plan-table { width:100%; border-collapse:collapse; font-size:1.01rem;}
+    .plan-table th, .plan-table td { border: 1px solid #b8c0c9; padding:3.5px 6px; text-align:center;}
+    .plan-table th { background: #e9f2fa; color:#003c78; font-size:1em;}
+    .plan-table tfoot td { font-weight:600;background:#f4f8fb;}
+    .ejecutivo-firma { margin-top:36px; font-size:1.07rem; }
+    .btn-imprimir {
+      background: #253045; color: #fff; font-size:1.15rem; padding:9px 34px;
+      border-radius:9px; border:none; cursor:pointer; font-weight:600;
+      box-shadow: 0 2px 8px #0002; transition:background .14s;
+      margin-top:10px;
+    }
+    .btn-imprimir:hover { background: #67C8F1; color:#222;}
+    .error { color:#f55; font-size:1.13rem; padding:24px 0; text-align:center;}
+    @media (max-width:900px) {
+      .container { padding: 0.7rem 0.2rem;}
+      .plan-table { font-size:.95rem;}
+      .plan-meta { gap:10px; }
+      .plan-meta > div { min-width:130px;}
+    }
+    @media print {
+      body { background:#fff !important; }
+      .container, #plan-pagos { box-shadow:none !important; }
+      .btn-imprimir { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 style="color:#F8AF40;text-align:center;font-size:1.62rem;margin-bottom:1.2rem;">
+      <i class="fas fa-file-invoice-dollar"></i> Plan de Pagos
+    </h1>
+    <div id="plan-pagos">
+      <div style="color:#888;text-align:center;padding:38px 0;">Cargando documento...</div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pagaré sin Protesto</title>
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    // Configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // Diccionario de direcciones y teléfonos de agencias
+    const agenciasInfo = {
+      'Ahuachapán': {
+        direccion: '6ª AV. NORTE Y 8ª CALLE PONIENTE N° 3-8A, AHUACHAPÁN, AHUACHAPÁN',
+        telefono: '2406-5099'
+      },
+      'Santa Ana': {
+        direccion: 'Av. Independencia Sur y 7a Calle Oriente #15, Santa Ana',
+        telefono: '2447-1010'
+      },
+      'Juayúa': {
+        direccion: 'Calle Principal, Barrio El Calvario, Juayúa',
+        telefono: '2457-5656'
+      }
+      // Agrega más agencias si es necesario...
+    };
+
+    // Función para convertir números a letras (solo para montos en dólares)
+    function numeroALetras(num) {
+      // Lógica mejorada: hasta 999,999.99 dólares
+      const unidades = ["", "UNO", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"];
+      const decenas = ["", "", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"];
+      const especiales = ["DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE", "DIECISÉIS", "DIECISIETE", "DIECIOCHO", "DIECINUEVE"];
+      const centenas = ["", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"];
+
+      if (typeof num !== 'number') num = parseFloat(num);
+
+      if (isNaN(num)) return "CERO 00/100";
+      if (num === 0) return "CERO 00/100";
+      if (num === 100) return "CIEN 00/100";
+
+      let entero = Math.floor(num);
+      let centavos = Math.round((num - entero) * 100);
+
+      let textoCentavos = centavos.toString().padStart(2, '0') + "/100";
+
+      let letras = "";
+
+      function seccion(n) {
+        if (n < 10) return unidades[n];
+        if (n < 20) return especiales[n - 10];
+        if (n < 100) {
+          let dec = Math.floor(n / 10);
+          let uni = n % 10;
+          if (dec === 2 && uni > 0) return "VEINTI" + unidades[uni].toLowerCase();
+          let txt = decenas[dec];
+          if (uni > 0) txt += " Y " + unidades[uni];
+          return txt;
+        }
+        if (n < 1000) {
+          if (n === 100) return "CIEN";
+          let cen = Math.floor(n / 100);
+          let resto = n % 100;
+          let txt = centenas[cen];
+          if (resto > 0) txt += " " + seccion(resto);
+          return txt;
+        }
+        if (n < 1000000) {
+          let miles = Math.floor(n / 1000);
+          let resto = n % 1000;
+          let milesTxt = (miles === 1 ? "MIL" : seccion(miles) + " MIL");
+          if (resto > 0) milesTxt += " " + seccion(resto);
+          return milesTxt;
+        }
+        return "Número muy grande";
+      }
+
+      letras = seccion(entero);
+      return letras.trim() + " " + textoCentavos;
+    }
+
+    function getParam(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name);
+    }
+
+    async function loadPagare() {
+      const asignacionID = getParam("id");
+      if (!asignacionID) {
+        document.getElementById('pagare').innerHTML = `<div class="error">ID de asignación no especificado en la URL.</div>`;
+        return;
+      }
+      onAuthStateChanged(auth, async user => {
+        if (!user) {
+          window.location.href = "login.html";
+          return;
+        }
+        try {
+          // 1) Leer la asignación
+          const asignRef = doc(db, "asignacion_de_cuota", asignacionID);
+          const asignSnap = await getDoc(asignRef);
+          if (!asignSnap.exists()) throw new Error("Asignación no encontrada.");
+          const asignData = asignSnap.data();
+
+          // 2) Leer la solicitud original
+          const solicitudID = asignData.solicitudID;
+          const solRef = doc(db, "Archivo Solicitudes", solicitudID);
+          const solSnap = await getDoc(solRef);
+          if (!solSnap.exists()) throw new Error("Solicitud original no encontrada.");
+          const solData = solSnap.data();
+
+          // 3) Datos de agencia
+          const agencia = asignData.agenciaAsignada || 'Ahuachapán';
+          const infoAgencia = agenciasInfo[agencia] || {direccion: '', telefono: ''};
+
+          // 4) Preparar variables y valores
+          const fechaApertura = asignData.fechaAprobacion 
+            ? (asignData.fechaAprobacion.toDate 
+                ? asignData.fechaAprobacion.toDate().toLocaleDateString("es-SV")
+                : asignData.fechaAprobacion)
+            : '';
+          const fechaVencimiento = (asignData.fechaVencimiento && asignData.fechaVencimiento.toDate)
+            ? asignData.fechaVencimiento.toDate().toLocaleDateString("es-SV")
+            : (asignData.fechaVencimiento || '');
+
+          const monto = asignData.montoAprobado || solData.montoSolicitado || '';
+          const montoLetras = numeroALetras(monto);
+          const cuota = asignData.cuota || '';
+          const plazo = asignData.numeroCuotas || '';
+          const frecuenciaPago = asignData.frecuenciaPago || '';
+          const tasaInteres = solData.tasaInteres || '';
+          const nombreCliente = `${solData.nombre || ''} ${solData.apellido || ''}`;
+          const duiCliente = solData.numeroDui || '';
+          const direccionCliente = solData.direccion || '';
+          const ciudad = agencia;
+          const departamento = agencia; // Si el nombre del departamento es diferente, puedes mapearlo aquí
+          const fechaFirma = fechaApertura;
+
+          // 5) Renderizar el documento
+          let html = `
+            <div class="doc-wrap" id="print-section">
+              <div class="doc-header">
+                <div class="empresa">MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.</div>
+              </div>
+              <div class="doc-title">PAGARÉ SIN PROTESTO</div>
+              <br>
+              <div class="parrafo">
+                Por este <b>PAGARÉ SIN PROTESTO</b>, me obligo a pagar incondicionalmente a la orden de MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V. el día <b>${fechaVencimiento}</b> en sus oficinas en la Ciudad de <b>${ciudad}</b>, la cantidad de <b>${montoLetras} Dólares de los Estados Unidos de América</b>, más intereses del <b>${tasaInteres}%</b>; dividiéndose la deuda en <b>${plazo}</b> abonos de <b>$${cuota} ${frecuenciaPago}</b> a partir de la fecha de la realización de este documento, los pagos se harán en la oficina de la empresa (esto sería el plan de pago) siendo estos no prorrogables y el incumplimiento de uno de ellos se tomará como la fecha de cancelación total el último abono realizado y será exigible la totalidad del capital más intereses para los efectos legales de esta obligación Mercantil, fijo como domicilio especial la Ciudad de <b>${ciudad}</b>, Departamento de <b>${departamento}</b> y en caso de ejecución renuncio al derecho de apelar del decreto de embargo, sentencia de remate y de cualquier resolución que admita este recurso y que se pronuncie en el Juicio Mercantil Ejecutivo correspondiente; será depositario de los bienes que se embarguen la persona designada por el Acreedor, a quien relevo de la obligación de rendir fianza; será a mi cargo todos los gastos que hiciere el Acreedor en el cobro de esta deuda, inclusive los llamados personales y aunque no sea especialmente condenado en costas procesales.
+              </div>
+              <br>
+              <div class="parrafo">
+                En fe de lo anterior, firmo este <b>PAGARÉ SIN PROTESTO</b> en la ciudad de <b>${ciudad}</b>, Departamento de <b>${departamento}</b>, el día <b>${fechaFirma}</b>.
+              </div>
+              <br><br>
+              <table class="firmas-table">
+                <tr>
+                  <td style="padding-bottom:36px;">
+                    <b>NOMBRE:</b> ${nombreCliente}<br>
+                    <b>DUI:</b> ${duiCliente}<br>
+                    <b>DIRECCIÓN:</b> ${direccionCliente}<br>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="firma-linea">___________________________</div>
+                    <div class="firma-etiqueta">FIRMA</div>
+                  </td>
+                </tr>
+              </table>
+            </div>
+            <div style="text-align:center;margin-top:26px;">
+              <button class="btn-imprimir" onclick="window.print()"><i class="fas fa-print"></i> Imprimir</button>
+            </div>
+          `;
+          document.getElementById('pagare').innerHTML = html;
+        } catch (err) {
+          document.getElementById('pagare').innerHTML = `<div class="error">Error: ${err.message}</div>`;
+        }
+      });
+    }
+    window.addEventListener("DOMContentLoaded", loadPagare);
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background: #fff; color: #181818; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; margin: 0; }
+    .container {
+      max-width: 700px; margin:2.5rem auto 0 auto;
+      background: #fff;
+      border-radius: 12px; box-shadow: 0 2px 18px #0003;
+      padding: 2.6rem 2.4rem 1.5rem 2.4rem;
+    }
+    .doc-wrap { background: #fff; color:#181818; }
+    .doc-header { text-align:center; margin-bottom:1.4rem; }
+    .empresa { font-size:1.17rem;font-weight:700;margin-bottom:2px;}
+    .doc-title { text-align:center; font-size:1.14rem; font-weight:700; color:#06569e; margin-bottom:10px; }
+    .parrafo { text-align:justify; font-size:1.03rem; margin-bottom:3px; color:#252b3b; }
+    .firmas-table { width:100%; border-collapse:collapse; margin-top:12px; font-size:1.04rem;}
+    .firma-linea { margin-top:22px; margin-bottom:4px; border-bottom:1px solid #222; width:68%; margin-left:auto; margin-right:auto; }
+    .firma-etiqueta { text-align:center; font-size:.98rem; color:#555;}
+    .btn-imprimir {
+      background: #253045; color: #fff; font-size:1.17rem; padding:10px 32px;
+      border-radius:9px; border:none; cursor:pointer; font-weight:600;
+      box-shadow: 0 2px 8px #0002; transition:background .14s;
+      margin-top:10px;
+    }
+    .btn-imprimir:hover { background: #67C8F1; color:#222;}
+    .error { color:#f55; font-size:1.13rem; padding:24px 0; text-align:center;}
+    @media (max-width:720px) {
+      .container { padding: 0.7rem 0.2rem;}
+      .firmas-table { font-size:.97rem;}
+    }
+    @media print {
+      body { background:#fff !important; }
+      .container, #pagare { box-shadow:none !important; }
+      .btn-imprimir { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 style="color:#F8AF40;text-align:center;font-size:1.63rem;margin-bottom:1.5rem;">
+      <i class="fas fa-file-signature"></i> Pagaré sin Protesto
+    </h1>
+    <div id="pagare">
+      <div style="color:#888;text-align:center;padding:38px 0;">Cargando documento...</div>
+    </div>
+  </div>
+</body>
+</html>

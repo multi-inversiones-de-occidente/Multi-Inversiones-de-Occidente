@@ -98,6 +98,26 @@
       color: #fff;
       text-decoration: none;
     }
+    .btn-imprimir {
+      display: block;
+      margin: 0 auto 18px auto;
+      padding: 12px 28px;
+      background: #f8af40;
+      color: #232323;
+      font-size: 1.08rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 11px;
+      cursor: pointer;
+      box-shadow: 0 1px 10px #f8af4045;
+      transition: background .17s;
+      letter-spacing: .5px;
+      text-align: center;
+    }
+    .btn-imprimir:hover {
+      background: #ffa600;
+      color: #222;
+    }
     @media (max-width: 540px) {
       .container { max-width: 98vw; padding: 1.2rem 2vw; }
       .ticket-title { font-size: 1.1rem;}
@@ -108,7 +128,7 @@
         background: #fff !important;
         margin: 0 !important; padding: 0 !important;
       }
-      header, .volver-btn {
+      header, .volver-btn, .btn-imprimir {
         display: none !important;
       }
       .container {
@@ -127,6 +147,9 @@
 <body>
   <header>Ticket de Pago</header>
   <div class="container" id="ticket-print">
+    <button class="btn-imprimir" onclick="window.print()">
+      <i class="fas fa-print"></i> Imprimir Ticket
+    </button>
     <div class="ticket-header">
       <img src="assets/logo_mi_bw.png" class="ticket-logo" alt="Multi Inversiones"/>
       <div style="font-size:1rem;color:#13b66b;font-weight:600;">
@@ -184,9 +207,6 @@
     document.getElementById('pagoInteres').textContent   = parseFloat(getParam('pagoInteres') || '0').toFixed(2);
     document.getElementById('pagoMultas').textContent    = parseFloat(getParam('pagoMultas') || '0').toFixed(2);
     document.getElementById('saldoRestante').textContent = parseFloat(getParam('saldoRestante') || '0').toFixed(2);
-
-    // Opcional: imprime automáticamente al cargar la página
-    // window.onload = () => window.print();
   </script>
 </body>
 </html>

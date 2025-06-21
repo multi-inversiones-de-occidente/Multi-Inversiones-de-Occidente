@@ -83,7 +83,7 @@
             <div class="info-row"><span>Agencia:</span> ${asignData.agenciaAsignada || '—'}</div>
             <div style="height:18px"></div>
             <div class="btns-acciones">
-              <button class="btn-legal" disabled>Papelería Legal</button>
+              <a class="btn-legal" href="papeleria_legal.html?id=${asignacionID}"><i class="fas fa-file-alt"></i> Papelería Legal</a>
               <a class="btn-apertura" href="apertura_credito_page.html?solicitudID=${encodeURIComponent(solicitudID)}">Apertura de Crédito</a>
             </div>
             <div style="height:28px"></div>
@@ -153,8 +153,10 @@
     .btn-legal, .btn-apertura {
       padding: 13px 18px; border-radius:10px; font-size:1rem; font-weight:600;
       border:none; cursor:pointer; outline:none; text-decoration:none; transition: background .16s;
+      display: flex; align-items: center; gap: 10px;
     }
-    .btn-legal { background: #444; color:#eee; opacity:.7; cursor:not-allowed;}
+    .btn-legal { background: #253045; color:#F8AF40; opacity:1; cursor:pointer;}
+    .btn-legal:hover { background: #67C8F1; color: #181818; }
     .btn-apertura { background: #13b66b; color:#fff; }
     .btn-apertura:hover { background: #0a8a5a; color:#fff;}
     table { width: 100%; border-collapse: collapse; background:#212a2c; margin-top:10px;}

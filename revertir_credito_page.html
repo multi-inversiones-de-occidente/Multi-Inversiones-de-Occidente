@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Revertir Créditos – Multi Inversiones</title>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+    import { sha256 } from "https://cdn.jsdelivr.net/npm/js-sha256@0.9.0/+esm";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    let agencia = '';
+    let gerenteName = '';
+    let gerenteUid = '';
+    let listaCreditos = [];
+
+    // UI refs
+    const searchInput = () => document.getElementById('search-credito');
+    const listaResultados = () => document.getElementById('resultados-creditos');
+    const boxDetalle = () => document.getElementById('box-detalle');
+    const motivoInput = () => document.getElementById('motivo-reversion');
+    const btnRevertir = () => document.getElementById('btn-revertir');
+    const loading = () => document.getElementById('loading');
+    const alertInfo = (msg) => { alert(msg); };
+    const limpiarDetalle = () => { boxDetalle().style.display = 'none'; motivoInput().value = ""; btnRevertir().disabled = true; };
+
+    // Cargar info gerente
+    async function cargarDatosGerente(uid) {
+      const snap = await getDocs(query(collection(db, "users"), where("__name__", "==", uid)));
+      if (snap.empty) {
+        alertInfo("Usuario no encontrado");
+        return false;
+      }
+      const data = snap.docs[0].data();
+      agencia = data.department || '';
+      gerenteName = (data.nombre || '') + ' ' + (data.apellido || '');
+      gerenteUid = uid;
+      document.getElementById("info-agencia").textContent = agencia;
+      return true;
+    }
+
+    // Buscar y renderizar créditos activos de la agencia
+    async function cargarCreditos(needle = "") {
+      limpiarDetalle();
+      listaResultados().innerHTML = "<div style='color:#aaa;padding:12px'>Buscando...</div>";
+      const snap = await getDocs(query(
+        collection(db, "creditos"),
+        where("agenciaAsignada", "==", agencia),
+        where("estadoCredito", "!=", "Revertido")
+      ));
+      listaCreditos = [];
+      const term = needle.trim().toLowerCase();
+      snap.forEach(docSnap => {
+        const d = docSnap.data();
+        // filtrar por nombre, apellido, dui, id
+        let text = (d.nombre||"") + " " + (d.apellido||"") + " " + (d.numeroDui||"") + " " + docSnap.id;
+        if (!term || text.toLowerCase().includes(term)) {
+          listaCreditos.push({
+            id: docSnap.id,
+            nombre: d.nombre || "",
+            apellido: d.apellido || "",
+            dui: d.numeroDui || "",
+            monto: d.montoAprobado || 0,
+            linea: d.lineaDeCredito || "",
+            estado: d.estadoCredito || "",
+            ref: docSnap.ref
+          });
+        }
+      });
+      if (listaCreditos.length === 0) {
+        listaResultados().innerHTML = "<div style='color:#aaa;padding:14px'>No se encontraron créditos en esta agencia.</div>";
+      } else {
+        listaResultados().innerHTML = listaCreditos.map((c, idx) => `
+          <div class="card-credito" onclick="window.selectCredito(${idx})">
+            <b>${c.nombre} ${c.apellido}</b><br>
+            <span class="dato">DUI:</span> ${c.dui} <span class="dato">| Línea:</span> ${c.linea} <span class="dato">| Estado:</span> ${c.estado}
+            <div class="monto">$${Number(c.monto).toFixed(2)}</div>
+          </div>
+        `).join("");
+      }
+    }
+
+    // Mostrar detalle de crédito seleccionado
+    window.selectCredito = function(idx) {
+      const c = listaCreditos[idx];
+      boxDetalle().style.display = 'block';
+      document.getElementById("nombre-detalle").textContent = `${c.nombre} ${c.apellido}`;
+      document.getElementById("dui-detalle").textContent = c.dui;
+      document.getElementById("linea-detalle").textContent = c.linea;
+      document.getElementById("monto-detalle").textContent = `$${Number(c.monto).toFixed(2)}`;
+      document.getElementById("id-credito").value = idx;
+      motivoInput().value = "";
+      btnRevertir().disabled = false;
+    };
+
+    // Pedir y validar PIN interno
+    async function pedirPin() {
+      let pin = prompt("Ingresa el PIN interno para autorizar la reversión:");
+      if (!pin) return false;
+      const hash = sha256(pin);
+      // Busca hash del gerente
+      const snap = await getDocs(query(collection(db, "users"), where("rol", "==", "gerente"), where("department", "==", agencia), where("__name__", "==", gerenteUid)));
+      if (snap.empty) {
+        alertInfo("No se encontró gerente o PIN.");
+        return false;
+      }
+      const gerenteHash = snap.docs[0].data().internalPassword || "";
+      if (gerenteHash === hash) {
+        return true;
+      } else {
+        alertInfo("PIN incorrecto.");
+        return false;
+      }
+    }
+
+    // Acción de revertir
+    window.revertirCredito = async function() {
+      const idx = document.getElementById("id-credito").value;
+      const motivo = motivoInput().value.trim();
+      if (!motivo) {
+        alertInfo("Debes ingresar el motivo de reversión.");
+        return;
+      }
+      const credito = listaCreditos[idx];
+      if (!credito) return;
+      loading().style.display = "block";
+      btnRevertir().disabled = true;
+
+      if (!(await pedirPin())) {
+        loading().style.display = "none";
+        btnRevertir().disabled = false;
+        return;
+      }
+
+      try {
+        await updateDoc(credito.ref, {
+          estadoCredito: "Revertido",
+          motivoReversion: motivo,
+          fechaReversion: new Date().toISOString(),
+          usuarioReversion: gerenteName,
+        });
+        await addDoc(collection(db, "logs_reversiones"), {
+          creditoID: credito.id,
+          agencia: agencia,
+          motivo: motivo,
+          fecha: new Date().toISOString(),
+          usuario: gerenteName,
+        });
+        alertInfo("¡Crédito revertido exitosamente!");
+        limpiarDetalle();
+        cargarCreditos(searchInput().value || "");
+      } catch (e) {
+        alertInfo("Error al revertir: " + e.message);
+      }
+      loading().style.display = "none";
+      btnRevertir().disabled = false;
+    };
+
+    // Al cargar...
+    window.addEventListener("DOMContentLoaded", async () => {
+      onAuthStateChanged(auth, async user => {
+        if (!user) return location.href = "login.html";
+        await cargarDatosGerente(user.uid);
+        cargarCreditos("");
+        searchInput().addEventListener('input', (e) => {
+          cargarCreditos(e.target.value || "");
+        });
+      });
+    });
+
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background: radial-gradient(circle,#000,#111); min-height:100vh; color:#fff; font-family:Arial,sans-serif; margin:0; }
+    .container { max-width:670px; margin: 0 auto; padding:2.6rem 1rem 2rem 1rem;}
+    h1 { font-size:2rem; text-align:center; margin-bottom:.6rem; margin-top: 1.1rem;}
+    .label-agencia {text-align:center; color:#F8AF40; font-size:1.09rem; margin-bottom:1.2rem;}
+    .search-bar { width:100%; margin-bottom: 1.1rem;}
+    .search-bar input {
+      width:100%; padding:0.7rem 1rem; font-size:1.08rem; border-radius:13px;
+      border:none; background: #16181a; color:#fff; outline: none;
+    }
+    .search-bar input::placeholder { color:#bbb; }
+    .card-credito {
+      background:#191f22; border-radius:10px; box-shadow:0 2px 9px #13b66a24;
+      padding:1.1rem 1.3rem; margin-bottom:9px; cursor:pointer; transition:background .16s;
+      position:relative;
+    }
+    .card-credito:hover { background:#213e3a; }
+    .dato { color:#67C8F1;font-size:.98rem; }
+    .monto { position:absolute; right:1.4rem; top:1.25rem; color:#13b66b;font-weight:700; }
+    #loading { display:none; text-align:center; margin:20px 0 9px 0; color:#fff; }
+    #box-detalle { display:none; background:#222227; border-radius:13px; margin-top:16px; padding:1.3rem 1.2rem 1.3rem 1.2rem;}
+    #box-detalle label { font-weight:bold; color:#F8AF40; font-size:1.07rem;}
+    #box-detalle input[type="text"], #motivo-reversion {
+      width:100%; background:#111418; color:#fff; border-radius:9px; border:none; font-size:1.08rem;
+      padding:.72rem .9rem; margin-bottom: 1.1rem;
+    }
+    #box-detalle input[readonly] { background:#181d20;}
+    #btn-revertir {
+      background:linear-gradient(90deg,#c0392b 70%,#8e0800 100%);
+      color:#fff; border:none; border-radius:13px; padding:0.85rem 0; font-size:1.16rem;
+      width:100%; font-weight:bold; cursor:pointer; margin-top:3px;
+      transition:background .15s;
+    }
+    #btn-revertir:disabled { opacity:.5; cursor:default; }
+    @media (max-width: 600px) {
+      .container { padding:1.2rem 1vw; }
+      h1 { font-size: 1.21rem;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1><i class="fas fa-undo"></i> Revertir Créditos</h1>
+    <div class="label-agencia">
+      Solo puedes revertir créditos de la agencia asignada: <span id="info-agencia">Cargando...</span>
+    </div>
+    <div class="search-bar">
+      <input id="search-credito" type="text" placeholder="Buscar por nombre, apellido, DUI o # de crédito...">
+    </div>
+    <div id="resultados-creditos"></div>
+
+    <div id="box-detalle">
+      <input type="hidden" id="id-credito" value="">
+      <label>Crédito Seleccionado:</label>
+      <div style="color:#67C8F1; font-size:1.14rem; margin-bottom:3px;" id="nombre-detalle"></div>
+      <div style="margin-bottom:4px;">
+        <span class="dato">DUI:</span> <span id="dui-detalle"></span>
+        <span style="margin-left:16px;" class="dato">Línea:</span> <span id="linea-detalle"></span>
+      </div>
+      <div style="margin-bottom:10px;">
+        <span class="dato">Monto:</span> <span id="monto-detalle"></span>
+      </div>
+      <textarea id="motivo-reversion" rows="2" placeholder="Motivo de reversión (obligatorio)"></textarea>
+      <button id="btn-revertir" onclick="window.revertirCredito()">Revertir Crédito</button>
+    </div>
+    <div id="loading">Procesando reversión...</div>
+  </div>
+</body>
+</html>

@@ -2,10 +2,12 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Cierre de Caja – Multi Inversiones</title>
+  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -14,163 +16,210 @@
       projectId: "multinversiones-38e13",
       storageBucket: "multinversiones-38e13.appspot.com",
       messagingSenderId: "380001917078",
-      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7"
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
     };
     const app  = initializeApp(firebaseConfig);
     const db   = getFirestore(app);
     const auth = getAuth(app);
 
-    let gerenteUid = null;
-    let agencia    = null;
-    let fechasPendientes = []; // Array de strings "YYYY-MM-DD"
-    let movimientosPendientes = {}; // {fecha: [docs]}
+    let gerenteId = null;
+    let agencia = null;
+    let diasPendientes = [];
+    let movimientosPendientes = {};
 
-    // ---- UTILIDAD: obtener solo fechas con movimientos no cerrados
-    async function obtenerFechasPendientesCierre(agencia) {
-      let fechas = new Set();
-      let movsPorFecha = {};
+    async function obtenerAgenciaDeUsuario(uid) {
+      const snap = await getDocs(query(collection(db, "users"), where("__name__", "==", uid)));
+      if (!snap.empty) {
+        return snap.docs[0].data().department || null;
+      }
+      return null;
+    }
 
-      // Para ambas colecciones
-      for (const col of ['movimientos_caja', 'movimientosCaja']) {
-        const q = query(
-          collection(db, col),
-          where('agencia', '==', agencia),
-          where('cierre', '!=', true)
-        );
-        const snap = await getDocs(q);
+    // Helper: retorna YYYY-MM-DD de un string ISO o similar
+    function soloFecha(fechaStr) {
+      return fechaStr?.substring(0,10);
+    }
 
-        snap.forEach(docSnap => {
-          const data = docSnap.data();
-          // Fecha sólo día
-          const fechaRaw = data.fecha?.substring(0,10);
-          if (fechaRaw) {
-            fechas.add(fechaRaw);
-            if (!movsPorFecha[fechaRaw]) movsPorFecha[fechaRaw] = [];
-            movsPorFecha[fechaRaw].push({ ...data, _id: docSnap.id, _col: col });
+    // Carga los días con movimientos y sin cierre para la agencia logueada
+    async function cargarDiasPendientes() {
+      diasPendientes = [];
+      movimientosPendientes = {};
+
+      if (!agencia) return;
+
+      // --- 1. Obtener todas las fechas con movimientos en ambas colecciones ---
+      let fechasMovimientos = new Set();
+      let movimientosPorFecha = {}; // Guarda los docs de cada fecha
+
+      for (const colName of ['movimientos_caja', 'movimientosCaja']) {
+        // Buscar por campo 'agencia'
+        const q1 = query(collection(db, colName), where('agencia', '==', agencia));
+        const snap1 = await getDocs(q1);
+        snap1.forEach(doc => {
+          const fecha = soloFecha(doc.data().fecha);
+          if (fecha) {
+            fechasMovimientos.add(fecha);
+            movimientosPorFecha[fecha] = movimientosPorFecha[fecha] || [];
+            movimientosPorFecha[fecha].push({ ...doc.data(), id: doc.id });
+          }
+        });
+
+        // Buscar por campo 'sucursal' (compatibilidad)
+        const q2 = query(collection(db, colName), where('sucursal', '==', agencia));
+        const snap2 = await getDocs(q2);
+        snap2.forEach(doc => {
+          const fecha = soloFecha(doc.data().fecha);
+          if (fecha) {
+            fechasMovimientos.add(fecha);
+            movimientosPorFecha[fecha] = movimientosPorFecha[fecha] || [];
+            movimientosPorFecha[fecha].push({ ...doc.data(), id: doc.id });
           }
         });
       }
-      return { fechas: Array.from(fechas).sort(), movsPorFecha };
-    }
 
-    // ---- CREAR EL CIERRE Y MARCAR MOVIMIENTOS COMO CERRADOS
-    async function cerrarCaja(fecha, agencia, gerenteUid, nombreGerente) {
-      // 1. Traer todos los movimientos pendientes de ese día
-      let todosMovimientos = [];
-      for (const col of ['movimientos_caja', 'movimientosCaja']) {
-        const q = query(
-          collection(db, col),
-          where('agencia', '==', agencia),
-          where('fecha', '>=', fecha + 'T00:00:00'),
-          where('fecha', '<=', fecha + 'T23:59:59'),
-          where('cierre', '!=', true)
-        );
-        const snap = await getDocs(q);
-        snap.forEach(docSnap => {
-          todosMovimientos.push({ ...docSnap.data(), _id: docSnap.id, _col: col });
-        });
-      }
-
-      if (todosMovimientos.length === 0) {
-        alert('No hay movimientos pendientes de cierre para este día.');
-        return;
-      }
-
-      // 2. Sumar totales
-      let totalIngresos = 0, totalEgresos = 0;
-      todosMovimientos.forEach(mov => {
-        if (mov.tipo === 'Ingreso') totalIngresos += mov.monto;
-        if (mov.tipo === 'Egreso') totalEgresos += mov.monto;
+      // --- 2. Obtener todas las fechas ya cerradas ---
+      let fechasCerradas = new Set();
+      const cierresSnap = await getDocs(query(collection(db, "cierres_caja"), where('agencia', '==', agencia)));
+      cierresSnap.forEach(doc => {
+        const fecha = soloFecha(doc.data().fecha);
+        if (fecha) fechasCerradas.add(fecha);
       });
 
-      // 3. Registrar cierre en colección de cierres
-      await addDoc(collection(db, 'cierres_caja'), {
+      // --- 3. Generar lista de días pendientes ---
+      diasPendientes = Array.from(fechasMovimientos).filter(f => !fechasCerradas.has(f));
+      diasPendientes.sort(); // ordenadas de menor a mayor
+      movimientosPendientes = movimientosPorFecha;
+    }
+
+    // Pinta el select con los días pendientes
+    async function renderDias() {
+      const select = document.getElementById('select-dia');
+      select.innerHTML = "";
+      await cargarDiasPendientes();
+      if (diasPendientes.length === 0) {
+        select.innerHTML = `<option value="">No hay días pendientes</option>`;
+        select.disabled = true;
+      } else {
+        select.disabled = false;
+        diasPendientes.forEach(f => {
+          const label = f.split('-').reverse().join('/'); // dd/MM/yyyy
+          select.innerHTML += `<option value="${f}">${label}</option>`;
+        });
+      }
+    }
+
+    // Cerrar caja de ese día: crea doc en cierres_caja y marca movimientos como cerrados
+    async function cerrarCaja() {
+      const dia = document.getElementById('select-dia').value;
+      if (!dia) return alert('Selecciona un día pendiente.');
+
+      // Busca los movimientos de ese día en movimientos_caja y movimientosCaja
+      let movimientos = [];
+      for (const colName of ['movimientos_caja', 'movimientosCaja']) {
+        // Campo agencia
+        const q1 = query(
+          collection(db, colName),
+          where('agencia', '==', agencia),
+          where('fecha', '>=', `${dia}T00:00:00`),
+          where('fecha', '<=', `${dia}T23:59:59`)
+        );
+        const snap1 = await getDocs(q1);
+        snap1.forEach(doc => movimientos.push({ ...doc.data(), id: doc.id, col: colName }));
+
+        // Campo sucursal
+        const q2 = query(
+          collection(db, colName),
+          where('sucursal', '==', agencia),
+          where('fecha', '>=', `${dia}T00:00:00`),
+          where('fecha', '<=', `${dia}T23:59:59`)
+        );
+        const snap2 = await getDocs(q2);
+        snap2.forEach(doc => movimientos.push({ ...doc.data(), id: doc.id, col: colName }));
+      }
+
+      // Sumar totales
+      let totalIngresos = 0, totalEgresos = 0;
+      movimientos.forEach(m => {
+        if (m.tipo === 'Ingreso') totalIngresos += Number(m.monto || 0);
+        if (m.tipo === 'Egreso') totalEgresos += Number(m.monto || 0);
+      });
+
+      // Guardar cierre de caja
+      await addDoc(collection(db, "cierres_caja"), {
         agencia: agencia,
-        fecha: fecha,
+        fecha: dia,
         total_ingresos: totalIngresos,
         total_egresos: totalEgresos,
         saldo_caja: totalIngresos - totalEgresos,
-        movimientos: todosMovimientos,
+        movimientos: movimientos,
         fecha_cierre: new Date().toISOString(),
-        gerente_id: gerenteUid,
-        gerente_nombre: nombreGerente || ''
+        gerente_id: gerenteId
       });
 
-      // 4. Actualizar los movimientos con cierre:true
-      for (const mov of todosMovimientos) {
-        const ref = doc(db, mov._col, mov._id);
-        await updateDoc(ref, { cierre: true });
+      // Marcar los movimientos con 'cierre: true'
+      for (let m of movimientos) {
+        const docRef = collection(db, m.col).doc(m.id);
+        // La API modular de Firestore web solo soporta updateDoc, así:
+        import("https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js").then(({ updateDoc, doc }) => {
+          updateDoc(doc(db, m.col, m.id), { cierre: true });
+        });
       }
 
-      alert('¡Cierre de caja realizado correctamente para el ' + fecha + '!');
-      location.reload();
+      alert('¡Cierre realizado!');
+      await renderDias(); // Refresca la lista
     }
 
-    // ---- CARGA INICIAL: autenticación, agencia, fechas pendientes
+    // --- Inicio ---
     window.addEventListener("DOMContentLoaded", () => {
       onAuthStateChanged(auth, async user => {
         if (!user) return location.href = "login.html";
-        gerenteUid = user.uid;
-
-        // Obtener agencia (department)
-        const userSnap = await getDocs(query(
-          collection(db, "users"),
-          where("__name__", "==", gerenteUid)
-        ));
-        userSnap.forEach(d => { agencia = d.data().department; });
-
-        if (!agencia) {
-          document.getElementById("main").innerHTML = "No se detectó agencia asignada.";
-          return;
-        }
-        // Obtener fechas pendientes
-        const { fechas, movsPorFecha } = await obtenerFechasPendientesCierre(agencia);
-        fechasPendientes = fechas;
-        movimientosPendientes = movsPorFecha;
-
-        const select = document.getElementById("fechasPendientes");
-        fechas.forEach(f => {
-          const opt = document.createElement('option');
-          opt.value = f;
-          opt.textContent = f.split('-').reverse().join('/');
-          select.appendChild(opt);
-        });
-
-        if (fechas.length === 0) {
-          document.getElementById("btnCerrarCaja").disabled = true;
-          document.getElementById("noMovs").style.display = '';
-        }
+        gerenteId = user.uid;
+        agencia = await obtenerAgenciaDeUsuario(gerenteId);
+        await renderDias();
+        document.getElementById('cerrar-btn').onclick = cerrarCaja;
       });
-
-      document.getElementById("btnCerrarCaja").onclick = async () => {
-        const fecha = document.getElementById("fechasPendientes").value;
-        if (!fecha) return alert('Selecciona un día pendiente');
-        const gerenteNombre = auth.currentUser.email || '';
-        await cerrarCaja(fecha, agencia, gerenteUid, gerenteNombre);
-      };
     });
+
   </script>
   <style>
-    body { background: #18132B; color:#fff; font-family: Arial,sans-serif; min-height: 100vh;}
-    .panel { max-width: 420px; margin: 40px auto; background: #222; border-radius: 18px; padding: 28px 20px; box-shadow: 0 2px 32px #0003;}
-    h2 { text-align: center; margin-bottom: 18px;}
-    label { color:#F8AF40;}
-    select, button {
-      width: 100%; padding: 11px 9px; font-size: 1.06rem; margin-top: 7px;
-      border-radius: 8px; border: none; margin-bottom: 18px;
+    body {
+      background: #18102a;
+      min-height: 100vh;
+      color: #fff;
+      font-family: Arial, sans-serif;
     }
-    button { background: #8C54FF; color:#fff; font-weight:bold; transition:.2s;}
-    button:hover:not(:disabled) { background: #A87CFF; transform: scale(1.03);}
-    #noMovs {color:#FF7984; text-align:center; display:none;}
+    .cierre-card {
+      max-width: 420px;
+      margin: 90px auto 0 auto;
+      background: #211832;
+      padding: 2.6rem 2.1rem 2.2rem 2.1rem;
+      border-radius: 24px;
+      box-shadow: 0 6px 44px #0005;
+      text-align: center;
+    }
+    .cierre-card h2 { margin-bottom: 20px; }
+    label { display:block; margin-bottom: 10px; color: #f8af40;}
+    select {
+      width: 100%; font-size: 1rem; border-radius: 9px; border: none; padding: 10px 8px; margin-bottom: 22px;
+      background: #130c22; color: #fff;
+    }
+    button {
+      width: 100%; background: #b18cff; color: #fff; border: none; border-radius: 12px;
+      font-size: 1.13rem; font-weight: bold; padding: 14px 0; margin-top: 9px; cursor: pointer; transition: .19s;
+    }
+    button:hover { background: #7a52f6;}
   </style>
 </head>
 <body>
-  <div class="panel" id="main">
+  <div class="cierre-card">
     <h2>Cierre de Caja</h2>
-    <label for="fechasPendientes">Selecciona un día pendiente de cierre:</label>
-    <select id="fechasPendientes"></select>
-    <span id="noMovs" style="display:none;">No hay días pendientes de cierre. ¡Todo está al día!</span>
-    <button id="btnCerrarCaja">Cerrar Caja del Día Seleccionado</button>
+    <label for="select-dia">Selecciona un día pendiente de cierre:</label>
+    <select id="select-dia">
+      <option>Cargando...</option>
+    </select>
+    <button id="cerrar-btn">Cerrar Caja del Día Seleccionado</button>
   </div>
 </body>
 </html>
+

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Cierre de Caja – Multi Inversiones</title>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7"
+    };
+    const app  = initializeApp(firebaseConfig);
+    const db   = getFirestore(app);
+    const auth = getAuth(app);
+
+    let gerenteUid = null;
+    let agencia    = null;
+    let fechasPendientes = []; // Array de strings "YYYY-MM-DD"
+    let movimientosPendientes = {}; // {fecha: [docs]}
+
+    // ---- UTILIDAD: obtener solo fechas con movimientos no cerrados
+    async function obtenerFechasPendientesCierre(agencia) {
+      let fechas = new Set();
+      let movsPorFecha = {};
+
+      // Para ambas colecciones
+      for (const col of ['movimientos_caja', 'movimientosCaja']) {
+        const q = query(
+          collection(db, col),
+          where('agencia', '==', agencia),
+          where('cierre', '!=', true)
+        );
+        const snap = await getDocs(q);
+
+        snap.forEach(docSnap => {
+          const data = docSnap.data();
+          // Fecha sólo día
+          const fechaRaw = data.fecha?.substring(0,10);
+          if (fechaRaw) {
+            fechas.add(fechaRaw);
+            if (!movsPorFecha[fechaRaw]) movsPorFecha[fechaRaw] = [];
+            movsPorFecha[fechaRaw].push({ ...data, _id: docSnap.id, _col: col });
+          }
+        });
+      }
+      return { fechas: Array.from(fechas).sort(), movsPorFecha };
+    }
+
+    // ---- CREAR EL CIERRE Y MARCAR MOVIMIENTOS COMO CERRADOS
+    async function cerrarCaja(fecha, agencia, gerenteUid, nombreGerente) {
+      // 1. Traer todos los movimientos pendientes de ese día
+      let todosMovimientos = [];
+      for (const col of ['movimientos_caja', 'movimientosCaja']) {
+        const q = query(
+          collection(db, col),
+          where('agencia', '==', agencia),
+          where('fecha', '>=', fecha + 'T00:00:00'),
+          where('fecha', '<=', fecha + 'T23:59:59'),
+          where('cierre', '!=', true)
+        );
+        const snap = await getDocs(q);
+        snap.forEach(docSnap => {
+          todosMovimientos.push({ ...docSnap.data(), _id: docSnap.id, _col: col });
+        });
+      }
+
+      if (todosMovimientos.length === 0) {
+        alert('No hay movimientos pendientes de cierre para este día.');
+        return;
+      }
+
+      // 2. Sumar totales
+      let totalIngresos = 0, totalEgresos = 0;
+      todosMovimientos.forEach(mov => {
+        if (mov.tipo === 'Ingreso') totalIngresos += mov.monto;
+        if (mov.tipo === 'Egreso') totalEgresos += mov.monto;
+      });
+
+      // 3. Registrar cierre en colección de cierres
+      await addDoc(collection(db, 'cierres_caja'), {
+        agencia: agencia,
+        fecha: fecha,
+        total_ingresos: totalIngresos,
+        total_egresos: totalEgresos,
+        saldo_caja: totalIngresos - totalEgresos,
+        movimientos: todosMovimientos,
+        fecha_cierre: new Date().toISOString(),
+        gerente_id: gerenteUid,
+        gerente_nombre: nombreGerente || ''
+      });
+
+      // 4. Actualizar los movimientos con cierre:true
+      for (const mov of todosMovimientos) {
+        const ref = doc(db, mov._col, mov._id);
+        await updateDoc(ref, { cierre: true });
+      }
+
+      alert('¡Cierre de caja realizado correctamente para el ' + fecha + '!');
+      location.reload();
+    }
+
+    // ---- CARGA INICIAL: autenticación, agencia, fechas pendientes
+    window.addEventListener("DOMContentLoaded", () => {
+      onAuthStateChanged(auth, async user => {
+        if (!user) return location.href = "login.html";
+        gerenteUid = user.uid;
+
+        // Obtener agencia (department)
+        const userSnap = await getDocs(query(
+          collection(db, "users"),
+          where("__name__", "==", gerenteUid)
+        ));
+        userSnap.forEach(d => { agencia = d.data().department; });
+
+        if (!agencia) {
+          document.getElementById("main").innerHTML = "No se detectó agencia asignada.";
+          return;
+        }
+        // Obtener fechas pendientes
+        const { fechas, movsPorFecha } = await obtenerFechasPendientesCierre(agencia);
+        fechasPendientes = fechas;
+        movimientosPendientes = movsPorFecha;
+
+        const select = document.getElementById("fechasPendientes");
+        fechas.forEach(f => {
+          const opt = document.createElement('option');
+          opt.value = f;
+          opt.textContent = f.split('-').reverse().join('/');
+          select.appendChild(opt);
+        });
+
+        if (fechas.length === 0) {
+          document.getElementById("btnCerrarCaja").disabled = true;
+          document.getElementById("noMovs").style.display = '';
+        }
+      });
+
+      document.getElementById("btnCerrarCaja").onclick = async () => {
+        const fecha = document.getElementById("fechasPendientes").value;
+        if (!fecha) return alert('Selecciona un día pendiente');
+        const gerenteNombre = auth.currentUser.email || '';
+        await cerrarCaja(fecha, agencia, gerenteUid, gerenteNombre);
+      };
+    });
+  </script>
+  <style>
+    body { background: #18132B; color:#fff; font-family: Arial,sans-serif; min-height: 100vh;}
+    .panel { max-width: 420px; margin: 40px auto; background: #222; border-radius: 18px; padding: 28px 20px; box-shadow: 0 2px 32px #0003;}
+    h2 { text-align: center; margin-bottom: 18px;}
+    label { color:#F8AF40;}
+    select, button {
+      width: 100%; padding: 11px 9px; font-size: 1.06rem; margin-top: 7px;
+      border-radius: 8px; border: none; margin-bottom: 18px;
+    }
+    button { background: #8C54FF; color:#fff; font-weight:bold; transition:.2s;}
+    button:hover:not(:disabled) { background: #A87CFF; transform: scale(1.03);}
+    #noMovs {color:#FF7984; text-align:center; display:none;}
+  </style>
+</head>
+<body>
+  <div class="panel" id="main">
+    <h2>Cierre de Caja</h2>
+    <label for="fechasPendientes">Selecciona un día pendiente de cierre:</label>
+    <select id="fechasPendientes"></select>
+    <span id="noMovs" style="display:none;">No hay días pendientes de cierre. ¡Todo está al día!</span>
+    <button id="btnCerrarCaja">Cerrar Caja del Día Seleccionado</button>
+  </div>
+</body>
+</html>

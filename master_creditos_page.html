@@ -7,10 +7,8 @@
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
-
-    // Configura aquí tu departamento, o pásalo dinámicamente si tienes login
-    const departamento = "Ahuachapán"; // <-- Cambia esto según el departamento del gerente
+    import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
@@ -24,19 +22,22 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const auth = getAuth(app);
 
     let creditos = [];
     let filtered = [];
+    let departamento = ""; // Se obtiene del usuario Firestore
 
-    // Cargar créditos al iniciar
     async function loadCreditos() {
       document.getElementById("lista-creditos").innerHTML = `<div class="loader"></div>`;
+      if (!departamento) {
+        document.getElementById("lista-creditos").innerHTML = `<div class="no-data">No tienes departamento asignado.</div>`;
+        return;
+      }
       const q = query(collection(db, "creditos"), where("agenciaAsignada", "==", departamento));
       const querySnapshot = await getDocs(q);
-
       creditos = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       filtered = [...creditos];
-
       renderCreditos();
     }
 
@@ -62,9 +63,9 @@
     }
 
     window.verDetalle = function (creditoId) {
-      // Aquí puedes redirigir o mostrar el detalle (por ahora alert)
+      // Puedes navegar a una página de detalle con el id
+      // window.location.href = "detalle_master_credito_page.html?id=" + creditoId;
       alert("Ver detalle de crédito: " + creditoId);
-      // window.location.href = "detalle_master_credito.html?id=" + creditoId;
     };
 
     function applySearch() {
@@ -79,8 +80,19 @@
     }
 
     window.addEventListener("DOMContentLoaded", () => {
-      loadCreditos();
-      document.getElementById("search-input").addEventListener("input", applySearch);
+      onAuthStateChanged(auth, async user => {
+        if (!user) {
+          location.href = "login.html";
+          return;
+        }
+        // Sacar departamento del usuario Firestore
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        departamento = userDoc.exists() ? userDoc.data().department : "";
+        document.getElementById("usuario-nombre").textContent = user.email + (departamento ? " – " + departamento : "");
+        document.querySelector(".main-card").style.display = "";
+        loadCreditos();
+        document.getElementById("search-input").addEventListener("input", applySearch);
+      });
     });
   </script>
   <style>
@@ -99,15 +111,23 @@
       font-weight: 700;
       color: #fff;
       letter-spacing: 1px;
-      margin-bottom: 24px;
+      margin-bottom: 18px;
     }
     .main-card {
       max-width: 560px;
-      margin: 36px auto 0 auto;
+      margin: 28px auto 0 auto;
       background: #171728;
       border-radius: 16px;
       box-shadow: 0 6px 30px #0003;
       padding: 2.2rem 1.2rem 2rem 1.2rem;
+      display: none;
+    }
+    .usuario-box {
+      text-align: center;
+      margin-bottom: 18px;
+      color: #F8AF40;
+      font-weight: 600;
+      font-size: 1.08rem;
     }
     .searchbox {
       width: 100%;
@@ -187,6 +207,7 @@
 <body>
   <header>Master de Créditos</header>
   <div class="main-card">
+    <div class="usuario-box" id="usuario-nombre">Cargando usuario...</div>
     <div class="searchbox">
       <span class="icon-search">🔍</span>
       <input id="search-input" placeholder="Buscar por nombre, apellido o DUI..." autocomplete="off" />
@@ -195,3 +216,4 @@
   </div>
 </body>
 </html>
+

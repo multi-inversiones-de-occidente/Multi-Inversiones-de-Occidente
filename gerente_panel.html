@@ -174,6 +174,29 @@
     .btn-mora-agencia i { color: #fff;}
     .btn-pin, .btn-pin i { color: #222; }
     .btn-pin i { color: #fff59d;}
+
+    /* Nuevos estilos para los botones agregados */
+    .btn-cierre-caja {
+      background: linear-gradient(90deg, #e7ff72 0%, #13b66b 100%);
+      color: #212121;
+    }
+    .btn-cierre-caja:active,
+    .btn-cierre-caja:hover {
+      background: linear-gradient(90deg, #13b66b 60%, #e7ff72 100%);
+      color: #222;
+    }
+    .btn-cierre-caja i { color: #847900; }
+
+    .btn-master-creditos {
+      background: linear-gradient(90deg, #607D8B 0%, #37474F 100%);
+      color: #fff !important;
+    }
+    .btn-master-creditos:active,
+    .btn-master-creditos:hover {
+      background: linear-gradient(90deg, #37474F 70%, #607D8B 100%);
+      color: #fff !important;
+    }
+    .btn-master-creditos i { color: #fff; opacity: 0.93;}
     @media (max-width: 600px) {
       .container { padding:1.2rem 1vw; }
       h1 { font-size: 1.23rem;}
@@ -213,7 +236,7 @@
       </a>
     </div>
 
-    <!-- BLOQUE PANEL ORIGINAL DEL GERENTE -->
+    <!-- BLOQUE PANEL ORIGINAL DEL GERENTE + BOTONES AGREGADOS -->
     <div class="grid-botones">
       <a href="detalle_gerente_caja_page.html" class="btn-grande btn-caja">
         <i class="fas fa-wallet"></i>
@@ -235,8 +258,16 @@
         <i class="fas fa-key"></i>
         Administrar PIN Interno
       </a>
+      <!-- NUEVOS BOTONES AGREGADOS -->
+      <a href="cierre_caja_page.html" class="btn-grande btn-cierre-caja">
+        <i class="fas fa-lock"></i>
+        Cierre de Caja (Arqueo Diario)
+      </a>
+      <a href="master_creditos_page.html" class="btn-grande btn-master-creditos">
+        <i class="fas fa-database"></i>
+        Master de Créditos
+      </a>
     </div>
   </div>
 </body>
 </html>
-

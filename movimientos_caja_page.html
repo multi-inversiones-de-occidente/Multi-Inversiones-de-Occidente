@@ -218,7 +218,7 @@
       );
       const snap = await getDocs(q);
       if (!snap.empty) {
-        const mayor = snap.docs[0].data().correlativo || 0;
+        const mayor = Number(snap.docs[0].data().correlativo) || 0;
         return mayor + 1;
       } else {
         return 1;
@@ -282,13 +282,13 @@
         await addDoc(collection(db, "movimientosCaja"), {
           descripcion: movimientoSel,
           tipo: tipoReal,
-          monto: parseFloat(montoSel),
+          monto: Number(montoSel), // Asegura que es número
           observaciones: observaciones,
           fecha: new Date().toISOString(),
           usuario: usuarioActual,
           agencia: userAgencia,
           nombre: tiposConNombre.includes(movimientoSel) ? nombreSel : "",
-          correlativo: correlativo
+          correlativo: Number(correlativo) // <-- SIEMPRE GUARDA COMO NÚMERO
         });
 
         mostrarComprobante({

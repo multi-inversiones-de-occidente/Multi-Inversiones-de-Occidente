@@ -1,14 +1,15 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Master de Créditos</title>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
+    // Configura tu proyecto aquí:
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -23,231 +24,170 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
+    // Asume que ya sabes el departamento (puedes obtenerlo del usuario logueado si quieres)
+    let departamentoAsignado = ""; // <- Aquí pon el valor si quieres forzarlo
+
+    // Permite ingresar el departamento por URL o prompt
+    function obtenerDepartamento() {
+      const urlParams = new URLSearchParams(window.location.search);
+      let dep = urlParams.get("department");
+      if (!dep) {
+        dep = prompt("Escribe el nombre EXACTO del departamento/agencia a consultar:");
+      }
+      return dep ? dep.trim() : "";
+    }
+
+    // Formato de dinero
+    function money(n) {
+      return "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits:2 });
+    }
+
+    // Estado visual
     let creditos = [];
-    let filtered = [];
-    let departamento = "";
+    let creditosFiltrados = [];
+    let loading = true;
 
-    // Utilidad para mostrar mensajes o estados
-    function setStatus(msg, color = "#aaa") {
-      const el = document.getElementById("status-msg");
-      el.textContent = msg;
-      el.style.color = color;
-      el.style.display = "block";
-    }
-    function clearStatus() {
-      const el = document.getElementById("status-msg");
-      el.textContent = "";
-      el.style.display = "none";
-    }
-
-    async function loadCreditos() {
-      setStatus("Cargando créditos...");
-      document.getElementById("lista-creditos").innerHTML = "";
-      if (!departamento) {
-        setStatus("No tienes departamento asignado.", "#FFD600");
+    // --- UI functions ---
+    function mostrarCreditos() {
+      const contenedor = document.getElementById("creditos-list");
+      contenedor.innerHTML = "";
+      if (loading) {
+        contenedor.innerHTML = `<div class="loader"></div>`;
         return;
       }
-      try {
-        const q = query(collection(db, "creditos"), where("agenciaAsignada", "==", departamento));
-        const querySnapshot = await getDocs(q);
-        creditos = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        filtered = [...creditos];
-        renderCreditos();
-        clearStatus();
-        if (filtered.length === 0) {
-          setStatus("No se encontraron créditos en tu agencia.", "#FFD600");
-        }
-      } catch (e) {
-        setStatus("Error al cargar créditos o permisos insuficientes.", "#FF6B6B");
-        console.error(e);
-      }
-    }
-
-    function renderCreditos() {
-      const cont = document.getElementById("lista-creditos");
-      if (filtered.length === 0) {
-        cont.innerHTML = ""; // El mensaje de "no data" se pone arriba
+      if (creditosFiltrados.length === 0) {
+        contenedor.innerHTML = `<div class="noresult">No se encontraron créditos.</div>`;
         return;
       }
-      cont.innerHTML = filtered.map(credito => `
-        <div class="card-credito" onclick="verDetalle('${credito.id}')">
-          <div class="icono"><span>💳</span></div>
-          <div>
-            <div class="nombre">${(credito.nombre || '')} ${(credito.apellido || '')}</div>
-            <div class="info">
-              <div><b>DUI:</b> ${credito.numeroDui || '-'}</div>
-              <div><b>Monto:</b> $${credito.monto || '-'}</div>
-              <div><b>Estado:</b> ${credito.estadoCredito || '-'}</div>
+      for (const c of creditosFiltrados) {
+        contenedor.innerHTML += `
+          <div class="card-credito" onclick="verDetalleCredito('${c.id}')">
+            <div class="icon"><span class="material-icons">credit_score</span></div>
+            <div>
+              <div class="nombre">${c.nombre || ""} ${c.apellido || ""}</div>
+              <div class="info">
+                <span>DUI: <b>${c.numeroDui || '-'}</b></span><br>
+                <span>Monto: <b>${money(c.monto)}</b></span><br>
+                <span>Estado: <b>${c.estadoCredito || '-'}</b></span>
+              </div>
             </div>
           </div>
-        </div>
-      `).join('');
-    }
-
-    window.verDetalle = function (creditoId) {
-      // Aquí puedes redirigir a un detalle real
-      alert("Ver detalle de crédito: " + creditoId);
-    };
-
-    function applySearch() {
-      const term = document.getElementById("search-input").value.toLowerCase();
-      filtered = creditos.filter(credito => {
-        const nombre = (credito.nombre || '').toLowerCase();
-        const apellido = (credito.apellido || '').toLowerCase();
-        const dui = (credito.numeroDui || '').toLowerCase();
-        return nombre.includes(term) || apellido.includes(term) || dui.includes(term);
-      });
-      renderCreditos();
-      if (filtered.length === 0) {
-        setStatus("No se encontraron créditos con ese criterio.", "#FFD600");
-      } else {
-        clearStatus();
+        `;
       }
     }
 
-    window.addEventListener("DOMContentLoaded", () => {
-      onAuthStateChanged(auth, async user => {
-        if (!user) {
-          location.href = "login.html";
-          return;
-        }
-        // Sacar departamento del usuario Firestore
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        departamento = userDoc.exists() ? (userDoc.data().department || "") : "";
-        document.getElementById("usuario-nombre").textContent = user.email + (departamento ? " – " + departamento : "");
-        document.querySelector(".main-card").style.display = "";
-        document.getElementById("search-input").addEventListener("input", applySearch);
-        await loadCreditos();
+    window.verDetalleCredito = function(id) {
+      // Aquí debes poner tu lógica de navegación o mostrar el detalle.
+      // Por ejemplo: location.href = "detalle_credito.html?id=" + id;
+      alert("Ir al detalle de crédito: " + id);
+    };
+
+    function aplicarFiltro(term) {
+      term = (term || "").toLowerCase();
+      creditosFiltrados = creditos.filter(c => {
+        return (c.nombre || "").toLowerCase().includes(term)
+          || (c.apellido || "").toLowerCase().includes(term)
+          || (c.numeroDui || "").toLowerCase().includes(term);
       });
+      mostrarCreditos();
+    }
+
+    async function cargarCreditos() {
+      loading = true;
+      mostrarCreditos();
+      let q = query(collection(db, "creditos"), where("agenciaAsignada", "==", departamentoAsignado));
+      let snap = await getDocs(q);
+      creditos = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      creditosFiltrados = [...creditos];
+      loading = false;
+      mostrarCreditos();
+    }
+
+    window.addEventListener("DOMContentLoaded", async () => {
+      departamentoAsignado = obtenerDepartamento();
+      document.getElementById("busqueda").addEventListener("input", e => aplicarFiltro(e.target.value));
+      await cargarCreditos();
     });
   </script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
     body {
-      background: #101015;
-      margin: 0;
+      margin: 0; background: #101012; color: #fff; min-height: 100vh;
       font-family: 'Segoe UI', Arial, sans-serif;
-      color: #fff;
-      min-height: 100vh;
     }
     header {
-      background: #1a1a26;
-      padding: 1.2rem 0;
-      text-align: center;
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #fff;
-      letter-spacing: 1px;
-      margin-bottom: 18px;
+      background: #191927; color: #fff; font-size: 1.35rem;
+      font-weight: 600; letter-spacing: .5px; text-align:center;
+      padding: 1.6rem 0 .8rem 0; margin-bottom: 0.3rem;
+      box-shadow: 0 1px 0 #211a3d33;
     }
-    .main-card {
-      max-width: 560px;
-      margin: 28px auto 0 auto;
-      background: #171728;
-      border-radius: 16px;
-      box-shadow: 0 6px 30px #0003;
-      padding: 2.2rem 1.2rem 2rem 1.2rem;
-      display: none;
+    .main-content {
+      max-width: 480px; margin: 0 auto; padding: 1.3rem 1rem 2.5rem 1rem;
     }
-    .usuario-box {
-      text-align: center;
-      margin-bottom: 18px;
-      color: #F8AF40;
-      font-weight: 600;
-      font-size: 1.08rem;
-    }
-    .searchbox {
+    .search-bar {
       width: 100%;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: #21213a;
-      border-radius: 12px;
-      padding: 0.55rem 1rem;
+      margin-bottom: 20px;
     }
-    .searchbox input {
-      flex: 1;
-      background: transparent;
-      border: none;
-      color: #fff;
-      font-size: 1.07rem;
-      outline: none;
-      padding: .5rem .3rem;
+    .search-bar input {
+      width: 100%; background: #191927; color: #fff;
+      border-radius: 9px; border: 1.5px solid #3f3860;
+      padding: 13px 14px 13px 44px; font-size: 1.1rem;
+      outline: none; box-sizing: border-box;
+      transition: border .14s;
     }
-    .searchbox input::placeholder { color: #cccc; }
-    .icon-search { color: #aaa; font-size: 1.28rem; }
-    #status-msg {
-      text-align: center;
-      font-size: 1.05rem;
-      margin-bottom: 18px;
-      color: #aaa;
-      display: none;
+    .search-bar input:focus { border-color: #845ef7; }
+    .search-bar .material-icons {
+      position: absolute; left: 17px; top: 14px; color: #dedede80; font-size: 1.2em;
     }
-    #lista-creditos { margin-top: 4px; }
-    .loader {
-      margin: 44px auto 32px auto;
-      border: 4px solid #222;
-      border-top: 4px solid #ffbb00;
-      border-radius: 50%;
-      width: 44px;
-      height: 44px;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin { 100% { transform: rotate(360deg); } }
-    .no-data {
-      color: #aaa;
-      text-align: center;
-      margin: 62px 0;
-      font-size: 1.17rem;
+    .search-wrap { position:relative; }
+    .creditos-list {
+      margin-top: .2rem;
     }
     .card-credito {
-      background: #24243b;
-      color: #fff;
-      border-radius: 13px;
-      box-shadow: 0 2px 10px #0002;
-      display: flex;
-      align-items: flex-start;
-      padding: 1.3rem 1rem 1rem 1rem;
-      margin-bottom: 16px;
-      cursor: pointer;
-      gap: 14px;
-      transition: background .13s;
+      background: #181828; border-radius: 12px; padding: 1.15rem 1rem 1.1rem 1rem;
+      margin-bottom: 15px; display: flex; gap: 15px; align-items: flex-start;
+      cursor: pointer; box-shadow: 0 2px 10px #0002;
+      transition: box-shadow .16s, background .11s;
     }
-    .card-credito:hover { background: #323258; }
-    .icono {
-      font-size: 2rem;
+    .card-credito:hover { box-shadow: 0 3px 17px #0005; background: #201c2b; }
+    .card-credito .icon {
       margin-top: 3px;
-      margin-right: 6px;
+      font-size: 34px;
+      background: #37335b;
+      border-radius: 50%;
+      width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
     }
+    .card-credito .material-icons { color: #ffb300; font-size: 32px; }
     .nombre {
-      font-weight: 600;
-      font-size: 1.13rem;
-      margin-bottom: 5px;
+      color: #fff; font-size: 1.09rem; font-weight: 500; margin-bottom: 3px;
     }
     .info {
-      color: #e0e0e0;
-      font-size: 0.99rem;
-      margin-bottom: 2px;
-      margin-top: 4px;
-      line-height: 1.5;
+      color: #babad9; font-size: 15px; line-height: 1.45;
     }
-    @media (max-width: 600px) {
-      .main-card { padding: 1rem .3rem 2rem .3rem; max-width: 99vw; }
-      .info { font-size: .97rem; }
+    .noresult {
+      color: #fff9; font-size: 1.08rem; text-align: center; margin: 2.6rem 0;
+    }
+    .loader {
+      width: 38px; height: 38px; margin: 44px auto 50px auto; border-radius: 50%;
+      border: 4.5px solid #4428c8; border-top: 4.5px solid #eee0; animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    @media (max-width: 570px) {
+      .main-content { max-width: 99vw; padding: 1rem .4rem 1.6rem .4rem; }
+      .card-credito { font-size: .97rem; }
     }
   </style>
 </head>
 <body>
   <header>Master de Créditos</header>
-  <div class="main-card">
-    <div class="usuario-box" id="usuario-nombre">Cargando usuario...</div>
-    <div class="searchbox">
-      <span class="icon-search">🔍</span>
-      <input id="search-input" placeholder="Buscar por nombre, apellido o DUI..." autocomplete="off" />
+  <div class="main-content">
+    <div class="search-bar search-wrap">
+      <span class="material-icons">search</span>
+      <input id="busqueda" type="search" placeholder="Buscar por nombre, apellido o DUI..." autocomplete="off"/>
     </div>
-    <div id="status-msg"></div>
-    <div id="lista-creditos"></div>
+    <div class="creditos-list" id="creditos-list"></div>
   </div>
 </body>
 </html>
+
 

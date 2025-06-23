@@ -76,7 +76,7 @@
           const q = query(
             collection(db, coll),
             where("agencia", "==", agenciaActual),
-            where("cierre", "==", false) // buscar solo los que no tienen cierre
+            where("cierre", "==", false)
           );
           const snap = await getDocs(q);
           for (const docMov of snap.docs) {
@@ -259,7 +259,8 @@
     }
     .main-card {
       margin: 54px auto 0 auto; background: #1a1a26; border-radius: 19px;
-      max-width: 480px; padding: 2.2rem 2.2rem 2.8rem 2.2rem; box-shadow: 0 8px 38px #0a013377;
+      max-width: 540px; min-width: 0;
+      padding: 2.2rem 2.2rem 2.8rem 2.2rem; box-shadow: 0 8px 38px #0a013377;
       display:flex; flex-direction:column;
     }
     label { margin-bottom: 5px; font-weight: 500;}
@@ -273,18 +274,33 @@
       font-size:1.1rem; cursor:pointer; transition:background .15s;
     }
     button:hover { background:#5e38a3; }
-    .table-movs {
-      margin-top: 1.4rem; width:100%; border-collapse:collapse; font-size:.99rem;
-      background:#181828; border-radius:10px; overflow:hidden;
+    .scroll-table-wrap {
+      width:100%; overflow-x:auto; margin-top: 1.3rem; border-radius:10px; 
+      background: #181828; box-shadow: 0 3px 13px #0002;
     }
-    .table-movs th, .table-movs td { padding:.6em .72em; }
+    .table-movs {
+      width:100%; min-width: 580px; border-collapse:collapse; font-size:.99rem;
+      background:#181828;
+    }
+    .table-movs th, .table-movs td { 
+      padding:.62em .80em; 
+      white-space: nowrap;
+      text-align: left;
+    }
     .table-movs th {
       background:#2c234a; color:#fff; font-weight:700; border:none;
       text-align:left;
+      font-size: 1.01rem;
+      position: sticky; top: 0; z-index: 2;
     }
     .table-movs td { border-bottom: 1px solid #212146; color:#fff; }
     .table-movs tr:last-child td { border-bottom: none; }
-    #totales { margin-top: 10px; }
+    #totales { margin-top: 10px; text-align: right;}
+    @media (max-width: 630px) {
+      .main-card { padding: 1rem .3rem 2rem .3rem; max-width: 99vw; }
+      .table-movs { font-size: .95rem; }
+      .scroll-table-wrap { min-width: 0; }
+    }
   </style>
 </head>
 <body>
@@ -297,14 +313,16 @@
     </div>
     <div>
       <b style="color:#fff">Movimientos del día</b>
-      <table class="table-movs" style="width:100%;margin-bottom:8px">
-        <thead>
-          <tr>
-            <th>Tipo</th><th>Descripción</th><th>Monto</th><th>Usuario</th><th>Fecha</th>
-          </tr>
-        </thead>
-        <tbody id="tabla-movs"></tbody>
-      </table>
+      <div class="scroll-table-wrap">
+        <table class="table-movs">
+          <thead>
+            <tr>
+              <th>Tipo</th><th>Descripción</th><th>Monto</th><th>Usuario</th><th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-movs"></tbody>
+        </table>
+      </div>
       <div id="totales"></div>
       <button onclick="cerrarCajaDelDia()">Cerrar Caja del Día Seleccionado</button>
     </div>

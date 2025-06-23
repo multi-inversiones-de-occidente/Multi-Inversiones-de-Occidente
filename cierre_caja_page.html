@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Cierre de Caja – Gerente</title>
-  <!-- Firebase -->
+  <title>Cierre de Caja – Panel Gerente</title>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, updateDoc, doc, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -24,220 +23,292 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
+    let agenciaActual = "";
+    let gerenteNombre = "";
+    let gerenteId = "";
+    let diasPendientes = [];
+    let movimientosDelDia = [];
+    let fechaSeleccionada = null;
+
+    // Helper para formato de fecha YYYY-MM-DD
+    function toDateString(date) {
+      return date.toISOString().slice(0,10);
+    }
+
     // Helper para formatear dinero
-    function money(n) { return '$' + (n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 }); }
-    function pad(n) { return n.toString().padStart(2, "0"); }
-    function fechaISO(d) {
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    function formatMoney(n) {
+      return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     }
 
-    let gerenteId, gerenteNombre, gerenteDepto;
-
-    async function obtenerInfoGerente() {
-      // Busca el user actual
-      const user = auth.currentUser;
-      if (!user) return location.href = "login.html";
-      gerenteId = user.uid;
-      // Obtener departamento y nombre
-      const docu = await getDocs(query(collection(db, "users"), where("__name__", "==", gerenteId)));
-      if (!docu.empty) {
-        const d = docu.docs[0].data();
-        gerenteNombre = `${d.nombre ?? ''} ${d.apellido ?? ''}`.trim();
-        gerenteDepto = d.department;
-      }
-      document.getElementById('nombreGerente').textContent = gerenteNombre ?? user.email;
-      cargarDiasPendientes();
+    // Helper para parsear fechas Firebase string
+    function toDateObj(str) {
+      return new Date(str.length > 10 ? str : (str + 'T00:00:00'));
     }
 
-    // Busca fechas de movimientos SIN cierre
-    async function cargarDiasPendientes() {
-      document.getElementById('loading').style.display = '';
-      document.getElementById('diasPendientes').innerHTML = '';
-      document.getElementById('tablaMovs').innerHTML = '';
-      document.getElementById('totales').style.display = 'none';
-      document.getElementById('cerrarBtn').style.display = 'none';
+    // Helper para comparar fechas YYYY-MM-DD
+    function sameDay(a, b) {
+      return toDateString(a) === toDateString(b);
+    }
 
-      let fechasSinCierre = new Set();
-      // Ambas colecciones, campo agencia Y sucursal
-      for (const col of ["movimientos_caja", "movimientosCaja"]) {
-        for (const campo of ["agencia", "sucursal"]) {
+    async function cargarGerenteYFechas() {
+      document.getElementById("select-fecha").innerHTML = `<option>Cargando...</option>`;
+      document.getElementById("tabla-movs").innerHTML = "";
+      document.getElementById("totales").innerHTML = "";
+
+      onAuthStateChanged(auth, async user => {
+        if (!user) return location.href = "login.html";
+        gerenteId = user.uid;
+        // Cargar info del gerente
+        const docRef = doc(db, "users", gerenteId);
+        const snap = await getDocs(query(collection(db, "users"), where("__name__", "==", gerenteId)));
+        if (snap.empty) {
+          document.getElementById("select-fecha").innerHTML = `<option>No se encontró gerente</option>`;
+          return;
+        }
+        const gerenteData = snap.docs[0].data();
+        agenciaActual = gerenteData.department;
+        gerenteNombre = `${gerenteData.nombre || ""} ${gerenteData.apellido || ""}`.trim();
+        document.getElementById("gerente-nombre").innerText = gerenteNombre || user.email;
+
+        // 1. Buscar todas las fechas de movimientos SIN cierre en las 2 colecciones
+        let movDatesSet = new Set();
+        for (const coll of ["movimientosCaja", "movimientos_caja"]) {
           const q = query(
-            collection(db, col),
-            where(campo, "==", gerenteDepto),
-            where("cierre", "!=", true)
+            collection(db, coll),
+            where("agencia", "==", agenciaActual),
+            where("cierre", "==", false) // buscar solo los que no tienen cierre
           );
           const snap = await getDocs(q);
-          snap.forEach(docu => {
-            const fecha = (docu.data().fecha || '').substring(0,10);
-            if (fecha.length === 10) fechasSinCierre.add(fecha);
-          });
+          for (const docMov of snap.docs) {
+            const movData = docMov.data();
+            if (!movData.fecha) continue;
+            movDatesSet.add(movData.fecha.substring(0,10));
+          }
         }
-      }
-      // Ordenar fechas ascendente
-      fechasSinCierre = Array.from(fechasSinCierre).sort();
 
-      if (!fechasSinCierre.length) {
-        // Solo hoy
-        const hoy = fechaISO(new Date());
-        fechasSinCierre.push(hoy);
-      }
+        // Si NO hay campo cierre en muchos, buscamos todos los movimientos y los que no tengan campo "cierre"
+        if (movDatesSet.size === 0) {
+          for (const coll of ["movimientosCaja", "movimientos_caja"]) {
+            const q = query(
+              collection(db, coll),
+              where("agencia", "==", agenciaActual)
+            );
+            const snap = await getDocs(q);
+            for (const docMov of snap.docs) {
+              const movData = docMov.data();
+              if (!movData.fecha) continue;
+              // Si no tiene campo "cierre", lo consideramos pendiente
+              if (movData.cierre !== true) {
+                movDatesSet.add(movData.fecha.substring(0,10));
+              }
+            }
+          }
+        }
 
-      // Pinta selector
-      const select = document.getElementById('diasPendientes');
-      select.innerHTML = fechasSinCierre.map(f =>
-        `<option value="${f}">${f.split("-").reverse().join("/")}</option>`
-      ).join('');
-      document.getElementById('loading').style.display = 'none';
-      mostrarMovimientos(select.value);
-      select.onchange = e => mostrarMovimientos(e.target.value);
+        // 2. Filtrar las que ya están cerradas
+        const cierresQ = query(collection(db, "cierres_caja"), where("agencia", "==", agenciaActual));
+        const cierresSnap = await getDocs(cierresQ);
+        let fechasCerradas = new Set();
+        for (const docC of cierresSnap.docs) {
+          let f = docC.data().fecha;
+          if (f && f.length >= 10) fechasCerradas.add(f.substring(0,10));
+        }
+
+        diasPendientes = Array.from(movDatesSet).filter(f => !fechasCerradas.has(f));
+        diasPendientes.sort();
+
+        // 3. Si no hay pendientes, permitir hoy para cierre
+        if (diasPendientes.length === 0) {
+          const hoy = toDateString(new Date());
+          diasPendientes = [hoy];
+        }
+
+        document.getElementById("select-fecha").innerHTML =
+          diasPendientes.map(f => `<option value="${f}">${f.split('-').reverse().join('/')}</option>`).join('');
+
+        // Cargar el primero por defecto
+        fechaSeleccionada = diasPendientes[0];
+        await cargarMovimientosYTotales(fechaSeleccionada);
+        document.getElementById("select-fecha").onchange = async e => {
+          fechaSeleccionada = e.target.value;
+          await cargarMovimientosYTotales(fechaSeleccionada);
+        };
+      });
     }
 
-    // Busca y pinta movimientos de la fecha
-    async function mostrarMovimientos(fechaSel) {
-      document.getElementById('tablaMovs').innerHTML = '';
-      document.getElementById('totales').style.display = 'none';
-      document.getElementById('cerrarBtn').style.display = 'none';
+    async function cargarMovimientosYTotales(fecha) {
+      // Mostrar loading
+      document.getElementById("tabla-movs").innerHTML = `<tr><td colspan="5" style="text-align:center">Cargando movimientos...</td></tr>`;
+      movimientosDelDia = [];
+      let totalIngresos = 0;
+      let totalEgresos = 0;
 
-      let movimientos = [];
-      for (const col of ["movimientos_caja", "movimientosCaja"]) {
-        for (const campo of ["agencia", "sucursal"]) {
-          const q = query(
-            collection(db, col),
-            where(campo, "==", gerenteDepto),
-            where("fecha", ">=", fechaSel + "T00:00:00"),
-            where("fecha", "<=", fechaSel + "T23:59:59"),
-            where("cierre", "!=", true)
-          );
-          const snap = await getDocs(q);
-          snap.forEach(docu => movimientos.push({ ...docu.data(), id: docu.id, ref: docu.ref, col }));
+      for (const coll of ["movimientosCaja", "movimientos_caja"]) {
+        const q = query(
+          collection(db, coll),
+          where("agencia", "==", agenciaActual),
+          where("fecha", ">=", `${fecha}T00:00:00`),
+          where("fecha", "<=", `${fecha}T23:59:59`)
+        );
+        const snap = await getDocs(q);
+        for (const docMov of snap.docs) {
+          const movData = docMov.data();
+          // Si ya tienen cierre:true, no mostrar
+          if (movData.cierre === true) continue;
+          movimientosDelDia.push({ id: docMov.id, coll, ...movData });
+          if (movData.tipo === "Ingreso") totalIngresos += Number(movData.monto || 0);
+          if (movData.tipo === "Egreso") totalEgresos += Number(movData.monto || 0);
         }
       }
-      // Si no hay movimientos, avisa
-      if (!movimientos.length) {
-        document.getElementById('tablaMovs').innerHTML =
-          `<tr><td colspan="5" style="color:#fff9">No hay movimientos para este día.</td></tr>`;
+
+      if (movimientosDelDia.length === 0) {
+        document.getElementById("tabla-movs").innerHTML =
+          `<tr><td colspan="5" style="text-align:center;color:#fff6">No hay movimientos para este día.</td></tr>`;
+      } else {
+        document.getElementById("tabla-movs").innerHTML =
+          movimientosDelDia.map(m =>
+            `<tr>
+              <td>${m.tipo || ""}</td>
+              <td>${m.descripcion || ""}</td>
+              <td>${formatMoney(m.monto || 0)}</td>
+              <td>${m.usuario || ""}</td>
+              <td>${(m.fecha || "").replace('T', ' ').replace('.000Z','').slice(0,16)}</td>
+            </tr>`
+          ).join('');
+      }
+
+      document.getElementById("totales").innerHTML =
+        `<div style="margin-top:18px;text-align:right">
+          <b style="color:#2EF37A">Total Ingresos: ${formatMoney(totalIngresos)}</b><br>
+          <b style="color:#F8AF40">Total Egresos: ${formatMoney(totalEgresos)}</b><br>
+          <b style="color:#FFD600">Saldo de Caja: ${formatMoney(totalIngresos - totalEgresos)}</b>
+        </div>`;
+    }
+
+    async function cerrarCajaDelDia() {
+      if (!fechaSeleccionada) return alert("Selecciona un día válido");
+      if (movimientosDelDia.length === 0) return alert("No hay movimientos para este día.");
+
+      // PIN
+      const pin = prompt("Por seguridad, ingresa tu PIN de gerente:");
+      if (!pin) return;
+      // Verificar hash de PIN
+      const shaObj = await import('https://cdn.jsdelivr.net/npm/js-sha256@0.9.0/build/sha256.min.js');
+      const pinHash = shaObj.sha256(pin);
+
+      // Verificar PIN
+      const gerenteSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", gerenteId)));
+      const gerenteData = gerenteSnap.docs[0]?.data();
+      if (!gerenteData || gerenteData.internalPassword !== pinHash) {
+        alert("PIN incorrecto");
         return;
       }
-      // Pinta movimientos
-      let ingresos = 0, egresos = 0;
-      document.getElementById('tablaMovs').innerHTML = movimientos.map(m => {
-        const esIng = m.tipo === "Ingreso";
-        const color = esIng ? "#26c6da44" : "#f4433644";
-        const monto = Number(m.monto ?? 0);
-        if (esIng) ingresos += monto; else egresos += monto;
-        return `
-          <tr style="background:${color};color:#fff">
-            <td>${m.tipo}</td>
-            <td>${m.descripcion ?? ''}</td>
-            <td>${money(monto)}</td>
-            <td>${m.usuario ?? ''}</td>
-            <td>${m.fecha ? m.fecha.replace("T", " ") : ''}</td>
-          </tr>
-        `;
-      }).join('');
-      document.getElementById('totIn').textContent = money(ingresos);
-      document.getElementById('totEg').textContent = money(egresos);
-      document.getElementById('totSd').textContent = money(ingresos - egresos);
-      document.getElementById('totales').style.display = '';
-      document.getElementById('cerrarBtn').style.display = '';
-      // Guardar en global para el cierre
-      window._movsPend = movimientos;
-      window._fechaPend = fechaSel;
-    }
 
-    // Cierra caja (pide PIN, crea registro y marca movimientos)
-    async function cerrarCaja() {
-      const pin = prompt("Por seguridad, ingresa tu PIN interno:");
-      if (!pin || pin.length < 4) return alert("PIN inválido");
-      // Valida el PIN contra el hash guardado
-      // Busca hash del gerente
-      const userSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", gerenteId)));
-      const gerente = userSnap.empty ? null : userSnap.docs[0].data();
-      if (!gerente || !gerente.internalPassword) return alert("No se encontró PIN.");
-      const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pin));
-      const pinHashHex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
-      if (pinHashHex !== gerente.internalPassword) return alert("PIN incorrecto");
-
-      document.getElementById('cerrarBtn').disabled = true;
-      // 1. Crear registro de cierre
-      let ingresos = 0, egresos = 0;
-      window._movsPend.forEach(m => {
-        const monto = Number(m.monto ?? 0);
-        if (m.tipo === "Ingreso") ingresos += monto; else egresos += monto;
+      // Totales
+      let totalIngresos = 0, totalEgresos = 0;
+      movimientosDelDia.forEach(m => {
+        if (m.tipo === "Ingreso") totalIngresos += Number(m.monto || 0);
+        if (m.tipo === "Egreso") totalEgresos += Number(m.monto || 0);
       });
+
+      // 1. Crear cierre en la colección cierres_caja
       await addDoc(collection(db, "cierres_caja"), {
-        agencia: gerenteDepto,
-        fecha: window._fechaPend,
-        total_ingresos: ingresos,
-        total_egresos: egresos,
-        saldo_caja: ingresos - egresos,
-        movimientos: window._movsPend.map(m => {
-          let { ref, col, id, ...rest } = m; return rest;
-        }),
-        fecha_cierre: new Date().toISOString(),
+        agencia: agenciaActual,
+        fecha: fechaSeleccionada,
+        total_ingresos: totalIngresos,
+        total_egresos: totalEgresos,
+        saldo_caja: totalIngresos - totalEgresos,
+        movimientos: movimientosDelDia.map(m => ({
+          tipo: m.tipo,
+          descripcion: m.descripcion,
+          monto: m.monto,
+          usuario: m.usuario,
+          fecha: m.fecha,
+          id_movimiento: m.id
+        })),
+        fecha_cierre: (new Date()).toISOString(),
         gerente_id: gerenteId,
+        gerente_nombre: gerenteNombre
       });
-      // 2. Actualizar movimientos
-      for (const m of window._movsPend) {
-        await updateDoc(m.ref, { cierre: true });
+
+      // 2. Actualizar movimientos de ese día con "cierre: true"
+      for (const m of movimientosDelDia) {
+        try {
+          const docRef = doc(db, m.coll, m.id);
+          await updateDoc(docRef, { cierre: true });
+        } catch (e) {}
       }
-      alert("¡Cierre realizado correctamente!");
-      cargarDiasPendientes();
+
+      alert("¡Cierre realizado y registrado exitosamente!");
+      // Recargar todo
+      await cargarGerenteYFechas();
     }
 
-    // INICIO
-    window.addEventListener("DOMContentLoaded", () => {
-      onAuthStateChanged(auth, user => {
-        if (!user) return location.href = "login.html";
-        obtenerInfoGerente();
-      });
-      document.getElementById('cerrarBtn').onclick = cerrarCaja;
-    });
+    window.addEventListener("DOMContentLoaded", cargarGerenteYFechas);
+    window.cerrarCajaDelDia = cerrarCajaDelDia;
   </script>
   <style>
-    body { background:#101212; color:#fff; font-family:sans-serif; margin:0; }
-    header { background:#211c3c; text-align:center; padding:1rem; font-size:1.25rem; font-weight:bold; letter-spacing:1px;}
-    .container { max-width:700px; margin:1.5rem auto; background:#181a23; border-radius:16px; box-shadow:0 5px 30px #0008; padding:2rem 2vw;}
-    h2 { margin:0 0 .7em 0;}
-    select { font-size:1.02rem; background:#111; color:#fff; border-radius:6px; padding:.4em .8em; border:1px solid #222;}
-    table { width:100%; margin:1.1rem 0; border-collapse:collapse;}
-    th,td { padding:.48em .4em; border-bottom:1px solid #222; text-align:left;}
-    th { background:#231c4d; color:#bdf;}
-    .tot { font-weight:bold; }
-    #totales { margin:.7em 0 1em 0; }
-    #cerrarBtn { font-size:1.15rem; background:#5236d3; color:#fff; border:none; border-radius:10px; padding:.7em 2.2em; cursor:pointer; box-shadow:0 3px 14px #3114;}
-    #cerrarBtn:disabled { opacity:.7; pointer-events:none; }
-    @media (max-width:600px) {.container {padding:1.1rem 1vw;}}
+    body {
+      margin: 0; font-family: Arial,sans-serif; background: #11102a;
+      color: #fff; min-height: 100vh;
+    }
+    header {
+      width:100%; background:#221a3a; padding:1.2rem 0 1.1rem 0; text-align:center;
+      font-size:1.44rem; font-weight:700; letter-spacing:.5px; color:#fff;
+      margin-bottom: 1.2rem;
+    }
+    .main-card {
+      margin: 54px auto 0 auto; background: #1a1a26; border-radius: 19px;
+      max-width: 480px; padding: 2.2rem 2.2rem 2.8rem 2.2rem; box-shadow: 0 8px 38px #0a013377;
+      display:flex; flex-direction:column;
+    }
+    label { margin-bottom: 5px; font-weight: 500;}
+    select, option, input {
+      font-size:1.08rem; background:#191834; color:#fff; border-radius:6px;
+      border:1px solid #4e3b71; padding:.59rem .7rem; margin-bottom:10px;
+    }
+    button {
+      width:100%; background:#a787f4; color:#fff; font-weight:700;
+      border:none; border-radius:8px; padding:1rem 0; margin-top:20px;
+      font-size:1.1rem; cursor:pointer; transition:background .15s;
+    }
+    button:hover { background:#5e38a3; }
+    .table-movs {
+      margin-top: 1.4rem; width:100%; border-collapse:collapse; font-size:.99rem;
+      background:#181828; border-radius:10px; overflow:hidden;
+    }
+    .table-movs th, .table-movs td { padding:.6em .72em; }
+    .table-movs th {
+      background:#2c234a; color:#fff; font-weight:700; border:none;
+      text-align:left;
+    }
+    .table-movs td { border-bottom: 1px solid #212146; color:#fff; }
+    .table-movs tr:last-child td { border-bottom: none; }
+    #totales { margin-top: 10px; }
   </style>
 </head>
 <body>
   <header>Cierre de Caja – Panel Gerente</header>
-  <div class="container">
-    <div><b>Gerente:</b> <span id="nombreGerente"></span></div>
-    <div style="margin:1em 0 .7em 0">
-      <label>Selecciona un día pendiente:</label><br>
-      <span id="loading" style="color:#67C8F1">Buscando días pendientes…</span>
-      <select id="diasPendientes" style="min-width:160px; margin-top:.5em; margin-bottom:.4em"></select>
+  <div class="main-card">
+    <div><b>Gerente:</b> <span id="gerente-nombre">Cargando...</span></div>
+    <div style="margin-top:20px;margin-bottom:8px;">
+      <label>Selecciona un día pendiente de cierre:</label><br>
+      <select id="select-fecha"></select>
     </div>
-    <h2>Movimientos del día</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Tipo</th>
-          <th>Descripción</th>
-          <th>Monto</th>
-          <th>Usuario</th>
-          <th>Fecha</th>
-        </tr>
-      </thead>
-      <tbody id="tablaMovs"></tbody>
-    </table>
-    <div id="totales" style="display:none;">
-      <div>Ingresos: <span id="totIn"></span></div>
-      <div>Egresos: <span id="totEg"></span></div>
-      <div class="tot">Saldo de Caja: <span id="totSd"></span></div>
+    <div>
+      <b style="color:#fff">Movimientos del día</b>
+      <table class="table-movs" style="width:100%;margin-bottom:8px">
+        <thead>
+          <tr>
+            <th>Tipo</th><th>Descripción</th><th>Monto</th><th>Usuario</th><th>Fecha</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-movs"></tbody>
+      </table>
+      <div id="totales"></div>
+      <button onclick="cerrarCajaDelDia()">Cerrar Caja del Día Seleccionado</button>
     </div>
-    <button id="cerrarBtn" style="display:none;">Cerrar Caja</button>
   </div>
 </body>
 </html>
+

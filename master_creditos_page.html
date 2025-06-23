@@ -9,7 +9,7 @@
     import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
-    // Configura tu proyecto aquí:
+    // Configuración de Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -23,19 +23,6 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
-
-    // Asume que ya sabes el departamento (puedes obtenerlo del usuario logueado si quieres)
-    let departamentoAsignado = ""; // <- Aquí pon el valor si quieres forzarlo
-
-    // Permite ingresar el departamento por URL o prompt
-    function obtenerDepartamento() {
-      const urlParams = new URLSearchParams(window.location.search);
-      let dep = urlParams.get("department");
-      if (!dep) {
-        dep = prompt("Escribe el nombre EXACTO del departamento/agencia a consultar:");
-      }
-      return dep ? dep.trim() : "";
-    }
 
     // Formato de dinero
     function money(n) {
@@ -78,7 +65,6 @@
 
     window.verDetalleCredito = function(id) {
       // Aquí debes poner tu lógica de navegación o mostrar el detalle.
-      // Por ejemplo: location.href = "detalle_credito.html?id=" + id;
       alert("Ir al detalle de crédito: " + id);
     };
 
@@ -92,10 +78,10 @@
       mostrarCreditos();
     }
 
-    async function cargarCreditos() {
+    async function cargarCreditos(department) {
       loading = true;
       mostrarCreditos();
-      let q = query(collection(db, "creditos"), where("agenciaAsignada", "==", departamentoAsignado));
+      let q = query(collection(db, "creditos"), where("agenciaAsignada", "==", department));
       let snap = await getDocs(q);
       creditos = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
       creditosFiltrados = [...creditos];
@@ -104,9 +90,26 @@
     }
 
     window.addEventListener("DOMContentLoaded", async () => {
-      departamentoAsignado = obtenerDepartamento();
+      // Autenticación y carga automática del departamento del usuario
+      onAuthStateChanged(auth, async user => {
+        if (!user) {
+          location.href = "login.html";
+          return;
+        }
+        // Buscar el usuario en la colección users para obtener el department
+        const q = query(collection(db, "users"), where("__name__", "==", user.uid));
+        const snap = await getDocs(q);
+        if (snap.empty) {
+          alert("No se encontró el usuario.");
+          return;
+        }
+        const userData = snap.docs[0].data();
+        const department = userData.department || "";
+        document.getElementById("nombre-usuario").innerText = `${userData.nombre || ""} ${userData.apellido || ""}`.trim() || user.email;
+        await cargarCreditos(department);
+      });
+
       document.getElementById("busqueda").addEventListener("input", e => aplicarFiltro(e.target.value));
-      await cargarCreditos();
     });
   </script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
@@ -176,11 +179,20 @@
       .main-content { max-width: 99vw; padding: 1rem .4rem 1.6rem .4rem; }
       .card-credito { font-size: .97rem; }
     }
+    .usuario-info {
+      font-size: .99rem;
+      color: #ffe5b7;
+      font-weight: 400;
+      margin-bottom: 16px;
+    }
   </style>
 </head>
 <body>
   <header>Master de Créditos</header>
   <div class="main-content">
+    <div class="usuario-info">
+      <b>Usuario:</b> <span id="nombre-usuario">Cargando...</span>
+    </div>
     <div class="search-bar search-wrap">
       <span class="material-icons">search</span>
       <input id="busqueda" type="search" placeholder="Buscar por nombre, apellido o DUI..." autocomplete="off"/>

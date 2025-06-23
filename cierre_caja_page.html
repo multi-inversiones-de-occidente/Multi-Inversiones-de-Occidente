@@ -6,7 +6,7 @@
   <title>Cierre de Caja – Panel Gerente</title>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, addDoc, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -29,25 +29,38 @@
     let diasPendientes = [];
     let movimientosDelDia = [];
     let fechaSeleccionada = null;
+    let saldoInicial = 0;
 
-    // Helper para formato de fecha YYYY-MM-DD
     function toDateString(date) {
       return date.toISOString().slice(0,10);
     }
 
-    // Helper para formatear dinero
     function formatMoney(n) {
       return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     }
 
-    // Helper para parsear fechas Firebase string
     function toDateObj(str) {
       return new Date(str.length > 10 ? str : (str + 'T00:00:00'));
     }
 
-    // Helper para comparar fechas YYYY-MM-DD
     function sameDay(a, b) {
       return toDateString(a) === toDateString(b);
+    }
+
+    // NUEVO: Obtener el saldo inicial del último cierre de caja
+    async function obtenerSaldoInicial(agencia) {
+      const cierresRef = collection(db, "cierres_caja");
+      const q = query(
+        cierresRef,
+        where("agencia", "==", agencia),
+        orderBy("fecha_cierre", "desc"),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        return Number(snap.docs[0].data().saldo_caja || 0);
+      }
+      return 0;
     }
 
     async function cargarGerenteYFechas() {
@@ -143,6 +156,9 @@
       let totalIngresos = 0;
       let totalEgresos = 0;
 
+      // Obtener saldo inicial del último cierre
+      saldoInicial = await obtenerSaldoInicial(agenciaActual);
+
       for (const coll of ["movimientosCaja", "movimientos_caja"]) {
         const q = query(
           collection(db, coll),
@@ -153,7 +169,6 @@
         const snap = await getDocs(q);
         for (const docMov of snap.docs) {
           const movData = docMov.data();
-          // Si ya tienen cierre:true, no mostrar
           if (movData.cierre === true) continue;
           movimientosDelDia.push({ id: docMov.id, coll, ...movData });
           if (movData.tipo === "Ingreso") totalIngresos += Number(movData.monto || 0);
@@ -177,11 +192,14 @@
           ).join('');
       }
 
+      const saldoFinal = saldoInicial + totalIngresos - totalEgresos;
+
       document.getElementById("totales").innerHTML =
         `<div style="margin-top:18px;text-align:right">
+          <b style="color:#55e2c1">Saldo Inicial: ${formatMoney(saldoInicial)}</b><br>
           <b style="color:#2EF37A">Total Ingresos: ${formatMoney(totalIngresos)}</b><br>
           <b style="color:#F8AF40">Total Egresos: ${formatMoney(totalEgresos)}</b><br>
-          <b style="color:#FFD600">Saldo de Caja: ${formatMoney(totalIngresos - totalEgresos)}</b>
+          <b style="color:#FFD600">Saldo de Caja (al cierre): ${formatMoney(saldoFinal)}</b>
         </div>`;
     }
 
@@ -219,13 +237,17 @@
         if (m.tipo === "Egreso") totalEgresos += Number(m.monto || 0);
       });
 
+      // Calcular saldo final CON saldo inicial
+      const saldoFinal = saldoInicial + totalIngresos - totalEgresos;
+
       // 1. Crear cierre en la colección cierres_caja
       await addDoc(collection(db, "cierres_caja"), {
         agencia: agenciaActual,
         fecha: fechaSeleccionada,
         total_ingresos: totalIngresos,
         total_egresos: totalEgresos,
-        saldo_caja: totalIngresos - totalEgresos,
+        saldo_inicial: saldoInicial,
+        saldo_caja: saldoFinal,
         movimientos: movimientosDelDia.map(m => ({
           tipo: m.tipo,
           descripcion: m.descripcion,

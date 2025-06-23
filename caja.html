@@ -171,6 +171,22 @@
       color: #fff !important;
       opacity: 1;
     }
+    /* Nuevo botón de reimpresión */
+    .btn-reimprimir {
+      background: linear-gradient(90deg, #F8AF40 0%, #FFD600 100%);
+      color: #232323 !important;
+      font-weight: bold;
+    }
+    .btn-reimprimir:active,
+    .btn-reimprimir:hover {
+      background: linear-gradient(90deg, #FFD600 60%, #F8AF40 100%);
+      color: #232323 !important;
+      box-shadow: 0 8px 26px #FFD60055;
+    }
+    .btn-reimprimir i {
+      color: #232323 !important;
+      opacity: 1;
+    }
     @media (max-width: 600px) {
       .container { padding:1.2rem 1vw; }
       h1 { font-size: 1.23rem;}
@@ -220,7 +236,12 @@
         <i class="fas fa-list-alt"></i>
         Ver Movimientos de Caja
       </a>
-      <!-- NUEVO BOTÓN DE REVERTIR PAGOS -->
+      <!-- NUEVO BOTÓN DE REIMPRESIÓN -->
+      <a href="reimpresion_tickets_page.html" class="btn-grande btn-reimprimir">
+        <i class="fas fa-print"></i>
+        Ver/Reimprimir Recibos
+      </a>
+      <!-- BOTÓN DE REVERTIR PAGOS -->
       <a href="revertir_pagos_page.html" class="btn-grande btn-revertir">
         <i class="fas fa-undo"></i>
         Revertir Pagos

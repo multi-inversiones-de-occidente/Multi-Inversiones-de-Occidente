@@ -59,6 +59,14 @@
     .comprobante-btns { text-align: center;}
     .btn-imprimir { background: #253045; color: #fff; font-size:1.13rem; padding:9px 34px; border-radius:9px; border:none; cursor:pointer; font-weight:600; margin-top:10px;}
     .btn-imprimir:hover { background: #67C8F1; color:#222;}
+    /* Tabla de cuadre */
+    .cuadre-table { width:100%; margin:35px 0 18px 0; background:#1a2533; color:#ffe37a; border-radius:12px; box-shadow:0 2px 12px #0008; }
+    .cuadre-table th, .cuadre-table td { padding:8px 10px; border-bottom:1px solid #253045; }
+    .cuadre-table th { color:#67C8F1; font-size:1.06rem; }
+    .cuadre-table tr:last-child td { border-bottom: none; }
+    .cuadre-table .ingreso { color:#7af18d; }
+    .cuadre-table .egreso { color:#ff6363; }
+    .cuadre-total { font-weight:bold; font-size:1.1rem; background:#253045; color:#ffe37a; }
     @media (max-width:600px){.container{padding:1.3rem .7rem;}}
     @media print {
       body * { visibility: hidden !important; }
@@ -72,9 +80,8 @@
         background: #fff !important;
         color: #181818 !important;
       }
-      .btn-imprimir {
-        display: none !important;
-      }
+      .btn-imprimir { display: none !important; }
+      #tabla-cuadre, #tabla-cuadre * { visibility: visible !important;}
     }
   </style>
 </head>
@@ -105,14 +112,12 @@
       </select>
       <div id="movimiento-error" class="error" style="display:none;"></div>
 
-      <!-- Campo Nombre (solo para algunos movimientos) -->
       <div id="div-nombre" style="display:none;">
         <label class="label" for="nombre">Nombre</label>
         <input id="nombre" class="input-main" type="text" maxlength="60" placeholder="Nombre de persona, cliente, etc"/>
         <div id="nombre-error" class="error" style="display:none;"></div>
       </div>
 
-      <!-- Aquí van los campos normales -->
       <div id="form-normal">
         <label class="label" for="monto">Monto</label>
         <input id="monto" class="input-main" type="number" min="0.01" step="0.01" placeholder="0.00" required/>
@@ -125,8 +130,6 @@
         <button type="submit" class="btn-main">Registrar Movimiento</button>
         <div id="ok-msg" class="ok-msg" style="display:none;"></div>
       </div>
-
-      <!-- Especial para Abono a fechas anteriores -->
       <div id="form-especial" style="display:none;">
         <div class="especial-abono">
           <i class="fas fa-history"></i>
@@ -143,7 +146,6 @@
     </form>
   </div>
 
-  <!-- Comprobante (oculto por defecto) -->
   <div id="comprobante-bg" class="comprobante-bg" style="display:none;">
     <div class="comprobante-header">Comprobante de Movimiento de Caja</div>
     <div class="comprobante-list">
@@ -160,6 +162,8 @@
       <button class="btn-imprimir" onclick="window.print()"><i class="fas fa-print"></i> Imprimir</button>
     </div>
   </div>
+
+  <div id="tabla-cuadre"></div>
 
   <!-- Firebase & lógica -->
   <script type="module">
@@ -199,16 +203,17 @@
       userId = user.uid;
       document.getElementById("usuario").textContent = "Gestión realizada por: " + usuarioActual;
 
-      // Obtener agencia (department)
       try {
         const docUser = await getDoc(doc(db, "users", user.uid));
         if (docUser.exists() && docUser.data().department) {
           userAgencia = docUser.data().department;
         }
       } catch (e) {}
+
+      // Muestra cuadre automático al cargar
+      mostrarCuadreCajaHoy();
     });
 
-    // === OBTENER NUEVO CORRELATIVO ===
     async function obtenerNuevoCorrelativo(agencia) {
       const q = query(
         collection(db, "movimientosCaja"),
@@ -282,13 +287,13 @@
         await addDoc(collection(db, "movimientosCaja"), {
           descripcion: movimientoSel,
           tipo: tipoReal,
-          monto: Number(montoSel), // Asegura que es número
+          monto: Number(montoSel),
           observaciones: observaciones,
           fecha: new Date().toISOString(),
           usuario: usuarioActual,
           agencia: userAgencia,
           nombre: tiposConNombre.includes(movimientoSel) ? nombreSel : "",
-          correlativo: Number(correlativo) // <-- SIEMPRE GUARDA COMO NÚMERO
+          correlativo: Number(correlativo)
         });
 
         mostrarComprobante({
@@ -307,7 +312,7 @@
         document.getElementById("form-mov-caja").reset();
         document.getElementById("fecha-row").textContent = "Fecha: " + getFechaLocalStr();
         document.getElementById("div-nombre").style.display = "none";
-
+        mostrarCuadreCajaHoy(); // Actualiza cuadre después de registrar
         setTimeout(() => {
           document.getElementById("ok-msg").style.display = "none";
         }, 2500);
@@ -334,6 +339,104 @@
       document.getElementById("comprobante-bg").style.display = "block";
       window.scrollTo({top: 0, behavior: "smooth"});
     }
+
+    // ================== CUADRE DIARIO: Suma movimientos + pagos clientes ==================
+    async function mostrarCuadreCajaHoy() {
+      // Fechas del día local (UTC-6 si es necesario ajustar)
+      const hoy = new Date();
+      const y = hoy.getFullYear(), m = hoy.getMonth(), d = hoy.getDate();
+      const startOfDay = new Date(y, m, d, 0, 0, 0, 0).toISOString();
+      const endOfDay = new Date(y, m, d, 23, 59, 59, 999).toISOString();
+
+      let movimientos = [];
+
+      // Movimientos de caja manuales
+      const movSnap = await getDocs(
+        query(
+          collection(db, "movimientosCaja"),
+          where("agencia", "==", userAgencia),
+          where("fecha", ">=", startOfDay),
+          where("fecha", "<=", endOfDay)
+        )
+      );
+      movSnap.forEach(doc => {
+        const d = doc.data();
+        movimientos.push({
+          tipo: d.tipo,
+          descripcion: d.descripcion,
+          monto: Number(d.monto),
+          usuario: d.usuario || "",
+          nombre: d.nombre || "",
+          fecha: d.fecha,
+          origen: "movimiento"
+        });
+      });
+
+      // Pagos de clientes del día, NO anulados y de la sucursal correcta
+      const pagosSnap = await getDocs(
+        query(
+          collection(db, "pagos"),
+          where("sucursal", "==", userAgencia),
+          where("fechaPago", ">=", startOfDay),
+          where("fechaPago", "<=", endOfDay)
+        )
+      );
+      pagosSnap.forEach(doc => {
+        const data = doc.data();
+        if (!('anulado' in data) || !data.anulado) {
+          movimientos.push({
+            tipo: "Ingreso",
+            descripcion: "Pago de cliente",
+            monto: Number(data.montoPagado) || 0,
+            usuario: data.cajeroNombre || "Cliente",
+            nombre: data.nombres || "",
+            fecha: data.fechaPago,
+            origen: "pago"
+          });
+        }
+      });
+
+      movimientos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+      // Render a tabla abajo del form
+      let html = `
+        <table class="cuadre-table" id="tabla-cuadre">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Descripción</th>
+              <th>Usuario</th>
+              <th>Monto</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+      let total = 0;
+      movimientos.forEach(mov => {
+        const clase = mov.tipo === "Ingreso" ? "ingreso" : "egreso";
+        html += `
+          <tr>
+            <td>${(mov.fecha || "").replace('T',' ').slice(0, 16)}</td>
+            <td class="${clase}">${mov.tipo}</td>
+            <td>${mov.descripcion}${mov.nombre ? ' / ' + mov.nombre : ''}</td>
+            <td>${mov.usuario}</td>
+            <td class="${clase}">$${Number(mov.monto).toFixed(2)}</td>
+          </tr>
+        `;
+        if(mov.tipo === "Ingreso") total += mov.monto;
+        else total -= mov.monto;
+      });
+      html += `
+        <tr class="cuadre-total">
+          <td colspan="4" style="text-align:right;">TOTAL EN CAJA:</td>
+          <td>$${total.toFixed(2)}</td>
+        </tr>
+        </tbody></table>
+      `;
+      document.getElementById("tabla-cuadre").innerHTML = html;
+    }
+
   </script>
 </body>
 </html>

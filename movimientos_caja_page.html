@@ -60,8 +60,6 @@
     .btn-imprimir { background: #253045; color: #fff; font-size:1.13rem; padding:9px 34px; border-radius:9px; border:none; cursor:pointer; font-weight:600; margin-top:10px;}
     .btn-imprimir:hover { background: #67C8F1; color:#222;}
     @media (max-width:600px){.container{padding:1.3rem .7rem;}}
-
-    /* SOLO imprime el comprobante/ticket */
     @media print {
       body * { visibility: hidden !important; }
       #comprobante-bg, #comprobante-bg * { visibility: visible !important; }
@@ -149,6 +147,7 @@
   <div id="comprobante-bg" class="comprobante-bg" style="display:none;">
     <div class="comprobante-header">Comprobante de Movimiento de Caja</div>
     <div class="comprobante-list">
+      <div class="row"><span class="label">Correlativo:</span> <span id="c-correlativo"></span></div>
       <div class="row"><span class="label">Tipo de movimiento:</span> <span id="c-tipo"></span></div>
       <div class="row" id="row-c-nombre" style="display:none;"><span class="label">Nombre:</span> <span id="c-nombre"></span></div>
       <div class="row"><span class="label">Monto:</span> <span id="c-monto"></span></div>
@@ -165,7 +164,7 @@
   <!-- Firebase & lógica -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDoc, doc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDoc, doc, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -186,17 +185,14 @@
     let userAgencia = "Desconocida";
     let fechaMovimientoActual = "";
 
-    // Fecha actual
     function getFechaLocalStr() {
       const d = new Date();
       return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
     }
     document.getElementById("fecha-row").textContent = "Fecha: " + getFechaLocalStr();
 
-    // Tipos que requieren campo de nombre extra
     const tiposConNombre = ["Otros ingresos", "Análisis financiero", "Desembolso", "Otros gastos"];
 
-    // Auth
     onAuthStateChanged(auth, async user => {
       if (!user) return location.href = "login.html";
       usuarioActual = user.displayName || user.email || "Usuario desconocido";
@@ -212,7 +208,24 @@
       } catch (e) {}
     });
 
-    // Mostrar/ocultar campo nombre extra según selección de movimiento
+    // === OBTENER NUEVO CORRELATIVO ===
+    async function obtenerNuevoCorrelativo(agencia) {
+      // Buscar el correlativo más alto para esta agencia
+      const q = query(
+        collection(db, "movimientosCaja"),
+        where("agencia", "==", agencia),
+        orderBy("correlativo", "desc"),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const mayor = snap.docs[0].data().correlativo || 0;
+        return mayor + 1;
+      } else {
+        return 1; // Primer movimiento para esa agencia
+      }
+    }
+
     document.getElementById("movimiento").addEventListener("change", function() {
       const mov = this.value;
       if (mov === "Abono a fechas anteriores") {
@@ -230,20 +243,16 @@
       }
     });
 
-    // Validación y registro
     document.getElementById("form-mov-caja").onsubmit = async function(e) {
       e.preventDefault();
-      // Si es abono especial, no hace submit normal
       if (document.getElementById("movimiento").value === "Abono a fechas anteriores") {
         return;
       }
-      // Limpia errores previos
       document.getElementById("movimiento-error").style.display = "none";
       document.getElementById("monto-error").style.display = "none";
       document.getElementById("nombre-error").style.display = "none";
       document.getElementById("ok-msg").style.display = "none";
 
-      // Valida movimiento
       const movimientoSel = document.getElementById("movimiento").value;
       const montoSel = document.getElementById("monto").value;
       const nombreSel = document.getElementById("nombre").value.trim();
@@ -266,9 +275,10 @@
       }
       const optionSel = document.querySelector(`#movimiento option[value="${movimientoSel}"]`);
       const tipoReal = optionSel ? optionSel.getAttribute("data-tipo") : "Ingreso";
-
-      // Fecha del movimiento (al momento de registrar)
       fechaMovimientoActual = getFechaLocalStr();
+
+      // === CORRELATIVO ===
+      let correlativo = await obtenerNuevoCorrelativo(userAgencia);
 
       // Registro en Firestore
       await addDoc(collection(db, "movimientosCaja"), {
@@ -280,10 +290,11 @@
         usuario: usuarioActual,
         agencia: userAgencia,
         nombre: tiposConNombre.includes(movimientoSel) ? nombreSel : "",
+        correlativo: correlativo
       });
 
-      // Mostrar comprobante solo si NO es "Abono a fechas anteriores"
       mostrarComprobante({
+        correlativo: correlativo,
         tipo: movimientoSel,
         nombre: tiposConNombre.includes(movimientoSel) ? nombreSel : "",
         monto: montoSel,
@@ -293,21 +304,19 @@
         obs: observaciones,
       });
 
-      // Reset
       document.getElementById("ok-msg").textContent = "Movimiento registrado exitosamente";
       document.getElementById("ok-msg").style.display = "block";
       document.getElementById("form-mov-caja").reset();
       document.getElementById("fecha-row").textContent = "Fecha: " + getFechaLocalStr();
       document.getElementById("div-nombre").style.display = "none";
 
-      // Oculta mensaje después de unos segundos (si lo quieres)
       setTimeout(() => {
         document.getElementById("ok-msg").style.display = "none";
       }, 2500);
     };
 
-    // Mostrar comprobante en el div
     function mostrarComprobante(data) {
+      document.getElementById("c-correlativo").textContent = data.correlativo || "-";
       document.getElementById("c-tipo").textContent = data.tipo;
       if (data.nombre) {
         document.getElementById("row-c-nombre").style.display = "block";

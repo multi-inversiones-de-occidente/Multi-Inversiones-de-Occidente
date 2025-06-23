@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Master de Créditos</title>
-  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -26,25 +25,48 @@
 
     let creditos = [];
     let filtered = [];
-    let departamento = ""; // Se obtiene del usuario Firestore
+    let departamento = "";
+
+    // Utilidad para mostrar mensajes o estados
+    function setStatus(msg, color = "#aaa") {
+      const el = document.getElementById("status-msg");
+      el.textContent = msg;
+      el.style.color = color;
+      el.style.display = "block";
+    }
+    function clearStatus() {
+      const el = document.getElementById("status-msg");
+      el.textContent = "";
+      el.style.display = "none";
+    }
 
     async function loadCreditos() {
-      document.getElementById("lista-creditos").innerHTML = `<div class="loader"></div>`;
+      setStatus("Cargando créditos...");
+      document.getElementById("lista-creditos").innerHTML = "";
       if (!departamento) {
-        document.getElementById("lista-creditos").innerHTML = `<div class="no-data">No tienes departamento asignado.</div>`;
+        setStatus("No tienes departamento asignado.", "#FFD600");
         return;
       }
-      const q = query(collection(db, "creditos"), where("agenciaAsignada", "==", departamento));
-      const querySnapshot = await getDocs(q);
-      creditos = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      filtered = [...creditos];
-      renderCreditos();
+      try {
+        const q = query(collection(db, "creditos"), where("agenciaAsignada", "==", departamento));
+        const querySnapshot = await getDocs(q);
+        creditos = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        filtered = [...creditos];
+        renderCreditos();
+        clearStatus();
+        if (filtered.length === 0) {
+          setStatus("No se encontraron créditos en tu agencia.", "#FFD600");
+        }
+      } catch (e) {
+        setStatus("Error al cargar créditos o permisos insuficientes.", "#FF6B6B");
+        console.error(e);
+      }
     }
 
     function renderCreditos() {
       const cont = document.getElementById("lista-creditos");
       if (filtered.length === 0) {
-        cont.innerHTML = `<div class="no-data">No se encontraron créditos.</div>`;
+        cont.innerHTML = ""; // El mensaje de "no data" se pone arriba
         return;
       }
       cont.innerHTML = filtered.map(credito => `
@@ -63,8 +85,7 @@
     }
 
     window.verDetalle = function (creditoId) {
-      // Puedes navegar a una página de detalle con el id
-      // window.location.href = "detalle_master_credito_page.html?id=" + creditoId;
+      // Aquí puedes redirigir a un detalle real
       alert("Ver detalle de crédito: " + creditoId);
     };
 
@@ -77,6 +98,11 @@
         return nombre.includes(term) || apellido.includes(term) || dui.includes(term);
       });
       renderCreditos();
+      if (filtered.length === 0) {
+        setStatus("No se encontraron créditos con ese criterio.", "#FFD600");
+      } else {
+        clearStatus();
+      }
     }
 
     window.addEventListener("DOMContentLoaded", () => {
@@ -87,11 +113,11 @@
         }
         // Sacar departamento del usuario Firestore
         const userDoc = await getDoc(doc(db, "users", user.uid));
-        departamento = userDoc.exists() ? userDoc.data().department : "";
+        departamento = userDoc.exists() ? (userDoc.data().department || "") : "";
         document.getElementById("usuario-nombre").textContent = user.email + (departamento ? " – " + departamento : "");
         document.querySelector(".main-card").style.display = "";
-        loadCreditos();
         document.getElementById("search-input").addEventListener("input", applySearch);
+        await loadCreditos();
       });
     });
   </script>
@@ -131,7 +157,7 @@
     }
     .searchbox {
       width: 100%;
-      margin-bottom: 28px;
+      margin-bottom: 14px;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -150,9 +176,16 @@
     }
     .searchbox input::placeholder { color: #cccc; }
     .icon-search { color: #aaa; font-size: 1.28rem; }
+    #status-msg {
+      text-align: center;
+      font-size: 1.05rem;
+      margin-bottom: 18px;
+      color: #aaa;
+      display: none;
+    }
     #lista-creditos { margin-top: 4px; }
     .loader {
-      margin: 64px auto 32px auto;
+      margin: 44px auto 32px auto;
       border: 4px solid #222;
       border-top: 4px solid #ffbb00;
       border-radius: 50%;
@@ -212,6 +245,7 @@
       <span class="icon-search">🔍</span>
       <input id="search-input" placeholder="Buscar por nombre, apellido o DUI..." autocomplete="off" />
     </div>
+    <div id="status-msg"></div>
     <div id="lista-creditos"></div>
   </div>
 </body>

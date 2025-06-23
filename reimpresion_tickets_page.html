@@ -1,55 +1,147 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8"/>
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Reimpresión de Tickets – Multi Inversiones</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body { background: #101212; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
-    header { background: #000; padding: 1rem 0; text-align: center; font-size: 1.45rem; letter-spacing: 1px; font-weight: 700; color: #67C8F1;}
-    .container { max-width: 480px; margin: 2.7rem auto 0 auto; background: #181b23; border-radius: 19px; box-shadow: 0 2px 25px #0005; padding: 2.2rem 1.7rem 2rem 1.7rem;}
-    .titulo { font-size: 1.4rem; font-weight: bold; margin-bottom: 10px;}
-    .input-main { width: 100%; background: #23272c; color: #fff; border: 1.7px solid #3c3f43; border-radius: 10px; font-size: 1.16rem; padding: 12px 14px; margin-bottom: 1.2em; outline: none;}
-    .btn-main { width: 100%; background: #13b66b; color: #fff; border: none; border-radius: 9px; font-size: 1.13rem; font-weight: 600; padding: 13px 0; cursor: pointer; margin-bottom: 0.7em; transition: background .17s;}
-    .btn-main:active, .btn-main:hover { background: #0b854c;}
-    .error { color: #e74c3c; font-size: 1.07rem; margin-bottom: 12px; text-align: center;}
-    .success { color: #13b66b; text-align: center; font-weight: bold; margin-bottom: 18px; font-size: 1.13rem;}
-    /* Ticket estilos */
-    .ticket-box { background: #fff; color: #232323; max-width: 440px; margin: 28px auto 0 auto; border-radius: 13px; box-shadow: 0 2px 25px #0004; padding: 2.4rem 1.7rem 1.5rem 1.7rem;}
-    .ticket-title { font-size: 1.28rem; color: #13b66b; font-weight: bold; margin-bottom: 8px; text-align: center; letter-spacing: 1px;}
-    .ticket-header { text-align: center; margin-bottom: 12px;}
-    .ticket-logo { height: 54px; margin-bottom: 10px; margin-top: 5px;}
-    .ticket-details { font-size: 1rem; margin-bottom: 11px;}
-    .detail-row { display: flex; justify-content: space-between; font-size: 1.03rem; margin-bottom: 3px; font-weight: 500;}
-    .detail-row strong { color: #222; min-width: 110px; font-weight: 700;}
-    .divider { border: none; border-top: 1.3px solid #eee; margin: 10px 0 12px 0;}
-    .final-msg { color: #13b66b; font-weight: 700; text-align: center; font-size: 1.07rem; margin-top: 14px;}
-    .btn-imprimir { display: block; margin: 0 auto 18px auto; padding: 12px 28px; background: #f8af40; color: #232323; font-size: 1.08rem; font-weight: bold; border: none; border-radius: 11px; cursor: pointer; box-shadow: 0 1px 10px #f8af4045; transition: background .17s; letter-spacing: .5px;}
-    .btn-imprimir:hover { background: #ffa600; color: #222; }
-    @media (max-width: 540px) { .container, .ticket-box { max-width: 98vw; padding: 1.2rem 2vw; } .ticket-title { font-size: 1.12rem;} }
-    @media print {
-      body, html { background: #fff !important; margin: 0 !important; padding: 0 !important; }
-      header, .container, .btn-imprimir, .btn-main { display: none !important; }
-      .ticket-box { box-shadow: none !important; margin: 0 !important; border-radius: 0 !important; background: #fff !important; width: 100vw !important; max-width: 100vw !important; min-width: 0 !important; padding: 0.7cm 0.5cm !important; }
+    body {
+      background: #111314;
+      color: #fff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+    }
+    header {
+      background: #191b21;
+      padding: 1.25rem 0 1.25rem 0;
+      text-align: center;
+      font-size: 1.7rem;
+      letter-spacing: 1px;
+      font-weight: 800;
+      color: #ffe37a;
+      margin-bottom: 2.5rem;
+    }
+    .center-card {
+      max-width: 400px;
+      margin: 44px auto 0 auto;
+      background: #17191c;
+      border-radius: 18px;
+      box-shadow: 0 6px 32px #0005;
+      padding: 2.2rem 1.5rem 2.4rem 1.5rem;
+      min-height: 260px;
+      text-align: center;
+    }
+    .titulo-buscar {
+      font-size: 1.18rem;
+      font-weight: bold;
+      margin-bottom: 18px;
+      letter-spacing: .5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #fff;
+    }
+    .input-main {
+      width: 100%;
+      background: #262a31;
+      color: #fff;
+      border: 1.5px solid #32353b;
+      border-radius: 10px;
+      font-size: 1.07rem;
+      padding: 13px 12px;
+      margin-bottom: 1em;
+      outline: none;
+      box-sizing: border-box;
+      font-weight: 500;
+      letter-spacing: 1px;
+      transition: border-color .18s;
+    }
+    .input-main:focus { border-color: #FFD600; }
+    .btn-main {
+      width: 100%;
+      background: #13b66b;
+      color: #fff;
+      font-size: 1.11rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 9px;
+      padding: 13px 0;
+      cursor: pointer;
+      margin-top: 0.7em;
+      transition: background .17s;
+    }
+    .btn-main:active,
+    .btn-main:hover { background: #0b854c; }
+    .ticket-box {
+      margin-top: 35px;
+    }
+    .ticket-header {
+      font-size: 1.12rem;
+      color: #13b66b;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .ticket-details {
+      background: #fff;
+      color: #181818;
+      border-radius: 10px;
+      padding: 16px 15px 16px 15px;
+      box-shadow: 0 2px 12px #0003;
+      text-align: left;
+      font-size: 1.03rem;
+      margin-bottom: 22px;
+    }
+    .ticket-details strong { color: #111; min-width: 110px; display: inline-block; }
+    .btn-imprimir {
+      display: block;
+      margin: 0 auto 0 auto;
+      padding: 12px 28px;
+      background: #f8af40;
+      color: #232323;
+      font-size: 1.04rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 1px 10px #f8af4045;
+      transition: background .17s;
+      text-align: center;
+      margin-top: 6px;
+    }
+    .btn-imprimir:hover {
+      background: #ffd600;
+      color: #232323;
+    }
+    .error-msg {
+      color: #ff6363;
+      font-weight: bold;
+      margin-top: 18px;
+      font-size: 1.08rem;
+    }
+    @media (max-width: 540px) {
+      .center-card { max-width: 97vw; padding: 1.1rem 2vw;}
     }
   </style>
 </head>
 <body>
   <header>Reimpresión de Tickets</header>
-  <div class="container">
-    <div class="titulo"><i class="fas fa-search"></i> Buscar Ticket por Correlativo</div>
-    <form id="form-buscar" autocomplete="off">
-      <input id="correlativo" class="input-main" type="text" maxlength="40" placeholder="Ingrese el correlativo del ticket..." required />
-      <button type="submit" class="btn-main"><i class="fas fa-search"></i> Buscar Ticket</button>
-      <div id="msg-error" class="error" style="display:none;"></div>
+  <div class="center-card">
+    <form id="formBuscarTicket" autocomplete="off">
+      <div class="titulo-buscar">
+        <i class="fas fa-search"></i> Buscar Ticket por Correlativo
+      </div>
+      <input type="text" class="input-main" id="input-correlativo" placeholder="Correlativo..." maxlength="15" required />
+      <button class="btn-main" type="submit"><i class="fas fa-search"></i> Buscar Ticket</button>
     </form>
-    <div id="ticket-result"></div>
+    <div id="ticket-container" class="ticket-box"></div>
+    <div id="error-msg" class="error-msg" style="display:none"></div>
   </div>
-
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
@@ -60,133 +152,108 @@
       appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
       measurementId: "G-H4E31XHG1Y"
     };
+
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const auth = getAuth(app);
 
-    const formBuscar = document.getElementById("form-buscar");
-    const ticketResult = document.getElementById("ticket-result");
-    const msgError = document.getElementById("msg-error");
+    // Debes esperar la autenticación ANTES de dejar buscar tickets
+    let usuarioListo = false;
+    let usuario = null;
 
-    function formatoFecha(fechaISO) {
-      if (!fechaISO) return '';
-      const fecha = new Date(fechaISO);
-      if (isNaN(fecha.getTime())) return fechaISO;
-      return fecha.toLocaleString('es-SV', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        hour12: true
-      });
-    }
+    onAuthStateChanged(auth, user => {
+      if (!user) {
+        window.location.href = "login.html";
+      } else {
+        usuarioListo = true;
+        usuario = user;
+      }
+    });
 
-    formBuscar.onsubmit = async function(e) {
+    document.getElementById('formBuscarTicket').onsubmit = async function(e) {
       e.preventDefault();
-      ticketResult.innerHTML = "";
-      msgError.style.display = "none";
-      const correlativo = document.getElementById("correlativo").value.trim();
+      if (!usuarioListo) {
+        document.getElementById("error-msg").textContent = "Espera a que se inicie sesión...";
+        document.getElementById("error-msg").style.display = "block";
+        return;
+      }
+      document.getElementById("error-msg").style.display = "none";
+      document.getElementById("ticket-container").innerHTML = "";
 
+      const correlativo = document.getElementById('input-correlativo').value.trim();
       if (!correlativo) return;
 
-      let ticketData = null;
-      let tipoTicket = "";
-      let coleccionOrigen = "";
-
-      // 1. Buscar en pagos
-      let pagosSnap = await getDocs(query(collection(db, "pagos"), where("correlativo", "==", correlativo)));
+      let ticket = null;
+      // Busca en pagos
+      const pagosQuery = query(collection(db, "pagos"), where("correlativo", "==", correlativo));
+      const pagosSnap = await getDocs(pagosQuery);
       if (!pagosSnap.empty) {
-        ticketData = pagosSnap.docs[0].data();
-        tipoTicket = "pago";
-        coleccionOrigen = "pagos";
+        ticket = { ...pagosSnap.docs[0].data(), tipo: "pago" };
       }
-      // 2. Buscar en movimientosCaja si no se encontró
-      if (!ticketData) {
-        let movSnap = await getDocs(query(collection(db, "movimientosCaja"), where("correlativo", "==", correlativo)));
-        if (!movSnap.empty) {
-          ticketData = movSnap.docs[0].data();
-          tipoTicket = "movimiento";
-          coleccionOrigen = "movimientosCaja";
-        }
-      }
-      // 3. Buscar en movimientos_caja si no se encontró
-      if (!ticketData) {
-        let movSnap2 = await getDocs(query(collection(db, "movimientos_caja"), where("correlativo", "==", correlativo)));
-        if (!movSnap2.empty) {
-          ticketData = movSnap2.docs[0].data();
-          tipoTicket = "movimiento";
-          coleccionOrigen = "movimientos_caja";
+
+      // Si no en pagos, busca en movimientosCaja
+      if (!ticket) {
+        const movCajaQuery = query(collection(db, "movimientosCaja"), where("correlativo", "==", correlativo));
+        const movCajaSnap = await getDocs(movCajaQuery);
+        if (!movCajaSnap.empty) {
+          ticket = { ...movCajaSnap.docs[0].data(), tipo: "movimientoCaja" };
         }
       }
 
-      if (!ticketData) {
-        msgError.textContent = "No se encontró ningún ticket con ese correlativo.";
-        msgError.style.display = "block";
+      // Si no en movimientos_caja (con guión bajo)
+      if (!ticket) {
+        const movCaja2Query = query(collection(db, "movimientos_caja"), where("correlativo", "==", correlativo));
+        const movCaja2Snap = await getDocs(movCaja2Query);
+        if (!movCaja2Snap.empty) {
+          ticket = { ...movCaja2Snap.docs[0].data(), tipo: "movimientoCaja" };
+        }
+      }
+
+      if (!ticket) {
+        document.getElementById("error-msg").textContent = "No se encontró ningún ticket con ese correlativo.";
+        document.getElementById("error-msg").style.display = "block";
         return;
       }
 
-      // Mostramos el ticket (según su tipo)
-      ticketResult.innerHTML =
-        tipoTicket === "pago" ?
-          renderTicketPago(ticketData, coleccionOrigen) :
-          renderTicketMovimiento(ticketData, coleccionOrigen);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      // Muestra el ticket de acuerdo al tipo (puedes personalizar esto)
+      let html = '';
+      if (ticket.tipo === "pago") {
+        html = `
+          <div class="ticket-header"><i class="fas fa-receipt"></i> Comprobante de Pago</div>
+          <div class="ticket-details">
+            <div><strong>Correlativo:</strong> ${ticket.correlativo}</div>
+            <div><strong>Cliente:</strong> ${ticket.nombres || ticket.clienteNombre || '-'}</div>
+            <div><strong>Monto Pagado:</strong> $${Number(ticket.montoPagado).toFixed(2)}</div>
+            <div><strong>Pago Capital:</strong> $${Number(ticket.pagoCapital || 0).toFixed(2)}</div>
+            <div><strong>Pago Interés:</strong> $${Number(ticket.pagoInteres || 0).toFixed(2)}</div>
+            <div><strong>Pago Multas:</strong> $${Number(ticket.pagoMultas || 0).toFixed(2)}</div>
+            <div><strong>Saldo Restante:</strong> $${Number(ticket.saldoRestante || 0).toFixed(2)}</div>
+            <div><strong>Fecha:</strong> ${(ticket.fechaPago || ticket.timestamp || '-').toString().slice(0,19).replace('T',' ')}</div>
+            <div><strong>Agencia:</strong> ${ticket.sucursal || ticket.agencia || '-'}</div>
+          </div>
+          <button class="btn-imprimir" onclick="window.print()"><i class="fas fa-print"></i> Imprimir Ticket</button>
+        `;
+      } else {
+        // Movimiento de caja
+        html = `
+          <div class="ticket-header"><i class="fas fa-receipt"></i> Comprobante de Movimiento de Caja</div>
+          <div class="ticket-details">
+            <div><strong>Correlativo:</strong> ${ticket.correlativo}</div>
+            <div><strong>Tipo:</strong> ${ticket.descripcion || ticket.tipo || '-'}</div>
+            <div><strong>Nombre:</strong> ${ticket.nombre || '-'}</div>
+            <div><strong>Monto:</strong> $${Number(ticket.monto || 0).toFixed(2)}</div>
+            <div><strong>Usuario:</strong> ${ticket.usuario || '-'}</div>
+            <div><strong>Fecha:</strong> ${(ticket.fecha || ticket.timestamp || '-').toString().slice(0,19).replace('T',' ')}</div>
+            <div><strong>Agencia:</strong> ${ticket.agencia || '-'}</div>
+            <div><strong>Observaciones:</strong> ${ticket.observaciones || '-'}</div>
+          </div>
+          <button class="btn-imprimir" onclick="window.print()"><i class="fas fa-print"></i> Imprimir Ticket</button>
+        `;
+      }
+
+      document.getElementById("ticket-container").innerHTML = html;
     };
-
-    function renderTicketPago(data, origen) {
-      return `
-      <div class="ticket-box" id="ticket-print">
-        <button class="btn-imprimir" onclick="window.print()"><i class="fas fa-print"></i> Imprimir Ticket</button>
-        <div class="ticket-header">
-          <img src="assets/logo_mi_bw.png" class="ticket-logo" alt="Multi Inversiones"/>
-          <div style="font-size:1rem;color:#13b66b;font-weight:600;">
-            Multi Inversiones de Occidente
-          </div>
-          <div style="color:#444;font-size:0.93rem;">
-            Llama al 6991-9989 – Credicash, aprobado en 20 minutos
-          </div>
-        </div>
-        <div class="ticket-title">
-          <i class="fas fa-receipt"></i> Comprobante de Pago
-        </div>
-        <div class="ticket-details">
-          <div class="detail-row"><strong>Ticket No.:</strong> <span>${data.correlativo || ''}</span></div>
-          <div class="detail-row"><strong>Agencia:</strong> <span>${data.agencia || '-'}</span></div>
-          <div class="detail-row"><strong>Fecha y Hora:</strong> <span>${formatoFecha(data.fecha)}</span></div>
-          <div class="detail-row"><strong>Cliente:</strong> <span>${data.cliente || '-'}</span></div>
-          <div class="detail-row"><strong>Monto Pagado:</strong> $<span>${Number(data.monto || 0).toFixed(2)}</span></div>
-          <div class="detail-row"><strong>Pago Capital:</strong> $<span>${Number(data.pagoCapital || 0).toFixed(2)}</span></div>
-          <div class="detail-row"><strong>Pago Interés:</strong> $<span>${Number(data.pagoInteres || 0).toFixed(2)}</span></div>
-          <div class="detail-row"><strong>Pago Multas:</strong> $<span>${Number(data.pagoMultas || 0).toFixed(2)}</span></div>
-          <div class="detail-row"><strong>Saldo Restante:</strong> $<span>${Number(data.saldoRestante || 0).toFixed(2)}</span></div>
-        </div>
-        <hr class="divider"/>
-        <div class="final-msg">¡Gracias por su pago!</div>
-        <div style="text-align:right;color:#888;font-size:.99em;">Colección: <b>${origen}</b></div>
-      </div>
-      `;
-    }
-
-    function renderTicketMovimiento(data, origen) {
-      return `
-      <div class="ticket-box" id="ticket-print">
-        <button class="btn-imprimir" onclick="window.print()"><i class="fas fa-print"></i> Imprimir Ticket</button>
-        <div class="ticket-title">
-          <i class="fas fa-cash-register"></i> Comprobante de Movimiento de Caja
-        </div>
-        <div class="ticket-details">
-          <div class="detail-row"><strong>Ticket No.:</strong> <span>${data.correlativo || '-'}</span></div>
-          <div class="detail-row"><strong>Tipo de Movimiento:</strong> <span>${data.descripcion || data.tipo || '-'}</span></div>
-          ${data.nombre ? `<div class="detail-row"><strong>Nombre:</strong> <span>${data.nombre}</span></div>` : ""}
-          <div class="detail-row"><strong>Monto:</strong> $<span>${Number(data.monto || 0).toFixed(2)}</span></div>
-          <div class="detail-row"><strong>Fecha:</strong> <span>${formatoFecha(data.fecha)}</span></div>
-          <div class="detail-row"><strong>Usuario:</strong> <span>${data.usuario || '-'}</span></div>
-          <div class="detail-row"><strong>Agencia:</strong> <span>${data.agencia || '-'}</span></div>
-          <div class="detail-row"><strong>Observaciones:</strong> <span>${data.observaciones || '—'}</span></div>
-        </div>
-        <hr class="divider"/>
-        <div class="final-msg">¡Movimiento registrado exitosamente!</div>
-        <div style="text-align:right;color:#888;font-size:.99em;">Colección: <b>${origen}</b></div>
-      </div>
-      `;
-    }
   </script>
 </body>
 </html>
+

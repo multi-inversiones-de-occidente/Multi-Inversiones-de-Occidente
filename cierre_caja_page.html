@@ -185,6 +185,14 @@
         </div>`;
     }
 
+    // ---- FUNCION NATIVA SHA256 ----
+    async function sha256(str) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(str);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
     async function cerrarCajaDelDia() {
       if (!fechaSeleccionada) return alert("Selecciona un día válido");
       if (movimientosDelDia.length === 0) return alert("No hay movimientos para este día.");
@@ -192,9 +200,9 @@
       // PIN
       const pin = prompt("Por seguridad, ingresa tu PIN de gerente:");
       if (!pin) return;
-      // Verificar hash de PIN
-      const shaObj = await import('https://cdn.jsdelivr.net/npm/js-sha256@0.9.0/build/sha256.min.js');
-      const pinHash = shaObj.sha256(pin);
+
+      // Verificar hash de PIN usando función nativa
+      const pinHash = await sha256(pin);
 
       // Verificar PIN
       const gerenteSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", gerenteId)));
@@ -329,4 +337,5 @@
   </div>
 </body>
 </html>
+
 

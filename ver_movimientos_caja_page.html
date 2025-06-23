@@ -39,7 +39,7 @@
   <!-- Firebase y lógica -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -63,21 +63,53 @@
       const d = new Date(fechaIso);
       return d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true });
     }
+    function toIsoStr(date) {
+      return date.toISOString().slice(0,10);
+    }
 
     // Estado
     let selectedDate = new Date();
+    let agenciaActual = "";
 
     // Renderiza fecha
     function renderFecha() {
       document.getElementById("fecha-label").textContent = "Fecha: " + formatFecha(selectedDate);
     }
 
+    // Obtener saldo del último cierre antes del día seleccionado
+    async function obtenerSaldoAnterior(agencia, fecha) {
+      const cierresRef = collection(db, "cierres_caja");
+      const fechaStr = fecha.toISOString().slice(0,10); // YYYY-MM-DD del día seleccionado
+      // Busca el último cierre ANTES de la fecha seleccionada
+      const q = query(
+        cierresRef,
+        where("agencia", "==", agencia),
+        where("fecha", "<", fechaStr), // anterior al día seleccionado
+        orderBy("fecha", "desc"),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        return Number(snap.docs[0].data().saldo_caja || 0);
+      }
+      return 0;
+    }
+
     // Cargar movimientos
-    async function cargarMovimientos() {
+    async function cargarMovimientos(user) {
       const listDiv = document.getElementById("movimientos-list");
       const totalDiv = document.getElementById("total-caja");
       listDiv.innerHTML = "Cargando...";
       totalDiv.textContent = "";
+
+      // Obtener agencia del usuario logeado
+      if (!agenciaActual) {
+        // Puedes obtener de tu sistema, aquí asumo campo "department" en users
+        const docUser = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
+        if (!docUser.empty) {
+          agenciaActual = docUser.docs[0].data().department || "";
+        }
+      }
 
       // Rango del día
       const y = selectedDate.getFullYear(), m = selectedDate.getMonth(), d = selectedDate.getDate();
@@ -88,10 +120,11 @@
 
       let movimientos = [];
 
-      // 1. Movimientos manuales
+      // 1. Movimientos manuales (solo de esa agencia)
       const movSnap = await getDocs(
         query(
           collection(db, "movimientosCaja"),
+          where("agencia", "==", agenciaActual),
           where("fecha", ">=", startIso),
           where("fecha", "<=", endIso)
         )
@@ -109,10 +142,11 @@
         });
       });
 
-      // 2. Pagos
+      // 2. Pagos (sólo de esa agencia si tienes el campo)
       const pagoSnap = await getDocs(
         query(
           collection(db, "pagos"),
+          where("agencia", "==", agenciaActual),
           where("fechaPago", ">=", startIso),
           where("fechaPago", "<=", endIso)
         )
@@ -133,12 +167,19 @@
       // Ordenar por hora descendente
       movimientos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
-      // Calcula total
-      let total = 0.0;
+      // === Aquí aplicamos la lógica de saldo anterior ===
+      // 1. Obtener saldo anterior de cierres de caja
+      const saldoAnterior = await obtenerSaldoAnterior(agenciaActual, selectedDate);
+
+      // 2. Calcula total del día
+      let totalIngresos = 0.0;
+      let totalEgresos = 0.0;
       movimientos.forEach(mov => {
-        if (mov.tipo === "Ingreso") total += mov.monto;
-        else total -= mov.monto;
+        if (mov.tipo === "Ingreso") totalIngresos += mov.monto;
+        else totalEgresos += mov.monto;
       });
+
+      const total = saldoAnterior + totalIngresos - totalEgresos;
 
       // Renderiza lista
       if (movimientos.length === 0) {
@@ -154,12 +195,18 @@
           </div>
         `).join('');
       }
-      totalDiv.textContent = "Total de Caja: $" + total.toFixed(2);
+      totalDiv.innerHTML = `
+        <div style="font-size:1.12rem;font-weight:400;margin-bottom:4px;">
+          <b style="color:#2ef37a;">Saldo Anterior: $${saldoAnterior.toFixed(2)}</b>
+        </div>
+        <div>
+          <b style="color:#fff;">Total de Caja: $${total.toFixed(2)}</b>
+        </div>
+      `;
     }
 
     // Cambiar fecha
     document.getElementById("fecha-btn").onclick = async function() {
-      // Simple picker para web: prompt
       const val = prompt("Ingrese la fecha en formato DD/MM/AAAA", formatFecha(selectedDate));
       if (!val) return;
       const [d, m, y] = val.split('/');
@@ -170,14 +217,17 @@
       }
       selectedDate = parsed;
       renderFecha();
-      cargarMovimientos();
+      // Espera usuario logeado para recargar movimientos
+      onAuthStateChanged(auth, user => {
+        if (user) cargarMovimientos(user);
+      });
     };
 
     // Carga inicial tras login
     onAuthStateChanged(auth, user => {
       if (!user) return location.href = "login.html";
       renderFecha();
-      cargarMovimientos();
+      cargarMovimientos(user);
     });
   </script>
 </body>

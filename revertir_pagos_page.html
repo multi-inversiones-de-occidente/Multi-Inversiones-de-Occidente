@@ -207,7 +207,7 @@
   <!-- Firebase & lógica -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, doc, getDoc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, doc, getDoc, updateDoc, addDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -224,7 +224,6 @@
     const auth = getAuth(app);
 
     let pagoDoc = null, pagoData = null, userId = null;
-    let isReverting = false;
 
     // --- PIN GERENTE MODAL ---
     function showGerentePinDialog() {
@@ -240,9 +239,8 @@
             return;
           }
           // Hash SHA256 (simple, solo en frontend para demo)
-          const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pinValue));
-          const hashHex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
-
+          const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pinValue));
+          const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
           // Buscar gerente
           const q = query(collection(db, "users"), where("rol", "==", "gerente"));
           const snap = await getDocs(q);
@@ -356,7 +354,7 @@
       document.getElementById("revertir-btn").onclick = revertirPago;
     }
 
-    // --- Revertir Pago ---
+    // --- Lógica robusta de reversión de pago ---
     async function revertirPago() {
       if (!pagoData || pagoData.anulado) return;
       const motivo = document.getElementById("motivo").value.trim();
@@ -365,13 +363,11 @@
         document.getElementById("motivo").focus();
         return;
       }
-
-      // Bloquea botón
       const btn = document.getElementById("revertir-btn");
       btn.disabled = true;
       btn.innerHTML = `<span class="spinner"></span> Revirtiendo...`;
 
-      // 1. Validación de gerente
+      // 1. Validación gerente
       const autorizado = await showGerentePinDialog();
       if (!autorizado) {
         btn.disabled = false;
@@ -379,8 +375,7 @@
         return;
       }
 
-      // 2. Validaciones extra
-      // Verifica pagos posteriores
+      // 2. Validaciones extra (pagos posteriores)
       const posterioresQ = query(
         collection(db, "pagos"),
         where("creditoID", "==", pagoData.creditoID),
@@ -394,7 +389,7 @@
         return;
       }
 
-      // 3. Obtener y restaurar crédito
+      // 3. Restaurar el crédito
       const creditoRef = doc(db, "creditos", pagoData.creditoID);
       const creditoSnap = await getDoc(creditoRef);
       if (!creditoSnap.exists()) {
@@ -404,18 +399,54 @@
         return;
       }
       const credito = creditoSnap.data();
-      const nuevoCapital = parseFloat(credito.saldoActual) + parseFloat(pagoData.pagoCapital);
-      const nuevoInteres = parseFloat(credito.interesActual) + parseFloat(pagoData.pagoInteres);
-      const nuevasMultas = parseFloat(credito.multasAcumuladas) + parseFloat(pagoData.pagoMultas);
 
+      let saldoActual = parseFloat(credito.saldoActual || "0");
+      let interesActual = parseFloat(credito.interesActual || "0");
+      let multasAcumuladas = parseFloat(credito.multasAcumuladas || "0");
+      let paraPonerseAlDia = parseFloat(credito.paraPonerseAlDia || "0");
+
+      saldoActual += parseFloat(pagoData.pagoCapital || "0");
+      interesActual += parseFloat(pagoData.pagoInteres || "0");
+      multasAcumuladas += parseFloat(pagoData.pagoMultas || "0");
+      paraPonerseAlDia += parseFloat(pagoData.montoPagado || "0");
+
+      // Tabla de amortización: restaurar cuotas
+      let nuevaAmortizacion = Array.isArray(credito.amortizacion) ? [...credito.amortizacion] : [];
+      if (Array.isArray(nuevaAmortizacion) && nuevaAmortizacion.length > 0 && pagoData.pagoCapital) {
+        let montoRestante = parseFloat(pagoData.pagoCapital || "0");
+        // Recorre de atrás para adelante para revertir la última cuota pagada (comportamiento estándar)
+        for (let i = nuevaAmortizacion.length - 1; i >= 0 && montoRestante > 0; i--) {
+          let cuota = nuevaAmortizacion[i];
+          let pagado = parseFloat(cuota.montoPagado || "0");
+          if (pagado > 0) {
+            if (pagado <= montoRestante) {
+              // Quita el pago total de esta cuota
+              montoRestante -= pagado;
+              cuota.montoPagado = 0;
+              cuota.estado = "Pendiente";
+              cuota.fechaPagoReal = null;
+            } else {
+              // Quita solo una parte
+              cuota.montoPagado = pagado - montoRestante;
+              cuota.estado = "Parcial";
+              cuota.fechaPagoReal = null;
+              montoRestante = 0;
+            }
+          }
+        }
+      }
+
+      // 4. Actualiza el crédito
       await updateDoc(creditoRef, {
-        saldoActual: nuevoCapital.toFixed(2),
-        interesActual: nuevoInteres.toFixed(2),
-        multasAcumuladas: nuevasMultas.toFixed(2),
-        estadoCredito: 'Activo',
+        saldoActual: saldoActual.toFixed(2),
+        interesActual: interesActual.toFixed(2),
+        multasAcumuladas: multasAcumuladas.toFixed(2),
+        paraPonerseAlDia: paraPonerseAlDia.toFixed(2),
+        estadoCredito: "Activo",
+        amortizacion: nuevaAmortizacion
       });
 
-      // 4. Marca pago como anulado y log de reversa
+      // 5. Marca pago como anulado y log
       await updateDoc(doc(db, "pagos", pagoDoc.id), {
         anulado: true,
         fechaReversion: new Date().toISOString(),
@@ -423,10 +454,10 @@
         motivoReversion: motivo,
       });
 
-      // 5. Registra egreso en caja
+      // 6. Registra egreso en caja
       await addDoc(collection(db, "movimientos_caja"), {
         tipoMovimiento: 'Egreso',
-        monto: -parseFloat(pagoData.montoPagado),
+        monto: -parseFloat(pagoData.montoPagado || "0"),
         fecha: new Date().toISOString(),
         referencia: 'Reversión de pago ' + pagoDoc.id,
         usuarioID: userId,
@@ -434,7 +465,6 @@
 
       btn.disabled = false;
       btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
-
       showSuccessDialog("El pago fue reversado correctamente.");
     }
 
@@ -449,3 +479,4 @@
   </script>
 </body>
 </html>
+

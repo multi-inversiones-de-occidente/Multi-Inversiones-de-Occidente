@@ -31,42 +31,31 @@
       Esta opción permite registrar un abono en una fecha anterior a la actual. <br>
       <b>Solo personal autorizado puede hacer esta operación.</b> Por seguridad, deberás ingresar el motivo y el PIN de gerente.
     </div>
-
     <!-- Buscar Cliente -->
     <label class="label" for="busqueda">Buscar cliente por nombre o DUI</label>
     <input id="busqueda" class="input-main" type="text" placeholder="Escribe el nombre o DUI..." autocomplete="off"/>
-
     <!-- Lista de créditos filtrados -->
     <div id="lista-creditos" class="list-group"></div>
-
     <!-- Selección de fecha -->
     <div id="seleccion-fecha" style="display:none;">
       <label class="label" for="fecha-abono">Selecciona la fecha del abono</label>
       <input id="fecha-abono" type="date" class="input-main"/>
     </div>
-
     <!-- Simulación histórica -->
-    <div id="simulacion-block" class="sim-block" style="display:none;">
-      <!-- Aquí se muestra la simulación -->
-    </div>
-
+    <div id="simulacion-block" class="sim-block" style="display:none;"></div>
     <!-- Formulario de abono -->
     <form id="form-abono" style="display:none;">
       <label class="label" for="monto">Monto del abono ($)</label>
       <input id="monto" class="input-main" type="number" min="0.01" step="0.01" placeholder="0.00" required/>
-
       <label class="label" for="motivo">Motivo del abono (obligatorio)</label>
       <textarea id="motivo" class="input-motivo" placeholder="Motivo del abono..." required></textarea>
-
       <button type="submit" class="btn-main">Registrar Abono a Valor Fecha</button>
       <div id="ok-msg" class="ok-msg" style="display:none;"></div>
     </form>
   </div>
-
-  <!-- Lógica y Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, getDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, getDoc, doc, query, where, updateDoc, Timestamp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -82,7 +71,6 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // Variables globales
     let usuarioActual = "Usuario desconocido";
     let userId = null;
     let userAgencia = "";
@@ -91,43 +79,58 @@
     let fechaSeleccionada = null;
     let historico = null;
 
-    // Al autenticarse, carga los créditos de la agencia del usuario
+    // --- PIN gerente modal ---
+    async function solicitarPinGerente() {
+      return new Promise((resolve) => {
+        let pin = prompt("Ingresa el PIN del gerente para autorizar:");
+        if (!pin) return resolve(false);
+        // Hash SHA256:
+        crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin)).then(hashBuffer => {
+          const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+          getDocs(query(collection(db, "users"), where("rol", "==", "gerente"))).then(snap => {
+            if (snap.empty) return resolve(false);
+            const gerente = snap.docs[0].data();
+            if (gerente.internalPassword === hashHex) resolve(true);
+            else resolve(false);
+          });
+        });
+      });
+    }
+
+    // --- Carga de usuario y créditos ---
     onAuthStateChanged(auth, async user => {
       if (!user) return location.href = "login.html";
       usuarioActual = user.displayName || user.email || "Usuario desconocido";
       userId = user.uid;
-
-      // Obtener agencia (department)
+      // Obtener agencia
       const docUser = await getDoc(doc(db, "users", user.uid));
       userAgencia = docUser.exists() && docUser.data().department ? docUser.data().department : "";
-
       // Cargar créditos agencia
       const q = query(collection(db, "creditos"), where("agenciaAsignada", "==", userAgencia));
       const snap = await getDocs(q);
-      creditosAgencia = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      creditosAgencia = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     });
 
-    // Filtrado en tiempo real
+    // --- Búsqueda de cliente ---
     document.getElementById("busqueda").addEventListener("input", () => {
       const queryTxt = document.getElementById("busqueda").value.toLowerCase();
       const listaDiv = document.getElementById("lista-creditos");
       listaDiv.innerHTML = "";
       if (!queryTxt) return;
-
-      const filtrados = creditosAgencia.filter(credito =>
-        (credito.nombre && credito.nombre.toLowerCase().includes(queryTxt)) ||
-        (credito.numeroDui && credito.numeroDui.includes(queryTxt))
+      const filtrados = creditosAgencia.filter(c =>
+        (c.nombre && c.nombre.toLowerCase().includes(queryTxt)) ||
+        (c.numeroDui && c.numeroDui.includes(queryTxt))
       );
       filtrados.forEach(credito => {
         const div = document.createElement("div");
         div.className = "list-group-item";
         div.textContent = `${credito.nombre} — DUI: ${credito.numeroDui} — Saldo: $${Number(credito.saldoActual || 0).toFixed(2)}`;
-        div.onclick = (event) => seleccionarCredito(credito, event);
+        div.onclick = () => seleccionarCredito(credito);
         listaDiv.appendChild(div);
       });
     });
 
-    function seleccionarCredito(credito, event) {
+    function seleccionarCredito(credito) {
       creditoSeleccionado = credito;
       Array.from(document.getElementsByClassName("list-group-item")).forEach(div => div.classList.remove("selected"));
       event.target.classList.add("selected");
@@ -136,92 +139,174 @@
       document.getElementById("simulacion-block").style.display = "none";
     }
 
-    // Cuando selecciona la fecha
+    // --- Selección de fecha y simulación ---
     document.getElementById("fecha-abono").addEventListener("change", () => {
       fechaSeleccionada = document.getElementById("fecha-abono").value;
       if (!fechaSeleccionada || !creditoSeleccionado) return;
+      mostrarSimulacionHistorica();
+    });
 
-      // -------------------------------
-      // Simulación histórica real aquí:
-      // -------------------------------
-      let fechaApertura = new Date(creditoSeleccionado.fechaInicio || creditoSeleccionado.fecha_apertura);
-      let fechaSim = new Date(fechaSeleccionada + "T23:59:59");
-      let saldoInicial = parseFloat(creditoSeleccionado.saldoInicial || creditoSeleccionado.montoCredito || 0);
-      let tasaDiaria = parseFloat(creditoSeleccionado.tasaDiariaCredito || 0);
-      let saldoActual = saldoInicial;
-      let interesAcumulado = 0;
-      let multasAcumuladas = 0;
-      let paraPonerseAlDia = 0;
-
-      // --- Calculamos los días corridos desde apertura hasta la fecha simulada
-      let dias = Math.floor((fechaSim - fechaApertura) / (1000 * 60 * 60 * 24));
-      dias = dias > 0 ? dias : 0;
-
-      // Calcula el interés total acumulado hasta esa fecha
-      interesAcumulado = saldoInicial * tasaDiaria * dias;
-
-      // Simulación de cuotas vencidas y para ponerse al día
-      let cuotasAtrasadas = 0;
+    // --- Simula el estado del crédito a la fecha seleccionada ---
+    function mostrarSimulacionHistorica() {
+      // Parámetros base
+      const fechaInicio = new Date(creditoSeleccionado.fechaInicio);
+      const fechaAbono = new Date(fechaSeleccionada + "T00:00:00");
+      const amortizacion = JSON.parse(JSON.stringify(creditoSeleccionado.amortizacion || []));
+      let saldo = Number(creditoSeleccionado.saldoInicial || creditoSeleccionado.saldoActual || 0);
+      let interesPendiente = 0;
       let capitalAtrasado = 0;
-      let totalOverdueCuota = 0;
-      let amortizacion = Array.isArray(creditoSeleccionado.amortizacion) ? creditoSeleccionado.amortizacion : [];
+      let cuotasAtrasadas = 0;
+      let multasAcumuladas = Number(creditoSeleccionado.multasAcumuladas || 0);
 
-      amortizacion.forEach(cuota => {
-        let fechaCuota = new Date(cuota.fecha);
-        // Si la cuota está antes de la fecha de simulación y no está pagada
-        if (fechaCuota <= fechaSim && (!cuota.estado || cuota.estado !== "Pagada")) {
-          cuotasAtrasadas += 1;
-          capitalAtrasado += parseFloat(cuota.cuota || 0) - parseFloat(cuota.montoPagado || 0);
-          totalOverdueCuota += parseFloat(cuota.cuota || 0);
+      // Se recorre la tabla de amortización y se simula pagos previos hasta la fecha seleccionada
+      for (let cuota of amortizacion) {
+        const fechaCuota = new Date(cuota.fecha);
+        if (fechaCuota < fechaAbono) {
+          interesPendiente += Number(cuota.interes || 0);
+          capitalAtrasado += Number(cuota.capital || 0);
+          cuotasAtrasadas++;
         }
-      });
+      }
 
-      // Para ponerse al día = suma de capital atrasado + interés hasta esa fecha + multas (si las tienes en la lógica)
-      paraPonerseAlDia = capitalAtrasado + interesAcumulado + multasAcumuladas;
-
+      // Ajustar para el estado actual
       historico = {
-        saldoActual: saldoInicial,
-        interesActual: interesAcumulado,
-        multasAcumuladas: multasAcumuladas,
-        paraPonerseAlDia: paraPonerseAlDia,
-        cuotasAtrasadas: cuotasAtrasadas,
-        capitalAtrasado: capitalAtrasado,
-        totalOverdueCuota: totalOverdueCuota,
+        saldoActual: saldo,
+        interesPendiente,
+        multasAcumuladas,
+        cuotasAtrasadas,
+        capitalAtrasado,
+        fechaAbono: fechaAbono,
+        amortizacion: amortizacion
       };
 
-      let html = `
-        <b>Saldo ese día:</b> $${historico.saldoActual.toFixed(2)}<br>
-        <b>Interés Actual:</b> $${historico.interesActual.toFixed(2)}<br>
-        <b>Multas Acumuladas:</b> $${historico.multasAcumuladas.toFixed(2)}<br>
-        <b>Para Ponerse al Día:</b> $${historico.paraPonerseAlDia.toFixed(2)}<br>
-        <b>Cuotas Atrasadas:</b> ${historico.cuotasAtrasadas}<br>
-        <b>Capital Atrasado:</b> $${historico.capitalAtrasado.toFixed(2)}<br>
-        <b>Total Overdue Cuota:</b> $${historico.totalOverdueCuota.toFixed(2)}
-      `;
+      // Visualiza
+      let html = `<b>Saldo actual ese día:</b> $${saldo.toFixed(2)}<br>
+        <b>Interés pendiente:</b> $${interesPendiente.toFixed(2)}<br>
+        <b>Multas acumuladas:</b> $${multasAcumuladas.toFixed(2)}<br>
+        <b>Cuotas atrasadas:</b> ${cuotasAtrasadas}<br>
+        <b>Capital atrasado:</b> $${capitalAtrasado.toFixed(2)}`;
       document.getElementById("simulacion-block").style.display = "block";
       document.getElementById("simulacion-block").innerHTML = html;
       document.getElementById("form-abono").style.display = "block";
-    });
+    }
 
-    // Registro del abono (dummy, implementa la lógica real de autorización aquí)
+    // --- Registrar el abono retroactivo, actualizando cuotas y saldos ---
     document.getElementById("form-abono").onsubmit = async function(e) {
       e.preventDefault();
-      // Validar campos
       if (!creditoSeleccionado || !fechaSeleccionada) return alert("Selecciona cliente y fecha.");
-      const monto = document.getElementById("monto").value;
+      const monto = Number(document.getElementById("monto").value);
       const motivo = document.getElementById("motivo").value.trim();
       if (!monto || !motivo) return alert("Completa todos los campos.");
 
-      // Aquí deberías solicitar PIN de gerente (en web, puedes pedirlo con prompt o modal)
-      const pin = prompt("Ingresa el PIN del gerente para autorizar:");
-      if (!pin) return alert("Autorización cancelada.");
+      // Autorizar con PIN
+      const autorizado = await solicitarPinGerente();
+      if (!autorizado) return alert("PIN incorrecto o autorización cancelada.");
 
-      // TODO: Aquí compara el hash del PIN con la base de datos, igual que en Flutter.
+      // 1. Estado antes del abono
+      const fechaAbono = new Date(fechaSeleccionada + "T00:00:00");
+      let amortizacion = JSON.parse(JSON.stringify(creditoSeleccionado.amortizacion || []));
+      let saldo = Number(creditoSeleccionado.saldoInicial || creditoSeleccionado.saldoActual || 0);
 
-      // Simulación registro
-      // ...guardar en Firestore...
+      // 2. Distribuir el abono en orden: multas, interés pendiente, capital
+      let restante = monto;
+      let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
+      let interesPendiente = 0;
 
-      document.getElementById("ok-msg").textContent = "Abono retroactivo registrado correctamente (simulado)";
+      // Calcular interés pendiente acumulado a la fecha seleccionada
+      for (let cuota of amortizacion) {
+        const fechaCuota = new Date(cuota.fecha);
+        if (fechaCuota < fechaAbono && (!cuota.estado || cuota.estado !== "Pagada")) {
+          interesPendiente += Number(cuota.interes || 0);
+        }
+      }
+
+      // Primero multas (si tu lógica incluye esto)
+      let multasAcumuladas = Number(creditoSeleccionado.multasAcumuladas || 0);
+      if (restante >= multasAcumuladas) {
+        pagoMultas = multasAcumuladas;
+        restante -= multasAcumuladas;
+        multasAcumuladas = 0;
+      } else {
+        pagoMultas = restante;
+        multasAcumuladas -= restante;
+        restante = 0;
+      }
+
+      // Luego intereses
+      if (restante > 0) {
+        if (restante >= interesPendiente) {
+          pagoInteres = interesPendiente;
+          restante -= interesPendiente;
+          interesPendiente = 0;
+        } else {
+          pagoInteres = restante;
+          interesPendiente -= restante;
+          restante = 0;
+        }
+      }
+
+      // Finalmente capital
+      if (restante > 0) {
+        pagoCapital = restante;
+        saldo -= restante;
+        restante = 0;
+      }
+
+      // 3. Actualizar tabla de amortización
+      for (let cuota of amortizacion) {
+        const fechaCuota = new Date(cuota.fecha);
+        if (fechaCuota < fechaAbono && (!cuota.estado || cuota.estado !== "Pagada")) {
+          let totalCuota = Number(cuota.cuota || 0);
+          let pagadoAntes = Number(cuota.montoPagado || 0);
+          let porPagar = totalCuota - pagadoAntes;
+          if (pagoCapital + pagoInteres >= porPagar) {
+            cuota.montoPagado = totalCuota;
+            cuota.estado = "Pagada";
+            cuota.fechaPagoReal = fechaAbono.toISOString();
+            pagoCapital -= Number(cuota.capital || 0);
+            pagoInteres -= Number(cuota.interes || 0);
+            if (pagoCapital < 0) pagoCapital = 0;
+            if (pagoInteres < 0) pagoInteres = 0;
+          } else if (pagoCapital + pagoInteres > 0) {
+            cuota.montoPagado = pagadoAntes + pagoCapital + pagoInteres;
+            cuota.estado = "Parcial";
+            cuota.fechaPagoReal = fechaAbono.toISOString();
+            pagoCapital = 0;
+            pagoInteres = 0;
+          }
+        }
+      }
+
+      // 4. Guarda el pago retroactivo en Firestore
+      const correlativo = Math.floor(Math.random() * 90000) + 10000;
+      const correlativoStr = correlativo.toString().padStart(5, '0');
+      await addDoc(collection(db, "pagos"), {
+        clienteID: creditoSeleccionado.clienteID,
+        creditoID: creditoSeleccionado.id,
+        nombres: creditoSeleccionado.nombre,
+        montoPagado: monto,
+        fechaPago: fechaAbono.toISOString(),
+        pagoMultas: pagoMultas.toFixed(2),
+        pagoInteres: pagoInteres.toFixed(2),
+        pagoCapital: pagoCapital.toFixed(2),
+        saldoRestante: saldo.toFixed(2),
+        cajeroID: userId,
+        cajeroNombre: usuarioActual,
+        sucursal: userAgencia,
+        correlativo: correlativoStr,
+        timestamp: new Date(),
+        retroactivo: true,
+        motivoRetroactivo: motivo
+      });
+
+      // 5. Actualiza el crédito y la tabla de amortización real
+      await updateDoc(doc(db, "creditos", creditoSeleccionado.id), {
+        saldoActual: saldo.toFixed(2),
+        multasAcumuladas: multasAcumuladas.toFixed(2),
+        amortizacion: amortizacion
+      });
+
+      document.getElementById("ok-msg").textContent = "Abono retroactivo registrado correctamente.";
       document.getElementById("ok-msg").style.display = "block";
       setTimeout(() => {
         document.getElementById("ok-msg").style.display = "none";
@@ -236,4 +321,5 @@
   </script>
 </body>
 </html>
+
 

@@ -221,7 +221,7 @@
       render();
     }
 
-    // === LÓGICA COMPLETA DE PAGO ACTUALIZADA ===
+    // === LÓGICA DE PAGO ROBUSTA Y SINTONIZADA ===
     async function realizarPago(cliente, montoNum) {
       try {
         // 1. Obtener usuario y agencia
@@ -232,6 +232,7 @@
         const cajeroNombre = userData.nombre_autorizacion || userData.nombre || "Sin Nombre";
         const sucursal = userData.department || "N/A";
         const fechaPago = new Date().toISOString();
+        const ahora = new Date(fechaPago);
 
         // 2. Leer el crédito actualizado
         const creditoSnap = await getDocs(query(collection(db, "creditos"), where("__name__", "==", cliente.id)));
@@ -241,16 +242,24 @@
         let saldoActual = parseFloat(creditoData.saldoActual || 0);
         let interesActual = parseFloat(creditoData.interesActual || 0);
         let multasAcumuladas = parseFloat(creditoData.multasAcumuladas || 0);
-        let fechaUltimoCalculo = creditoData.fechaUltimoCalculoIntereses ? new Date(creditoData.fechaUltimoCalculoIntereses) : new Date(creditoData.fechaInicio);
-        let ahora = new Date(fechaPago);
-
-        // Calcular interés corrido desde el último cálculo hasta hoy
+        let fechaUltimoCalculo = creditoData.fechaUltimoCalculoIntereses
+          ? new Date(creditoData.fechaUltimoCalculoIntereses)
+          : new Date(creditoData.fechaInicio);
         let tasaDiaria = parseFloat(creditoData.tasaDiariaCredito || 0.0);
         let dias = Math.floor((ahora - fechaUltimoCalculo) / (1000 * 60 * 60 * 24));
         let interesCorrido = dias > 0 ? saldoActual * tasaDiaria * dias : 0;
         interesActual += interesCorrido;
 
-        // Ahora aplicar la lógica de cobro: multas, intereses corridos, capital
+        // Asegura que amortizacion tenga los campos necesarios
+        let amortizacion = Array.isArray(creditoData.amortizacion) ? creditoData.amortizacion : [];
+        amortizacion = amortizacion.map((cuota) => ({
+          ...cuota,
+          estado: cuota.estado || "Pendiente",
+          montoPagado: typeof cuota.montoPagado === "number" ? cuota.montoPagado : 0,
+          fechaPagoReal: cuota.fechaPagoReal || null
+        }));
+
+        // --- Lógica de cobro ---
         let restante = montoNum;
         let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
 
@@ -288,10 +297,45 @@
           }
         }
 
-        // Registrar el movimiento (opcional: puedes agregar campos para desglose de cuotas pagadas)
+        // ======================
+        // ACTUALIZAR AMORTIZACION DE CUOTAS
+        // ======================
+        let montoAbonado = pagoCapital; // Solo el capital abona a cuotas
+        for (let i = 0; i < amortizacion.length; i++) {
+          let cuota = amortizacion[i];
+          let pagadoAntes = parseFloat(cuota.montoPagado || 0);
+          let totalPorPagar = parseFloat(cuota.cuota) - pagadoAntes;
+          // Solo actualiza si la cuota no está pagada
+          if (cuota.estado !== "Pagada") {
+            if (montoAbonado > 0) {
+              if (montoAbonado >= totalPorPagar) {
+                cuota.montoPagado = parseFloat(cuota.cuota);
+                cuota.estado = "Pagada";
+                cuota.fechaPagoReal = fechaPago;
+                montoAbonado -= totalPorPagar;
+              } else {
+                cuota.montoPagado = pagadoAntes + montoAbonado;
+                cuota.estado = "Parcial";
+                cuota.fechaPagoReal = null;
+                montoAbonado = 0;
+              }
+            }
+            // Si está vencida y no se ha pagado completo
+            if (cuota.estado !== "Pagada" && new Date(cuota.fecha) < ahora) {
+              cuota.estado = "Atrasado";
+            }
+            // Si no ha recibido pagos, la dejamos pendiente
+            if ((cuota.montoPagado ?? 0) === 0 && new Date(cuota.fecha) >= ahora) {
+              cuota.estado = "Pendiente";
+            }
+          }
+        }
+
+        // ======================
+        // REGISTRO DEL PAGO
+        // ======================
         const correlativo = Math.floor(Math.random() * 90000) + 10000;
         const correlativoStr = correlativo.toString().padStart(5, '0');
-
         await window.firebaseAddDoc("pagos", {
           clienteID: creditoData.clienteID,
           creditoID: cliente.id,
@@ -309,14 +353,17 @@
           timestamp: new Date()
         });
 
-        // Actualiza el crédito
+        // ======================
+        // ACTUALIZA EL CRÉDITO EN LA BASE
+        // ======================
         await window.firebaseUpdateDoc("creditos", cliente.id, {
           saldoActual: saldoActual.toFixed(2),
           interesActual: interesActual.toFixed(2),
           multasAcumuladas: multasAcumuladas.toFixed(2),
           ultimaActualizacion: fechaPago,
           fechaUltimoCalculoIntereses: fechaPago,
-          estadoCredito: saldoActual == 0 ? "Pagado" : creditoData.estadoCredito
+          estadoCredito: saldoActual == 0 ? "Pagado" : creditoData.estadoCredito,
+          amortizacion: amortizacion // <-- array de cuotas actualizado
         });
 
         // Redirigir al ticket (comprobante)

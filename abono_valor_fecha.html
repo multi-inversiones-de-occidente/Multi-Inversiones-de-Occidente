@@ -21,6 +21,18 @@
     .list-group-item { background: #181e2b; color: #fff; border-radius: 8px; padding: 8px 14px; margin-bottom: 7px; cursor: pointer; }
     .list-group-item.selected, .list-group-item:hover { background: #fb923c; color: #181818; font-weight: bold;}
     .label { color: #fb923c; font-weight: 600; margin-bottom: 4px; display: block;}
+    .modal-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #181e21cc; z-index: 9998; display: flex; align-items: center; justify-content: center;}
+    .modal { background: #fff; color: #222; border-radius: 15px; box-shadow: 0 6px 38px #0008; padding: 26px 23px 20px 23px; max-width: 340px; width: 95%; z-index: 9999; position: relative; text-align: left; font-size: 1rem; animation: showmodal .18s;}
+    @keyframes showmodal { from { transform: scale(.93); opacity:.6;} to {transform:none;opacity:1;} }
+    .modal label {font-weight: bold;}
+    .modal input { width: 100%; background: #f5f8fb; border: 1.2px solid #dadada; color: #111; font-size: 1.12rem; padding: 11px 10px; margin-bottom: 12px; border-radius: 8px; outline: none; box-sizing: border-box;}
+    .modal-btns { display: flex; gap: 13px; margin-top: 8px; justify-content: flex-end;}
+    .modal-btn-cancel { background: #e74c3c; color: #fff; border: none; padding: 9px 16px; border-radius: 7px; cursor: pointer; font-weight: bold; transition: background .17s;}
+    .modal-btn-cancel:hover { background: #bb2c1a; }
+    .modal-btn-ok { background: #fb923c; color: #1a1813; border: none; padding: 9px 18px; border-radius: 7px; cursor: pointer; font-weight: bold; transition: background .17s;}
+    .modal-error { color: #d30013; font-size: 0.99rem; margin-bottom: 9px; font-weight: 500;}
+    .spinner { display:inline-block; width:20px; height:20px; border-radius:50%; border:3px solid #fff3; border-top:3px solid #fff; animation:spin 1s linear infinite;}
+    @keyframes spin {100%{transform:rotate(360deg);}}
     @media (max-width:640px){.container{padding:1.15rem .6rem;}}
   </style>
 </head>
@@ -62,14 +74,12 @@
       <div id="ok-msg" class="ok-msg" style="display:none;"></div>
     </form>
   </div>
+  <div id="modal-root"></div>
 
   <!-- Lógica y Firebase -->
   <script type="module">
-    // --- Firebase inicialización igual a tus otros archivos ---
-    // (Ajusta a tu config)
-
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, getDoc, doc, query, where, Timestamp, FieldValue } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, getDoc, doc, query, where, updateDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -94,7 +104,62 @@
     let fechaSeleccionada = null;
     let historico = null;
 
-    // Al autenticarse, carga los créditos de la agencia del usuario
+    // --- Modal PIN de Gerente ---
+    function showGerentePinDialog() {
+      return new Promise((resolve) => {
+        let modalRoot = document.getElementById("modal-root");
+        let errorMsg = "";
+        async function onOk() {
+          const pinValue = document.getElementById("gerente-pin-input").value.trim();
+          if (!pinValue) {
+            errorMsg = "Debes ingresar el PIN del gerente.";
+            render();
+            return;
+          }
+          const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pinValue));
+          const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+          const q = query(collection(db, "users"), where("rol", "==", "gerente"));
+          const snap = await getDocs(q);
+          if (snap.empty) {
+            errorMsg = "No hay gerente configurado.";
+            render();
+            return;
+          }
+          const gerente = snap.docs[0].data();
+          const gerenteHash = gerente.internalPassword;
+          if (gerenteHash === hashHex) {
+            closeModal();
+            resolve(true);
+          } else {
+            errorMsg = "PIN incorrecto";
+            render();
+          }
+        }
+        function closeModal() { modalRoot.innerHTML = ""; resolve(false);}
+        function render() {
+          modalRoot.innerHTML = `
+            <div class="modal-bg">
+              <div class="modal">
+                <label>PIN del gerente</label>
+                <input type="password" id="gerente-pin-input" maxlength="10" autocomplete="off" placeholder="PIN" style="font-size:1.18rem;"/>
+                ${errorMsg ? `<div class="modal-error">${errorMsg}</div>` : ""}
+                <div class="modal-btns">
+                  <button class="modal-btn-cancel" id="cancelar-pin">Cancelar</button>
+                  <button class="modal-btn-ok" id="autorizar-pin">Autorizar</button>
+                </div>
+              </div>
+            </div>
+          `;
+          document.getElementById("cancelar-pin").onclick = closeModal;
+          document.getElementById("autorizar-pin").onclick = onOk;
+          document.getElementById("gerente-pin-input").onkeydown = e => { if (e.key === "Enter") onOk(); };
+          setTimeout(() => document.getElementById("gerente-pin-input").focus(), 30);
+        }
+        render();
+      });
+    }
+
+    // --- Carga de créditos por agencia ---
     onAuthStateChanged(auth, async user => {
       if (!user) return location.href = "login.html";
       usuarioActual = user.displayName || user.email || "Usuario desconocido";
@@ -112,27 +177,25 @@
 
     // Filtrado en tiempo real
     document.getElementById("busqueda").addEventListener("input", () => {
-      const query = document.getElementById("busqueda").value.toLowerCase();
+      const queryTxt = document.getElementById("busqueda").value.toLowerCase();
       const listaDiv = document.getElementById("lista-creditos");
       listaDiv.innerHTML = "";
-      if (!query) return;
-
+      if (!queryTxt) return;
       const filtrados = creditosAgencia.filter(c =>
-        (c.nombre && c.nombre.toLowerCase().includes(query)) ||
-        (c.numeroDui && c.numeroDui.includes(query))
+        (c.nombre && c.nombre.toLowerCase().includes(queryTxt)) ||
+        (c.numeroDui && c.numeroDui.includes(queryTxt))
       );
       filtrados.forEach(credito => {
         const div = document.createElement("div");
         div.className = "list-group-item";
         div.textContent = `${credito.nombre} — DUI: ${credito.numeroDui} — Saldo: $${Number(credito.saldoActual || 0).toFixed(2)}`;
-        div.onclick = () => seleccionarCredito(credito);
+        div.onclick = (event) => seleccionarCredito(credito, event);
         listaDiv.appendChild(div);
       });
     });
 
-    function seleccionarCredito(credito) {
+    function seleccionarCredito(credito, event) {
       creditoSeleccionado = credito;
-      // Visual
       Array.from(document.getElementsByClassName("list-group-item")).forEach(div => div.classList.remove("selected"));
       event.target.classList.add("selected");
       document.getElementById("seleccion-fecha").style.display = "block";
@@ -144,51 +207,71 @@
     document.getElementById("fecha-abono").addEventListener("change", () => {
       fechaSeleccionada = document.getElementById("fecha-abono").value;
       if (!fechaSeleccionada || !creditoSeleccionado) return;
-      // Aquí haces la simulación. Por ahora, solo dummy:
-      // Puedes llamar un endpoint, calcular en JS, o mostrar un mensaje.
-      // Simula campos como en Flutter:
+      // 1. Aquí deberías hacer el cálculo histórico real de la situación del crédito en esa fecha.
+      // Por simplicidad, usamos valores dummy:
       historico = {
         saldoActual: Number(creditoSeleccionado.saldoActual || 0),
-        interesActual: 0, // Calcula aquí si quieres
+        interesActual: Number(creditoSeleccionado.interesActual || 0),
         interesPendiente: 0,
-        multasAcumuladas: 0,
-        paraPonerseAlDia: 0,
+        multasAcumuladas: Number(creditoSeleccionado.multasAcumuladas || 0),
+        paraPonerseAlDia: Number(creditoSeleccionado.paraPonerseAlDia || 0),
         cuotasAtrasadas: 0,
         capitalAtrasado: 0,
         totalOverdueCuota: 0,
       };
-      let html = `<b>Saldo actual ese día:</b> $${historico.saldoActual.toFixed(2)}<br>
+      // 2. Muestra simulación (modifica aquí si tu cálculo histórico es más avanzado)
+      let html = `<b>Saldo ese día:</b> $${historico.saldoActual.toFixed(2)}<br>
         <b>Interés Actual:</b> $${historico.interesActual.toFixed(2)}<br>
-        <b>Interés Pendiente:</b> $${historico.interesPendiente.toFixed(2)}<br>
         <b>Multas Acumuladas:</b> $${historico.multasAcumuladas.toFixed(2)}<br>
-        <b>Para Ponerse al Día:</b> $${historico.paraPonerseAlDia.toFixed(2)}<br>
-        <b>Cuotas Atrasadas:</b> ${historico.cuotasAtrasadas}<br>
-        <b>Capital Atrasado:</b> $${historico.capitalAtrasado.toFixed(2)}<br>
-        <b>Total Overdue Cuota:</b> $${historico.totalOverdueCuota.toFixed(2)}`;
+        <b>Para Ponerse al Día:</b> $${historico.paraPonerseAlDia.toFixed(2)}`;
       document.getElementById("simulacion-block").style.display = "block";
       document.getElementById("simulacion-block").innerHTML = html;
       document.getElementById("form-abono").style.display = "block";
     });
 
-    // Registro del abono (dummy, implementa la lógica real de autorización aquí)
+    // Registro del abono retroactivo
     document.getElementById("form-abono").onsubmit = async function(e) {
       e.preventDefault();
-      // Validar campos
       if (!creditoSeleccionado || !fechaSeleccionada) return alert("Selecciona cliente y fecha.");
-      const monto = document.getElementById("monto").value;
+      const monto = parseFloat(document.getElementById("monto").value);
       const motivo = document.getElementById("motivo").value.trim();
       if (!monto || !motivo) return alert("Completa todos los campos.");
 
-      // Aquí deberías solicitar PIN de gerente (en web, puedes pedirlo con prompt o modal)
-      const pin = prompt("Ingresa el PIN del gerente para autorizar:");
-      if (!pin) return alert("Autorización cancelada.");
+      // Modal de PIN de gerente
+      const autorizado = await showGerentePinDialog();
+      if (!autorizado) return alert("PIN incorrecto o cancelado.");
 
-      // TODO: Aquí compara el hash del PIN con la base de datos, igual que en Flutter.
+      // Simulación del registro del abono (aquí deberías implementar la lógica real de distribución de pago a multas/interés/capital)
+      // --- EJEMPLO SENCILLO: (ajusta esto según la lógica real de tus pagos normales) ---
+      let pagoMultas = 0, pagoInteres = 0, pagoCapital = monto;
+      // Actualiza la tabla de amortización igual que en pagos normales (opcional, si impacta cuotas)
+      // let nuevaAmortizacion = [...(creditoSeleccionado.amortizacion || [])];
 
-      // Simulación registro
-      // ...guardar en Firestore...
+      // --- Registra el abono retroactivo, incluyendo paraPonerseAlDiaAntes ---
+      await addDoc(collection(db, "pagos"), {
+        clienteID: creditoSeleccionado.clienteID,
+        creditoID: creditoSeleccionado.id,
+        nombres: creditoSeleccionado.nombre,
+        montoPagado: monto,
+        fechaPago: new Date(fechaSeleccionada + 'T12:00:00Z').toISOString(), // fecha histórica
+        pagoMultas: pagoMultas.toFixed(2),
+        pagoInteres: pagoInteres.toFixed(2),
+        pagoCapital: pagoCapital.toFixed(2),
+        saldoRestante: (historico.saldoActual - monto).toFixed(2),
+        cajeroID: userId,
+        cajeroNombre: usuarioActual,
+        sucursal: userAgencia,
+        correlativo: Math.floor(Math.random() * 90000) + 10000,
+        paraPonerseAlDiaAntes: historico.paraPonerseAlDia, // campo clave para reversión
+        motivo: motivo,
+        retroactivo: true,
+        timestamp: new Date()
+      });
 
-      document.getElementById("ok-msg").textContent = "Abono retroactivo registrado correctamente (simulado)";
+      // --- Puedes actualizar el crédito si tu lógica lo requiere ---
+      // await updateDoc(doc(db, "creditos", creditoSeleccionado.id), { ... });
+
+      document.getElementById("ok-msg").textContent = "Abono retroactivo registrado correctamente.";
       document.getElementById("ok-msg").style.display = "block";
       setTimeout(() => {
         document.getElementById("ok-msg").style.display = "none";
@@ -203,3 +286,4 @@
   </script>
 </body>
 </html>
+

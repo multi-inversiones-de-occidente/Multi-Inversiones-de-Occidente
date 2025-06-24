@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body {
-      background: #101212;
+      background: #f8f8f8;
       color: #222;
       font-family: 'Segoe UI', Arial, sans-serif;
       margin: 0;
@@ -23,73 +23,77 @@
       color: #67C8F1;
     }
     .container {
-      max-width: 430px;
+      width: 100%;
+      max-width: 450px;
       margin: 2.5rem auto 0 auto;
       background: #fff;
-      border-radius: 18px;
-      box-shadow: 0 2px 25px #0005;
-      padding: 2.2rem 1.7rem 2rem 1.7rem;
-      min-height: 340px;
+      border-radius: 14px;
+      box-shadow: 0 2px 18px #0003;
+      padding: 2.3cm 1.3cm 1.2cm 1.3cm;
+      min-height: 360px;
+      border: 1.5px solid #e6e6e6;
     }
     .ticket-title {
-      font-size: 1.55rem;
+      font-size: 1.45rem;
       color: #13b66b;
       font-weight: bold;
-      margin-bottom: 8px;
+      margin-bottom: 7px;
       text-align: center;
       letter-spacing: 1px;
     }
     .ticket-header {
       text-align: center;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
     .ticket-logo {
-      height: 58px;
-      margin-bottom: 10px;
-      margin-top: 5px;
+      height: 55px;
+      margin-bottom: 9px;
+      margin-top: 3px;
     }
     .ticket-details {
-      font-size: 1rem;
-      margin-bottom: 11px;
+      font-size: 1.04rem;
+      margin-bottom: 14px;
+      padding: 7px 0 0 0;
     }
     .detail-row {
       display: flex;
       justify-content: space-between;
-      font-size: 1.02rem;
-      margin-bottom: 3px;
+      font-size: 1.04rem;
+      margin-bottom: 2.5px;
       font-weight: 500;
+      gap: 12px;
     }
     .detail-row strong {
-      color: #222;
-      min-width: 110px;
+      color: #333;
+      min-width: 108px;
       font-weight: 700;
     }
     .divider {
       border: none;
-      border-top: 1.5px solid #eee;
+      border-top: 1.4px dashed #d9d9d9;
       margin: 10px 0 12px 0;
     }
     .final-msg {
       color: #13b66b;
       font-weight: 700;
       text-align: center;
-      font-size: 1.14rem;
-      margin-top: 14px;
+      font-size: 1.11rem;
+      margin-top: 10px;
     }
     .volver-btn {
       display: block;
-      margin: 27px auto 0 auto;
-      padding: 13px 28px;
+      margin: 28px auto 0 auto;
+      padding: 11px 25px;
       background: #13b66b;
       color: #fff;
-      font-size: 1.13rem;
+      font-size: 1.08rem;
       font-weight: bold;
       border: none;
-      border-radius: 11px;
+      border-radius: 9px;
       cursor: pointer;
-      box-shadow: 0 1px 12px #0b854c27;
-      transition: background .19s;
-      letter-spacing: 0.7px;
+      box-shadow: 0 1px 10px #0b854c25;
+      transition: background .18s;
+      letter-spacing: 0.6px;
       text-decoration: none;
       text-align: center;
     }
@@ -101,16 +105,16 @@
     .btn-imprimir {
       display: block;
       margin: 0 auto 18px auto;
-      padding: 12px 28px;
+      padding: 11px 25px;
       background: #f8af40;
       color: #232323;
-      font-size: 1.08rem;
+      font-size: 1.03rem;
       font-weight: bold;
       border: none;
-      border-radius: 11px;
+      border-radius: 9px;
       cursor: pointer;
-      box-shadow: 0 1px 10px #f8af4045;
-      transition: background .17s;
+      box-shadow: 0 1px 9px #f8af4035;
+      transition: background .14s;
       letter-spacing: .5px;
       text-align: center;
     }
@@ -118,11 +122,27 @@
       background: #ffa600;
       color: #222;
     }
+    .firma {
+      margin-top: 28px;
+      margin-bottom: 8px;
+      height: 44px;
+      border-bottom: 1.2px solid #bdbdbd;
+      width: 68%;
+      margin-left: 0;
+      margin-right: auto;
+      display: block;
+    }
+    .firma-label {
+      font-size: 0.93rem;
+      color: #787878;
+      margin-top: 2px;
+      margin-left: 2px;
+      margin-bottom: 12px;
+    }
     @media (max-width: 540px) {
-      .container { max-width: 98vw; padding: 1.2rem 2vw; }
+      .container { max-width: 98vw; padding: 1.3rem 2vw; }
       .ticket-title { font-size: 1.1rem;}
     }
-    /* --- SOLO IMPRIMIR EL TICKET --- */
     @media print {
       body, html {
         background: #fff !important;
@@ -136,10 +156,11 @@
         margin: 0 !important;
         border-radius: 0 !important;
         background: #fff !important;
-        width: 100vw !important;
-        max-width: 100vw !important;
+        width: 95vw !important;
+        max-width: 95vw !important;
         min-width: 0 !important;
-        padding: 0.7cm 0.5cm !important;
+        padding: 1.5cm 1.3cm 1.2cm 1.3cm !important;
+        border: none !important;
       }
     }
   </style>
@@ -152,7 +173,7 @@
     </button>
     <div class="ticket-header">
       <img src="assets/logo_mi_bw.png" class="ticket-logo" alt="Multi Inversiones"/>
-      <div style="font-size:1rem;color:#13b66b;font-weight:600;">
+      <div style="font-size:1.02rem;color:#13b66b;font-weight:600;">
         Multi Inversiones de Occidente
       </div>
       <div style="color:#444;font-size:0.93rem;">
@@ -166,7 +187,10 @@
       <div class="detail-row"><strong>Ticket No.:</strong> <span id="correlativo"></span></div>
       <div class="detail-row"><strong>Agencia:</strong> <span id="agencia"></span></div>
       <div class="detail-row"><strong>Fecha y Hora:</strong> <span id="fecha"></span></div>
+      <div class="detail-row"><strong>Cajero:</strong> <span id="cajero"></span></div>
       <div class="detail-row"><strong>Cliente:</strong> <span id="cliente"></span></div>
+      <div class="detail-row"><strong>DUI:</strong> <span id="dui"></span></div>
+      <div class="detail-row"><strong>Línea de Crédito:</strong> <span id="linea"></span></div>
       <div class="detail-row"><strong>Monto Pagado:</strong> $<span id="monto"></span></div>
       <div class="detail-row"><strong>Pago Capital:</strong> $<span id="pagoCapital"></span></div>
       <div class="detail-row"><strong>Pago Interés:</strong> $<span id="pagoInteres"></span></div>
@@ -174,6 +198,8 @@
       <div class="detail-row"><strong>Saldo Restante:</strong> $<span id="saldoRestante"></span></div>
     </div>
     <hr class="divider"/>
+    <div class="firma"></div>
+    <div class="firma-label">Firma del cliente</div>
     <div class="final-msg">
       ¡Gracias por su pago!
     </div>
@@ -201,7 +227,10 @@
     document.getElementById('correlativo').textContent   = getParam('correlativo');
     document.getElementById('agencia').textContent       = getParam('agencia');
     document.getElementById('fecha').textContent         = formatoFecha(getParam('fecha'));
+    document.getElementById('cajero').textContent        = getParam('cajero');
     document.getElementById('cliente').textContent       = getParam('cliente');
+    document.getElementById('dui').textContent           = getParam('dui');
+    document.getElementById('linea').textContent         = getParam('linea');
     document.getElementById('monto').textContent         = parseFloat(getParam('monto') || '0').toFixed(2);
     document.getElementById('pagoCapital').textContent   = parseFloat(getParam('pagoCapital') || '0').toFixed(2);
     document.getElementById('pagoInteres').textContent   = parseFloat(getParam('pagoInteres') || '0').toFixed(2);
@@ -210,4 +239,5 @@
   </script>
 </body>
 </html>
+
 

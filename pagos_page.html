@@ -221,7 +221,7 @@
       render();
     }
 
-    // --- Lógica real para el pago, igual a Flutter ---
+    // === LÓGICA COMPLETA DE PAGO ACTUALIZADA ===
     async function realizarPago(cliente, montoNum) {
       try {
         // 1. Obtener usuario y agencia
@@ -241,7 +241,16 @@
         let saldoActual = parseFloat(creditoData.saldoActual || 0);
         let interesActual = parseFloat(creditoData.interesActual || 0);
         let multasAcumuladas = parseFloat(creditoData.multasAcumuladas || 0);
+        let fechaUltimoCalculo = creditoData.fechaUltimoCalculoIntereses ? new Date(creditoData.fechaUltimoCalculoIntereses) : new Date(creditoData.fechaInicio);
+        let ahora = new Date(fechaPago);
 
+        // Calcular interés corrido desde el último cálculo hasta hoy
+        let tasaDiaria = parseFloat(creditoData.tasaDiariaCredito || 0.0);
+        let dias = Math.floor((ahora - fechaUltimoCalculo) / (1000 * 60 * 60 * 24));
+        let interesCorrido = dias > 0 ? saldoActual * tasaDiaria * dias : 0;
+        interesActual += interesCorrido;
+
+        // Ahora aplicar la lógica de cobro: multas, intereses corridos, capital
         let restante = montoNum;
         let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
 
@@ -279,14 +288,10 @@
           }
         }
 
-        if (saldoActual < 0.01) saldoActual = 0;
-        let nuevoSaldoActual = saldoActual + interesActual;
-
-        // 3. Correlativo simple (5 dígitos aleatorio, solo para demo)
+        // Registrar el movimiento (opcional: puedes agregar campos para desglose de cuotas pagadas)
         const correlativo = Math.floor(Math.random() * 90000) + 10000;
         const correlativoStr = correlativo.toString().padStart(5, '0');
 
-        // 4. Guardar pago en 'pagos'
         await window.firebaseAddDoc("pagos", {
           clienteID: creditoData.clienteID,
           creditoID: cliente.id,
@@ -296,7 +301,7 @@
           pagoMultas: pagoMultas.toFixed(2),
           pagoInteres: pagoInteres.toFixed(2),
           pagoCapital: pagoCapital.toFixed(2),
-          saldoRestante: nuevoSaldoActual.toFixed(2),
+          saldoRestante: saldoActual.toFixed(2),
           cajeroID: user.uid,
           cajeroNombre: cajeroNombre,
           sucursal: sucursal,
@@ -304,17 +309,18 @@
           timestamp: new Date()
         });
 
-        // 5. Actualizar crédito
+        // Actualiza el crédito
         await window.firebaseUpdateDoc("creditos", cliente.id, {
           saldoActual: saldoActual.toFixed(2),
           interesActual: interesActual.toFixed(2),
           multasAcumuladas: multasAcumuladas.toFixed(2),
           ultimaActualizacion: fechaPago,
+          fechaUltimoCalculoIntereses: fechaPago,
           estadoCredito: saldoActual == 0 ? "Pagado" : creditoData.estadoCredito
         });
 
-        // 6. Redirigir al ticket (simula comprobante)
-        window.location.href = `ticket_page.html?correlativo=${correlativoStr}&cliente=${encodeURIComponent(creditoData.nombre)}&monto=${montoNum.toFixed(2)}&agencia=${encodeURIComponent(sucursal)}&fecha=${encodeURIComponent(fechaPago)}&pagoCapital=${pagoCapital.toFixed(2)}&pagoInteres=${pagoInteres.toFixed(2)}&pagoMultas=${pagoMultas.toFixed(2)}&saldoRestante=${nuevoSaldoActual.toFixed(2)}`;
+        // Redirigir al ticket (comprobante)
+        window.location.href = `ticket_page.html?correlativo=${correlativoStr}&cliente=${encodeURIComponent(creditoData.nombre)}&monto=${montoNum.toFixed(2)}&agencia=${encodeURIComponent(sucursal)}&fecha=${encodeURIComponent(fechaPago)}&pagoCapital=${pagoCapital.toFixed(2)}&pagoInteres=${pagoInteres.toFixed(2)}&pagoMultas=${pagoMultas.toFixed(2)}&saldoRestante=${saldoActual.toFixed(2)}`;
       } catch (e) {
         alert("Error al realizar el pago: " + e.message);
       }
@@ -330,4 +336,5 @@
   </script>
 </body>
 </html>
+
 

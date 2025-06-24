@@ -167,6 +167,7 @@
       }
     }
 
+    // ---- FUNCIÓN ROBUSTA DE GUARDAR CRÉDITO ----
     async function guardarCredito() {
       if (!solicitudData || !asignacionData) {
         alert("No hay datos completos para guardar el crédito.");
@@ -185,6 +186,21 @@
       const saldoInicial = montoAprobado;
       const saldoActual = montoAprobado;
       const clienteID = solicitudData.clienteID || "";
+      const fechaInicio = new Date().toISOString();
+
+      // Tabla de amortización con los campos nuevos
+      let nuevaAmortizacion = [];
+      if (Array.isArray(asignacionData.amortizacion)) {
+        nuevaAmortizacion = asignacionData.amortizacion.map((cuota) => ({
+          ...cuota,
+          estado: "Pendiente",
+          montoPagado: 0.00,
+          fechaPagoReal: null
+        }));
+      }
+
+      // Nuevo campo: fecha precisa para control de intereses diarios
+      const fechaUltimoCalculoIntereses = fechaInicio;
 
       try {
         await addDoc(collection(db, "creditos"), {
@@ -208,11 +224,14 @@
           numeroCuotas: numeroCuotas,
           cuotaAprobada: cuotaAprobada,
           estadoCredito: "Activo",
-          fechaInicio: new Date().toISOString(),
-          ultimaActualizacion: new Date().toISOString(),
-          amortizacion: amortizacion,
+          fechaInicio: fechaInicio,
+          ultimaActualizacion: fechaInicio,
           asignadoA: asignadoNombre,
-          agenciaAsignada: agenciaAsignada
+          agenciaAsignada: agenciaAsignada,
+
+          // ---- NUEVOS CAMPOS ----
+          fechaUltimoCalculoIntereses: fechaUltimoCalculoIntereses,
+          amortizacion: nuevaAmortizacion // con estado, montoPagado y fechaPagoReal en cada cuota
         });
         alert("Crédito guardado correctamente.");
       } catch (e) {
@@ -304,4 +323,3 @@
   </div>
 </body>
 </html>
-

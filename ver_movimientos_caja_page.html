@@ -39,7 +39,7 @@
   <!-- Firebase y lógica -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, orderBy, limit, getDoc, doc as docRef } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -63,28 +63,22 @@
       const d = new Date(fechaIso);
       return d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true });
     }
-    function toIsoStr(date) {
-      return date.toISOString().slice(0,10);
-    }
 
     // Estado
     let selectedDate = new Date();
     let agenciaActual = "";
 
-    // Renderiza fecha
     function renderFecha() {
       document.getElementById("fecha-label").textContent = "Fecha: " + formatFecha(selectedDate);
     }
 
-    // Obtener saldo del último cierre antes del día seleccionado
     async function obtenerSaldoAnterior(agencia, fecha) {
       const cierresRef = collection(db, "cierres_caja");
-      const fechaStr = fecha.toISOString().slice(0,10); // YYYY-MM-DD del día seleccionado
-      // Busca el último cierre ANTES de la fecha seleccionada
+      const fechaStr = fecha.toISOString().slice(0,10);
       const q = query(
         cierresRef,
         where("agencia", "==", agencia),
-        where("fecha", "<", fechaStr), // anterior al día seleccionado
+        where("fecha", "<", fechaStr),
         orderBy("fecha", "desc"),
         limit(1)
       );
@@ -95,7 +89,6 @@
       return 0;
     }
 
-    // Cargar movimientos
     async function cargarMovimientos(user) {
       const listDiv = document.getElementById("movimientos-list");
       const totalDiv = document.getElementById("total-caja");
@@ -104,7 +97,6 @@
 
       // Obtener agencia del usuario logeado
       if (!agenciaActual) {
-        // Puedes obtener de tu sistema, aquí asumo campo "department" en users
         const docUser = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
         if (!docUser.empty) {
           agenciaActual = docUser.docs[0].data().department || "";
@@ -138,29 +130,65 @@
           observaciones: d.observaciones || '',
           usuario: d.usuario || '',
           fecha: d.fecha,
-          clase: d.tipo === "Ingreso" ? "mov-ingreso" : "mov-egreso"
+          clase: d.tipo === "Ingreso" ? "mov-ingreso" : "mov-egreso",
+          cliente: ""
         });
       });
 
-      // 2. Pagos (sólo de esa agencia si tienes el campo)
+      // 2. Pagos (NO anulados, solo de esa agencia)
       const pagoSnap = await getDocs(
         query(
           collection(db, "pagos"),
-          where("agencia", "==", agenciaActual),
+          // ==== CAMBIA 'sucursal' por 'agencia' aquí si tu campo es agencia en vez de sucursal ====
+          where("sucursal", "==", agenciaActual),
           where("fechaPago", ">=", startIso),
           where("fechaPago", "<=", endIso)
         )
       );
+      // 2a. Construir set de clienteID únicos
+      const clienteIDSet = new Set();
+      const pagosList = [];
       pagoSnap.forEach(doc => {
         const d = doc.data();
+        if (!("anulado" in d) || !d.anulado) {
+          pagosList.push({...d, id: doc.id});
+          if (d.clienteID) clienteIDSet.add(d.clienteID);
+        }
+      });
+
+      // 2b. Buscar nombre y apellido de users (en bloques de 10)
+      let clientesData = {};
+      const ids = Array.from(clienteIDSet).filter(Boolean);
+      for (let i = 0; i < ids.length; i += 10) {
+        const batch = ids.slice(i, i + 10);
+        await Promise.all(batch.map(async cid => {
+          try {
+            const userDoc = await getDoc(docRef(db, "users", cid));
+            if (userDoc.exists()) {
+              const user = userDoc.data();
+              clientesData[cid] = ((user.nombre || "") + " " + (user.apellido || "")).trim();
+            }
+          } catch (e) {}
+        }));
+      }
+
+      // 2c. Añadir a movimientos
+      pagosList.forEach(data => {
+        let clienteNombre = "Cliente";
+        if (data.clienteID && clientesData[data.clienteID]) {
+          clienteNombre = clientesData[data.clienteID];
+        } else if (data.nombres) {
+          clienteNombre = data.nombres;
+        }
         movimientos.push({
           tipo: "Ingreso",
           descripcion: "Pago",
-          monto: Number(d.montoPagado),
+          monto: Number(data.montoPagado),
           observaciones: "",
-          usuario: d.cajeroNombre || '',
-          fecha: d.fechaPago,
-          clase: "mov-pago"
+          usuario: data.cajeroNombre || '',
+          fecha: data.fechaPago,
+          clase: "mov-pago",
+          cliente: clienteNombre
         });
       });
 
@@ -168,10 +196,8 @@
       movimientos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
       // === Aquí aplicamos la lógica de saldo anterior ===
-      // 1. Obtener saldo anterior de cierres de caja
       const saldoAnterior = await obtenerSaldoAnterior(agenciaActual, selectedDate);
 
-      // 2. Calcula total del día
       let totalIngresos = 0.0;
       let totalEgresos = 0.0;
       movimientos.forEach(mov => {
@@ -191,6 +217,7 @@
             <div class="mov-sub">Monto: $${mov.monto.toFixed(2)}</div>
             ${mov.observaciones ? `<div class="mov-sub">Obs: ${mov.observaciones}</div>` : ""}
             <div class="mov-sub">Usuario: ${mov.usuario}</div>
+            ${mov.cliente ? `<div class="mov-sub">Cliente: ${mov.cliente}</div>` : ""}
             <div class="mov-sub">Hora: ${formatHora(mov.fecha)}</div>
           </div>
         `).join('');
@@ -217,7 +244,6 @@
       }
       selectedDate = parsed;
       renderFecha();
-      // Espera usuario logeado para recargar movimientos
       onAuthStateChanged(auth, user => {
         if (user) cargarMovimientos(user);
       });

@@ -242,6 +242,7 @@
         let saldoActual = parseFloat(creditoData.saldoActual || 0);
         let interesActual = parseFloat(creditoData.interesActual || 0);
         let multasAcumuladas = parseFloat(creditoData.multasAcumuladas || 0);
+        let paraPonerseAlDia = parseFloat(creditoData.paraPonerseAlDia || 0); // <-- Agregado
         let fechaUltimoCalculo = creditoData.fechaUltimoCalculoIntereses
           ? new Date(creditoData.fechaUltimoCalculoIntereses)
           : new Date(creditoData.fechaInicio);
@@ -350,7 +351,10 @@
           cajeroNombre: cajeroNombre,
           sucursal: sucursal,
           correlativo: correlativoStr,
-          timestamp: new Date()
+          timestamp: new Date(),
+          // =========== AGREGADO ===========
+          paraPonerseAlDiaAntes: paraPonerseAlDia.toFixed(2)
+          // =========== AGREGADO ===========
         });
 
         // ======================
@@ -383,5 +387,6 @@
   </script>
 </body>
 </html>
+
 
 

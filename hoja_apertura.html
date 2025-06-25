@@ -76,14 +76,18 @@
           const infoAgencia = agenciasInfo[agencia] || {direccion: '', telefono: ''};
 
           // 4) Preparar variables y valores
-          const fechaApertura = asignData.fechaAprobacion 
-            ? (asignData.fechaAprobacion.toDate 
-                ? asignData.fechaAprobacion.toDate().toLocaleDateString("es-SV")
-                : asignData.fechaAprobacion)
-            : '';
-          const fechaVencimiento = (asignData.fechaVencimiento && asignData.fechaVencimiento.toDate)
-            ? asignData.fechaVencimiento.toDate().toLocaleDateString("es-SV")
-            : (asignData.fechaVencimiento || '');
+          const fechaApertura = new Date().toLocaleDateString('es-SV');
+
+          // Calcular fecha de vencimiento (última cuota de la amortización)
+          let fechaVencimiento = '';
+          if (Array.isArray(asignData.amortizacion) && asignData.amortizacion.length > 0) {
+            const last = asignData.amortizacion[asignData.amortizacion.length - 1];
+            if (last.fecha && last.fecha.toDate) {
+              fechaVencimiento = last.fecha.toDate().toLocaleDateString("es-SV");
+            } else if (typeof last.fecha === "string") {
+              fechaVencimiento = last.fecha.split('T')[0];
+            }
+          }
 
           const monto = asignData.montoAprobado || solData.montoSolicitado || '';
           const cuota = asignData.cuota || '';

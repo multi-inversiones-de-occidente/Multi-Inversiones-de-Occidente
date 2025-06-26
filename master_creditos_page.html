@@ -63,9 +63,9 @@
       }
     }
 
+    // CAMBIADO: Navega a la página detalle con el id
     window.verDetalleCredito = function(id) {
-      // Aquí debes poner tu lógica de navegación o mostrar el detalle.
-      alert("Ir al detalle de crédito: " + id);
+      location.href = `detalle_credito.html?id=${id}`;
     };
 
     function aplicarFiltro(term) {
@@ -201,5 +201,6 @@
   </div>
 </body>
 </html>
+
 
 

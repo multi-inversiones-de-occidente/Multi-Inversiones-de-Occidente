@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Detalles del Crédito</title>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+
+    // Configuración Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Función para leer el parámetro id de la URL
+    function getIdParam() {
+      const url = new URL(window.location.href);
+      return url.searchParams.get("id");
+    }
+
+    // Formato de dinero
+    function money(n) {
+      return "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits:2 });
+    }
+
+    // Formato de fecha legible (acepta string y timestamp)
+    function formateaFecha(fecha) {
+      if (!fecha) return "-";
+      try {
+        // Firestore Timestamp
+        if (typeof fecha === "object" && fecha.seconds) {
+          const dt = new Date(fecha.seconds * 1000);
+          return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+        }
+        // String tipo ISO
+        let limpia = (fecha + "")
+          .replaceAll(" a.m.", "")
+          .replaceAll(" p.m.", "")
+          .replaceAll(" a.m.", "")
+          .replaceAll(" p.m.", "")
+          .trim();
+        const dt = new Date(limpia);
+        if (!isNaN(dt.getTime())) {
+          return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+        } else {
+          return fecha;
+        }
+      } catch {
+        return fecha;
+      }
+    }
+
+    // Renderiza campo de detalle
+    function detailTile(label, value, icon) {
+      return `
+        <div class="detail-card">
+          <div class="icon"><span class="material-icons">${icon || "info"}</span></div>
+          <div class="detail-content">
+            <div class="detail-label">${label}</div>
+            <div class="detail-value">${value || "-"}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function cargarCredito() {
+      const creditoId = getIdParam();
+      if (!creditoId) {
+        document.getElementById("main-detail").innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
+        return;
+      }
+      document.getElementById("main-detail").innerHTML = `<div class="loader"></div>`;
+
+      const ref = doc(db, "creditos", creditoId);
+      const snap = await getDoc(ref);
+
+      if (!snap.exists()) {
+        document.getElementById("main-detail").innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
+        return;
+      }
+      const c = snap.data();
+
+      document.getElementById("main-detail").innerHTML = `
+        <div class="cabecera">
+          <div class="title">${(c.nombre || "") + " " + (c.apellido || "")}</div>
+          <div class="subtitle">DUI: <b>${c.numeroDui || "-"}</b></div>
+          <div class="subtitle">Tel: <b>${c.telefono || "-"}</b></div>
+        </div>
+        <div class="detalles">
+          ${detailTile("Agencia asignada", c.agenciaAsignada, "location_on")}
+          ${detailTile("Dirección", c.direccion, "home")}
+          ${detailTile("Línea de Crédito", c.lineaDeCredito, "account_tree")}
+          ${detailTile("Estado del Crédito", c.estadoCredito, "info")}
+          ${detailTile("Fecha de Inicio", formateaFecha(c.fechaInicio), "event")}
+          ${detailTile("Fecha Vencimiento", formateaFecha(c.fechaVencimiento), "event_busy")}
+          ${detailTile("Monto Aprobado", money(c.montoAprobado), "attach_money")}
+          ${detailTile("Saldo Inicial", money(c.saldoInicial), "monetization_on")}
+          ${detailTile("Saldo Actual", money(c.saldoActual), "savings")}
+          ${detailTile("Cuota Aprobada", money(c.cuotaAprobada), "request_quote")}
+          ${detailTile("Número de Cuotas", c.numeroCuotas, "format_list_numbered")}
+          ${detailTile("Cuotas Pendientes", c.cuotasPendientes, "timelapse")}
+          ${detailTile("Cuotas Atrasadas", c.cuotasAtrasadas, "error")}
+          ${detailTile("Asignado a", c.asignadoA, "person")}
+          ${detailTile("Frecuencia de Pago", c.frecuenciaPago, "repeat")}
+          ${detailTile("Tasa Anual", c.tasaAnualCredito ? c.tasaAnualCredito + "%" : "-", "percent")}
+          ${detailTile("Tasa Diaria", c.tasaDiariaCredito, "percent")}
+          ${detailTile("Capital Atrasado", money(c.capitalAtrasado), "money_off_csred")}
+          ${detailTile("Interés Actual", money(c.interesActual), "trending_up")}
+          ${detailTile("Interés Pendiente", money(c.interesPendiente), "schedule")}
+          ${detailTile("Multas Acumuladas", money(c.multasAcumuladas), "gavel")}
+          ${detailTile("Días de Mora", c.diasMora, "calendar_today")}
+          ${detailTile("Días Intereses", c.diasIntereses, "calendar_view_day")}
+          ${detailTile("Para Ponerse al Día", money(c.paraPonerseAlDia), "paid")}
+          ${detailTile("Última actualización", formateaFecha(c.ultimaActualizacion), "update")}
+        </div>
+        <div class="acciones">
+          <button class="btn-accent" onclick="window.open('amortizacion.html?id=${creditoId}', '_self')">
+            <span class="material-icons">view_list</span> Ver Plan de Pagos
+          </button>
+          <button class="btn-green" onclick="window.open('proyeccion.html?id=${creditoId}', '_self')">
+            <span class="material-icons">trending_up</span> Hacer Proyección
+          </button>
+        </div>
+      `;
+    }
+
+    window.addEventListener("DOMContentLoaded", cargarCredito);
+  </script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    body { background: #101012; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
+    .main { max-width: 480px; margin: 0 auto; padding: 1.5rem 1rem 3rem 1rem; }
+    .cabecera {
+      background: #ffb30012; border-radius: 16px; padding: 22px 18px 17px 18px;
+      margin-bottom: 16px; box-shadow: 0 2px 14px #0002;
+    }
+    .title { font-size: 2rem; font-weight: bold; color: #fff;}
+    .subtitle { color: #ffe5b7; font-size: 1rem; margin-top: 1px;}
+    .detalles { margin-bottom: 28px; }
+    .detail-card {
+      background: #191927;
+      border-radius: 12px;
+      margin-bottom: 11px;
+      display: flex; align-items: flex-start;
+      box-shadow: 0 2px 8px #0002;
+      padding: 10px 16px;
+      gap: 12px;
+    }
+    .detail-card .icon {
+      width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      background: #37335b; border-radius: 50%;
+      margin-right: 6px; margin-top: 3px;
+      flex-shrink: 0;
+    }
+    .detail-card .material-icons { color: #ffb300; font-size: 22px;}
+    .detail-label { color: #ffe7b5; font-size: .99rem;}
+    .detail-value { color: #fff; font-size: 1.12rem; font-weight: bold;}
+    .loader {
+      width: 44px; height: 44px; margin: 55px auto 70px auto; border-radius: 50%;
+      border: 4.5px solid #ffb300; border-top: 4.5px solid #eee0; animation: spin 1s linear infinite;
+      display: block;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    .notfound { color: #fff9; font-size: 1.22rem; text-align: center; margin: 70px 0;}
+    .acciones {
+      display: flex;
+      gap: 15px;
+      justify-content: stretch;
+      margin-top: 35px;
+    }
+    .acciones .btn-accent, .acciones .btn-green {
+      flex: 1 1 0;
+      background: #2196f3;
+      border: none;
+      color: #fff;
+      font-size: 1.08rem;
+      padding: 15px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      gap: 8px;
+      transition: background 0.16s;
+    }
+    .acciones .btn-green { background: #23b76d; }
+    .acciones .btn-accent:hover { background: #2962ff;}
+    .acciones .btn-green:hover { background: #19a05a;}
+    @media (max-width: 570px) {
+      .main { max-width: 99vw; padding: 1rem .4rem 2rem .4rem;}
+      .cabecera { font-size: 1.13rem;}
+    }
+  </style>
+</head>
+<body>
+  <div class="main">
+    <div id="main-detail"></div>
+  </div>
+</body>
+</html>

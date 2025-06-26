@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Proyección de Crédito</title>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    // Configuración Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // ============= Utilidades =============
+    function getIdParam() {
+      const url = new URL(window.location.href);
+      return url.searchParams.get("id");
+    }
+    function money(n) {
+      return "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits:2 });
+    }
+    function pad(num) {
+      return num < 10 ? "0" + num : num;
+    }
+    function formatDate(date) {
+      if (!date) return "-";
+      if (typeof date === "string" && date.length === 10 && date.includes("-")) {
+        // Ya viene como yyyy-mm-dd
+        return date;
+      }
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return "-";
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+    function formatHumanDate(date) {
+      if (!date) return "-";
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return "-";
+      return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+    }
+
+    // ============= PROYECCIÓN LÓGICA =============
+    function calcularProyeccion(credito, fechaProy) {
+      // Parámetros y bases
+      const tasaDiaria = parseFloat(credito.tasaDiariaCredito || "0") || 0;
+      const saldoActual = parseFloat(credito.saldoActual || "0") || 0;
+      const interesActual = parseFloat(credito.interesActual || "0") || 0;
+      const amortizacion = credito.amortizacion || [];
+
+      let fechaBaseStr = credito.fechaUltimoMovimiento || credito.fechaInicio;
+      let fechaBase;
+      try {
+        fechaBase = new Date(fechaBaseStr.replace(' a.m.','').replace(' p.m.','').replace(' a.m.','').replace(' p.m.',''));
+      } catch { fechaBase = new Date(); }
+
+      let fechaProyeccion = new Date(fechaProy);
+
+      // --- Amortización y cuotas vencidas
+      let cuotasVencidas = 0.0;
+      let capitalVencido = 0.0;
+      let interesesVencidos = 0.0;
+      let cuotasAtrasadas = 0;
+      let fechaUltimaVencida = null;
+
+      for (const cuotaItem of amortizacion) {
+        if (!cuotaItem) continue;
+        let fechaCuota;
+        try {
+          fechaCuota = new Date(cuotaItem.fecha);
+        } catch { continue; }
+        const estado = cuotaItem.estado || "Pendiente";
+        if (fechaCuota <= fechaProyeccion && estado !== "Pagada") {
+          cuotasVencidas += parseFloat(cuotaItem.cuota || "0");
+          capitalVencido += parseFloat(cuotaItem.capital || "0");
+          interesesVencidos += parseFloat(cuotaItem.interes || "0");
+          cuotasAtrasadas++;
+          if (!fechaUltimaVencida || fechaCuota > fechaUltimaVencida) {
+            fechaUltimaVencida = fechaCuota;
+          }
+        }
+      }
+
+      // --- Intereses corridos
+      let interesCorriente = 0.0;
+      let dias = 0;
+      if (cuotasAtrasadas > 0 && fechaUltimaVencida) {
+        // Intereses corridos desde el día siguiente de la última cuota vencida
+        const desde = new Date(fechaUltimaVencida.getTime() + 86400000);
+        if (fechaProyeccion >= desde) {
+          dias = Math.floor((fechaProyeccion - desde) / 86400000);
+          interesCorriente = saldoActual * tasaDiaria * dias;
+        } else {
+          dias = 0;
+          interesCorriente = 0;
+        }
+      } else {
+        // Antes de la primera cuota: solo intereses corridos desde la base
+        dias = Math.floor((fechaProyeccion - fechaBase) / 86400000);
+        interesCorriente = (dias > 0) ? saldoActual * tasaDiaria * dias : 0.0;
+      }
+
+      // Para ponerse al día
+      let paraPonerseAlDia = 0.0;
+      if (cuotasAtrasadas > 0) {
+        paraPonerseAlDia = cuotasVencidas + interesCorriente;
+      } else {
+        paraPonerseAlDia = interesCorriente;
+      }
+
+      // Interés acumulado
+      let interesProyectado = interesActual + interesCorriente + interesesVencidos;
+
+      return {
+        diasProyeccion: dias,
+        cuotasAtrasadas,
+        cuotasVencidas,
+        interesesVencidos,
+        capitalVencido,
+        interesesCorridos: interesCorriente,
+        saldoActual,
+        paraPonerseAlDia,
+        interesProyectado
+      };
+    }
+
+    // ============= UI RENDER =============
+    let creditoGlobal = null;
+    let fechaProyeccion = null;
+    let proyeccion = null;
+
+    async function cargarCredito() {
+      const creditoId = getIdParam();
+      if (!creditoId) {
+        document.getElementById("main-proyeccion").innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
+        return;
+      }
+      document.getElementById("main-proyeccion").innerHTML = `<div class="loader"></div>`;
+
+      onAuthStateChanged(auth, async user => {
+        if (!user) {
+          window.location.href = "login.html";
+          return;
+        }
+        try {
+          const ref = doc(db, "creditos", creditoId);
+          const snap = await getDoc(ref);
+
+          if (!snap.exists()) {
+            document.getElementById("main-proyeccion").innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
+            return;
+          }
+          const c = snap.data();
+          creditoGlobal = c;
+          renderUI();
+        } catch (err) {
+          document.getElementById("main-proyeccion").innerHTML = `<div class="notfound">No tienes permisos para ver este crédito.</div>`;
+        }
+      });
+    }
+
+    function renderUI() {
+      const c = creditoGlobal;
+      if (!c) {
+        document.getElementById("main-proyeccion").innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
+        return;
+      }
+
+      // Cabecera
+      let html = `
+        <div class="cabecera">
+          <div class="title">${(c.nombre || "") + " " + (c.apellido || "")}</div>
+          <div class="subtitle">DUI: <b>${c.numeroDui || "-"}</b></div>
+        </div>
+        <div class="seccion-fecha">
+          <button id="btnElegirFecha" class="btn-fecha">
+            ${fechaProyeccion ? "Cambiar fecha de proyección" : "Seleccionar fecha para proyección"}
+          </button>
+        </div>
+      `;
+
+      if (fechaProyeccion && proyeccion) {
+        html += `
+          <div class="card-proyeccion">
+            <div class="row-card"><span class="icon-mat orange">date_range</span>
+              <b>Proyección al:</b> ${formatHumanDate(fechaProyeccion)}
+            </div>
+            <div class="row-card"><span class="icon-mat">timer</span>
+              Días proyectados: <b>${proyeccion.diasProyeccion}</b>
+            </div>
+            <div class="row-card"><span class="icon-mat blue">savings</span>
+              Saldo actual: <b>${money(proyeccion.saldoActual)}</b>
+            </div>
+            <div class="row-card"><span class="icon-mat orange">trending_up</span>
+              Intereses corridos: <b>${money(proyeccion.interesesCorridos)}</b>
+            </div>
+        `;
+        if (proyeccion.cuotasAtrasadas > 0) {
+          html += `
+            <div class="row-card"><span class="icon-mat red">assignment_late</span>
+              Cuotas vencidas: <b>${proyeccion.cuotasAtrasadas}</b>
+            </div>
+            <div class="row-card detalles-vencidos">
+              <span style="width:130px;display:inline-block"></span>
+              Capital vencido: <b>${money(proyeccion.capitalVencido)}</b>
+            </div>
+            <div class="row-card detalles-vencidos">
+              <span style="width:130px;display:inline-block"></span>
+              Interés vencido: <b>${money(proyeccion.interesesVencidos)}</b>
+            </div>
+            <div class="row-card detalles-vencidos">
+              <span style="width:130px;display:inline-block"></span>
+              Total cuotas vencidas: <b>${money(proyeccion.cuotasVencidas)}</b>
+            </div>
+          `;
+        }
+        html += `
+            <div class="row-card"><span class="icon-mat orange">paid</span>
+              Para ponerse al día: <b>${money(proyeccion.paraPonerseAlDia)}</b>
+            </div>
+            <div class="row-card"><span class="icon-mat orange">trending_up</span>
+              Interés acumulado: <b>${money(proyeccion.interesProyectado)}</b>
+            </div>
+          </div>
+        `;
+      } else {
+        html += `
+          <div class="aviso-fecha">
+            Selecciona una fecha para calcular la proyección del crédito.
+          </div>
+        `;
+      }
+      document.getElementById("main-proyeccion").innerHTML = html;
+      if (document.getElementById("btnElegirFecha")) {
+        document.getElementById("btnElegirFecha").onclick = elegirFecha;
+      }
+    }
+
+    function elegirFecha() {
+      // Usamos un date input modal nativo para máxima compatibilidad
+      const dateInput = document.createElement("input");
+      dateInput.type = "date";
+      dateInput.min = formatDate(new Date(Date.now() - 365*24*60*60*1000));
+      dateInput.max = formatDate(new Date(Date.now() + 3*365*24*60*60*1000));
+      dateInput.value = formatDate(new Date());
+      dateInput.style.position = "fixed";
+      dateInput.style.top = "-100px";
+      document.body.appendChild(dateInput);
+
+      dateInput.onchange = () => {
+        fechaProyeccion = dateInput.value;
+        proyeccion = calcularProyeccion(creditoGlobal, fechaProyeccion);
+        renderUI();
+        document.body.removeChild(dateInput);
+      };
+      dateInput.click();
+    }
+
+    window.addEventListener("DOMContentLoaded", cargarCredito);
+  </script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    body { background: #101012; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
+    .main { max-width: 480px; margin: 0 auto; padding: 1.5rem 1rem 3rem 1rem; }
+    .cabecera {
+      background: #ffb30012; border-radius: 16px; padding: 22px 18px 13px 18px;
+      margin-bottom: 16px; box-shadow: 0 2px 14px #0002;
+    }
+    .title { font-size: 1.55rem; font-weight: bold; color: #fff;}
+    .subtitle { color: #ffe5b7; font-size: 1rem; margin-top: 1px;}
+    .seccion-fecha { margin-bottom: 17px; }
+    .btn-fecha {
+      background: #2196f3;
+      border: none;
+      color: #fff;
+      font-size: 1.12rem;
+      padding: 14px 12px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      min-width: 80%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.16s;
+      margin: 0 auto;
+    }
+    .btn-fecha:hover { background: #2962ff;}
+    .card-proyeccion {
+      background: #181828;
+      border-radius: 13px;
+      box-shadow: 0 2px 12px #0003;
+      padding: 19px 16px 13px 16px;
+      margin-bottom: 18px;
+    }
+    .row-card {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 1.08rem; color: #ffe0b7; margin-bottom: 6px;
+    }
+    .detalles-vencidos { color: #ffd9b0; font-size: .98rem; }
+    .icon-mat {
+      font-family: 'Material Icons'; font-size: 22px; color: #ffb300; display: inline-block;
+      vertical-align: middle; width: 23px; text-align: center;
+    }
+    .icon-mat.orange { color: #ffb300; }
+    .icon-mat.blue { color: #37aaff; }
+    .icon-mat.red { color: #ff4040; }
+    .loader {
+      width: 44px; height: 44px; margin: 60px auto 70px auto; border-radius: 50%;
+      border: 4.5px solid #ffb300; border-top: 4.5px solid #eee0; animation: spin 1s linear infinite;
+      display: block;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    .notfound { color: #fff9; font-size: 1.22rem; text-align: center; margin: 70px 0;}
+    .aviso-fecha { color: #fff9; font-size: 1.08rem; text-align: center; margin: 35px 0;}
+    @media (max-width: 570px) {
+      .main { max-width: 99vw; padding: 1rem .4rem 2rem .4rem;}
+      .card-proyeccion { font-size: .99rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="main">
+    <div id="main-proyeccion"></div>
+  </div>
+</body>
+</html>

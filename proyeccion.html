@@ -24,7 +24,6 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // ============= Utilidades =============
     function getIdParam() {
       const url = new URL(window.location.href);
       return url.searchParams.get("id");
@@ -38,7 +37,6 @@
     function formatDate(date) {
       if (!date) return "-";
       if (typeof date === "string" && date.length === 10 && date.includes("-")) {
-        // Ya viene como yyyy-mm-dd
         return date;
       }
       const d = new Date(date);
@@ -52,9 +50,7 @@
       return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
     }
 
-    // ============= PROYECCIÓN LÓGICA =============
     function calcularProyeccion(credito, fechaProy) {
-      // Parámetros y bases
       const tasaDiaria = parseFloat(credito.tasaDiariaCredito || "0") || 0;
       const saldoActual = parseFloat(credito.saldoActual || "0") || 0;
       const interesActual = parseFloat(credito.interesActual || "0") || 0;
@@ -68,7 +64,6 @@
 
       let fechaProyeccion = new Date(fechaProy);
 
-      // --- Amortización y cuotas vencidas
       let cuotasVencidas = 0.0;
       let capitalVencido = 0.0;
       let interesesVencidos = 0.0;
@@ -93,11 +88,9 @@
         }
       }
 
-      // --- Intereses corridos
       let interesCorriente = 0.0;
       let dias = 0;
       if (cuotasAtrasadas > 0 && fechaUltimaVencida) {
-        // Intereses corridos desde el día siguiente de la última cuota vencida
         const desde = new Date(fechaUltimaVencida.getTime() + 86400000);
         if (fechaProyeccion >= desde) {
           dias = Math.floor((fechaProyeccion - desde) / 86400000);
@@ -107,20 +100,16 @@
           interesCorriente = 0;
         }
       } else {
-        // Antes de la primera cuota: solo intereses corridos desde la base
         dias = Math.floor((fechaProyeccion - fechaBase) / 86400000);
         interesCorriente = (dias > 0) ? saldoActual * tasaDiaria * dias : 0.0;
       }
 
-      // Para ponerse al día
       let paraPonerseAlDia = 0.0;
       if (cuotasAtrasadas > 0) {
         paraPonerseAlDia = cuotasVencidas + interesCorriente;
       } else {
         paraPonerseAlDia = interesCorriente;
       }
-
-      // Interés acumulado
       let interesProyectado = interesActual + interesCorriente + interesesVencidos;
 
       return {
@@ -136,7 +125,6 @@
       };
     }
 
-    // ============= UI RENDER =============
     let creditoGlobal = null;
     let fechaProyeccion = null;
     let proyeccion = null;
@@ -177,8 +165,6 @@
         document.getElementById("main-proyeccion").innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
         return;
       }
-
-      // Cabecera
       let html = `
         <div class="cabecera">
           <div class="title">${(c.nombre || "") + " " + (c.apellido || "")}</div>
@@ -188,6 +174,16 @@
           <button id="btnElegirFecha" class="btn-fecha">
             ${fechaProyeccion ? "Cambiar fecha de proyección" : "Seleccionar fecha para proyección"}
           </button>
+        </div>
+        <div id="modalFecha" class="modal-fecha" style="display:none;">
+          <div class="modal-content">
+            <label for="inputFecha">Selecciona la fecha de proyección:</label>
+            <input type="date" id="inputFecha" min="${formatDate(new Date(Date.now() - 365*24*60*60*1000))}" max="${formatDate(new Date(Date.now() + 3*365*24*60*60*1000))}" value="${formatDate(new Date())}">
+            <div style="margin-top:12px; text-align:right;">
+              <button id="btnCancelarFecha" class="btn-cancelar">Cancelar</button>
+              <button id="btnConfirmarFecha" class="btn-confirmar">Aceptar</button>
+            </div>
+          </div>
         </div>
       `;
 
@@ -243,29 +239,27 @@
         `;
       }
       document.getElementById("main-proyeccion").innerHTML = html;
-      if (document.getElementById("btnElegirFecha")) {
-        document.getElementById("btnElegirFecha").onclick = elegirFecha;
-      }
-    }
 
-    function elegirFecha() {
-      // Usamos un date input modal nativo para máxima compatibilidad
-      const dateInput = document.createElement("input");
-      dateInput.type = "date";
-      dateInput.min = formatDate(new Date(Date.now() - 365*24*60*60*1000));
-      dateInput.max = formatDate(new Date(Date.now() + 3*365*24*60*60*1000));
-      dateInput.value = formatDate(new Date());
-      dateInput.style.position = "fixed";
-      dateInput.style.top = "-100px";
-      document.body.appendChild(dateInput);
-
-      dateInput.onchange = () => {
-        fechaProyeccion = dateInput.value;
-        proyeccion = calcularProyeccion(creditoGlobal, fechaProyeccion);
-        renderUI();
-        document.body.removeChild(dateInput);
+      // Modal lógica
+      document.getElementById("btnElegirFecha").onclick = () => {
+        document.getElementById("modalFecha").style.display = "block";
       };
-      dateInput.click();
+      if (document.getElementById("btnCancelarFecha")) {
+        document.getElementById("btnCancelarFecha").onclick = () => {
+          document.getElementById("modalFecha").style.display = "none";
+        };
+      }
+      if (document.getElementById("btnConfirmarFecha")) {
+        document.getElementById("btnConfirmarFecha").onclick = () => {
+          const val = document.getElementById("inputFecha").value;
+          if (val) {
+            fechaProyeccion = val;
+            proyeccion = calcularProyeccion(creditoGlobal, fechaProyeccion);
+            renderUI();
+          }
+          document.getElementById("modalFecha").style.display = "none";
+        };
+      }
     }
 
     window.addEventListener("DOMContentLoaded", cargarCredito);
@@ -326,6 +320,26 @@
     @keyframes spin { 100% { transform: rotate(360deg); } }
     .notfound { color: #fff9; font-size: 1.22rem; text-align: center; margin: 70px 0;}
     .aviso-fecha { color: #fff9; font-size: 1.08rem; text-align: center; margin: 35px 0;}
+    .modal-fecha {
+      display: none; position: fixed; left: 0; top: 0; right: 0; bottom: 0;
+      background: #000a; z-index: 90; justify-content: center; align-items: center;
+    }
+    .modal-content {
+      background: #181828; border-radius: 10px; padding: 28px 24px 20px 24px; box-shadow: 0 8px 32px #0006; max-width: 340px; margin: 110px auto 0 auto;
+    }
+    .modal-content label { color: #ffb300; font-size: 1rem; margin-bottom: 8px; display:block;}
+    .modal-content input[type="date"] {
+      background: #222; color: #fff; border: 1px solid #ffb300; border-radius: 7px; padding: 8px 10px; font-size: 1rem;
+      margin: 0 0 7px 0; width: 100%;
+    }
+    .btn-cancelar, .btn-confirmar {
+      background: #222; border: 1.5px solid #ffb300; color: #ffb300; border-radius: 7px;
+      font-size: 1rem; padding: 7px 20px; font-weight: bold; cursor: pointer; margin-left: 9px;
+      transition: background .14s, color .14s;
+    }
+    .btn-confirmar { background: #ffb300; color: #222; border: 1.5px solid #ffb300;}
+    .btn-cancelar:hover { background: #333; color: #fff;}
+    .btn-confirmar:hover { background: #f8c43d; color: #101012;}
     @media (max-width: 570px) {
       .main { max-width: 99vw; padding: 1rem .4rem 2rem .4rem;}
       .card-proyeccion { font-size: .99rem; }
@@ -338,3 +352,4 @@
   </div>
 </body>
 </html>
+

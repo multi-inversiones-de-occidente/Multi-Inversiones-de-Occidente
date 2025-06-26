@@ -54,7 +54,7 @@
               <div class="nombre">${c.nombre || ""} ${c.apellido || ""}</div>
               <div class="info">
                 <span>DUI: <b>${c.numeroDui || '-'}</b></span><br>
-                <span>Monto: <b>${money(c.monto)}</b></span><br>
+                <span>Monto: <b>${money(c.montoAprobado)}</b></span><br>
                 <span>Estado: <b>${c.estadoCredito || '-'}</b></span>
               </div>
             </div>
@@ -63,7 +63,6 @@
       }
     }
 
-    // CAMBIADO: Navega a la página detalle con el id
     window.verDetalleCredito = function(id) {
       location.href = `detalle_credito.html?id=${id}`;
     };
@@ -201,6 +200,4 @@
   </div>
 </body>
 </html>
-
-
 

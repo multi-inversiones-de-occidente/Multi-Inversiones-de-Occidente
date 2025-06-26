@@ -24,6 +24,13 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
+    // Map de tasas anuales por línea de crédito
+    const TASAS_ANUALES = {
+      "Credicash": 192,
+      "Credicel": 150,
+      "Amuebla2": 132
+    };
+
     // Función para leer el parámetro id de la URL
     function getIdParam() {
       const url = new URL(window.location.href);
@@ -75,6 +82,34 @@
       `;
     }
 
+    function obtenerCuotas(amortizacion) {
+      // Cuenta las cuotas pendientes y atrasadas en el array
+      let cuotasPendientes = 0;
+      let cuotasAtrasadas = 0;
+      let ultimaFechaVencimiento = null;
+      if (Array.isArray(amortizacion)) {
+        for (const cuota of amortizacion) {
+          // Estado puede ser "Pendiente", "Parcial", "Pagada"
+          if (cuota.estado === "Pendiente") cuotasPendientes++;
+          if (cuota.estado === "Parcial" || cuota.estado === "Pendiente") cuotasAtrasadas++;
+          // Buscar la última fecha
+          if (cuota.fecha) {
+            const fechaNum = new Date(cuota.fecha).getTime();
+            if (!ultimaFechaVencimiento || fechaNum > ultimaFechaVencimiento) {
+              ultimaFechaVencimiento = fechaNum;
+            }
+          }
+        }
+      }
+      return {
+        cuotasPendientes,
+        cuotasAtrasadas,
+        fechaVencimiento: ultimaFechaVencimiento
+          ? formateaFecha(new Date(ultimaFechaVencimiento))
+          : "-"
+      };
+    }
+
     async function cargarCredito() {
       const creditoId = getIdParam();
       if (!creditoId) {
@@ -83,7 +118,6 @@
       }
       document.getElementById("main-detail").innerHTML = `<div class="loader"></div>`;
 
-      // Espera autenticación igual que en Master
       onAuthStateChanged(auth, async user => {
         if (!user) {
           window.location.href = "login.html";
@@ -99,6 +133,15 @@
           }
           const c = snap.data();
 
+          // Calcular campos derivados
+          let amortizacion = c.amortizacion || [];
+          let cuotas = obtenerCuotas(amortizacion);
+
+          // Tasa Anual según línea de crédito
+          let tasaAnual = TASAS_ANUALES[c.lineaDeCredito] || "-";
+          // Tasa Diaria = tasa anual / 360
+          let tasaDiaria = (tasaAnual !== "-") ? (tasaAnual / 360).toFixed(4) : "-";
+
           document.getElementById("main-detail").innerHTML = `
             <div class="cabecera">
               <div class="title">${(c.nombre || "") + " " + (c.apellido || "")}</div>
@@ -111,18 +154,18 @@
               ${detailTile("Línea de Crédito", c.lineaDeCredito, "account_tree")}
               ${detailTile("Estado del Crédito", c.estadoCredito, "info")}
               ${detailTile("Fecha de Inicio", formateaFecha(c.fechaInicio), "event")}
-              ${detailTile("Fecha Vencimiento", formateaFecha(c.fechaVencimiento), "event_busy")}
+              ${detailTile("Fecha Vencimiento", cuotas.fechaVencimiento, "event_busy")}
               ${detailTile("Monto Aprobado", money(c.montoAprobado), "attach_money")}
               ${detailTile("Saldo Inicial", money(c.saldoInicial), "monetization_on")}
               ${detailTile("Saldo Actual", money(c.saldoActual), "savings")}
               ${detailTile("Cuota Aprobada", money(c.cuotaAprobada), "request_quote")}
-              ${detailTile("Número de Cuotas", c.numeroCuotas, "format_list_numbered")}
-              ${detailTile("Cuotas Pendientes", c.cuotasPendientes, "timelapse")}
-              ${detailTile("Cuotas Atrasadas", c.cuotasAtrasadas, "error")}
+              ${detailTile("Número de Cuotas", amortizacion.length || "-", "format_list_numbered")}
+              ${detailTile("Cuotas Pendientes", cuotas.cuotasPendientes, "timelapse")}
+              ${detailTile("Cuotas Atrasadas", cuotas.cuotasAtrasadas, "error")}
               ${detailTile("Asignado a", c.asignadoA, "person")}
               ${detailTile("Frecuencia de Pago", c.frecuenciaPago, "repeat")}
-              ${detailTile("Tasa Anual", c.tasaAnualCredito ? c.tasaAnualCredito + "%" : "-", "percent")}
-              ${detailTile("Tasa Diaria", c.tasaDiariaCredito, "percent")}
+              ${detailTile("Tasa Anual", tasaAnual !== "-" ? tasaAnual + "%" : "-", "percent")}
+              ${detailTile("Tasa Diaria", tasaDiaria, "percent")}
               ${detailTile("Capital Atrasado", money(c.capitalAtrasado), "money_off_csred")}
               ${detailTile("Interés Actual", money(c.interesActual), "trending_up")}
               ${detailTile("Interés Pendiente", money(c.interesPendiente), "schedule")}
@@ -221,3 +264,4 @@
   </div>
 </body>
 </html>
+

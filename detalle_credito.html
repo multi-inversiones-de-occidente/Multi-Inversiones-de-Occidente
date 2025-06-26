@@ -7,6 +7,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     // Configuración Firebase
     const firebaseConfig = {
@@ -21,6 +22,7 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const auth = getAuth(app);
 
     // Función para leer el parámetro id de la URL
     function getIdParam() {
@@ -81,57 +83,68 @@
       }
       document.getElementById("main-detail").innerHTML = `<div class="loader"></div>`;
 
-      const ref = doc(db, "creditos", creditoId);
-      const snap = await getDoc(ref);
+      // Espera autenticación igual que en Master
+      onAuthStateChanged(auth, async user => {
+        if (!user) {
+          window.location.href = "login.html";
+          return;
+        }
+        try {
+          const ref = doc(db, "creditos", creditoId);
+          const snap = await getDoc(ref);
 
-      if (!snap.exists()) {
-        document.getElementById("main-detail").innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
-        return;
-      }
-      const c = snap.data();
+          if (!snap.exists()) {
+            document.getElementById("main-detail").innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
+            return;
+          }
+          const c = snap.data();
 
-      document.getElementById("main-detail").innerHTML = `
-        <div class="cabecera">
-          <div class="title">${(c.nombre || "") + " " + (c.apellido || "")}</div>
-          <div class="subtitle">DUI: <b>${c.numeroDui || "-"}</b></div>
-          <div class="subtitle">Tel: <b>${c.telefono || "-"}</b></div>
-        </div>
-        <div class="detalles">
-          ${detailTile("Agencia asignada", c.agenciaAsignada, "location_on")}
-          ${detailTile("Dirección", c.direccion, "home")}
-          ${detailTile("Línea de Crédito", c.lineaDeCredito, "account_tree")}
-          ${detailTile("Estado del Crédito", c.estadoCredito, "info")}
-          ${detailTile("Fecha de Inicio", formateaFecha(c.fechaInicio), "event")}
-          ${detailTile("Fecha Vencimiento", formateaFecha(c.fechaVencimiento), "event_busy")}
-          ${detailTile("Monto Aprobado", money(c.montoAprobado), "attach_money")}
-          ${detailTile("Saldo Inicial", money(c.saldoInicial), "monetization_on")}
-          ${detailTile("Saldo Actual", money(c.saldoActual), "savings")}
-          ${detailTile("Cuota Aprobada", money(c.cuotaAprobada), "request_quote")}
-          ${detailTile("Número de Cuotas", c.numeroCuotas, "format_list_numbered")}
-          ${detailTile("Cuotas Pendientes", c.cuotasPendientes, "timelapse")}
-          ${detailTile("Cuotas Atrasadas", c.cuotasAtrasadas, "error")}
-          ${detailTile("Asignado a", c.asignadoA, "person")}
-          ${detailTile("Frecuencia de Pago", c.frecuenciaPago, "repeat")}
-          ${detailTile("Tasa Anual", c.tasaAnualCredito ? c.tasaAnualCredito + "%" : "-", "percent")}
-          ${detailTile("Tasa Diaria", c.tasaDiariaCredito, "percent")}
-          ${detailTile("Capital Atrasado", money(c.capitalAtrasado), "money_off_csred")}
-          ${detailTile("Interés Actual", money(c.interesActual), "trending_up")}
-          ${detailTile("Interés Pendiente", money(c.interesPendiente), "schedule")}
-          ${detailTile("Multas Acumuladas", money(c.multasAcumuladas), "gavel")}
-          ${detailTile("Días de Mora", c.diasMora, "calendar_today")}
-          ${detailTile("Días Intereses", c.diasIntereses, "calendar_view_day")}
-          ${detailTile("Para Ponerse al Día", money(c.paraPonerseAlDia), "paid")}
-          ${detailTile("Última actualización", formateaFecha(c.ultimaActualizacion), "update")}
-        </div>
-        <div class="acciones">
-          <button class="btn-accent" onclick="window.open('amortizacion.html?id=${creditoId}', '_self')">
-            <span class="material-icons">view_list</span> Ver Plan de Pagos
-          </button>
-          <button class="btn-green" onclick="window.open('proyeccion.html?id=${creditoId}', '_self')">
-            <span class="material-icons">trending_up</span> Hacer Proyección
-          </button>
-        </div>
-      `;
+          document.getElementById("main-detail").innerHTML = `
+            <div class="cabecera">
+              <div class="title">${(c.nombre || "") + " " + (c.apellido || "")}</div>
+              <div class="subtitle">DUI: <b>${c.numeroDui || "-"}</b></div>
+              <div class="subtitle">Tel: <b>${c.telefono || "-"}</b></div>
+            </div>
+            <div class="detalles">
+              ${detailTile("Agencia asignada", c.agenciaAsignada, "location_on")}
+              ${detailTile("Dirección", c.direccion, "home")}
+              ${detailTile("Línea de Crédito", c.lineaDeCredito, "account_tree")}
+              ${detailTile("Estado del Crédito", c.estadoCredito, "info")}
+              ${detailTile("Fecha de Inicio", formateaFecha(c.fechaInicio), "event")}
+              ${detailTile("Fecha Vencimiento", formateaFecha(c.fechaVencimiento), "event_busy")}
+              ${detailTile("Monto Aprobado", money(c.montoAprobado), "attach_money")}
+              ${detailTile("Saldo Inicial", money(c.saldoInicial), "monetization_on")}
+              ${detailTile("Saldo Actual", money(c.saldoActual), "savings")}
+              ${detailTile("Cuota Aprobada", money(c.cuotaAprobada), "request_quote")}
+              ${detailTile("Número de Cuotas", c.numeroCuotas, "format_list_numbered")}
+              ${detailTile("Cuotas Pendientes", c.cuotasPendientes, "timelapse")}
+              ${detailTile("Cuotas Atrasadas", c.cuotasAtrasadas, "error")}
+              ${detailTile("Asignado a", c.asignadoA, "person")}
+              ${detailTile("Frecuencia de Pago", c.frecuenciaPago, "repeat")}
+              ${detailTile("Tasa Anual", c.tasaAnualCredito ? c.tasaAnualCredito + "%" : "-", "percent")}
+              ${detailTile("Tasa Diaria", c.tasaDiariaCredito, "percent")}
+              ${detailTile("Capital Atrasado", money(c.capitalAtrasado), "money_off_csred")}
+              ${detailTile("Interés Actual", money(c.interesActual), "trending_up")}
+              ${detailTile("Interés Pendiente", money(c.interesPendiente), "schedule")}
+              ${detailTile("Multas Acumuladas", money(c.multasAcumuladas), "gavel")}
+              ${detailTile("Días de Mora", c.diasMora, "calendar_today")}
+              ${detailTile("Días Intereses", c.diasIntereses, "calendar_view_day")}
+              ${detailTile("Para Ponerse al Día", money(c.paraPonerseAlDia), "paid")}
+              ${detailTile("Última actualización", formateaFecha(c.ultimaActualizacion), "update")}
+            </div>
+            <div class="acciones">
+              <button class="btn-accent" onclick="window.open('amortizacion.html?id=${creditoId}', '_self')">
+                <span class="material-icons">view_list</span> Ver Plan de Pagos
+              </button>
+              <button class="btn-green" onclick="window.open('proyeccion.html?id=${creditoId}', '_self')">
+                <span class="material-icons">trending_up</span> Hacer Proyección
+              </button>
+            </div>
+          `;
+        } catch (err) {
+          document.getElementById("main-detail").innerHTML = `<div class="notfound">No tienes permisos para ver este crédito.</div>`;
+        }
+      });
     }
 
     window.addEventListener("DOMContentLoaded", cargarCredito);

@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Panel de Gerente – Multi Inversiones</title>
+  <title>Cuotas por Vencer – Multi Inversiones</title>
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -19,278 +19,262 @@
       appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
       measurementId: "G-H4E31XHG1Y"
     };
-    const app  = initializeApp(firebaseConfig);
-    const db   = getFirestore(app);
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
     const auth = getAuth(app);
 
-    // Badges y lógica solo se activa si usuario autenticado
-    function suscribirBadge(idBadge, filtros=[]) {
-      const q = query(collection(db, "Archivo Solicitudes"), ...filtros);
-      onSnapshot(q, snap => {
-        document.getElementById(idBadge).textContent = snap.docs.length;
-      }, err => {
-        document.getElementById(idBadge).textContent = "!";
-      });
-    }
-
-    // Esconde todo el body hasta autenticar
+    // Esconde el contenido hasta autenticar
     document.documentElement.style.visibility = "hidden";
 
+    // Formatea fecha YYYY-MM-DD a DD/MM/YYYY
+    function formatoFecha(fecha) {
+      if (!fecha) return '';
+      const d = new Date(fecha);
+      return d.toLocaleDateString('es-SV', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    }
+
+    // Devuelve diferencia de días entre hoy y fecha de cuota (sin hora)
+    function diasHasta(fechaStr) {
+      const hoy = new Date();
+      hoy.setHours(0,0,0,0);
+      const f = new Date(fechaStr);
+      f.setHours(0,0,0,0);
+      return Math.round((f - hoy) / (1000*60*60*24));
+    }
+
+    // Lógica principal al cargar el DOM y autenticar
     window.addEventListener("DOMContentLoaded", () => {
-      onAuthStateChanged(auth, user => {
-        if (!user) {
-          location.href = "login.html";
-          return;
-        }
-        // Si está autenticado, muestra el body y sigue
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) return location.href = "login.html";
         document.documentElement.style.visibility = "visible";
         document.getElementById("usuario-nombre").textContent = user.email;
-        const uid = user.uid;
-
-        // Badges de solicitudes aprobadas por línea y usuario logueado
-        suscribirBadge(
-          "badge-app-credicash",
-          [
-            where("estado","==","Aprobado"),
-            where("creditLine","==","Credicash"),
-            where("AsignacionID", "==", uid)
-          ]
-        );
-        suscribirBadge(
-          "badge-app-credicel",
-          [
-            where("estado","==","Aprobado"),
-            where("creditLine","==","Credicel"),
-            where("AsignacionID", "==", uid)
-          ]
-        );
-        suscribirBadge(
-          "badge-app-amuebla2",
-          [
-            where("estado","==","Aprobado"),
-            where("creditLine","==","Amuebla2"),
-            where("AsignacionID", "==", uid)
-          ]
-        );
+        cargarCuotas("hoy");
+        document.getElementById("filtro-cuotas").addEventListener("change", (e) => {
+          cargarCuotas(e.target.value);
+        });
       });
     });
-  </script>
 
+    // Trae cuotas pendientes según filtro seleccionado
+    async function cargarCuotas(filtro) {
+      const contenedor = document.getElementById("contenedor-cuotas");
+      contenedor.innerHTML = "<div class='cargando'>Cargando cuotas…</div>";
+      const snapshot = await getDocs(collection(db, "creditos"));
+      const cuotas = [];
+      const hoy = new Date(); hoy.setHours(0,0,0,0);
+
+      let diasMin = 0, diasMax = 0;
+      if (filtro === "hoy")      { diasMin = 0;  diasMax = 0; }
+      if (filtro === "7dias")    { diasMin = 0;  diasMax = 7; }
+      if (filtro === "15dias")   { diasMin = 0;  diasMax = 15; }
+      if (filtro === "30dias")   { diasMin = 0;  diasMax = 30; }
+
+      snapshot.forEach(doc => {
+        const c = doc.data();
+        const nombreCliente = c.nombre?.trim() || "(Sin nombre)";
+        const apellidoCliente = c.apellido?.trim() || "";
+        const telefono = c.telefono || "";
+        const idCredito = doc.id;
+
+        if (Array.isArray(c.amortizacion)) {
+          c.amortizacion.forEach((cuota, i) => {
+            if (cuota.estado === "Pendiente" && cuota.fecha) {
+              const dias = diasHasta(cuota.fecha);
+              if (dias >= diasMin && dias <= diasMax) {
+                cuotas.push({
+                  nombre: nombreCliente,
+                  apellido: apellidoCliente,
+                  telefono,
+                  idCredito,
+                  numeroCuota: cuota.numeroCuota,
+                  fecha: cuota.fecha,
+                  dias,
+                  capital: cuota.capital,
+                  interes: cuota.interes,
+                  cuotaTotal: cuota.cuota,
+                  saldo: cuota.saldo,
+                });
+              }
+            }
+          });
+        }
+      });
+
+      // Ordena por fecha de vencimiento (ascendente)
+      cuotas.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+
+      // Renderiza la tabla
+      if (cuotas.length === 0) {
+        contenedor.innerHTML = "<div class='sin-resultados'>No hay cuotas pendientes en este rango.</div>";
+        return;
+      }
+
+      let html = `
+        <table class="tabla-cuotas">
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>Cuota #</th>
+              <th>Fecha Vence</th>
+              <th>Días</th>
+              <th>Capital</th>
+              <th>Interés</th>
+              <th>Total</th>
+              <th>Saldo Crédito</th>
+              <th>Teléfono</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+      cuotas.forEach(cuota => {
+        html += `
+          <tr>
+            <td>${cuota.nombre} ${cuota.apellido}</td>
+            <td style="text-align:center">${cuota.numeroCuota+1}</td>
+            <td>${formatoFecha(cuota.fecha)}</td>
+            <td style="text-align:center">${cuota.dias}</td>
+            <td style="text-align:right">$${parseFloat(cuota.capital).toFixed(2)}</td>
+            <td style="text-align:right">$${parseFloat(cuota.interes).toFixed(2)}</td>
+            <td style="text-align:right"><b>$${parseFloat(cuota.cuotaTotal).toFixed(2)}</b></td>
+            <td style="text-align:right">$${parseFloat(cuota.saldo).toFixed(2)}</td>
+            <td><a href="tel:${cuota.telefono}" style="color:#4fcf70;text-decoration:none;"><i class="fas fa-phone"></i> ${cuota.telefono}</a></td>
+          </tr>
+        `;
+      });
+      html += "</tbody></table>";
+      contenedor.innerHTML = html;
+    }
+  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body {
-      margin:0; font-family:Arial,sans-serif;
-      background: radial-gradient(circle,#000,#111);
-      color:#fff; min-height: 100vh;
+      background: radial-gradient(circle,#000,#101820 70%);
+      color: #fff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0; min-height: 100vh;
     }
     header {
-      background:#000; padding:1rem; text-align:center;
-      font-size:1.5rem; letter-spacing:1px; font-weight:700;
+      background: #000;
+      padding: 1.2rem 0;
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: .5px;
+      color: #67C8F1;
     }
     .container {
-      max-width:900px; margin:0 auto; padding:2.5rem 1rem 2rem 1rem;
-      display: flex; flex-direction: column; align-items: center;
-    }
-    h1 { 
-      margin:1rem 0 0.2rem 0; 
-      font-size:2.3rem;
-      font-weight:800;
-      letter-spacing:.5px;
-      text-align:center;
-    }
-    .mensaje-bienvenida {
-      font-size:1.12rem;
-      color:#F8AF40;
-      margin-bottom: 2.4rem;
-      margin-top: 0.4rem;
-      font-weight:600;
-      text-align:center;
-      line-height:1.38;
-      max-width: 600px;
-    }
-    .grid-botones {
-      width:100%;
-      display:grid;
-      grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
-      gap:1.55rem;
-      margin-bottom:2.2rem;
-    }
-    .btn-grande {
-      background: linear-gradient(90deg, #67C8F1 0%, #13b66b 100%);
-      color: #212121;
-      font-weight: bold;
-      font-size: 1.16rem;
-      border: none;
-      border-radius: 18px;
-      box-shadow: 0 4px 22px #13b66a2b;
-      padding: 2rem 1.2rem 2rem 1.2rem;
-      text-align: center;
-      cursor: pointer;
-      transition: background .19s, color .19s, transform .15s;
-      position: relative;
-      outline: none;
+      max-width: 1150px;
+      margin: 0 auto;
+      padding: 2.3rem 2vw 2rem 2vw;
       display: flex;
       flex-direction: column;
       align-items: center;
+    }
+    h1 {
+      font-size: 2.1rem;
+      margin-bottom: 0.65rem;
+      letter-spacing: 0.5px;
+      color: #F8AF40;
+      text-align:center;
+      font-weight:900;
+    }
+    .usuario {
+      font-size: 1.03rem;
+      color: #A1DDFB;
+      margin-bottom: 1.5rem;
+      font-weight: 600;
+      text-align: center;
+    }
+    .filtros-cuotas {
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: center;
       gap: .7rem;
-      min-width:0;
-      user-select: none;
-      text-decoration: none;
     }
-    .btn-grande:active,
-    .btn-grande:hover {
-      background: linear-gradient(90deg, #13b66b 70%, #67C8F1 100%);
-      color: #222;
-      transform: scale(1.03);
-      box-shadow: 0 8px 26px #0a644188;
-      text-decoration: none;
+    select {
+      padding: 0.46rem 0.8rem;
+      border-radius: 8px;
+      border: 1px solid #88e7ad;
+      font-size: 1.08rem;
+      font-family: inherit;
+      background: #1c2730;
+      color: #fff;
+      font-weight: bold;
+      outline: none;
+      margin-left: .3rem;
+      margin-right: 1.1rem;
     }
-    .btn-grande i {
-      font-size: 2.2rem;
-      margin-bottom: 9px;
-      color: #212121;
-      opacity: .89;
-      transition: color .15s;
+    .tabla-cuotas {
+      width: 100%;
+      border-collapse: collapse;
+      background: #222c33;
+      box-shadow: 0 4px 24px #0005;
+      border-radius: 14px;
+      overflow: hidden;
+      margin-top: 0.7rem;
     }
-    .btn-grande:hover i { color: #0c7451; }
-    .btn-grande .badge {
-      position: absolute; top: 14px; right: 15px;
-      background:#e74c3c; color:#fff;
-      width:28px; height:28px; border-radius:50%;
-      display:flex; align-items:center; justify-content:center;
-      font-size:.85rem; font-weight:700;
-      box-shadow:0 1px 8px #0002;
+    .tabla-cuotas th,
+    .tabla-cuotas td {
+      padding: 10px 6px;
+      border-bottom: 1px solid #2b485b;
+      font-size: 1.02rem;
     }
-    /* Estilos adicionales de botones del panel original */
-    .btn-revertir {
-      background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%);
-      color: #fff !important;
+    .tabla-cuotas th {
+      background: #212a35;
+      color: #F8AF40;
+      font-size: 1.08rem;
+      letter-spacing: .5px;
+      font-weight: 700;
+      text-align: center;
     }
-    .btn-revertir:active,
-    .btn-revertir:hover {
-      background: linear-gradient(90deg, #c0392b 70%, #8e0800 100%);
-      color: #fff !important;
-      box-shadow: 0 8px 26px #800a0a88;
+    .tabla-cuotas tr:last-child td {
+      border-bottom: none;
     }
-    .btn-revertir i { color: #fff !important; opacity: 1;}
-    .btn-caja { background: linear-gradient(90deg, #67C8F1 0%, #13b66b 100%);}
-    .btn-mora-usuario { background: linear-gradient(90deg, #7a42f1 0%, #5933d7 100%);}
-    .btn-mora-agencia { background: linear-gradient(90deg, #304ffe 0%, #5c6bc0 100%);}
-    .btn-pin { background: linear-gradient(90deg, #f8af40 0%, #ffa726 100%);}
-    .btn-caja i { color: #134e3b; }
-    .btn-mora-usuario i { color: #fff;}
-    .btn-mora-agencia i { color: #fff;}
-    .btn-pin, .btn-pin i { color: #222; }
-    .btn-pin i { color: #fff59d;}
-
-    /* Nuevos estilos para los botones agregados */
-    .btn-cierre-caja {
-      background: linear-gradient(90deg, #e7ff72 0%, #13b66b 100%);
-      color: #212121;
+    .tabla-cuotas td a { color: #4fcf70; }
+    .cargando, .sin-resultados {
+      padding: 1.5rem;
+      color: #90caf9;
+      font-size: 1.15rem;
+      text-align: center;
     }
-    .btn-cierre-caja:active,
-    .btn-cierre-caja:hover {
-      background: linear-gradient(90deg, #13b66b 60%, #e7ff72 100%);
-      color: #222;
+    @media (max-width: 750px) {
+      .container { padding: 1.2rem 0.6vw; }
+      .tabla-cuotas th, .tabla-cuotas td { font-size: .91rem; padding: 7px 2px;}
     }
-    .btn-cierre-caja i { color: #847900; }
-
-    .btn-master-creditos {
-      background: linear-gradient(90deg, #607D8B 0%, #37474F 100%);
-      color: #fff !important;
-    }
-    .btn-master-creditos:active,
-    .btn-master-creditos:hover {
-      background: linear-gradient(90deg, #37474F 70%, #607D8B 100%);
-      color: #fff !important;
-    }
-    .btn-master-creditos i { color: #fff; opacity: 0.93;}
-    /* --- NUEVO BOTÓN DE CUOTAS POR VENCER --- */
-    .btn-cuotas-vencer {
-      background: linear-gradient(90deg, #F8AF40 0%, #67C8F1 100%);
-      color: #24272b !important;
-    }
-    .btn-cuotas-vencer:active,
-    .btn-cuotas-vencer:hover {
-      background: linear-gradient(90deg, #67C8F1 70%, #F8AF40 100%);
-      color: #111 !important;
-    }
-    .btn-cuotas-vencer i { color: #222; opacity: 0.98;}
-    @media (max-width: 600px) {
-      .container { padding:1.2rem 1vw; }
-      h1 { font-size: 1.23rem;}
-      .mensaje-bienvenida { font-size: .99rem; }
-      .grid-botones { gap:1rem; }
-      .btn-grande { padding: 1.3rem 0.6rem 1.3rem 0.6rem; font-size: .97rem;}
-      .btn-grande i { font-size:1.4rem; }
+    @media (max-width: 530px) {
+      .tabla-cuotas, .tabla-cuotas thead, .tabla-cuotas tbody, .tabla-cuotas tr, .tabla-cuotas th, .tabla-cuotas td {
+        display: block;
+      }
+      .tabla-cuotas tr { margin-bottom: 13px; }
+      .tabla-cuotas td, .tabla-cuotas th {
+        padding: 7px 2vw;
+        text-align: left !important;
+      }
+      .tabla-cuotas thead { display: none; }
+      .tabla-cuotas td:before {
+        content: attr(data-label);
+        font-weight: bold;
+        color: #f8af40;
+        margin-right: 8px;
+      }
     }
   </style>
 </head>
 <body>
-  <header>Panel de Gerente</header>
-
+  <header>Cuotas por Vencer</header>
   <div class="container">
-    <h1 id="usuario-nombre">Bienvenido, usuario</h1>
-    <div class="mensaje-bienvenida">
-      Acceso rápido a las funciones del gerente.<br>
-      <span style="color:#67C8F1;font-weight:700;">Visualiza tus solicitudes aprobadas y administra las funciones claves de Multi Inversiones.</span>
+    <h1>Cuotas Pendientes Próximas a Vencer</h1>
+    <div class="usuario">Usuario: <span id="usuario-nombre"></span></div>
+    <div class="filtros-cuotas">
+      <label for="filtro-cuotas"><i class="fas fa-filter"></i> Mostrar:</label>
+      <select id="filtro-cuotas">
+        <option value="hoy">Cuotas que vencen <b>HOY</b></option>
+        <option value="7dias">En los próximos 7 días</option>
+        <option value="15dias">En los próximos 15 días</option>
+        <option value="30dias">En los próximos 30 días</option>
+      </select>
     </div>
-
-    <!-- BLOQUE NUEVO: Solicitudes aprobadas con badges -->
-    <div class="grid-botones" style="margin-bottom: 1.8rem;">
-      <a href="solicitudes_aprobadas_credicash_page.html" class="btn-grande">
-        <i class="fas fa-check-circle"></i>
-        Solicitudes Aprobadas Credicash
-        <span id="badge-app-credicash" class="badge">0</span>
-      </a>
-      <a href="solicitudes_aprobadas_credicel_page.html" class="btn-grande">
-        <i class="fas fa-check-circle"></i>
-        Solicitudes Aprobadas Credicel
-        <span id="badge-app-credicel" class="badge">0</span>
-      </a>
-      <a href="solicitudes_aprobadas_amuebla2_page.html" class="btn-grande">
-        <i class="fas fa-check-circle"></i>
-        Solicitudes Aprobadas Amuebla2
-        <span id="badge-app-amuebla2" class="badge">0</span>
-      </a>
-    </div>
-
-    <!-- BLOQUE PANEL ORIGINAL DEL GERENTE + BOTONES AGREGADOS -->
-    <div class="grid-botones">
-      <a href="detalle_gerente_caja_page.html" class="btn-grande btn-caja">
-        <i class="fas fa-wallet"></i>
-        Ver Movimientos de Caja
-      </a>
-      <a href="tasa_mora_usuario_page.html" class="btn-grande btn-mora-usuario">
-        <i class="fas fa-user-check"></i>
-        Tasa de Mora por Usuario
-      </a>
-      <a href="tasa_mora_agencia_page.html" class="btn-grande btn-mora-agencia">
-        <i class="fas fa-city"></i>
-        Tasa de Mora por Agencia
-      </a>
-      <a href="revertir_credito_page.html" class="btn-grande btn-revertir">
-        <i class="fas fa-undo"></i>
-        Revertir Créditos
-      </a>
-      <a href="gerente_password_page.html" class="btn-grande btn-pin">
-        <i class="fas fa-key"></i>
-        Administrar PIN Interno
-      </a>
-      <a href="cierre_caja_page.html" class="btn-grande btn-cierre-caja">
-        <i class="fas fa-lock"></i>
-        Cierre de Caja (Arqueo Diario)
-      </a>
-      <a href="master_creditos_page.html" class="btn-grande btn-master-creditos">
-        <i class="fas fa-database"></i>
-        Master de Créditos
-      </a>
-      <!-- === BOTÓN DE CUOTAS POR VENCER AGREGADO AQUÍ === -->
-      <a href="cuotas_por_vencer_page.html" class="btn-grande btn-cuotas-vencer">
-        <i class="fa-solid fa-hourglass-half"></i>
-        Cuotas por Vencer
-      </a>
-    </div>
+    <div id="contenedor-cuotas"></div>
   </div>
 </body>
 </html>

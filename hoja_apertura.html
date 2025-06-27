@@ -38,41 +38,11 @@
         direccion: 'Calle Principal, Barrio El Calvario, Juayúa',
         telefono: '2457-5656'
       }
-      // Más agencias si necesitas...
     };
 
     function getParam(name) {
       const params = new URLSearchParams(window.location.search);
       return params.get(name);
-    }
-
-    // OBTIENE la tabla recalculada desde localStorage si existe
-    function getAmortizacionTemp(asignacionID) {
-      try {
-        const key = `nuevaAmortizacionTemp_${asignacionID}`;
-        const val = localStorage.getItem(key);
-        if (!val) return null;
-        const data = JSON.parse(val);
-        if (Array.isArray(data) && data.length > 0) return data;
-        return null;
-      } catch {
-        return null;
-      }
-    }
-
-    // Devuelve fecha local legible
-    function formatFecha(str) {
-      if (!str) return "";
-      // Para formato YYYY-MM-DD
-      if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
-        const d = new Date(str);
-        return d.toLocaleDateString("es-SV");
-      }
-      // Para formato con T (ISO)
-      if (str.includes("T")) {
-        return new Date(str).toLocaleDateString("es-SV");
-      }
-      return str;
     }
 
     async function loadHojaApertura() {
@@ -107,20 +77,25 @@
           // 4) Preparar variables y valores
           const fechaApertura = new Date().toLocaleDateString('es-SV');
 
-          // OBTENER FECHA DE VENCIMIENTO DE LA TABLA DEL CACHE
-          let fechaVencimiento = '';
-          const tablaAmortTemp = getAmortizacionTemp(asignacionID);
+          // Buscar tabla temporal de amortización por asignación (localStorage)
+          let amortTemp = [];
+          const keyTemp = 'amortizacion_temp_' + asignacionID;
+          if (localStorage.getItem(keyTemp)) {
+            amortTemp = JSON.parse(localStorage.getItem(keyTemp));
+          } else if (Array.isArray(asignData.amortizacion)) {
+            amortTemp = asignData.amortizacion;
+          }
 
-          if (tablaAmortTemp && tablaAmortTemp.length > 0) {
-            // SIEMPRE toma la última de la tabla temporal
-            fechaVencimiento = formatFecha(tablaAmortTemp[tablaAmortTemp.length - 1].fecha);
-          } else if (Array.isArray(asignData.amortizacion) && asignData.amortizacion.length > 0) {
-            // Si no existe temp, usa la original
-            const last = asignData.amortizacion[asignData.amortizacion.length - 1];
+          // Obtener fecha de vencimiento: última cuota de la tabla
+          let fechaVencimiento = '';
+          if (amortTemp && amortTemp.length > 0) {
+            let last = amortTemp[amortTemp.length - 1];
             if (last.fecha && last.fecha.toDate) {
               fechaVencimiento = last.fecha.toDate().toLocaleDateString("es-SV");
             } else if (typeof last.fecha === "string") {
-              fechaVencimiento = formatFecha(last.fecha);
+              fechaVencimiento = last.fecha.split("T")[0];
+            } else {
+              fechaVencimiento = '';
             }
           }
 
@@ -140,7 +115,7 @@
           const nombreCliente = `${solData.nombre || ''} ${solData.apellido || ''}`;
           const clienteID = asignacionID;
 
-          // Renderizar el documento
+          // 5) Renderizar el documento
           let html = `
             <div class="doc-wrap" id="print-section">
               <div class="doc-header">
@@ -276,4 +251,5 @@
   </div>
 </body>
 </html>
+
 

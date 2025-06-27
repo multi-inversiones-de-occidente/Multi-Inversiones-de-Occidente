@@ -38,7 +38,7 @@
         direccion: 'Calle Principal, Barrio El Calvario, Juayúa',
         telefono: '2457-5656'
       }
-      // Agrega más agencias si es necesario...
+      // Más agencias si necesitas...
     };
 
     function getParam(name) {
@@ -46,7 +46,7 @@
       return params.get(name);
     }
 
-    // Nueva función para obtener la tabla recalculada temporal desde localStorage
+    // OBTIENE la tabla recalculada desde localStorage si existe
     function getAmortizacionTemp(asignacionID) {
       try {
         const key = `nuevaAmortizacionTemp_${asignacionID}`;
@@ -58,6 +58,21 @@
       } catch {
         return null;
       }
+    }
+
+    // Devuelve fecha local legible
+    function formatFecha(str) {
+      if (!str) return "";
+      // Para formato YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        const d = new Date(str);
+        return d.toLocaleDateString("es-SV");
+      }
+      // Para formato con T (ISO)
+      if (str.includes("T")) {
+        return new Date(str).toLocaleDateString("es-SV");
+      }
+      return str;
     }
 
     async function loadHojaApertura() {
@@ -92,18 +107,20 @@
           // 4) Preparar variables y valores
           const fechaApertura = new Date().toLocaleDateString('es-SV');
 
-          // --------- OBTENER FECHA DE VENCIMIENTO DE TABLA TEMPORAL SI EXISTE ---------
+          // OBTENER FECHA DE VENCIMIENTO DE LA TABLA DEL CACHE
           let fechaVencimiento = '';
-          let tablaAmortTemp = getAmortizacionTemp(asignacionID);
+          const tablaAmortTemp = getAmortizacionTemp(asignacionID);
+
           if (tablaAmortTemp && tablaAmortTemp.length > 0) {
-            const last = tablaAmortTemp[tablaAmortTemp.length - 1];
-            if (last.fecha) fechaVencimiento = last.fecha;
+            // SIEMPRE toma la última de la tabla temporal
+            fechaVencimiento = formatFecha(tablaAmortTemp[tablaAmortTemp.length - 1].fecha);
           } else if (Array.isArray(asignData.amortizacion) && asignData.amortizacion.length > 0) {
+            // Si no existe temp, usa la original
             const last = asignData.amortizacion[asignData.amortizacion.length - 1];
             if (last.fecha && last.fecha.toDate) {
               fechaVencimiento = last.fecha.toDate().toLocaleDateString("es-SV");
             } else if (typeof last.fecha === "string") {
-              fechaVencimiento = last.fecha.split('T')[0];
+              fechaVencimiento = formatFecha(last.fecha);
             }
           }
 
@@ -123,7 +140,7 @@
           const nombreCliente = `${solData.nombre || ''} ${solData.apellido || ''}`;
           const clienteID = asignacionID;
 
-          // 5) Renderizar el documento
+          // Renderizar el documento
           let html = `
             <div class="doc-wrap" id="print-section">
               <div class="doc-header">
@@ -203,8 +220,6 @@
     window.addEventListener("DOMContentLoaded", loadHojaApertura);
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- ... tu CSS igual ... -->
-  <!-- el resto igual -->
   <style>
     body { background: #fff; color: #181818; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; margin: 0; }
     .container {

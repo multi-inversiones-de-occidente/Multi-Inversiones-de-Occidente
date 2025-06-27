@@ -157,7 +157,6 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // Debes esperar la autenticación ANTES de dejar buscar tickets
     let usuarioListo = false;
     let usuario = null;
 
@@ -180,12 +179,17 @@
       document.getElementById("error-msg").style.display = "none";
       document.getElementById("ticket-container").innerHTML = "";
 
-      const correlativo = document.getElementById('input-correlativo').value.trim();
-      if (!correlativo) return;
+      const correlativoInput = document.getElementById('input-correlativo').value.trim();
+      if (!correlativoInput) return;
+
+      // Buscar como string y como número
+      let correlativoNum = Number(correlativoInput);
+      let correlativosBuscar = [correlativoInput];
+      if (!isNaN(correlativoNum) && correlativoInput !== "") correlativosBuscar.push(correlativoNum);
 
       let ticket = null;
       // Busca en pagos
-      const pagosQuery = query(collection(db, "pagos"), where("correlativo", "==", correlativo));
+      const pagosQuery = query(collection(db, "pagos"), where("correlativo", "in", correlativosBuscar));
       const pagosSnap = await getDocs(pagosQuery);
       if (!pagosSnap.empty) {
         ticket = { ...pagosSnap.docs[0].data(), tipo: "pago" };
@@ -193,7 +197,7 @@
 
       // Si no en pagos, busca en movimientosCaja
       if (!ticket) {
-        const movCajaQuery = query(collection(db, "movimientosCaja"), where("correlativo", "==", correlativo));
+        const movCajaQuery = query(collection(db, "movimientosCaja"), where("correlativo", "in", correlativosBuscar));
         const movCajaSnap = await getDocs(movCajaQuery);
         if (!movCajaSnap.empty) {
           ticket = { ...movCajaSnap.docs[0].data(), tipo: "movimientoCaja" };
@@ -202,7 +206,7 @@
 
       // Si no en movimientos_caja (con guión bajo)
       if (!ticket) {
-        const movCaja2Query = query(collection(db, "movimientos_caja"), where("correlativo", "==", correlativo));
+        const movCaja2Query = query(collection(db, "movimientos_caja"), where("correlativo", "in", correlativosBuscar));
         const movCaja2Snap = await getDocs(movCaja2Query);
         if (!movCaja2Snap.empty) {
           ticket = { ...movCaja2Snap.docs[0].data(), tipo: "movimientoCaja" };
@@ -215,7 +219,6 @@
         return;
       }
 
-      // Muestra el ticket de acuerdo al tipo (puedes personalizar esto)
       let html = '';
       if (ticket.tipo === "pago") {
         html = `
@@ -234,7 +237,6 @@
           <button class="btn-imprimir" onclick="window.print()"><i class="fas fa-print"></i> Imprimir Ticket</button>
         `;
       } else {
-        // Movimiento de caja
         html = `
           <div class="ticket-header"><i class="fas fa-receipt"></i> Comprobante de Movimiento de Caja</div>
           <div class="ticket-details">

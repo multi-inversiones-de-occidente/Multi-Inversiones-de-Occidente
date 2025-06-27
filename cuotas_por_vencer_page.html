@@ -4,278 +4,261 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Cuotas por Vencer – Multi Inversiones</title>
-  <!-- Firebase SDK -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    body {
+      background: #f5f8fa;
+      min-height: 100vh;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    .container {
+      max-width: 800px;
+      margin: 2.8rem auto 0 auto;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 3px 18px #00538b16;
+      padding: 2.5rem 2.2rem 2rem 2.2rem;
+    }
+    h2 {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #1371b6;
+      margin-bottom: 0.9rem;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .usuario-bar {
+      text-align: center;
+      font-size: 1.08rem;
+      color: #1371b6;
+      margin-bottom: 8px;
+      font-weight: 600;
+      letter-spacing: .3px;
+    }
+    .subtitulo {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 800;
+      color: #f8af40;
+      margin-bottom: 1.4rem;
+      letter-spacing: 1.1px;
+    }
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 19px;
+      flex-wrap: wrap;
+    }
+    select {
+      padding: 8px 22px;
+      border-radius: 8px;
+      border: 1px solid #d2e2ee;
+      background: #e7f2fb;
+      color: #125c9c;
+      font-size: 1.04rem;
+      font-weight: bold;
+      outline: none;
+      transition: border .16s;
+    }
+    select:focus {
+      border: 1.5px solid #1371b6;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      background: #fafdff;
+    }
+    th, td {
+      padding: 8.5px 10px;
+      border-bottom: 1px solid #e3e9f2;
+      text-align: left;
+      font-size: 1rem;
+    }
+    th {
+      background: #e7f2fb;
+      color: #125c9c;
+      font-size: 1.03rem;
+      letter-spacing: .7px;
+    }
+    .pendiente {
+      color: #dbab16;
+      font-weight: bold;
+    }
+    .telefono-cell {
+      color: #13b66b;
+      font-weight: 700;
+      font-family: monospace;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+    .telefono-cell i {
+      color: #0db768;
+      margin-right: 5px;
+    }
+    .row-today {
+      background: #fefbe7 !important;
+    }
+    .row-7d {
+      background: #e8fbe7 !important;
+    }
+    .row-15d {
+      background: #e7f3fb !important;
+    }
+    .row-30d {
+      background: #f4e7fb !important;
+    }
+    .loading {
+      color: #888;
+      text-align: center;
+      padding: 35px 0 25px 0;
+      font-size: 1.15rem;
+    }
+    @media (max-width: 700px) {
+      .container { padding: 1.3rem .4rem; }
+      table { font-size: 0.97rem; }
+      th, td { padding: 7px 3px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2><i class="fa-solid fa-calendar-day"></i> Cuotas por Vencer</h2>
+    <div class="subtitulo">Cuotas Pendientes Próximas a Vencer</div>
+    <div class="usuario-bar" id="usuario-bar">Usuario: ---</div>
+    <div class="filter-row">
+      <label for="rango" style="font-weight:600; color:#126caa;">Filtrar por:</label>
+      <select id="rango">
+        <option value="hoy">Hoy</option>
+        <option value="7">Próximos 7 días</option>
+        <option value="15">Próximos 15 días</option>
+        <option value="30">Próximos 30 días</option>
+      </select>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>Cuota #</th>
+          <th>Fecha</th>
+          <th>Días</th>
+          <th>Capital</th>
+          <th>Interés</th>
+          <th>Total</th>
+          <th>Saldo Crédito</th>
+          <th>Teléfono</th>
+        </tr>
+      </thead>
+      <tbody id="cuotas-list"></tbody>
+    </table>
+  </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
+    // Configuración Firebase (ajusta si es necesario)
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
-      projectId: "multinversiones-38e13",
-      storageBucket: "multinversiones-38e13.appspot.com",
-      messagingSenderId: "380001917078",
-      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
-      measurementId: "G-H4E31XHG1Y"
+      projectId: "multinversiones-38e13"
     };
     const app = initializeApp(firebaseConfig);
-    const db  = getFirestore(app);
+    const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // Esconde el contenido hasta autenticar
-    document.documentElement.style.visibility = "hidden";
-
-    // Formatea fecha YYYY-MM-DD a DD/MM/YYYY
-    function formatoFecha(fecha) {
-      if (!fecha) return '';
-      const d = new Date(fecha);
-      return d.toLocaleDateString('es-SV', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    function formateaFecha(fechaIso) {
+      if(!fechaIso) return '';
+      let fecha = new Date(fechaIso);
+      let dia = fecha.getDate().toString().padStart(2, '0');
+      let mes = (fecha.getMonth()+1).toString().padStart(2, '0');
+      let anio = fecha.getFullYear();
+      return `${dia}/${mes}/${anio}`;
+    }
+    function diasEntre(f1, f2) {
+      f1.setHours(0,0,0,0);
+      f2.setHours(0,0,0,0);
+      return Math.floor((f1 - f2) / (1000*60*60*24));
     }
 
-    // Devuelve diferencia de días entre hoy y fecha de cuota (sin hora)
-    function diasHasta(fechaStr) {
-      const hoy = new Date();
+    // SOLO próxima cuota pendiente de cada cliente/crédito
+    async function cargarCuotas(rango) {
+      let hoy = new Date();
       hoy.setHours(0,0,0,0);
-      const f = new Date(fechaStr);
-      f.setHours(0,0,0,0);
-      return Math.round((f - hoy) / (1000*60*60*24));
-    }
-
-    // Lógica principal al cargar el DOM y autenticar
-    window.addEventListener("DOMContentLoaded", () => {
-      onAuthStateChanged(auth, async (user) => {
-        if (!user) return location.href = "login.html";
-        document.documentElement.style.visibility = "visible";
-        document.getElementById("usuario-nombre").textContent = user.email;
-        cargarCuotas("hoy");
-        document.getElementById("filtro-cuotas").addEventListener("change", (e) => {
-          cargarCuotas(e.target.value);
-        });
-      });
-    });
-
-    // Trae cuotas pendientes según filtro seleccionado
-    async function cargarCuotas(filtro) {
-      const contenedor = document.getElementById("contenedor-cuotas");
-      contenedor.innerHTML = "<div class='cargando'>Cargando cuotas…</div>";
+      let cuotas = [];
+      document.getElementById("cuotas-list").innerHTML = `<tr><td colspan="9" class="loading"><i class="fa-solid fa-spinner fa-spin"></i> Cargando...</td></tr>`;
       const snapshot = await getDocs(collection(db, "creditos"));
-      const cuotas = [];
-      const hoy = new Date(); hoy.setHours(0,0,0,0);
-
-      let diasMin = 0, diasMax = 0;
-      if (filtro === "hoy")      { diasMin = 0;  diasMax = 0; }
-      if (filtro === "7dias")    { diasMin = 0;  diasMax = 7; }
-      if (filtro === "15dias")   { diasMin = 0;  diasMax = 15; }
-      if (filtro === "30dias")   { diasMin = 0;  diasMax = 30; }
-
       snapshot.forEach(doc => {
-        const c = doc.data();
-        const nombreCliente = c.nombre?.trim() || "(Sin nombre)";
-        const apellidoCliente = c.apellido?.trim() || "";
-        const telefono = c.telefono || "";
-        const idCredito = doc.id;
-
-        if (Array.isArray(c.amortizacion)) {
-          c.amortizacion.forEach((cuota, i) => {
-            if (cuota.estado === "Pendiente" && cuota.fecha) {
-              const dias = diasHasta(cuota.fecha);
-              if (dias >= diasMin && dias <= diasMax) {
-                cuotas.push({
-                  nombre: nombreCliente,
-                  apellido: apellidoCliente,
-                  telefono,
-                  idCredito,
-                  numeroCuota: cuota.numeroCuota,
-                  fecha: cuota.fecha,
-                  dias,
-                  capital: cuota.capital,
-                  interes: cuota.interes,
-                  cuotaTotal: cuota.cuota,
-                  saldo: cuota.saldo,
-                });
-              }
+        let d = doc.data();
+        if (!Array.isArray(d.amortizacion)) return;
+        // Buscar la PRÓXIMA cuota "Pendiente"
+        let proxima = null;
+        for (let cuota of d.amortizacion) {
+          if (cuota.estado === "Pendiente" && cuota.fecha) {
+            if (!proxima || new Date(cuota.fecha) < new Date(proxima.fecha)) {
+              proxima = cuota;
             }
-          });
+          }
+        }
+        if (proxima) {
+          let fcuota = new Date(proxima.fecha);
+          fcuota.setHours(0,0,0,0);
+          let dias = diasEntre(fcuota, hoy);
+          let mostrar = false, clase = "";
+          if      (rango === "hoy" && dias === 0)            { mostrar = true; clase = "row-today"; }
+          else if (rango === "7"  && dias > 0 && dias <= 7)  { mostrar = true; clase = "row-7d"; }
+          else if (rango === "15" && dias > 0 && dias <= 15) { mostrar = true; clase = "row-15d"; }
+          else if (rango === "30" && dias > 0 && dias <= 30) { mostrar = true; clase = "row-30d"; }
+          if (mostrar) {
+            cuotas.push({
+              cliente: d.nombre,
+              numero: proxima.numeroCuota,
+              fecha: proxima.fecha,
+              dias: dias,
+              capital: proxima.capital,
+              interes: proxima.interes,
+              total: parseFloat(proxima.capital) + parseFloat(proxima.interes),
+              saldo: d.saldoActual,
+              telefono: d.telefono,
+              clase: clase
+            });
+          }
         }
       });
 
-      // Ordena por fecha de vencimiento (ascendente)
-      cuotas.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-
-      // Renderiza la tabla
-      if (cuotas.length === 0) {
-        contenedor.innerHTML = "<div class='sin-resultados'>No hay cuotas pendientes en este rango.</div>";
-        return;
-      }
-
-      let html = `
-        <table class="tabla-cuotas">
-          <thead>
-            <tr>
-              <th>Cliente</th>
-              <th>Cuota #</th>
-              <th>Fecha Vence</th>
-              <th>Días</th>
-              <th>Capital</th>
-              <th>Interés</th>
-              <th>Total</th>
-              <th>Saldo Crédito</th>
-              <th>Teléfono</th>
-            </tr>
-          </thead>
-          <tbody>
-      `;
-      cuotas.forEach(cuota => {
-        html += `
-          <tr>
-            <td>${cuota.nombre} ${cuota.apellido}</td>
-            <td style="text-align:center">${cuota.numeroCuota+1}</td>
-            <td>${formatoFecha(cuota.fecha)}</td>
-            <td style="text-align:center">${cuota.dias}</td>
-            <td style="text-align:right">$${parseFloat(cuota.capital).toFixed(2)}</td>
-            <td style="text-align:right">$${parseFloat(cuota.interes).toFixed(2)}</td>
-            <td style="text-align:right"><b>$${parseFloat(cuota.cuotaTotal).toFixed(2)}</b></td>
-            <td style="text-align:right">$${parseFloat(cuota.saldo).toFixed(2)}</td>
-            <td><a href="tel:${cuota.telefono}" style="color:#4fcf70;text-decoration:none;"><i class="fas fa-phone"></i> ${cuota.telefono}</a></td>
-          </tr>
-        `;
-      });
-      html += "</tbody></table>";
-      contenedor.innerHTML = html;
+      let html = cuotas.length ? cuotas.map(c => `
+        <tr class="${c.clase}">
+          <td>${c.cliente}</td>
+          <td>${c.numero}</td>
+          <td>${formateaFecha(c.fecha)}</td>
+          <td>${c.dias}</td>
+          <td>$${parseFloat(c.capital).toFixed(2)}</td>
+          <td>$${parseFloat(c.interes).toFixed(2)}</td>
+          <td style="font-weight:bold;color:#f8af40;">$${parseFloat(c.total).toFixed(2)}</td>
+          <td>$${parseFloat(c.saldo).toFixed(2)}</td>
+          <td class="telefono-cell"><i class="fa-solid fa-phone"></i> ${c.telefono}</td>
+        </tr>
+      `).join('') : `<tr><td colspan="9" class="loading">Sin cuotas por vencer en este rango</td></tr>`;
+      document.getElementById("cuotas-list").innerHTML = html;
     }
+
+    // Autenticación y carga inicial
+    onAuthStateChanged(auth, user => {
+      if (!user) {
+        window.location.href = "login.html";
+      } else {
+        document.getElementById("usuario-bar").textContent = "Usuario: " + (user.email || user.phoneNumber || "");
+        document.getElementById("rango").onchange = function() {
+          cargarCuotas(this.value);
+        };
+        cargarCuotas("hoy");
+      }
+    });
   </script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    body {
-      background: radial-gradient(circle,#000,#101820 70%);
-      color: #fff;
-      font-family: 'Segoe UI', Arial, sans-serif;
-      margin: 0; min-height: 100vh;
-    }
-    header {
-      background: #000;
-      padding: 1.2rem 0;
-      text-align: center;
-      font-size: 1.5rem;
-      font-weight: 800;
-      letter-spacing: .5px;
-      color: #67C8F1;
-    }
-    .container {
-      max-width: 1150px;
-      margin: 0 auto;
-      padding: 2.3rem 2vw 2rem 2vw;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    h1 {
-      font-size: 2.1rem;
-      margin-bottom: 0.65rem;
-      letter-spacing: 0.5px;
-      color: #F8AF40;
-      text-align:center;
-      font-weight:900;
-    }
-    .usuario {
-      font-size: 1.03rem;
-      color: #A1DDFB;
-      margin-bottom: 1.5rem;
-      font-weight: 600;
-      text-align: center;
-    }
-    .filtros-cuotas {
-      margin-bottom: 2rem;
-      display: flex;
-      align-items: center;
-      gap: .7rem;
-    }
-    select {
-      padding: 0.46rem 0.8rem;
-      border-radius: 8px;
-      border: 1px solid #88e7ad;
-      font-size: 1.08rem;
-      font-family: inherit;
-      background: #1c2730;
-      color: #fff;
-      font-weight: bold;
-      outline: none;
-      margin-left: .3rem;
-      margin-right: 1.1rem;
-    }
-    .tabla-cuotas {
-      width: 100%;
-      border-collapse: collapse;
-      background: #222c33;
-      box-shadow: 0 4px 24px #0005;
-      border-radius: 14px;
-      overflow: hidden;
-      margin-top: 0.7rem;
-    }
-    .tabla-cuotas th,
-    .tabla-cuotas td {
-      padding: 10px 6px;
-      border-bottom: 1px solid #2b485b;
-      font-size: 1.02rem;
-    }
-    .tabla-cuotas th {
-      background: #212a35;
-      color: #F8AF40;
-      font-size: 1.08rem;
-      letter-spacing: .5px;
-      font-weight: 700;
-      text-align: center;
-    }
-    .tabla-cuotas tr:last-child td {
-      border-bottom: none;
-    }
-    .tabla-cuotas td a { color: #4fcf70; }
-    .cargando, .sin-resultados {
-      padding: 1.5rem;
-      color: #90caf9;
-      font-size: 1.15rem;
-      text-align: center;
-    }
-    @media (max-width: 750px) {
-      .container { padding: 1.2rem 0.6vw; }
-      .tabla-cuotas th, .tabla-cuotas td { font-size: .91rem; padding: 7px 2px;}
-    }
-    @media (max-width: 530px) {
-      .tabla-cuotas, .tabla-cuotas thead, .tabla-cuotas tbody, .tabla-cuotas tr, .tabla-cuotas th, .tabla-cuotas td {
-        display: block;
-      }
-      .tabla-cuotas tr { margin-bottom: 13px; }
-      .tabla-cuotas td, .tabla-cuotas th {
-        padding: 7px 2vw;
-        text-align: left !important;
-      }
-      .tabla-cuotas thead { display: none; }
-      .tabla-cuotas td:before {
-        content: attr(data-label);
-        font-weight: bold;
-        color: #f8af40;
-        margin-right: 8px;
-      }
-    }
-  </style>
-</head>
-<body>
-  <header>Cuotas por Vencer</header>
-  <div class="container">
-    <h1>Cuotas Pendientes Próximas a Vencer</h1>
-    <div class="usuario">Usuario: <span id="usuario-nombre"></span></div>
-    <div class="filtros-cuotas">
-      <label for="filtro-cuotas"><i class="fas fa-filter"></i> Mostrar:</label>
-      <select id="filtro-cuotas">
-        <option value="hoy">Cuotas que vencen <b>HOY</b></option>
-        <option value="7dias">En los próximos 7 días</option>
-        <option value="15dias">En los próximos 15 días</option>
-        <option value="30dias">En los próximos 30 días</option>
-      </select>
-    </div>
-    <div id="contenedor-cuotas"></div>
-  </div>
 </body>
 </html>
 

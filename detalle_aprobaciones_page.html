@@ -92,6 +92,8 @@
         fechaBase = new Date(fechaBaseStr);
       } else {
         fechaBase = new Date(); // Hoy
+        // LIMPIA hora para evitar desfases por zona horaria
+        fechaBase.setHours(0,0,0,0);
       }
 
       // Generar tabla
@@ -102,7 +104,7 @@
         const capital = cuota - interes;
         saldo -= capital;
         if (k === numCuotas) saldo = 0;
-        // El primer pago es dentro de N días
+        // El primer pago es EXACTAMENTE después de N días (NO el mismo día)
         const fechaCuota = new Date(fechaBase);
         fechaCuota.setDate(fechaBase.getDate() + (k * diasPeriodo));
         lista.push({
@@ -149,6 +151,7 @@
         <div style="margin-top:18px;padding:12px;background:#213d4b;color:#F8AF40;border-radius:12px;">
           <b>IMPORTANTE:</b> Esta tabla se genera usando la fecha actual.  
           <ul style="margin:8px 0 0 19px;color:#fff;">
+            <li>La PRIMERA cuota siempre se agenda exactamente N días después de hoy. (Hoy + período = fecha de cuota 1)</li>
             <li>Si la fecha de apertura real coincide con la fecha de asignación, las fechas serán idénticas.</li>
             <li>Si han pasado días desde la asignación, las fechas de pago se ajustarán y los intereses también (por días extra de gracia).</li>
             <li>La tabla recalculada debe usarse para papelería legal y el control real del crédito.</li>
@@ -229,3 +232,4 @@
   </div>
 </body>
 </html>
+

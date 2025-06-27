@@ -164,6 +164,8 @@
       // Evento para botón de nueva tabla
       document.getElementById("btn-nueva-tabla").onclick = function () {
         recalcularAmortizacion(); // hoy
+        // ---- GUARDAR TABLA EN LOCALSTORAGE para paso a papelería legal, hoja apertura, etc ----
+        localStorage.setItem('amortizacion_temp', JSON.stringify(nuevaAmortizacion));
         let tabla = `<h2>Tabla de Amortización (RECALCULADA)</h2>
         <div style="overflow-x:auto;"><table><thead>
           <tr>
@@ -232,4 +234,3 @@
   </div>
 </body>
 </html>
-

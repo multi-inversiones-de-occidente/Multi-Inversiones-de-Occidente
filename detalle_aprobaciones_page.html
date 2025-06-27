@@ -35,8 +35,10 @@
     let solData = null;
     let nuevaAmortizacion = [];
 
+    let asignacionID = null;
+
     async function loadDetalleAprobacion() {
-      const asignacionID = getParam("id");
+      asignacionID = getParam("id");
       if (!asignacionID) {
         document.getElementById('detalle-contenido').innerHTML = `<div class="error">ID de asignación no especificado en la URL.</div>`;
         return;
@@ -164,8 +166,10 @@
       // Evento para botón de nueva tabla
       document.getElementById("btn-nueva-tabla").onclick = function () {
         recalcularAmortizacion(); // hoy
-        // ---- GUARDAR TABLA EN LOCALSTORAGE para paso a papelería legal, hoja apertura, etc ----
-        localStorage.setItem('amortizacion_temp', JSON.stringify(nuevaAmortizacion));
+        // GUARDAR TABLA EN LOCALSTORAGE CON ID UNICO
+        if (asignacionID && nuevaAmortizacion.length > 0) {
+          localStorage.setItem('amortizacion_temp_' + asignacionID, JSON.stringify(nuevaAmortizacion));
+        }
         let tabla = `<h2>Tabla de Amortización (RECALCULADA)</h2>
         <div style="overflow-x:auto;"><table><thead>
           <tr>
@@ -234,3 +238,4 @@
   </div>
 </body>
 </html>
+

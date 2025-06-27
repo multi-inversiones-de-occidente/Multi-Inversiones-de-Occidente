@@ -129,15 +129,40 @@
           const agencia = asignData.agenciaAsignada || 'Ahuachapán';
           const infoAgencia = agenciasInfo[agencia] || {direccion: '', telefono: ''};
 
-          // 4) Preparar variables y valores
+          // 4) Buscar fecha de vencimiento preferiblemente en la tabla temporal de localStorage
+          let fechaVencimiento = '';
+          let amortTemp = localStorage.getItem('amortizacion_temp');
+          if (amortTemp) {
+            try {
+              const amort = JSON.parse(amortTemp);
+              if (amort.length > 0 && amort[amort.length - 1].fecha) {
+                let f = amort[amort.length - 1].fecha;
+                if (typeof f === "string" && f.includes("-")) {
+                  // Mostrar DD/MM/AAAA
+                  let [yyyy, mm, dd] = f.split("T")[0].split("-");
+                  fechaVencimiento = `${dd}/${mm}/${yyyy}`;
+                } else {
+                  fechaVencimiento = f;
+                }
+              }
+            } catch (e) {
+              fechaVencimiento = '';
+            }
+          }
+          // Si no hay fecha en localStorage, usa la tradicional
+          if (!fechaVencimiento) {
+            fechaVencimiento = (asignData.fechaVencimiento && asignData.fechaVencimiento.toDate)
+              ? asignData.fechaVencimiento.toDate().toLocaleDateString("es-SV")
+              : (asignData.fechaVencimiento || '');
+          }
+
+          // 5) Otras variables y datos
           const fechaApertura = asignData.fechaAprobacion 
             ? (asignData.fechaAprobacion.toDate 
                 ? asignData.fechaAprobacion.toDate().toLocaleDateString("es-SV")
                 : asignData.fechaAprobacion)
             : '';
-          const fechaVencimiento = (asignData.fechaVencimiento && asignData.fechaVencimiento.toDate)
-            ? asignData.fechaVencimiento.toDate().toLocaleDateString("es-SV")
-            : (asignData.fechaVencimiento || '');
+          const fechaFirma = fechaApertura || new Date().toLocaleDateString("es-SV");
 
           const monto = asignData.montoAprobado || solData.montoSolicitado || '';
           const montoLetras = numeroALetras(monto);
@@ -149,10 +174,9 @@
           const duiCliente = solData.numeroDui || '';
           const direccionCliente = solData.direccion || '';
           const ciudad = agencia;
-          const departamento = agencia; // Si el nombre del departamento es diferente, puedes mapearlo aquí
-          const fechaFirma = fechaApertura;
+          const departamento = agencia;
 
-          // 5) Renderizar el documento
+          // 6) Renderizar el documento
           let html = `
             <div class="doc-wrap" id="print-section">
               <div class="doc-header">
@@ -243,3 +267,4 @@
   </div>
 </body>
 </html>
+

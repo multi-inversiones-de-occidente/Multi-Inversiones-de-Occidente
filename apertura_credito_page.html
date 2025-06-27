@@ -1,3 +1,4 @@
+<!-- apertura_credito_page.html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -40,6 +41,54 @@
       document.getElementById('main-content').innerHTML = `<div style="color:#fff;text-align:center;padding:70px 0;">${msg}</div>`;
     }
 
+    function recalcularAmortizacion() {
+      if (!asignacionData) return [];
+
+      const monto = Number(asignacionData.montoAprobado);
+      const tasaAnual = Number(asignacionData.tasaAnual);
+      const frecuencia = asignacionData.frecuenciaPago;
+      const numCuotas = Number(asignacionData.numeroCuotas);
+      const cuota = Number(asignacionData.cuota);
+
+      // Frecuencias
+      const specs = {
+        "Semanal": { periodos: 52, dias: 7 },
+        "Catorcenal": { periodos: 26, dias: 14 },
+        "Quincenal": { periodos: 24, dias: 15 },
+        "Mensual": { periodos: 12, dias: 30 },
+      };
+      const perAno = specs[frecuencia]?.periodos ?? 52;
+      const diasPeriodo = specs[frecuencia]?.dias ?? 7;
+      const tasa = tasaAnual / perAno / 100;
+
+      let fechaBase = new Date(); // hoy, limpia hora
+      fechaBase.setHours(0,0,0,0);
+
+      let saldo = monto;
+      let lista = [];
+      for (let k = 1; k <= numCuotas; k++) {
+        const interes = saldo * tasa;
+        const capital = cuota - interes;
+        saldo -= capital;
+        if (k === numCuotas) saldo = 0;
+        // Fecha de cuota
+        const fechaCuota = new Date(fechaBase);
+        fechaCuota.setDate(fechaBase.getDate() + (k * diasPeriodo));
+        lista.push({
+          numeroCuota: k,
+          fecha: fechaCuota.toISOString().split("T")[0],
+          cuota: cuota.toFixed(2),
+          interes: interes.toFixed(2),
+          capital: capital.toFixed(2),
+          saldo: saldo.toFixed(2),
+          estado: "Pendiente",
+          montoPagado: 0.00,
+          fechaPagoReal: null
+        });
+      }
+      return lista;
+    }
+
     // Mostrar info y controles
     function renderMain() {
       if (!solicitudData) {
@@ -67,18 +116,11 @@
         `;
       }
 
-      html += `
-        <div style="margin:30px 0 15px 0;">
-          <button id="guardar-credito-btn" ${guardando || !asignacionData ? "disabled" : ""} style="background:#13b66b;border:none;color:#fff;font-weight:bold;padding:15px 0;width:100%;font-size:17px;border-radius:10px;cursor:pointer;">
-            ${guardando ? "Guardando..." : "Guardar Crédito"}
-          </button>
-        </div>
-      `;
-
-      // Tabla de amortización
-      if (asignacionData && Array.isArray(amortizacion) && amortizacion.length > 0) {
+      // Tabla de amortización nueva (si hay asignación)
+      if (asignacionData) {
+        amortizacion = recalcularAmortizacion();
         html += `
-          <div style="margin:35px 0 7px 0;font-weight:bold;font-size:18px;color:#fff;">Tabla de Amortización:</div>
+          <div style="margin:35px 0 7px 0;font-weight:bold;font-size:18px;color:#fff;">Tabla de Amortización (al día de hoy):</div>
           <div style="overflow-x:auto;">
             <table style="min-width:700px;background:#191919;">
               <thead>
@@ -96,23 +138,33 @@
                   amortizacion.map(row => `
                     <tr>
                       <td>${row.numeroCuota ?? ''}</td>
-                      <td>${row.fecha ? String(row.fecha).split("T")[0] : ''}</td>
-                      <td>$${row.cuota ?? ''}</td>
-                      <td>$${row.interes ?? ''}</td>
-                      <td>$${row.capital ?? ''}</td>
-                      <td>$${row.saldo ?? ''}</td>
+                      <td>${row.fecha}</td>
+                      <td>$${row.cuota}</td>
+                      <td>$${row.interes}</td>
+                      <td>$${row.capital}</td>
+                      <td>$${row.saldo}</td>
                     </tr>
                   `).join('')
                 }
               </tbody>
             </table>
           </div>
+          <div style="margin-top:14px;padding:10px;background:#213d4b;color:#F8AF40;border-radius:10px;font-size:1em;">
+            Esta tabla de amortización está calculada **al día de la apertura del crédito**.<br>
+            Si la apertura es posterior a la asignación, las fechas y valores reflejan el día exacto de apertura.
+          </div>
         `;
-      } else if (!asignacionData) {
-        html += ``;
       } else {
         html += `<div style="margin-top:18px;color:#aaa;">No hay amortización disponible.</div>`;
       }
+
+      html += `
+        <div style="margin:30px 0 15px 0;">
+          <button id="guardar-credito-btn" ${guardando || !asignacionData ? "disabled" : ""} style="background:#13b66b;border:none;color:#fff;font-weight:bold;padding:15px 0;width:100%;font-size:17px;border-radius:10px;cursor:pointer;">
+            ${guardando ? "Guardando..." : "Guardar Crédito"}
+          </button>
+        </div>
+      `;
 
       document.getElementById('main-content').innerHTML = html;
 
@@ -133,7 +185,7 @@
     async function fetchSolicitudYAsignacion() {
       setLoading();
       try {
-        solicitudID = getQueryParam('solicitudID');  // <-- CORRECTO: debe ser "solicitudID"
+        solicitudID = getQueryParam('solicitudID');
         if (!solicitudID) {
           setLoading("No se especificó una solicitud.");
           return;
@@ -154,12 +206,8 @@
         );
         if (!asignSnap.empty) {
           asignacionData = asignSnap.docs[0].data();
-          const rawAmort = Array.isArray(asignacionData.amortizacion)
-            ? asignacionData.amortizacion : [];
-          amortizacion = rawAmort.map(e => (typeof e === "object" ? e : {}));
         } else {
           asignacionData = null;
-          amortizacion = [];
         }
         renderMain();
       } catch (e) {
@@ -167,9 +215,9 @@
       }
     }
 
-    // ---- FUNCIÓN ROBUSTA DE GUARDAR CRÉDITO ----
+    // ---- GUARDAR CRÉDITO con la nueva tabla ----
     async function guardarCredito() {
-      if (!solicitudData || !asignacionData) {
+      if (!solicitudData || !asignacionData || amortizacion.length === 0) {
         alert("No hay datos completos para guardar el crédito.");
         return;
       }
@@ -187,17 +235,6 @@
       const saldoActual = montoAprobado;
       const clienteID = solicitudData.clienteID || "";
       const fechaInicio = new Date().toISOString();
-
-      // Tabla de amortización con los campos nuevos
-      let nuevaAmortizacion = [];
-      if (Array.isArray(asignacionData.amortizacion)) {
-        nuevaAmortizacion = asignacionData.amortizacion.map((cuota) => ({
-          ...cuota,
-          estado: "Pendiente",
-          montoPagado: 0.00,
-          fechaPagoReal: null
-        }));
-      }
 
       // Nuevo campo: fecha precisa para control de intereses diarios
       const fechaUltimoCalculoIntereses = fechaInicio;
@@ -228,10 +265,8 @@
           ultimaActualizacion: fechaInicio,
           asignadoA: asignadoNombre,
           agenciaAsignada: agenciaAsignada,
-
-          // ---- NUEVOS CAMPOS ----
           fechaUltimoCalculoIntereses: fechaUltimoCalculoIntereses,
-          amortizacion: nuevaAmortizacion // con estado, montoPagado y fechaPagoReal en cada cuota
+          amortizacion: amortizacion // La tabla nueva generada
         });
         alert("Crédito guardado correctamente.");
       } catch (e) {
@@ -323,3 +358,4 @@
   </div>
 </body>
 </html>
+

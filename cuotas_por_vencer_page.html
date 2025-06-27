@@ -12,7 +12,7 @@
       font-family: 'Segoe UI', Arial, sans-serif;
     }
     .container {
-      max-width: 1080px;
+      max-width: 1050px;
       margin: 2.8rem auto 0 auto;
       background: #fff;
       border-radius: 18px;
@@ -31,17 +31,24 @@
     }
     .subtitulo {
       font-size: 1.45rem;
-      font-weight: bold;
-      color: #f8af40;
+      color: #ffa726;
+      font-weight: 700;
       margin-bottom: 1.7rem;
-      letter-spacing: .8px;
+      letter-spacing: .2px;
+      text-align: center;
+    }
+    .user-email {
+      color: #1785ba;
+      font-size: 1.09rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
       text-align: center;
     }
     .filter-row {
       display: flex;
       align-items: center;
       gap: 15px;
-      margin-bottom: 18px;
+      margin-bottom: 19px;
       flex-wrap: wrap;
     }
     select {
@@ -55,75 +62,81 @@
       outline: none;
       transition: border .16s;
     }
-    select:focus { border: 1.5px solid #1371b6; }
+    select:focus {
+      border: 1.5px solid #1371b6;
+    }
     table {
       width: 100%;
-      min-width: 1020px;
+      min-width: 980px;
       border-collapse: collapse;
       margin-top: 6px;
       background: #fafdff;
-      font-size: 1.09rem;
+      table-layout: fixed;
     }
     th, td {
-      padding: 13px 14px;
+      padding: 8.5px 10px;
       border-bottom: 1px solid #e3e9f2;
       text-align: left;
-      font-size: 1.09rem;
+      font-size: 1rem;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     th {
       background: #e7f2fb;
       color: #125c9c;
-      font-size: 1.09rem;
+      font-size: 1.03rem;
       letter-spacing: .7px;
     }
-    th:nth-child(1), td:nth-child(1) { min-width: 210px; max-width: 330px;}
     .pendiente {
       color: #dbab16;
       font-weight: bold;
     }
-    .row-today { background: #fefbe7 !important; }
-    .row-7d    { background: #e8fbe7 !important; }
-    .row-15d   { background: #e7f3fb !important; }
-    .row-30d   { background: #f4e7fb !important; }
+    .tel {
+      color: #14b060;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .tel i { margin-right: 5px;}
+    .total-monto {
+      color: #ffa726;
+      font-weight: bold;
+    }
+    .row-today {
+      background: #fefbe7 !important;
+    }
+    .row-7d {
+      background: #e8fbe7 !important;
+    }
+    .row-15d {
+      background: #e7f3fb !important;
+    }
+    .row-30d {
+      background: #f4e7fb !important;
+    }
     .loading {
       color: #888;
       text-align: center;
       padding: 35px 0 25px 0;
       font-size: 1.15rem;
     }
-    .telefono {
-      color: #18b368;
-      font-weight: bold;
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      letter-spacing: 1px;
-    }
-    .usuario-email {
-      color: #2770a6;
-      font-size: 1.01rem;
-      font-weight: bold;
-      text-align: center;
-      margin-bottom: 14px;
-    }
     @media (max-width: 1200px) {
-      .container { max-width: 98vw; }
-      table { font-size: 1rem; }
-    }
-    @media (max-width: 700px) {
-      .container { padding: 1.3rem .4rem; max-width:99vw;}
-      table { font-size: 0.97rem; min-width: 600px;}
+      .container { padding: 1.2rem 0.2rem; max-width: 99vw;}
+      table { font-size: 0.95rem; min-width:800px;}
       th, td { padding: 7px 3px; }
     }
-    ::-webkit-scrollbar { height: 10px; }
+    @media (max-width: 700px) {
+      .container { padding: 1.3rem .4rem; }
+      table { font-size: 0.92rem; min-width:700px;}
+      th, td { padding: 7px 3px; }
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h2><i class="fa-solid fa-calendar-day"></i> Cuotas por Vencer</h2>
     <div class="subtitulo">Cuotas Pendientes Próximas a Vencer</div>
-    <div id="user-info" class="usuario-email"></div>
+    <div class="user-email" id="usuario-email"></div>
     <div class="filter-row">
       <label for="rango" style="font-weight:600; color:#126caa;">Filtrar por:</label>
       <select id="rango">
@@ -133,25 +146,24 @@
         <option value="30">Próximos 30 días</option>
       </select>
     </div>
-    <div style="overflow-x:auto;">
-      <table>
-        <thead>
-          <tr>
-            <th>Cliente</th>
-            <th>Cuota #</th>
-            <th>Fecha</th>
-            <th>Días</th>
-            <th>Capital</th>
-            <th>Interés</th>
-            <th>Total</th>
-            <th>Saldo Crédito</th>
-            <th>Teléfono</th>
-          </tr>
-        </thead>
-        <tbody id="cuotas-list"></tbody>
-      </table>
-    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>Cuota #</th>
+          <th>Fecha</th>
+          <th>Días</th>
+          <th>Capital</th>
+          <th>Interés</th>
+          <th>Total</th>
+          <th>Saldo Crédito</th>
+          <th>Teléfono</th>
+        </tr>
+      </thead>
+      <tbody id="cuotas-list"></tbody>
+    </table>
   </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -166,84 +178,86 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    function formateaFecha(fechaIso) {
+    // Función para formatear fecha a UTC (sin error de zona horaria)
+    function formateaFechaUTC(fechaIso) {
       if(!fechaIso) return '';
       let fecha = new Date(fechaIso);
-      let dia = fecha.getDate().toString().padStart(2, '0');
-      let mes = (fecha.getMonth()+1).toString().padStart(2, '0');
-      let anio = fecha.getFullYear();
+      let dia = fecha.getUTCDate().toString().padStart(2, '0');
+      let mes = (fecha.getUTCMonth()+1).toString().padStart(2, '0');
+      let anio = fecha.getUTCFullYear();
       return `${dia}/${mes}/${anio}`;
     }
-    function diasEntre(f1, f2) {
-      f1.setHours(0,0,0,0);
-      f2.setHours(0,0,0,0);
-      return Math.floor((f1 - f2) / (1000*60*60*24));
+
+    // Días entre fechas (UTC)
+    function diasEntreUTC(f1, f2) {
+      let d1 = new Date(Date.UTC(f1.getUTCFullYear(),f1.getUTCMonth(),f1.getUTCDate()));
+      let d2 = new Date(Date.UTC(f2.getUTCFullYear(),f2.getUTCMonth(),f2.getUTCDate()));
+      return Math.floor((d1 - d2) / (1000*60*60*24));
     }
+
+    // Mostrar usuario logueado (email)
+    onAuthStateChanged(auth, user => {
+      if (!user) return location.href = "login.html";
+      document.getElementById("usuario-email").textContent = "Usuario: " + user.email;
+    });
 
     async function cargarCuotas(rango) {
       let hoy = new Date();
-      hoy.setHours(0,0,0,0);
+      let hoyUTC = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate()));
       let cuotas = [];
       document.getElementById("cuotas-list").innerHTML = `<tr><td colspan="9" class="loading"><i class="fa-solid fa-spinner fa-spin"></i> Cargando...</td></tr>`;
       const snapshot = await getDocs(collection(db, "creditos"));
       snapshot.forEach(doc => {
         let d = doc.data();
         if (!Array.isArray(d.amortizacion)) return;
-        let proxima = d.amortizacion.find(cuota => cuota.estado === "Pendiente");
-        if (proxima) {
-          let fcuota = new Date(proxima.fecha);
-          fcuota.setHours(0,0,0,0);
-          let dias = diasEntre(fcuota, hoy);
-          let mostrar = false, clase = "";
-          if      (rango === "hoy" && dias === 0)             { mostrar = true; clase = "row-today"; }
-          else if (rango === "7"  && dias > 0 && dias <= 7)   { mostrar = true; clase = "row-7d"; }
-          else if (rango === "15" && dias > 0 && dias <= 15)  { mostrar = true; clase = "row-15d"; }
-          else if (rango === "30" && dias > 0 && dias <= 30)  { mostrar = true; clase = "row-30d"; }
-          if (mostrar) {
-            cuotas.push({
-              cliente: (d.nombre || "") + " " + (d.apellido || ""),
-              numero: proxima.numeroCuota,
-              fecha: proxima.fecha,
-              dias: dias,
-              capital: proxima.capital,
-              interes: proxima.interes,
-              total: (parseFloat(proxima.capital) + parseFloat(proxima.interes)).toFixed(2),
-              saldo: d.saldoActual,
-              telefono: d.telefono,
-              clase: clase
-            });
+        (d.amortizacion).forEach(cuota => {
+          if (cuota.estado === "Pendiente" && cuota.fecha) {
+            let fcuota = new Date(cuota.fecha);
+            let fcuotaUTC = new Date(Date.UTC(fcuota.getUTCFullYear(), fcuota.getUTCMonth(), fcuota.getUTCDate()));
+            let dias = diasEntreUTC(fcuotaUTC, hoyUTC);
+            let mostrar = false, clase = "";
+            if      (rango === "hoy" && dias === 0)             { mostrar = true; clase = "row-today"; }
+            else if (rango === "7"  && dias > 0 && dias <= 7)   { mostrar = true; clase = "row-7d"; }
+            else if (rango === "15" && dias > 0 && dias <= 15)  { mostrar = true; clase = "row-15d"; }
+            else if (rango === "30" && dias > 0 && dias <= 30)  { mostrar = true; clase = "row-30d"; }
+            if (mostrar) {
+              cuotas.push({
+                cliente: (d.nombre ? d.nombre.trim() : "") + (d.apellido ? " " + d.apellido.trim() : ""),
+                numero: cuota.numeroCuota,
+                fecha: cuota.fecha,
+                dias: dias,
+                capital: cuota.capital,
+                interes: cuota.interes,
+                total: cuota.cuota,
+                saldo: d.saldoActual,
+                telefono: d.telefono
+              });
+            }
           }
-        }
+        });
       });
 
       let html = cuotas.length ? cuotas.map(c => `
         <tr class="${c.clase}">
-          <td>${c.cliente.trim()}</td>
+          <td title="${c.cliente}">${c.cliente}</td>
           <td>${c.numero}</td>
-          <td>${formateaFecha(c.fecha)}</td>
+          <td>${formateaFechaUTC(c.fecha)}</td>
           <td>${c.dias}</td>
           <td>$${parseFloat(c.capital).toFixed(2)}</td>
           <td>$${parseFloat(c.interes).toFixed(2)}</td>
-          <td style="color:#f8af40;font-weight:700;">$${c.total}</td>
+          <td class="total-monto">$${parseFloat(c.total).toFixed(2)}</td>
           <td>$${parseFloat(c.saldo).toFixed(2)}</td>
-          <td class="telefono"><i class="fa-solid fa-phone"></i> ${c.telefono}</td>
+          <td class="tel"><i class="fa-solid fa-phone"></i> ${c.telefono}</td>
         </tr>
-      `).join('') : `<tr><td colspan="9" class="loading">Sin cuotas próximas a vencer en este rango</td></tr>`;
+      `).join('') : `<tr><td colspan="9" class="loading">Sin cuotas por vencer en este rango</td></tr>`;
       document.getElementById("cuotas-list").innerHTML = html;
     }
 
-    onAuthStateChanged(auth, user => {
-      if (!user) {
-        window.location.href = "login.html";
-      } else {
-        document.getElementById("user-info").textContent = "Usuario: " + (user.email || user.phoneNumber);
-        cargarCuotas(document.getElementById("rango").value);
-      }
-    });
-
+    // Inicializa con rango por defecto (hoy)
     document.getElementById("rango").onchange = function() {
       cargarCuotas(this.value);
     };
+    cargarCuotas("hoy");
   </script>
 </body>
 </html>

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cuotas por Vencer – Multi Inversiones</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    body {
+      background: #f5f8fa;
+      min-height: 100vh;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    .container {
+      max-width: 800px;
+      margin: 2.8rem auto 0 auto;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 3px 18px #00538b16;
+      padding: 2.5rem 2.2rem 2rem 2.2rem;
+    }
+    h2 {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #1371b6;
+      margin-bottom: 0.9rem;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 19px;
+      flex-wrap: wrap;
+    }
+    select {
+      padding: 8px 22px;
+      border-radius: 8px;
+      border: 1px solid #d2e2ee;
+      background: #e7f2fb;
+      color: #125c9c;
+      font-size: 1.04rem;
+      font-weight: bold;
+      outline: none;
+      transition: border .16s;
+    }
+    select:focus {
+      border: 1.5px solid #1371b6;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      background: #fafdff;
+    }
+    th, td {
+      padding: 8.5px 10px;
+      border-bottom: 1px solid #e3e9f2;
+      text-align: left;
+      font-size: 1rem;
+    }
+    th {
+      background: #e7f2fb;
+      color: #125c9c;
+      font-size: 1.03rem;
+      letter-spacing: .7px;
+    }
+    .pendiente {
+      color: #dbab16;
+      font-weight: bold;
+    }
+    .row-today {
+      background: #fefbe7 !important;
+    }
+    .row-7d {
+      background: #e8fbe7 !important;
+    }
+    .row-15d {
+      background: #e7f3fb !important;
+    }
+    .row-30d {
+      background: #f4e7fb !important;
+    }
+    .loading {
+      color: #888;
+      text-align: center;
+      padding: 35px 0 25px 0;
+      font-size: 1.15rem;
+    }
+    @media (max-width: 700px) {
+      .container { padding: 1.3rem .4rem; }
+      table { font-size: 0.97rem; }
+      th, td { padding: 7px 3px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2><i class="fa-solid fa-calendar-day"></i> Cuotas por Vencer</h2>
+    <div class="filter-row">
+      <label for="rango" style="font-weight:600; color:#126caa;">Filtrar por:</label>
+      <select id="rango">
+        <option value="hoy">Hoy</option>
+        <option value="7">Próximos 7 días</option>
+        <option value="15">Próximos 15 días</option>
+        <option value="30">Próximos 30 días</option>
+      </select>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>N° Cuota</th>
+          <th>Fecha</th>
+          <th>Monto</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody id="cuotas-list"></tbody>
+    </table>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+
+    // Configuración Firebase (ajusta si es necesario)
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Helpers
+    function formateaFecha(fechaIso) {
+      if(!fechaIso) return '';
+      let fecha = new Date(fechaIso);
+      let dia = fecha.getDate().toString().padStart(2, '0');
+      let mes = (fecha.getMonth()+1).toString().padStart(2, '0');
+      let anio = fecha.getFullYear();
+      return `${dia}/${mes}/${anio}`;
+    }
+
+    // Calcula el rango de días entre dos fechas
+    function diasEntre(f1, f2) {
+      // Elimina hora
+      f1.setHours(0,0,0,0);
+      f2.setHours(0,0,0,0);
+      return Math.floor((f1 - f2) / (1000*60*60*24));
+    }
+
+    async function cargarCuotas(rango) {
+      let hoy = new Date();
+      hoy.setHours(0,0,0,0);
+      let cuotas = [];
+      document.getElementById("cuotas-list").innerHTML = `<tr><td colspan="5" class="loading"><i class="fa-solid fa-spinner fa-spin"></i> Cargando...</td></tr>`;
+      const snapshot = await getDocs(collection(db, "creditos"));
+      snapshot.forEach(doc => {
+        let d = doc.data();
+        if (!Array.isArray(d.amortizacion)) return;
+        (d.amortizacion).forEach(cuota => {
+          if (cuota.estado === "Pendiente" && cuota.fecha) {
+            let fcuota = new Date(cuota.fecha);
+            fcuota.setHours(0,0,0,0);
+            let dias = diasEntre(fcuota, hoy);
+            let mostrar = false, clase = "";
+            if      (rango === "hoy" && dias === 0)             { mostrar = true; clase = "row-today"; }
+            else if (rango === "7"  && dias > 0 && dias <= 7)   { mostrar = true; clase = "row-7d"; }
+            else if (rango === "15" && dias > 0 && dias <= 15)  { mostrar = true; clase = "row-15d"; }
+            else if (rango === "30" && dias > 0 && dias <= 30)  { mostrar = true; clase = "row-30d"; }
+            if (mostrar) {
+              cuotas.push({
+                cliente: d.nombre,
+                numero: cuota.numeroCuota,
+                fecha: cuota.fecha,
+                monto: cuota.cuota,
+                estado: cuota.estado,
+                clase: clase
+              });
+            }
+          }
+        });
+      });
+
+      let html = cuotas.length ? cuotas.map(c => `
+        <tr class="${c.clase}">
+          <td>${c.cliente}</td>
+          <td>${c.numero}</td>
+          <td>${formateaFecha(c.fecha)}</td>
+          <td>$${parseFloat(c.monto).toFixed(2)}</td>
+          <td class="pendiente">${c.estado}</td>
+        </tr>
+      `).join('') : `<tr><td colspan="5" class="loading">Sin cuotas por vencer en este rango</td></tr>`;
+      document.getElementById("cuotas-list").innerHTML = html;
+    }
+
+    // Inicializa con rango por defecto (hoy)
+    document.getElementById("rango").onchange = function() {
+      cargarCuotas(this.value);
+    };
+    cargarCuotas("hoy");
+  </script>
+</body>
+</html>

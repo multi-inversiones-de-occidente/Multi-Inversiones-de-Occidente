@@ -58,24 +58,36 @@
           return;
         }
         try {
-          // 1) Leer la asignación
+          // --- Buscar primero la tabla temporal en localStorage
+          let amortizacion = [];
+          let tablaLocalStorage = false;
+          const planTemp = localStorage.getItem('planPagosTemp');
+          if (planTemp) {
+            amortizacion = JSON.parse(planTemp);
+            tablaLocalStorage = true;
+          } else {
+            // Si no existe en localStorage, leer la asignación original de Firebase
+            const asignRef = doc(db, "asignacion_de_cuota", asignacionID);
+            const asignSnap = await getDoc(asignRef);
+            if (!asignSnap.exists()) throw new Error("Asignación no encontrada.");
+            const asignData = asignSnap.data();
+            amortizacion = Array.isArray(asignData.amortizacion) ? asignData.amortizacion : [];
+          }
+
+          // Leer la asignación y solicitud (para encabezados)
           const asignRef = doc(db, "asignacion_de_cuota", asignacionID);
           const asignSnap = await getDoc(asignRef);
           if (!asignSnap.exists()) throw new Error("Asignación no encontrada.");
           const asignData = asignSnap.data();
 
-          // 2) Leer la solicitud original
           const solicitudID = asignData.solicitudID;
           const solRef = doc(db, "Archivo Solicitudes", solicitudID);
           const solSnap = await getDoc(solRef);
           if (!solSnap.exists()) throw new Error("Solicitud original no encontrada.");
           const solData = solSnap.data();
 
-          // 3) Datos de agencia
           const agencia = asignData.agenciaAsignada || 'Ahuachapán';
           const infoAgencia = agenciasInfo[agencia] || {direccion: '', telefono: ''};
-
-          // 4) Datos generales para encabezado
           const fechaEmision = new Date().toLocaleDateString('es-SV');
           const nombreEjecutivo = asignData.asignadoA || '';
           const nombreCliente = `${solData.nombre || ''} ${solData.apellido || ''}`;
@@ -84,10 +96,7 @@
           const cuota = asignData.cuota || '';
           const plazo = asignData.numeroCuotas || '';
 
-          // 5) Plan de pagos (amortización)
-          const amortizacion = Array.isArray(asignData.amortizacion) ? asignData.amortizacion : [];
-
-          // Cálculos de totales (si existen campos Seg/Vida y Seg/Deuda)
+          // Cálculos de totales
           let totalCapital = 0, totalSegVida = 0, totalSegDeuda = 0;
           amortizacion.forEach(row => {
             totalCapital += Number(row.capital || 0);
@@ -95,7 +104,6 @@
             totalSegDeuda += Number(row.segDeuda || 0);
           });
 
-          // Renderizar tabla de pagos
           let tablaPagos = amortizacion.map((row, i) => `
             <tr>
               <td>${row.numeroCuota ?? i+1}</td>
@@ -108,7 +116,13 @@
             </tr>
           `).join('');
 
-          // 6) Renderizar el documento
+          let advertencia = tablaLocalStorage
+            ? `<div style="margin-bottom:16px;padding:10px 13px;background:#ffc;border-radius:9px;color:#6a4d00;">
+                <b>Advertencia:</b> Este plan de pagos es temporal (calculado y guardado localmente, aún NO aperturado en sistema).<br>
+                Una vez que el crédito sea aperturado, los datos serán definitivos.
+              </div>`
+            : "";
+
           let html = `
             <div class="doc-wrap" id="print-section">
               <div class="doc-header">
@@ -125,6 +139,7 @@
                 <div><b>Cuota:</b> $${cuota}</div>
                 <div><b>Plazo:</b> ${plazo}</div>
               </div>
+              ${advertencia}
               <br>
               <table class="plan-table">
                 <thead>

@@ -46,6 +46,20 @@
       return params.get(name);
     }
 
+    // Nueva función para obtener la tabla recalculada temporal desde localStorage
+    function getAmortizacionTemp(asignacionID) {
+      try {
+        const key = `nuevaAmortizacionTemp_${asignacionID}`;
+        const val = localStorage.getItem(key);
+        if (!val) return null;
+        const data = JSON.parse(val);
+        if (Array.isArray(data) && data.length > 0) return data;
+        return null;
+      } catch {
+        return null;
+      }
+    }
+
     async function loadHojaApertura() {
       const asignacionID = getParam("id");
       if (!asignacionID) {
@@ -78,9 +92,13 @@
           // 4) Preparar variables y valores
           const fechaApertura = new Date().toLocaleDateString('es-SV');
 
-          // Calcular fecha de vencimiento (última cuota de la amortización)
+          // --------- OBTENER FECHA DE VENCIMIENTO DE TABLA TEMPORAL SI EXISTE ---------
           let fechaVencimiento = '';
-          if (Array.isArray(asignData.amortizacion) && asignData.amortizacion.length > 0) {
+          let tablaAmortTemp = getAmortizacionTemp(asignacionID);
+          if (tablaAmortTemp && tablaAmortTemp.length > 0) {
+            const last = tablaAmortTemp[tablaAmortTemp.length - 1];
+            if (last.fecha) fechaVencimiento = last.fecha;
+          } else if (Array.isArray(asignData.amortizacion) && asignData.amortizacion.length > 0) {
             const last = asignData.amortizacion[asignData.amortizacion.length - 1];
             if (last.fecha && last.fecha.toDate) {
               fechaVencimiento = last.fecha.toDate().toLocaleDateString("es-SV");
@@ -185,6 +203,8 @@
     window.addEventListener("DOMContentLoaded", loadHojaApertura);
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- ... tu CSS igual ... -->
+  <!-- el resto igual -->
   <style>
     body { background: #fff; color: #181818; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; margin: 0; }
     .container {
@@ -241,3 +261,4 @@
   </div>
 </body>
 </html>
+

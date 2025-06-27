@@ -12,7 +12,7 @@
       font-family: 'Segoe UI', Arial, sans-serif;
     }
     .container {
-      max-width: 800px;
+      max-width: 1080px;
       margin: 2.8rem auto 0 auto;
       background: #fff;
       border-radius: 18px;
@@ -58,22 +58,26 @@
     select:focus { border: 1.5px solid #1371b6; }
     table {
       width: 100%;
+      min-width: 1020px;
       border-collapse: collapse;
       margin-top: 6px;
       background: #fafdff;
+      font-size: 1.09rem;
     }
     th, td {
-      padding: 8.5px 10px;
+      padding: 13px 14px;
       border-bottom: 1px solid #e3e9f2;
       text-align: left;
-      font-size: 1rem;
+      font-size: 1.09rem;
+      white-space: nowrap;
     }
     th {
       background: #e7f2fb;
       color: #125c9c;
-      font-size: 1.03rem;
+      font-size: 1.09rem;
       letter-spacing: .7px;
     }
+    th:nth-child(1), td:nth-child(1) { min-width: 210px; max-width: 330px;}
     .pendiente {
       color: #dbab16;
       font-weight: bold;
@@ -103,11 +107,16 @@
       text-align: center;
       margin-bottom: 14px;
     }
+    @media (max-width: 1200px) {
+      .container { max-width: 98vw; }
+      table { font-size: 1rem; }
+    }
     @media (max-width: 700px) {
-      .container { padding: 1.3rem .4rem; }
-      table { font-size: 0.97rem; }
+      .container { padding: 1.3rem .4rem; max-width:99vw;}
+      table { font-size: 0.97rem; min-width: 600px;}
       th, td { padding: 7px 3px; }
     }
+    ::-webkit-scrollbar { height: 10px; }
   </style>
 </head>
 <body>
@@ -124,22 +133,24 @@
         <option value="30">Próximos 30 días</option>
       </select>
     </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Cliente</th>
-          <th>Cuota #</th>
-          <th>Fecha</th>
-          <th>Días</th>
-          <th>Capital</th>
-          <th>Interés</th>
-          <th>Total</th>
-          <th>Saldo Crédito</th>
-          <th>Teléfono</th>
-        </tr>
-      </thead>
-      <tbody id="cuotas-list"></tbody>
-    </table>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Cuota #</th>
+            <th>Fecha</th>
+            <th>Días</th>
+            <th>Capital</th>
+            <th>Interés</th>
+            <th>Total</th>
+            <th>Saldo Crédito</th>
+            <th>Teléfono</th>
+          </tr>
+        </thead>
+        <tbody id="cuotas-list"></tbody>
+      </table>
+    </div>
   </div>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
@@ -169,7 +180,6 @@
       return Math.floor((f1 - f2) / (1000*60*60*24));
     }
 
-    // Filtra SOLO la próxima cuota PENDIENTE de cada crédito (por cliente)
     async function cargarCuotas(rango) {
       let hoy = new Date();
       hoy.setHours(0,0,0,0);
@@ -179,7 +189,6 @@
       snapshot.forEach(doc => {
         let d = doc.data();
         if (!Array.isArray(d.amortizacion)) return;
-        // Buscar la PRÓXIMA cuota pendiente
         let proxima = d.amortizacion.find(cuota => cuota.estado === "Pendiente");
         if (proxima) {
           let fcuota = new Date(proxima.fecha);
@@ -223,7 +232,6 @@
       document.getElementById("cuotas-list").innerHTML = html;
     }
 
-    // Autenticación obligatoria antes de mostrar página
     onAuthStateChanged(auth, user => {
       if (!user) {
         window.location.href = "login.html";
@@ -233,11 +241,11 @@
       }
     });
 
-    // Cambia el rango de búsqueda
     document.getElementById("rango").onchange = function() {
       cargarCuotas(this.value);
     };
   </script>
 </body>
 </html>
+
 

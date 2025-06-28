@@ -221,7 +221,7 @@
       render();
     }
 
-    // === LÓGICA DE PAGO ROBUSTA Y SINTONIZADA ===
+    // === LÓGICA DE PAGO ROBUSTA Y AJUSTADA ===
     async function realizarPago(cliente, montoNum) {
       try {
         // 1. Obtener usuario y agencia
@@ -242,7 +242,7 @@
         let saldoActual = parseFloat(creditoData.saldoActual || 0);
         let interesActual = parseFloat(creditoData.interesActual || 0);
         let multasAcumuladas = parseFloat(creditoData.multasAcumuladas || 0);
-        let paraPonerseAlDia = parseFloat(creditoData.paraPonerseAlDia || 0); // <-- Agregado
+        let paraPonerseAlDia = parseFloat(creditoData.paraPonerseAlDia || 0);
         let fechaUltimoCalculo = creditoData.fechaUltimoCalculoIntereses
           ? new Date(creditoData.fechaUltimoCalculoIntereses)
           : new Date(creditoData.fechaInicio);
@@ -257,6 +257,7 @@
           ...cuota,
           estado: cuota.estado || "Pendiente",
           montoPagado: typeof cuota.montoPagado === "number" ? cuota.montoPagado : 0,
+          montoPagadoInteres: typeof cuota.montoPagadoInteres === "number" ? cuota.montoPagadoInteres : 0,
           fechaPagoReal: cuota.fechaPagoReal || null
         }));
 
@@ -264,6 +265,7 @@
         let restante = montoNum;
         let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
 
+        // 1. Multas
         if (restante >= multasAcumuladas) {
           restante -= multasAcumuladas;
           pagoMultas = multasAcumuladas;
@@ -274,63 +276,103 @@
           restante = 0;
         }
 
-        if (restante > 0) {
-          if (restante >= interesActual) {
-            restante -= interesActual;
-            pagoInteres = interesActual;
-            interesActual = 0;
-          } else {
-            interesActual -= restante;
-            pagoInteres = restante;
-            restante = 0;
-          }
-        }
-
-        if (restante > 0) {
-          if (restante >= saldoActual) {
-            restante -= saldoActual;
-            pagoCapital = saldoActual;
-            saldoActual = 0;
-          } else {
-            saldoActual -= restante;
-            pagoCapital = restante;
-            restante = 0;
-          }
-        }
-
-        // ======================
-        // ACTUALIZAR AMORTIZACION DE CUOTAS
-        // ======================
-        let montoAbonado = pagoCapital; // Solo el capital abona a cuotas
+        // 2. INTERÉS y CAPITAL SOLO de cuotas vencidas o actuales, luego sobrante solo a capital futuro
+        // a) Primero: INTERÉS y CAPITAL de cuotas vencidas o actuales (de acuerdo a la fecha)
         for (let i = 0; i < amortizacion.length; i++) {
           let cuota = amortizacion[i];
-          let pagadoAntes = parseFloat(cuota.montoPagado || 0);
-          let totalPorPagar = parseFloat(cuota.cuota) - pagadoAntes;
-          // Solo actualiza si la cuota no está pagada
-          if (cuota.estado !== "Pagada") {
-            if (montoAbonado > 0) {
-              if (montoAbonado >= totalPorPagar) {
-                cuota.montoPagado = parseFloat(cuota.cuota);
-                cuota.estado = "Pagada";
-                cuota.fechaPagoReal = fechaPago;
-                montoAbonado -= totalPorPagar;
+          if (cuota.estado === "Pagada") continue;
+
+          const cuotaFecha = new Date(cuota.fecha);
+          // Solo pagar intereses/capital de cuotas vencidas o de la actual (hoy)
+          if (cuotaFecha <= ahora) {
+            // INTERÉS primero
+            let interesPendiente = parseFloat(cuota.interes || 0) - (parseFloat(cuota.montoPagadoInteres || 0));
+            if (restante > 0 && interesPendiente > 0) {
+              let abonoInteres = Math.min(restante, interesPendiente);
+              cuota.montoPagadoInteres = (parseFloat(cuota.montoPagadoInteres) || 0) + abonoInteres;
+              restante -= abonoInteres;
+              pagoInteres += abonoInteres;
+            }
+            // CAPITAL después, solo si el interés está pagado
+            let capitalPendiente = parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado || 0));
+            if (restante > 0 && interesPendiente <= 0 && capitalPendiente > 0) {
+              let abonoCapital = Math.min(restante, capitalPendiente);
+              cuota.montoPagado = (parseFloat(cuota.montoPagado) || 0) + abonoCapital;
+              restante -= abonoCapital;
+              pagoCapital += abonoCapital;
+            }
+
+            // Estado cuota
+            if (
+              ((parseFloat(cuota.montoPagadoInteres) || 0) >= parseFloat(cuota.interes || 0)) &&
+              ((parseFloat(cuota.montoPagado) || 0) >= parseFloat(cuota.capital || 0))
+            ) {
+              cuota.estado = "Pagada";
+              cuota.fechaPagoReal = fechaPago;
+            } else if (
+              ((parseFloat(cuota.montoPagadoInteres) || 0) > 0) ||
+              ((parseFloat(cuota.montoPagado) || 0) > 0)
+            ) {
+              cuota.estado = "Parcial";
+              cuota.fechaPagoReal = null;
+            } else {
+              if (cuotaFecha < ahora) {
+                cuota.estado = "Atrasado";
               } else {
-                cuota.montoPagado = pagadoAntes + montoAbonado;
-                cuota.estado = "Parcial";
-                cuota.fechaPagoReal = null;
-                montoAbonado = 0;
+                cuota.estado = "Pendiente";
               }
-            }
-            // Si está vencida y no se ha pagado completo
-            if (cuota.estado !== "Pagada" && new Date(cuota.fecha) < ahora) {
-              cuota.estado = "Atrasado";
-            }
-            // Si no ha recibido pagos, la dejamos pendiente
-            if ((cuota.montoPagado ?? 0) === 0 && new Date(cuota.fecha) >= ahora) {
-              cuota.estado = "Pendiente";
             }
           }
         }
+        // b) Segundo: Sobrante SOLO a capital de próximas cuotas futuras (sin tocar interés futuro)
+        if (restante > 0) {
+          for (let i = 0; i < amortizacion.length; i++) {
+            let cuota = amortizacion[i];
+            if (cuota.estado === "Pagada") continue;
+            const cuotaFecha = new Date(cuota.fecha);
+            if (cuotaFecha > ahora) {
+              let capitalPendiente = parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado || 0));
+              if (capitalPendiente > 0) {
+                let abonoCapital = Math.min(restante, capitalPendiente);
+                cuota.montoPagado = (parseFloat(cuota.montoPagado) || 0) + abonoCapital;
+                restante -= abonoCapital;
+                pagoCapital += abonoCapital;
+
+                // Si cubre todo capital y el interés es 0 (que no debería pasar en cuotas futuras), la marca como pagada
+                if (
+                  ((parseFloat(cuota.montoPagadoInteres) || 0) >= parseFloat(cuota.interes || 0)) &&
+                  ((parseFloat(cuota.montoPagado) || 0) >= parseFloat(cuota.capital || 0))
+                ) {
+                  cuota.estado = "Pagada";
+                  cuota.fechaPagoReal = fechaPago;
+                } else {
+                  cuota.estado = "Parcial";
+                  cuota.fechaPagoReal = null;
+                }
+              }
+            }
+            if (restante <= 0) break;
+          }
+        }
+
+        // --- ACTUALIZAR INDICADORES GLOBALES ---
+        paraPonerseAlDia = 0;
+        let capitalAtrasado = 0;
+        interesActual = 0;
+        const hoy = new Date();
+        for (let i = 0; i < amortizacion.length; i++) {
+          let cuota = amortizacion[i];
+          const esVencida = new Date(cuota.fecha) < hoy && cuota.estado !== "Pagada";
+          if (esVencida) {
+            let faltaCapital = Math.max(0, parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0));
+            let faltaInteres = Math.max(0, parseFloat(cuota.interes || 0) - (parseFloat(cuota.montoPagadoInteres) || 0));
+            paraPonerseAlDia += faltaCapital + faltaInteres;
+            capitalAtrasado += faltaCapital;
+            interesActual += faltaInteres;
+          }
+        }
+        saldoActual = amortizacion
+          .reduce((acc, cuota) => acc + Math.max(0, parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0)), 0);
 
         // ======================
         // REGISTRO DEL PAGO
@@ -352,9 +394,7 @@
           sucursal: sucursal,
           correlativo: correlativoStr,
           timestamp: new Date(),
-          // =========== AGREGADO ===========
-          paraPonerseAlDiaAntes: paraPonerseAlDia.toFixed(2)
-          // =========== AGREGADO ===========
+          paraPonerseAlDiaAntes: (creditoData.paraPonerseAlDia || 0).toFixed(2)
         });
 
         // ======================
@@ -363,6 +403,8 @@
         await window.firebaseUpdateDoc("creditos", cliente.id, {
           saldoActual: saldoActual.toFixed(2),
           interesActual: interesActual.toFixed(2),
+          capitalAtrasado: capitalAtrasado.toFixed(2),
+          paraPonerseAlDia: paraPonerseAlDia.toFixed(2),
           multasAcumuladas: multasAcumuladas.toFixed(2),
           ultimaActualizacion: fechaPago,
           fechaUltimoCalculoIntereses: fechaPago,

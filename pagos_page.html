@@ -301,7 +301,6 @@
               restante -= abonoCapital;
               pagoCapital += abonoCapital;
             }
-
             // Estado cuota
             if (
               ((parseFloat(cuota.montoPagadoInteres) || 0) >= parseFloat(cuota.interes || 0)) &&
@@ -331,13 +330,12 @@
             if (cuota.estado === "Pagada") continue;
             const cuotaFecha = new Date(cuota.fecha);
             if (cuotaFecha > ahora) {
-              let capitalPendiente = parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado || 0));
+              let capitalPendiente = parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0);
               if (capitalPendiente > 0) {
                 let abonoCapital = Math.min(restante, capitalPendiente);
                 cuota.montoPagado = (parseFloat(cuota.montoPagado) || 0) + abonoCapital;
                 restante -= abonoCapital;
                 pagoCapital += abonoCapital;
-
                 // Si cubre todo capital y el interés es 0 (que no debería pasar en cuotas futuras), la marca como pagada
                 if (
                   ((parseFloat(cuota.montoPagadoInteres) || 0) >= parseFloat(cuota.interes || 0)) &&
@@ -385,27 +383,27 @@
           nombres: creditoData.nombre,
           montoPagado: montoNum,
           fechaPago: fechaPago,
-          pagoMultas: pagoMultas.toFixed(2),
-          pagoInteres: pagoInteres.toFixed(2),
-          pagoCapital: pagoCapital.toFixed(2),
-          saldoRestante: saldoActual.toFixed(2),
+          pagoMultas: (parseFloat(pagoMultas) || 0).toFixed(2),
+          pagoInteres: (parseFloat(pagoInteres) || 0).toFixed(2),
+          pagoCapital: (parseFloat(pagoCapital) || 0).toFixed(2),
+          saldoRestante: (parseFloat(saldoActual) || 0).toFixed(2),
           cajeroID: user.uid,
           cajeroNombre: cajeroNombre,
           sucursal: sucursal,
           correlativo: correlativoStr,
           timestamp: new Date(),
-          paraPonerseAlDiaAntes: (creditoData.paraPonerseAlDia || 0).toFixed(2)
+          paraPonerseAlDiaAntes: (parseFloat(creditoData.paraPonerseAlDia) || 0).toFixed(2)
         });
 
         // ======================
         // ACTUALIZA EL CRÉDITO EN LA BASE
         // ======================
         await window.firebaseUpdateDoc("creditos", cliente.id, {
-          saldoActual: saldoActual.toFixed(2),
-          interesActual: interesActual.toFixed(2),
-          capitalAtrasado: capitalAtrasado.toFixed(2),
-          paraPonerseAlDia: paraPonerseAlDia.toFixed(2),
-          multasAcumuladas: multasAcumuladas.toFixed(2),
+          saldoActual: (parseFloat(saldoActual) || 0).toFixed(2),
+          interesActual: (parseFloat(interesActual) || 0).toFixed(2),
+          capitalAtrasado: (parseFloat(capitalAtrasado) || 0).toFixed(2),
+          paraPonerseAlDia: (parseFloat(paraPonerseAlDia) || 0).toFixed(2),
+          multasAcumuladas: (parseFloat(multasAcumuladas) || 0).toFixed(2),
           ultimaActualizacion: fechaPago,
           fechaUltimoCalculoIntereses: fechaPago,
           estadoCredito: saldoActual == 0 ? "Pagado" : creditoData.estadoCredito,
@@ -413,7 +411,7 @@
         });
 
         // Redirigir al ticket (comprobante)
-        window.location.href = `ticket_page.html?correlativo=${correlativoStr}&cliente=${encodeURIComponent(creditoData.nombre)}&monto=${montoNum.toFixed(2)}&agencia=${encodeURIComponent(sucursal)}&fecha=${encodeURIComponent(fechaPago)}&pagoCapital=${pagoCapital.toFixed(2)}&pagoInteres=${pagoInteres.toFixed(2)}&pagoMultas=${pagoMultas.toFixed(2)}&saldoRestante=${saldoActual.toFixed(2)}`;
+        window.location.href = `ticket_page.html?correlativo=${correlativoStr}&cliente=${encodeURIComponent(creditoData.nombre)}&monto=${montoNum.toFixed(2)}&agencia=${encodeURIComponent(sucursal)}&fecha=${encodeURIComponent(fechaPago)}&pagoCapital=${(parseFloat(pagoCapital)||0).toFixed(2)}&pagoInteres=${(parseFloat(pagoInteres)||0).toFixed(2)}&pagoMultas=${(parseFloat(pagoMultas)||0).toFixed(2)}&saldoRestante=${(parseFloat(saldoActual)||0).toFixed(2)}`;
       } catch (e) {
         alert("Error al realizar el pago: " + e.message);
       }
@@ -429,6 +427,7 @@
   </script>
 </body>
 </html>
+
 
 
 

@@ -215,7 +215,7 @@
       render();
     }
 
-    // === LÓGICA DE PAGO CLARA Y AJUSTADA ===
+    // === LÓGICA DE PAGO CLARA Y AJUSTADA (con pendienteDeCuota) ===
     async function realizarPago(cliente, montoNum) {
       try {
         // 1. Obtener usuario y agencia
@@ -254,7 +254,8 @@
           estado: cuota.estado || "Pendiente",
           montoPagado: typeof cuota.montoPagado === "number" ? cuota.montoPagado : 0,
           montoPagadoInteres: typeof cuota.montoPagadoInteres === "number" ? cuota.montoPagadoInteres : 0,
-          fechaPagoReal: cuota.fechaPagoReal || null
+          fechaPagoReal: cuota.fechaPagoReal || null,
+          pendienteDeCuota: typeof cuota.pendienteDeCuota === "number" ? cuota.pendienteDeCuota : parseFloat(cuota.cuota || 0) // inicialización
         }));
 
         let restante = montoNum;
@@ -335,6 +336,14 @@
         saldoActual = amortizacion
           .reduce((acc, cuota) => acc + Math.max(0, parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0)), 0);
 
+        // --- ACTUALIZAR pendienteDeCuota en cada cuota ---
+        for (let i = 0; i < amortizacion.length; i++) {
+          let cuota = amortizacion[i];
+          let pendienteInteres = Math.max(0, parseFloat(cuota.interes) - parseFloat(cuota.montoPagadoInteres));
+          let pendienteCapital = Math.max(0, parseFloat(cuota.capital) - parseFloat(cuota.montoPagado));
+          cuota.pendienteDeCuota = +(pendienteInteres + pendienteCapital).toFixed(2);
+        }
+
         // === REGISTRO DEL PAGO ===
         const correlativo = Math.floor(Math.random() * 90000) + 10000;
         const correlativoStr = correlativo.toString().padStart(5, '0');
@@ -385,6 +394,7 @@
   </script>
 </body>
 </html>
+
 
 
 

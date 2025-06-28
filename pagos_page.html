@@ -57,7 +57,6 @@
     import { getFirestore, collection, query, where, getDocs, doc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
-    // --- Helpers add/update (compatibilidad con modular) ---
     window.firebaseAddDoc = async function(collectionName, data) {
       const col = collection(db, collectionName);
       return await addDoc(col, data);
@@ -67,7 +66,6 @@
       await updateDoc(docRef, data);
     };
 
-    // Configuración Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -83,7 +81,6 @@
 
     let userDepartment = null;
 
-    // --- Obtiene agency (department) del usuario actual y la muestra ---
     function obtenerAgenciaUsuario() {
       return new Promise((resolve, reject) => {
         onAuthStateChanged(auth, async user => {
@@ -97,7 +94,6 @@
           if (!snap.empty) {
             const data = snap.docs[0].data();
             userDepartment = data.department || null;
-            // Mostrar en la UI
             const agenciaRow = document.getElementById('agencia-row');
             const agenciaNombre = document.getElementById('agencia-nombre');
             if (userDepartment) {
@@ -116,7 +112,6 @@
       });
     }
 
-    // --- Busca clientes filtrados por agency ---
     async function buscarClientes(term) {
       const clientesList = document.getElementById("clientes-list");
       clientesList.innerHTML = "Cargando...";
@@ -144,7 +139,6 @@
         clientesList.innerHTML = `<div style="color:#ccc;text-align:center;padding:34px 0;">No se encontraron clientes para tu agencia.</div>`;
         return;
       }
-      // Renderiza
       clientesList.innerHTML = clientes.map(cliente => `
         <div class="cliente-card">
           <div>
@@ -154,7 +148,6 @@
           <button class="btn-pagar" data-id="${cliente.id}" data-nombre="${cliente.nombre}" data-dui="${cliente.numeroDui}"><i class="fas fa-dollar-sign"></i> Pagar</button>
         </div>
       `).join('');
-      // Vincular eventos pagar
       document.querySelectorAll('.btn-pagar').forEach(btn => {
         btn.onclick = function() {
           mostrarDialogoPago({
@@ -166,7 +159,6 @@
       });
     }
 
-    // --- Modal de Pago Mejorado ---
     function mostrarDialogoPago(cliente) {
       let modalRoot = document.getElementById("modal-root");
       let monto = "";
@@ -251,7 +243,6 @@
         let interesCorrido = dias > 0 ? saldoActual * tasaDiaria * dias : 0;
         interesActual += interesCorrido;
 
-        // Asegura que amortizacion tenga los campos necesarios
         let amortizacion = Array.isArray(creditoData.amortizacion) ? creditoData.amortizacion : [];
         amortizacion = amortizacion.map((cuota) => ({
           ...cuota,
@@ -261,7 +252,6 @@
           fechaPagoReal: cuota.fechaPagoReal || null
         }));
 
-        // --- Lógica de cobro ---
         let restante = montoNum;
         let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
 
@@ -276,16 +266,15 @@
           restante = 0;
         }
 
-        // 2. INTERÉS y CAPITAL SOLO de cuotas vencidas o actuales, luego sobrante solo a capital futuro
-        // a) Primero: INTERÉS y CAPITAL de cuotas vencidas o actuales (de acuerdo a la fecha)
+        // 2. INTERÉS y CAPITAL SOLO de cuotas vencidas o actuales
         for (let i = 0; i < amortizacion.length; i++) {
           let cuota = amortizacion[i];
           if (cuota.estado === "Pagada") continue;
-
           const cuotaFecha = new Date(cuota.fecha);
-          // Solo pagar intereses/capital de cuotas vencidas o de la actual (hoy)
+
+          // Solo cuotas vencidas o actuales
           if (cuotaFecha <= ahora) {
-            // INTERÉS primero
+            // INTERÉS primero SIEMPRE
             let interesPendiente = parseFloat(cuota.interes || 0) - (parseFloat(cuota.montoPagadoInteres || 0));
             if (restante > 0 && interesPendiente > 0) {
               let abonoInteres = Math.min(restante, interesPendiente);
@@ -293,7 +282,8 @@
               restante -= abonoInteres;
               pagoInteres += abonoInteres;
             }
-            // CAPITAL después, solo si el interés está pagado
+            // Solo si interés está totalmente cubierto, abona a CAPITAL
+            interesPendiente = parseFloat(cuota.interes || 0) - (parseFloat(cuota.montoPagadoInteres || 0)); // recalcula por si ya se abonó arriba
             let capitalPendiente = parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado || 0));
             if (restante > 0 && interesPendiente <= 0 && capitalPendiente > 0) {
               let abonoCapital = Math.min(restante, capitalPendiente);
@@ -323,7 +313,7 @@
             }
           }
         }
-        // b) Segundo: Sobrante SOLO a capital de próximas cuotas futuras (sin tocar interés futuro)
+        // 3. Sobrante SOLO a capital de próximas cuotas futuras
         if (restante > 0) {
           for (let i = 0; i < amortizacion.length; i++) {
             let cuota = amortizacion[i];
@@ -336,7 +326,6 @@
                 cuota.montoPagado = (parseFloat(cuota.montoPagado) || 0) + abonoCapital;
                 restante -= abonoCapital;
                 pagoCapital += abonoCapital;
-                // Si cubre todo capital y el interés es 0 (que no debería pasar en cuotas futuras), la marca como pagada
                 if (
                   ((parseFloat(cuota.montoPagadoInteres) || 0) >= parseFloat(cuota.interes || 0)) &&
                   ((parseFloat(cuota.montoPagado) || 0) >= parseFloat(cuota.capital || 0))
@@ -372,9 +361,7 @@
         saldoActual = amortizacion
           .reduce((acc, cuota) => acc + Math.max(0, parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0)), 0);
 
-        // ======================
-        // REGISTRO DEL PAGO
-        // ======================
+        // === REGISTRO DEL PAGO ===
         const correlativo = Math.floor(Math.random() * 90000) + 10000;
         const correlativoStr = correlativo.toString().padStart(5, '0');
         await window.firebaseAddDoc("pagos", {
@@ -395,9 +382,7 @@
           paraPonerseAlDiaAntes: (parseFloat(creditoData.paraPonerseAlDia) || 0).toFixed(2)
         });
 
-        // ======================
-        // ACTUALIZA EL CRÉDITO EN LA BASE
-        // ======================
+        // === ACTUALIZA EL CRÉDITO EN LA BASE ===
         await window.firebaseUpdateDoc("creditos", cliente.id, {
           saldoActual: (parseFloat(saldoActual) || 0).toFixed(2),
           interesActual: (parseFloat(interesActual) || 0).toFixed(2),
@@ -407,7 +392,7 @@
           ultimaActualizacion: fechaPago,
           fechaUltimoCalculoIntereses: fechaPago,
           estadoCredito: saldoActual == 0 ? "Pagado" : creditoData.estadoCredito,
-          amortizacion: amortizacion // <-- array de cuotas actualizado
+          amortizacion: amortizacion
         });
 
         // Redirigir al ticket (comprobante)
@@ -417,7 +402,6 @@
       }
     }
 
-    // --- Cargar agencia usuario y setear buscador ---
     window.addEventListener("DOMContentLoaded", async () => {
       await obtenerAgenciaUsuario();
       document.getElementById("buscador").addEventListener("input", e => {
@@ -427,7 +411,5 @@
   </script>
 </body>
 </html>
-
-
 
 

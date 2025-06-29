@@ -187,6 +187,18 @@
       color: #232323 !important;
       opacity: 1;
     }
+    /* Botón de reportes gerenciales (nuevo) */
+    .btn-reporte {
+      background: linear-gradient(90deg, #ee0979 0%, #ff6a00 100%);
+      color: #fff !important;
+    }
+    .btn-reporte:active,
+    .btn-reporte:hover {
+      background: linear-gradient(90deg, #ff6a00 60%, #ee0979 100%);
+      color: #fff !important;
+      box-shadow: 0 8px 26px #ee097955;
+    }
+    .btn-reporte i { color: #fff; opacity: 0.95;}
     @media (max-width: 600px) {
       .container { padding:1.2rem 1vw; }
       h1 { font-size: 1.23rem;}
@@ -255,6 +267,11 @@
       <a href="cuotas_por_vencer_page.html" class="btn-grande">
         <i class="fas fa-hourglass-half"></i>
         Cuotas por Vencer
+      </a>
+      <!-- NUEVO BOTÓN DE REPORTES GERENCIALES -->
+      <a href="reporte_page.html" class="btn-grande btn-reporte">
+        <i class="fas fa-chart-bar"></i>
+        Reportes Gerenciales
       </a>
     </div>
   </div>

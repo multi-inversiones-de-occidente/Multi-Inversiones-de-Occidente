@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Reporte de Colocación de Créditos</title>
-  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, orderBy, getDocs, where } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -33,6 +32,18 @@
       return (str || '').toString().trim().toLowerCase();
     }
 
+    function mostrarError(mensaje, errObj) {
+      const area = document.getElementById('error-area');
+      area.innerText = mensaje + (errObj ? '\n' + (errObj.message || JSON.stringify(errObj)) : '');
+      area.style.display = 'block';
+      console.error('Error:', mensaje, errObj || '');
+    }
+
+    function limpiarError() {
+      document.getElementById('error-area').style.display = 'none';
+      document.getElementById('error-area').innerText = '';
+    }
+
     function formatFecha(fecha) {
       const d = new Date(fecha);
       return d.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -43,64 +54,67 @@
     }
 
     async function obtenerCreditosConAsignacionAceptada() {
+      limpiarError();
       if (!ejecutivoNombre) return;
       document.getElementById('resultados').innerHTML = '<div class="loader"></div>';
 
-      const creditosRef = collection(db, "creditos");
-      const q = query(creditosRef, orderBy("fechaInicio", "desc"));
-      const snapshot = await getDocs(q);
+      try {
+        const creditosRef = collection(db, "creditos");
+        const q = query(creditosRef, orderBy("fechaInicio", "desc"));
+        const snapshot = await getDocs(q);
 
-      let docs = [];
-      snapshot.forEach(doc => {
-        let d = doc.data();
-        d.id = doc.id;
-        docs.push(d);
-      });
+        let docs = [];
+        snapshot.forEach(doc => {
+          let d = doc.data();
+          d.id = doc.id;
+          docs.push(d);
+        });
 
-      // Filtra por usuario asignado y rango de fechas
-      docs = docs.filter(doc => {
-        if (normaliza(doc.asignadoA) !== normaliza(ejecutivoNombre)) return false;
-        let fechaDoc = doc.fechaInicio;
-        if (typeof fechaDoc === "object" && fechaDoc.seconds) {
-          fechaDoc = new Date(fechaDoc.seconds * 1000);
-        } else if (typeof fechaDoc === "string") {
-          fechaDoc = new Date(fechaDoc);
-        } else {
-          fechaDoc = new Date(fechaDoc);
-        }
-        if (fechaDesde && fechaDoc < fechaDesde) return false;
-        if (fechaHasta && fechaDoc > new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23,59,59)) return false;
-        doc._fechaObj = fechaDoc;
-        return true;
-      });
-
-      // Consulta asignacion_de_cuota por cada crédito
-      const resultadosFinales = [];
-      for (const credito of docs) {
-        try {
-          // Preferible filtrar por clienteID y montoAprobado para minimizar falsos positivos
-          const asignacionRef = collection(db, "asignacion_de_cuota");
-          // Puedes usar también solicitudID si está en ambos lados
-          const q2 = query(
-            asignacionRef,
-            where("clienteID", "==", credito.clienteID ?? ""),
-            where("respuestaCliente", "==", "Aceptado")
-          );
-          const snapshot2 = await getDocs(q2);
-
-          if (!snapshot2.empty) {
-            // Toma la primera asignación aceptada que coincida
-            let asignacion = snapshot2.docs[0].data();
-            credito._asignacion = asignacion;
-            resultadosFinales.push(credito);
+        // Filtra por usuario asignado y rango de fechas
+        docs = docs.filter(doc => {
+          if (normaliza(doc.asignadoA) !== normaliza(ejecutivoNombre)) return false;
+          let fechaDoc = doc.fechaInicio;
+          if (typeof fechaDoc === "object" && fechaDoc.seconds) {
+            fechaDoc = new Date(fechaDoc.seconds * 1000);
+          } else if (typeof fechaDoc === "string") {
+            fechaDoc = new Date(fechaDoc);
+          } else {
+            fechaDoc = new Date(fechaDoc);
           }
-        } catch (e) {
-          // Error en la consulta de asignación
-        }
-      }
+          if (fechaDesde && fechaDoc < fechaDesde) return false;
+          if (fechaHasta && fechaDoc > new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23,59,59)) return false;
+          doc._fechaObj = fechaDoc;
+          return true;
+        });
 
-      creditosData = resultadosFinales;
-      renderCreditos();
+        // Consulta asignacion_de_cuota por cada crédito
+        const resultadosFinales = [];
+        for (const credito of docs) {
+          try {
+            const asignacionRef = collection(db, "asignacion_de_cuota");
+            const q2 = query(
+              asignacionRef,
+              where("clienteID", "==", credito.clienteID ?? ""),
+              where("respuestaCliente", "==", "Aceptado")
+            );
+            const snapshot2 = await getDocs(q2);
+
+            if (!snapshot2.empty) {
+              let asignacion = snapshot2.docs[0].data();
+              credito._asignacion = asignacion;
+              resultadosFinales.push(credito);
+            }
+          } catch (errAsig) {
+            mostrarError("Error al consultar la asignación de cuota", errAsig);
+          }
+        }
+
+        creditosData = resultadosFinales;
+        renderCreditos();
+      } catch (err) {
+        mostrarError("Error al consultar los créditos.", err);
+        document.getElementById('resultados').innerHTML = '<div style="color:#f44; text-align:center">Error al cargar datos</div>';
+      }
     }
 
     function renderCreditos() {
@@ -108,7 +122,6 @@
         document.getElementById('resultados').innerHTML = `<div style="text-align:center;color:#fff7">No hay créditos en el rango seleccionado.</div>`;
         return;
       }
-      // Agrupa por fecha
       const grouped = {};
       creditosData.forEach(doc => {
         const key = formatFechaGroup(doc._fechaObj);
@@ -178,13 +191,11 @@
     window.addEventListener("DOMContentLoaded", () => {
       onAuthStateChanged(auth, user => {
         if (!user) return location.href = "login.html";
-        // Usa displayName si existe, si no, email (normaliza ambos)
         ejecutivoNombre = (user.displayName || user.email || '').toString().trim().toLowerCase();
         document.getElementById("usuario-nombre").textContent = user.email;
-        // Primer día del mes actual hasta hoy
         const now = new Date();
         document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
-        document.getElementById('fecha-hasta').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        document.getElementById('fecha-hasta').value = `${now.getFullYear(), String(now.getMonth()+1).padStart(2,'0'), String(now.getDate()).padStart(2,'0')}`.replace(/,/g,'-');
         fechaDesde = new Date(now.getFullYear(), now.getMonth(), 1);
         fechaHasta = now;
         obtenerCreditosConAsignacionAceptada();
@@ -215,6 +226,18 @@
       padding: 2.1rem 1.2rem 2rem 1.2rem;
       display: flex;
       flex-direction: column;
+    }
+    #error-area {
+      display: none;
+      color: #f85c60;
+      background: #1c1b1d;
+      border: 1px solid #f85c60;
+      border-radius: 8px;
+      padding: 0.9rem 1rem;
+      margin-bottom: 1.1rem;
+      font-size: 1rem;
+      white-space: pre-wrap;
+      word-break: break-all;
     }
     #usuario-nombre {
       color: #F8AF40;
@@ -342,6 +365,7 @@
 <body>
   <header>Reporte de Colocación de Créditos</header>
   <div class="container">
+    <div id="error-area"></div>
     <div id="usuario-nombre"></div>
     <h1>MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.<br><span style="font-size:.97rem;color:#fff;font-weight:400">Colocación de Créditos</span></h1>
     <div class="filtros-row">
@@ -358,4 +382,3 @@
   </div>
 </body>
 </html>
-

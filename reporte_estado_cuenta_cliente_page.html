@@ -10,7 +10,7 @@
     import { getFirestore, collection, query, where, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
-    // Configuración
+    // Configuración Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -27,53 +27,104 @@
 
     let currentUser = null;
     let currentAgencia = null;
+    let clientesAgencia = []; // Para autocompletar
 
-    async function buscarCliente() {
-      const criterio = document.getElementById('busqueda').value.trim().toLowerCase();
-      document.getElementById('estado-cuenta').innerHTML = '<div class="loader"></div>';
-      document.getElementById('resumen-usuario').innerHTML = '';
-      if (!criterio) {
-        document.getElementById('estado-cuenta').innerHTML = '';
+    // --- AUTOCOMPLETAR CLIENTES ---
+    async function cargarClientesAgencia() {
+      if (!currentAgencia) return;
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("department", "==", currentAgencia));
+      const snap = await getDocs(q);
+      clientesAgencia = [];
+      snap.forEach(doc => {
+        const d = doc.data();
+        clientesAgencia.push({
+          id: doc.id,
+          nombre: d.nombre || '',
+          apellido: d.apellido || '',
+          numeroDui: d.numeroDui || '',
+          label: ((d.nombre || '') + ' ' + (d.apellido || '') + ' | DUI: ' + (d.numeroDui || '')).trim()
+        });
+      });
+    }
+
+    function mostrarOpcionesBusqueda(valor) {
+      const predictivo = document.getElementById('opciones-busqueda');
+      valor = valor.trim().toLowerCase();
+      predictivo.innerHTML = '';
+      if (!valor || clientesAgencia.length === 0) {
+        predictivo.style.display = 'none';
         return;
       }
-      try {
-        // Buscar cliente por nombre/apellido/dui en users que pertenezca a la agencia logeada
-        let usersRef = collection(db, "users");
-        let q = query(usersRef, where("department", "==", currentAgencia));
-        let usersSnap = await getDocs(q);
-        let encontrados = [];
-        usersSnap.forEach(doc => {
-          let d = doc.data();
-          if (
-            (d.nombre && d.nombre.toLowerCase().includes(criterio)) ||
-            (d.apellido && d.apellido.toLowerCase().includes(criterio)) ||
-            (d.numeroDui && d.numeroDui.toLowerCase().includes(criterio))
-          ) {
-            encontrados.push({ id: doc.id, ...d });
-          }
+      const matches = clientesAgencia.filter(c =>
+        c.nombre.toLowerCase().includes(valor) ||
+        c.apellido.toLowerCase().includes(valor) ||
+        c.numeroDui.toLowerCase().includes(valor)
+      );
+      if (matches.length === 0) {
+        predictivo.style.display = 'none';
+        return;
+      }
+      matches.slice(0,10).forEach(c => {
+        const opt = document.createElement('div');
+        opt.className = "predictivo-opt";
+        opt.textContent = c.label;
+        opt.addEventListener('click', () => {
+          document.getElementById('busqueda').value = c.label;
+          predictivo.style.display = 'none';
         });
+        predictivo.appendChild(opt);
+      });
+      predictivo.style.display = 'block';
+    }
 
-        if (!encontrados.length) {
-          document.getElementById('estado-cuenta').innerHTML = '<div style="color:#F44;text-align:center;">Cliente no encontrado en tu agencia.</div>';
-          return;
-        }
+    async function buscarCliente() {
+      let criterio = document.getElementById('busqueda').value.trim().toLowerCase();
+      const predictivo = document.getElementById('opciones-busqueda');
+      predictivo.style.display = 'none';
+      document.getElementById('estado-cuenta').innerHTML = '<div class="loader"></div>';
+      document.getElementById('resumen-usuario').innerHTML = '';
+      document.getElementById('resumen-credito').innerHTML = '';
 
-        // Si hay más de uno, pedir elegir (puedes mejorar esto con un selector, para ahora solo toma el primero)
-        let cliente = encontrados[0];
-        let clienteID = cliente.id;
+      // Soporta buscar por predicción
+      let cliente = null;
+      if (criterio.includes('dui:')) {
+        // Extracción por DUI
+        let dui = criterio.split('dui:')[1].split('|')[0].replace(/[^\d-]/g,'').trim();
+        cliente = clientesAgencia.find(c => c.numeroDui.replace(/[^\d-]/g,'').toLowerCase() === dui);
+      }
+      if (!cliente) {
+        // Busca por nombre, apellido o DUI de cualquier modo
+        cliente = clientesAgencia.find(c =>
+          c.label.toLowerCase() === criterio ||
+          (c.nombre.toLowerCase() + ' ' + c.apellido.toLowerCase()).trim() === criterio ||
+          c.numeroDui.replace(/[^\d-]/g,'').toLowerCase() === criterio.replace(/[^\d-]/g,'')
+        );
+      }
+      if (!cliente) {
+        cliente = clientesAgencia.find(c =>
+          c.nombre.toLowerCase().includes(criterio) ||
+          c.apellido.toLowerCase().includes(criterio) ||
+          c.numeroDui.replace(/[^\d-]/g,'').includes(criterio.replace(/[^\d-]/g,''))
+        );
+      }
+      if (!cliente) {
+        document.getElementById('estado-cuenta').innerHTML = '<div style="color:#F44;text-align:center;">Cliente no encontrado en tu agencia.</div>';
+        return;
+      }
 
-        document.getElementById('resumen-usuario').innerHTML = `
-          <div class="resumen-box">
-            <b>Cliente:</b> ${cliente.nombre || ''} ${cliente.apellido || ''} | 
-            <b>DUI:</b> ${cliente.numeroDui || ''} | 
-            <b>Tel:</b> ${cliente.telefono || '-'} | 
-            <b>Agencia:</b> ${cliente.department}
-          </div>
-        `;
+      // Mostrar resumen de cliente
+      document.getElementById('resumen-usuario').innerHTML = `
+        <div class="resumen-box">
+          <b>Cliente:</b> ${cliente.nombre || ''} ${cliente.apellido || ''} | 
+          <b>DUI:</b> ${cliente.numeroDui || ''}
+        </div>
+      `;
 
-        // Buscar créditos del cliente en la agencia actual
+      // Buscar créditos de ese cliente en la agencia actual
+      try {
         let creditosRef = collection(db, "creditos");
-        let q2 = query(creditosRef, where("clienteID", "==", clienteID), where("agenciaAsignada", "==", currentAgencia));
+        let q2 = query(creditosRef, where("clienteID", "==", cliente.id), where("agenciaAsignada", "==", currentAgencia));
         let creditosSnap = await getDocs(q2);
         let creditos = [];
         creditosSnap.forEach(doc => {
@@ -82,37 +133,44 @@
 
         if (!creditos.length) {
           document.getElementById('estado-cuenta').innerHTML = '<div style="color:#F44;text-align:center;">No tiene créditos activos en esta agencia.</div>';
+          document.getElementById('resumen-credito').innerHTML = '';
           return;
         }
 
-        // Solo mostramos el primer crédito para no hacer la tabla demasiado larga, puedes expandir esto si quieres
         let credito = creditos[0];
 
-        // Buscar pagos de ese crédito (filtrando por agencia)
+        // Resumen de crédito arriba de la tabla
+        document.getElementById('resumen-credito').innerHTML = `
+          <div class="resumen-box resumen-credito">
+            <b>Monto Aprobado:</b> $${parseFloat(credito.montoAprobado || 0).toFixed(2)} |
+            <b>Saldo Inicial:</b> $${parseFloat(credito.saldoInicial || 0).toFixed(2)} |
+            <b>Saldo Actual:</b> $${parseFloat(credito.saldoActual || 0).toFixed(2)} |
+            <b>Estado:</b> ${credito.estadoCredito || '-'} |
+            <b>Para Ponerse al Día:</b> $${parseFloat(credito.paraPonerseAlDia || 0).toFixed(2)}
+          </div>
+        `;
+
+        // Buscar pagos de ese crédito (solo en esta agencia)
         let pagosRef = collection(db, "pagos");
         let pagosQuery = query(pagosRef, where("creditoID", "==", credito.id), where("sucursal", "==", currentAgencia));
         let pagosSnap = await getDocs(pagosQuery);
         let pagos = [];
         pagosSnap.forEach(doc => pagos.push(doc.data()));
-
-        // Ordenar pagos por fecha
         pagos.sort((a, b) => new Date(a.fechaPago) - new Date(b.fechaPago));
 
-        // Renderizar tabla de estado de cuenta
         renderEstadoCuenta(credito, pagos);
       } catch (e) {
         document.getElementById('estado-cuenta').innerHTML = `<div style="color:#F44;text-align:center;">Error: ${e.message}</div>`;
+        document.getElementById('resumen-credito').innerHTML = '';
       }
     }
 
     function renderEstadoCuenta(credito, pagos) {
-      // Armamos una tabla con las cuotas del crédito y pagos realizados
       let amort = credito.amortizacion || [];
       if (!amort.length) {
         document.getElementById('estado-cuenta').innerHTML = '<div style="color:#F44;text-align:center;">El crédito no tiene detalle de cuotas.</div>';
         return;
       }
-
       let html = `<div class="tabla-scroll"><table class="tabla-estado">
         <thead>
           <tr>
@@ -130,9 +188,7 @@
         </thead>
         <tbody>
       `;
-
       amort.forEach(cuota => {
-        // Pagos aplicados a esta cuota
         let pagosCuota = pagos.filter(p => (p.numeroCuota == cuota.numeroCuota));
         let montoPagado = pagosCuota.reduce((sum, p) => sum + (parseFloat(p.montoPagado) || 0), 0);
         let fechaPagoReal = pagosCuota.length ? new Date(pagosCuota[0].fechaPago).toLocaleDateString('es-SV') : '';
@@ -151,7 +207,6 @@
           </tr>
         `;
       });
-
       html += `
         </tbody>
       </table></div>
@@ -160,29 +215,40 @@
       document.getElementById('estado-cuenta').innerHTML = html;
     }
 
-    window.addEventListener("DOMContentLoaded", () => {
-      onAuthStateChanged(auth, user => {
+    window.addEventListener("DOMContentLoaded", async () => {
+      onAuthStateChanged(auth, async user => {
         if (!user) return location.href = "login.html";
         currentUser = user;
-        // Buscar el usuario logeado en users para sacar el agency
+        // Obtener agencia del usuario logeado
         const usersRef = collection(db, "users");
-        getDocs(usersRef).then(snapshot => {
-          let usuario = null;
-          snapshot.forEach(doc => {
-            const d = doc.data();
-            if (d.email && d.email.toLowerCase() === user.email.toLowerCase()) {
-              usuario = d;
-            }
-          });
-          currentAgencia = usuario ? usuario.department : null;
-          document.getElementById('usuario-nombre').innerHTML = usuario
-            ? `Agencia: <b>${usuario.department}</b> | Usuario: <b>${usuario.nombre || user.email}</b>`
-            : `Usuario: <b>${user.email}</b>`;
+        let usuario = null;
+        const snap = await getDocs(usersRef);
+        snap.forEach(doc => {
+          const d = doc.data();
+          if (d.email && d.email.toLowerCase() === user.email.toLowerCase()) {
+            usuario = d;
+          }
         });
+        currentAgencia = usuario ? usuario.department : null;
+        document.getElementById('usuario-nombre').innerHTML = usuario
+          ? `Agencia: <b>${usuario.department}</b> | Usuario: <b>${usuario.nombre || user.email}</b>`
+          : `Usuario: <b>${user.email}</b>`;
+        await cargarClientesAgencia();
+      });
+
+      // Autocompletar
+      const busquedaInput = document.getElementById('busqueda');
+      busquedaInput.addEventListener('input', (e) => {
+        mostrarOpcionesBusqueda(e.target.value);
       });
       document.getElementById('btn-buscar').addEventListener('click', buscarCliente);
-      document.getElementById('busqueda').addEventListener('keydown', function(e) {
+      busquedaInput.addEventListener('keydown', function(e) {
         if (e.key === "Enter") buscarCliente();
+      });
+      document.addEventListener('click', function(event) {
+        if (!event.target.closest('.busqueda-wrap')) {
+          document.getElementById('opciones-busqueda').style.display = 'none';
+        }
       });
     });
   </script>
@@ -234,6 +300,11 @@
       justify-content: center;
       margin-bottom: 1.1rem;
       flex-wrap: wrap;
+      position: relative;
+    }
+    .busqueda-wrap {
+      position: relative;
+      width: 230px;
     }
     .busqueda-row input[type="text"] {
       background: #181c1f;
@@ -242,7 +313,7 @@
       border-radius: 7px;
       padding: 0.75rem 1.1rem;
       font-size: 1.11rem;
-      width: 220px;
+      width: 100%;
       outline: none;
       box-shadow: 0 1px 7px #0003;
       transition: border .18s;
@@ -283,20 +354,22 @@
       width: 100%;
       overflow-x: auto;
       margin: 1.1rem 0 0 0;
+      background: #191919;
+      border-radius: 10px;
+      box-shadow: 0 1px 10px #0003;
     }
     .tabla-estado {
       border-collapse: collapse;
       width: 100%;
-      min-width: 900px;
+      min-width: 950px;
       background: #181b20;
       border-radius: 12px;
-      box-shadow: 0 2px 16px #0003;
       overflow: hidden;
+      font-size: 0.98rem;
     }
     .tabla-estado th, .tabla-estado td {
-      padding: 0.68rem 0.6rem;
+      padding: 0.60rem 0.43rem;
       text-align: center;
-      font-size: 1.01rem;
       border-bottom: 1px solid #292c30;
       white-space: nowrap;
     }
@@ -304,17 +377,18 @@
       background: #171c20;
       color: #00e6c0;
       font-weight: 700;
-      font-size: 1.09rem;
-      letter-spacing: .7px;
+      font-size: 1.01rem;
+      letter-spacing: .4px;
     }
     .tabla-estado td {
       color: #e6e6e6;
+      font-size: 0.98rem;
     }
     .tabla-estado tr:last-child td {
       border-bottom: none;
     }
     .btn-imprimir {
-      margin: 1.8rem auto 0 auto;
+      margin: 1.5rem auto 0 auto;
       display: block;
       background: linear-gradient(90deg, #67C8F1 0%, #13b66b 100%);
       color: #212121;
@@ -339,18 +413,44 @@
       padding: 0.9rem 1.2rem;
       border-radius: 7px;
       margin-bottom: 1rem;
-      font-size: 1.11rem;
+      font-size: 1.08rem;
       color: #5de0ba;
       font-weight: 500;
-      display: flex; gap: 1.8rem; flex-wrap: wrap;
+      display: flex; gap: 1.4rem; flex-wrap: wrap;
     }
-    @media (max-width: 900px) {
-      .container { padding: 1.1rem 2vw; }
-      .tabla-estado { min-width: 670px;}
-      .resumen-box { font-size: .96rem;}
+    .resumen-credito {
+      background: #142a22;
+      color: #8ee8d8;
+      border-left: 6px solid #00e6c0;
+    }
+    /* AUTOCOMPLETAR */
+    #opciones-busqueda {
+      position: absolute;
+      left: 0; top: 100%; z-index: 99;
+      background: #20292d;
+      width: 230px;
+      border-radius: 0 0 8px 8px;
+      box-shadow: 0 3px 18px #0006;
+      display: none;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .predictivo-opt {
+      padding: 9px 13px;
+      color: #fff;
+      cursor: pointer;
+      border-bottom: 1px solid #182121;
+      transition: background 0.14s;
+    }
+    .predictivo-opt:last-child { border-bottom: none;}
+    .predictivo-opt:hover {
+      background: #67C8F1;
+      color: #191919;
     }
     @media (max-width: 700px) {
-      .tabla-estado { min-width: 550px;}
+      .container { padding: 1.1rem 1vw; }
+      .tabla-estado { min-width: 550px; font-size: 0.93rem;}
+      .resumen-box { font-size: .95rem;}
     }
   </style>
 </head>
@@ -361,11 +461,16 @@
     <h1>MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.<br>
       <span style="font-size:.97rem;color:#fff;font-weight:400">Estado de Cuenta</span></h1>
     <div class="busqueda-row">
-      <input type="text" id="busqueda" placeholder="Buscar por nombre, apellido o DUI...">
+      <div class="busqueda-wrap">
+        <input type="text" id="busqueda" placeholder="Buscar por nombre, apellido o DUI..." autocomplete="off">
+        <div id="opciones-busqueda"></div>
+      </div>
       <button id="btn-buscar" class="btn-buscar"><i class="fas fa-search"></i>Buscar</button>
     </div>
     <div id="resumen-usuario"></div>
+    <div id="resumen-credito"></div>
     <div id="estado-cuenta"></div>
   </div>
 </body>
 </html>
+

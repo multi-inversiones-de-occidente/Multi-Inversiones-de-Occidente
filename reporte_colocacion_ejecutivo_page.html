@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Reporte de Colocación – Multi Inversiones</title>
+  <title>Reporte de Colocación de Créditos</title>
+  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -24,10 +25,13 @@
     const auth = getAuth(app);
 
     let ejecutivoNombre = null;
-    let rootEjecutivo = null;
     let creditosData = [];
     let fechaDesde = null;
     let fechaHasta = null;
+
+    function normaliza(str) {
+      return (str || '').toString().trim().toLowerCase();
+    }
 
     function formatFecha(fecha) {
       const d = new Date(fecha);
@@ -37,19 +41,14 @@
       const d = new Date(fecha);
       return d.toISOString().slice(0, 10); // yyyy-MM-dd
     }
-    function normaliza(str) {
-      return (str ?? '').toString().trim().toLowerCase();
-    }
 
-    function obtenerCreditos() {
+    async function obtenerCreditos() {
       if (!ejecutivoNombre) return;
       document.getElementById('resultados').innerHTML = '<div class="loader"></div>';
-      document.getElementById('resumen').innerHTML = '';
 
       const creditosRef = collection(db, "creditos");
       const q = query(
         creditosRef,
-        where("tipoCredito", "==", "Nuevo"),
         orderBy("fechaInicio", "desc")
       );
       getDocs(q).then(snapshot => {
@@ -60,13 +59,11 @@
           docs.push(d);
         });
 
-        // FILTRA por asignadoA igual al usuario (normalizado) y rango de fechas
+        // Filtra por usuario asignado y fechas
         docs = docs.filter(doc => {
-          // acepta ambos: displayName/email y root (antes de @)
-          if (
-            normaliza(doc.asignadoA) !== ejecutivoNombre &&
-            normaliza(doc.asignadoA) !== rootEjecutivo
-          ) return false;
+          // --- Comparación flexible por asignadoA ---
+          if (normaliza(doc.asignadoA) !== normaliza(ejecutivoNombre)) return false;
+          // Filtrar por rango de fechas
           let fechaDoc = doc.fechaInicio;
           if (typeof fechaDoc === "object" && fechaDoc.seconds) {
             fechaDoc = new Date(fechaDoc.seconds * 1000);
@@ -82,135 +79,67 @@
         });
 
         creditosData = docs;
-        renderResumen();
         renderCreditos();
       }).catch(err => {
-        document.getElementById('resumen').innerHTML = '';
-        if (err && err.message && err.message.includes('index')) {
-          document.getElementById('resultados').innerHTML =
-            `<div style="color:#f44; text-align:center">
-              Error: Esta consulta requiere un <b>índice en Firestore</b>.<br>
-              <span style="color:#fff">Abre la consola de tu navegador, haz clic en el link que te aparece y crea el índice.<br>
-              <b>Una vez creado, este reporte funcionará automáticamente.</b></span>
-            </div>`;
-        } else if (err && err.code && err.code === 'permission-denied') {
-          document.getElementById('resultados').innerHTML =
-            `<div style="color:#f44; text-align:center">
-              Permiso denegado: revisa las reglas de seguridad de Firestore.<br>
-              <span style="color:#fff">Dale permiso de lectura temporalmente a todos para probar:<br>
-              <code>allow read, write: if true;</code>
-              </span>
-            </div>`;
-        } else {
-          document.getElementById('resultados').innerHTML =
-            `<div style="color:#f44; text-align:center">
-              Error al cargar datos: <br><span style="color:#fff">${err.message || err}</span>
-            </div>`;
-        }
+        document.getElementById('resultados').innerHTML = '<div style="color:#f44; text-align:center">Error al cargar datos</div>';
       });
-    }
-
-    function renderResumen() {
-      if (!creditosData.length) {
-        document.getElementById('resumen').innerHTML = '';
-        return;
-      }
-      // Calcula totales y agrupaciones
-      const total = creditosData.length;
-      const totalMonto = creditosData.reduce((a, b) => a + Number(b.montoAprobado || 0), 0);
-      const promedio = total ? totalMonto / total : 0;
-      // Por línea de crédito
-      const resumenLineas = {};
-      creditosData.forEach(d => {
-        const linea = d.lineaDeCredito ?? '-';
-        if (!resumenLineas[linea]) resumenLineas[linea] = { monto: 0, cantidad: 0 };
-        resumenLineas[linea].monto += Number(d.montoAprobado || 0);
-        resumenLineas[linea].cantidad++;
-      });
-
-      let lineasHTML = '';
-      for (const k in resumenLineas) {
-        lineasHTML += `
-          <div class="mini-card-linea">
-            <div><b>${k}</b></div>
-            <div>$${resumenLineas[k].monto.toFixed(2)}</div>
-            <div>${resumenLineas[k].cantidad} créditos</div>
-          </div>
-        `;
-      }
-
-      document.getElementById('resumen').innerHTML = `
-        <div class="cards-resumen">
-          <div class="card-resumen">
-            <div class="card-title">Total créditos</div>
-            <div class="card-value">${total}</div>
-          </div>
-          <div class="card-resumen">
-            <div class="card-title">Monto colocado</div>
-            <div class="card-value">$${totalMonto.toFixed(2)}</div>
-          </div>
-          <div class="card-resumen">
-            <div class="card-title">Monto promedio</div>
-            <div class="card-value">$${promedio.toFixed(2)}</div>
-          </div>
-        </div>
-        <div class="lineas-resumen">
-          <div class="lineas-title">Resumen por línea de crédito</div>
-          ${lineasHTML}
-        </div>
-      `;
     }
 
     function renderCreditos() {
       if (!creditosData.length) {
-        document.getElementById('resultados').innerHTML = `<div class="msg-vacio">No hay créditos en el rango seleccionado.</div>`;
+        document.getElementById('resultados').innerHTML = `<div style="text-align:center;color:#fff7">No hay créditos en el rango seleccionado.</div>`;
         return;
       }
-      // Agrupar por fecha de colocación
       const grouped = {};
       creditosData.forEach(doc => {
         const key = formatFechaGroup(doc._fechaObj);
         if (!grouped[key]) grouped[key] = [];
         grouped[key].push(doc);
       });
-
+      let totalGeneral = 0;
       let html = '';
       for (const fecha in grouped) {
+        let subtotal = 0;
         html += `
-        <div class="detalle-dia">
-          <div class="detalle-dia-fecha">
+        <div class="group">
+          <div class="group-header">
             <i class="fas fa-calendar-alt"></i>
-            ${formatFecha(fecha)}
+            <span>${formatFecha(fecha)}</span>
           </div>
-          <div class="detalle-table">
-            <div class="detalle-header">
-              <div>Cliente</div>
-              <div>DUI</div>
-              <div>Monto</div>
-              <div>Línea</div>
-              <div>Plazo</div>
-              <div>Tasa</div>
-              <div>Ejecutivo</div>
-              <div>Agencia</div>
-              <div>Estado</div>
+          <div class="tabla-header">
+            <div>Asignado A</div>
+            <div>Línea de Crédito</div>
+            <div>Nombre</div>
+            <div style="text-align:right">Monto</div>
+          </div>
+        `;
+        grouped[fecha].forEach(doc => {
+          subtotal += Number(doc.montoAprobado || 0);
+          html += `
+            <div class="tabla-row">
+              <div>${doc.asignadoA ?? '-'}</div>
+              <div>${doc.lineaDeCredito ?? '-'}</div>
+              <div>${(doc.nombre ?? '') + ' ' + (doc.apellido ?? '')}</div>
+              <div style="text-align:right;font-weight:700">$${Number(doc.montoAprobado || 0).toFixed(2)}</div>
             </div>
-            ${grouped[fecha].map(doc => `
-              <div class="detalle-row">
-                <div>${(doc.nombre ?? '') + ' ' + (doc.apellido ?? '')}</div>
-                <div>${doc.numeroDui ?? '-'}</div>
-                <div>$${Number(doc.montoAprobado || 0).toFixed(2)}</div>
-                <div>${doc.lineaDeCredito ?? '-'}</div>
-                <div>${doc.numeroCuotas ?? '-'}<span class="detalle-cuotas">(${doc.frecuenciaPago ?? '-'})</span></div>
-                <div>${doc.tasaAnualCredito ? doc.tasaAnualCredito + '%' : '-'}</div>
-                <div>${doc.asignadoA ?? '-'}</div>
-                <div>${doc.agenciaAsignada ?? '-'}</div>
-                <div>${doc.estadoCredito ?? '-'}</div>
-              </div>
-            `).join('')}
+          `;
+        });
+        totalGeneral += subtotal;
+        html += `
+          <div class="subtotal">
+            <div style="flex:1"></div>
+            <div><b>Subtotal:</b></div>
+            <div style="text-align:right"><b>$${subtotal.toFixed(2)}</b></div>
           </div>
         </div>
         `;
       }
+      html += `
+        <div class="total-general">
+          <span>TOTAL GENERAL</span>
+          <span style="font-size:1.19rem;letter-spacing:.7px;">$${totalGeneral.toFixed(2)}</span>
+        </div>
+      `;
       document.getElementById('resultados').innerHTML = html;
     }
 
@@ -228,9 +157,10 @@
     window.addEventListener("DOMContentLoaded", () => {
       onAuthStateChanged(auth, user => {
         if (!user) return location.href = "login.html";
-        ejecutivoNombre = (user.displayName ?? user.email ?? '').trim().toLowerCase();
-        rootEjecutivo = ejecutivoNombre.split('@')[0];
-        document.getElementById("usuario-nombre").textContent = ejecutivoNombre;
+        // Usa displayName si existe, si no, email (normaliza ambos)
+        ejecutivoNombre = (user.displayName || user.email || '').toString().trim().toLowerCase();
+        document.getElementById("usuario-nombre").textContent = user.email;
+        // Primer día del mes actual hasta hoy
         const now = new Date();
         document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
         document.getElementById('fecha-hasta').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
@@ -245,7 +175,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body {
-      background: #13171a;
+      background: #101212;
       color: #fff;
       font-family: 'Segoe UI', Arial, sans-serif;
       margin: 0; min-height: 100vh;
@@ -256,13 +186,14 @@
       color:#67C8F1;
     }
     .container {
-      max-width: 920px;
-      margin: 2.1rem auto 0 auto;
-      background: #1c2327;
-      border-radius: 20px;
+      max-width: 700px;
+      margin: 2.4rem auto 0 auto;
+      background: #1c1d1f;
+      border-radius: 17px;
       box-shadow: 0 2px 28px #0005;
-      padding: 2.1rem 1.4rem 2.1rem 1.4rem;
-      display: flex; flex-direction: column;
+      padding: 2.1rem 1.2rem 2rem 1.2rem;
+      display: flex;
+      flex-direction: column;
     }
     #usuario-nombre {
       color: #F8AF40;
@@ -270,21 +201,20 @@
       text-align: right;
       margin-bottom: 0.4rem;
       font-weight: 600;
-      letter-spacing: 1px;
     }
     h1 {
-      font-size: 1.35rem;
+      font-size: 1.36rem;
       font-weight: bold;
       text-align: center;
       color: #00e6c0;
-      margin-bottom: 1.1rem;
+      margin-bottom: 1.6rem;
       letter-spacing: .8px;
     }
     .filtros-row {
       display: flex;
-      gap: 1.2rem;
+      gap: 1.1rem;
       justify-content: center;
-      margin-bottom: 2rem;
+      margin-bottom: 1.6rem;
       flex-wrap: wrap;
     }
     .filtro-fecha {
@@ -292,14 +222,13 @@
       flex-direction: column;
       align-items: flex-start;
       background: #222;
-      padding: 0.6rem 1.2rem 0.4rem 1.2rem;
+      padding: 0.7rem 1.1rem 0.5rem 1.1rem;
       border-radius: 8px;
-      box-shadow: 0 1px 7px #0002;
     }
     .filtro-fecha label {
       color: #67C8F1;
-      font-size: .99rem;
-      margin-bottom: 3px;
+      font-size: .97rem;
+      margin-bottom: 4px;
       font-weight: 600;
       letter-spacing: 0.5px;
     }
@@ -307,9 +236,9 @@
       background: #191a1c;
       color: #fff;
       border: none;
-      border-radius: 6px;
-      padding: 0.36rem 0.7rem;
-      font-size: 1.03rem;
+      border-radius: 5px;
+      padding: 0.39rem 0.7rem;
+      font-size: 1.01rem;
     }
     .loader {
       border: 4px solid #232324;
@@ -317,137 +246,74 @@
       border-radius: 50%;
       width: 46px; height: 46px;
       animation: spin 1.1s linear infinite;
-      margin: 2.3rem auto;
+      margin: 1.8rem auto;
     }
     @keyframes spin { 100% { transform: rotate(360deg); } }
-    .cards-resumen {
-      display: flex;
-      gap: 2.1rem;
-      margin-bottom: 1.1rem;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-    .card-resumen {
-      background: linear-gradient(100deg, #232b33 70%, #67C8F1 100%);
-      border-radius: 15px;
-      box-shadow: 0 1px 12px #00e6c08a;
-      padding: 1.1rem 2.1rem;
-      text-align: center;
-      color: #fff;
-      min-width: 140px;
-    }
-    .card-title {
-      font-size: 1.06rem;
-      color: #a9e1ff;
-      margin-bottom: 7px;
-      font-weight: 600;
-      letter-spacing: .8px;
-    }
-    .card-value {
-      font-size: 1.55rem;
-      font-weight: bold;
-      letter-spacing: .8px;
-    }
-    .lineas-resumen {
-      margin-bottom: 2rem;
-      text-align: center;
-    }
-    .lineas-title {
-      color: #fff8b0;
-      font-weight: 700;
-      font-size: 1.05rem;
-      margin-bottom: 0.3rem;
-      letter-spacing: 1px;
-    }
-    .mini-card-linea {
-      display: inline-block;
-      background: #263238;
-      color: #fff;
-      border-radius: 10px;
-      padding: 0.5rem 1.3rem 0.4rem 1.3rem;
-      margin: 0.23rem;
-      font-size: 1.05rem;
-      box-shadow: 0 1px 7px #0002;
-    }
-    .detalle-dia {
-      margin-bottom: 2.2rem;
-      background: #232a31;
+    .group {
+      margin-bottom: 1.6rem;
+      background: #252c28;
       border-radius: 14px;
       box-shadow: 0 1px 8px #0002;
-      padding: 1.1rem 0.7rem 1.1rem 0.7rem;
+      padding: 1rem 0.8rem 0.6rem 0.8rem;
     }
-    .detalle-dia-fecha {
+    .group-header {
       display: flex;
       align-items: center;
-      font-size: 1.09rem;
-      color: #80ffe3;
-      margin-bottom: 7px;
-      font-weight: 700;
+      font-size: 1.05rem;
+      color: #8affef;
+      margin-bottom: 8px;
+      font-weight: 600;
       gap: 8px;
     }
-    .detalle-table {
-      width: 100%;
-      margin: 0 auto;
-    }
-    .detalle-header, .detalle-row {
+    .tabla-header, .tabla-row {
       display: grid;
-      grid-template-columns: 2fr 1.5fr 1.2fr 1.4fr 1.1fr 1fr 1.5fr 1.6fr 1.1fr;
-      gap: 0.55rem;
-      font-size: 1.01rem;
+      grid-template-columns: 2fr 2fr 2fr 1fr;
+      gap: 0.7rem;
+      font-size: 0.99rem;
       align-items: center;
       margin-bottom: 2px;
     }
-    .detalle-header {
+    .tabla-header {
       color: #67C8F1;
-      font-weight: 800;
+      font-weight: 700;
       border-bottom: 1px solid #27e2a377;
       margin-bottom: 8px;
-      font-size: 1.07rem;
-      background: #202629;
-      border-radius: 6px;
-      padding: 6px 0;
+      font-size: 1.02rem;
     }
-    .detalle-row {
+    .tabla-row {
       color: #e6e6e6;
       background: #0002;
       border-radius: 6px;
       margin-bottom: 2px;
       padding: 2px 3px;
-      font-weight: 500;
     }
-    .detalle-cuotas {
-      color: #f8af40;
-      font-size: 0.98em;
-      margin-left: 4px;
+    .subtotal {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 0.8rem;
+      margin-top: 7px;
+      color: #00ffd5;
+      font-size: 1.04rem;
+      font-weight: bold;
+      border-top: 1.5px solid #23e2a377;
+      padding-top: 7px;
     }
-    .msg-vacio {
-      color: #fff7;
-      font-size: 1.14rem;
-      text-align: center;
-      margin: 2.5rem 0 2.5rem 0;
-      font-weight: 600;
-    }
-    @media (max-width: 1100px) {
-      .container { padding: 1.2rem 0.7vw; }
-      .detalle-header, .detalle-row { font-size: .98rem;}
-      .card-resumen { min-width: 110px; padding: .7rem 1.1rem; }
-    }
-    @media (max-width: 900px) {
-      .detalle-header, .detalle-row {
-        grid-template-columns: 2.5fr 1.7fr 1.2fr 1.5fr 1.1fr 1fr 1.7fr 1.6fr 1.2fr;
-      }
+    .total-general {
+      margin: 1.7rem 0 0.3rem 0;
+      padding: 1.1rem 1.1rem;
+      background: #1f8260;
+      border-radius: 12px;
+      box-shadow: 0 1px 12px #00e6c03a;
+      display: flex; align-items: center; justify-content: space-between;
+      font-weight: bold;
+      font-size: 1.11rem;
+      color: #fff;
+      letter-spacing: 1px;
     }
     @media (max-width: 700px) {
       .container { padding: 1.1rem 1vw; }
-      .detalle-header, .detalle-row { font-size: .94rem;}
-      .card-resumen { padding: .6rem 0.6rem;}
-      .mini-card-linea { font-size: .95rem; padding: .38rem .6rem;}
-    }
-    @media (max-width: 600px) {
-      .cards-resumen { flex-direction: column; gap: 1.1rem;}
-      .detalle-header, .detalle-row { font-size: .89rem; }
-      .lineas-resumen { font-size: .93rem;}
-      .detalle-header, .detalle-row { grid-template-columns: 1.7fr 1.2fr 1fr 1fr 0.9fr 0.9fr 1.3fr 1.2fr 0.7fr;}
+      .tabla-header, .tabla-row { font-size: .94rem;}
     }
   </style>
 </head>
@@ -455,9 +321,7 @@
   <header>Reporte de Colocación de Créditos</header>
   <div class="container">
     <div id="usuario-nombre"></div>
-    <h1>MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.<br>
-      <span style="font-size:.97rem;color:#fff;font-weight:400">Colocación de Créditos</span>
-    </h1>
+    <h1>MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.<br><span style="font-size:.97rem;color:#fff;font-weight:400">Colocación de Créditos</span></h1>
     <div class="filtros-row">
       <div class="filtro-fecha">
         <label for="fecha-desde">Desde:</label>
@@ -468,7 +332,6 @@
         <input type="date" id="fecha-hasta" />
       </div>
     </div>
-    <div id="resumen"></div>
     <div id="resultados"></div>
   </div>
 </body>

@@ -1,4 +1,3 @@
-<!-- RECEPCIÓN DE PAGOS – MULTI INVERSIONES (Lógica simplificada, sin pendienteDeCuota) -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -17,6 +16,7 @@
     .cliente-card { background: #232c31; border-radius: 12px; margin-bottom: 13px; padding: 16px 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 12px #0004;}
     .cliente-info { font-size: 1rem; color: #fff;}
     .cliente-dui { font-size: 0.98rem; color: #8ae1fc; margin-top: 2px;}
+    .estado-mora { color: #FFD166; font-weight: 600; font-size: 0.96rem; display: flex; align-items: center; gap: 5px;}
     .btn-pagar { background: #13b66b; color: #fff; border: none; padding: 11px 24px; border-radius: 9px; font-size: 1.02rem; font-weight: bold; cursor: pointer; transition: background .18s; margin-left: 15px;}
     .btn-pagar:active, .btn-pagar:hover { background: #0b854c; }
     .modal-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #111c; z-index: 9998; display: flex; align-items: center; justify-content: center;}
@@ -125,8 +125,16 @@
         clientesList.innerHTML = `<div style="color:#ccc;text-align:center;padding:34px 0;">No se detectó agencia asignada a tu usuario.</div>`;
         return;
       }
+      // NUEVO: Incluye créditos en mora (excepto Pagado o Anulado)
+      const estadosPermitidos = [
+        "Activo",
+        "Mora Temprana",
+        "Mora Moderada",
+        "Mora Severa",
+        "Riesgo Alto"
+      ];
       const creditosRef = collection(db, "creditos");
-      const q = query(creditosRef, where("estadoCredito", "==", "Activo"), where("agenciaAsignada", "==", userDepartment));
+      const q = query(creditosRef, where("estadoCredito", "in", estadosPermitidos), where("agenciaAsignada", "==", userDepartment));
       const snap = await getDocs(q);
       snap.forEach(docSnap => {
         const d = docSnap.data();
@@ -143,7 +151,15 @@
       clientesList.innerHTML = clientes.map(cliente => `
         <div class="cliente-card">
           <div>
-            <div class="cliente-info"><b>${cliente.nombre}</b></div>
+            <div class="cliente-info">
+              <b>${cliente.nombre}</b>
+              ${cliente.estadoCredito !== "Activo"
+                ? `<span class="estado-mora" title="Estado: ${cliente.estadoCredito}">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    ${cliente.estadoCredito}
+                  </span>`
+                : ""}
+            </div>
             <div class="cliente-dui">DUI: ${cliente.numeroDui}</div>
           </div>
           <button class="btn-pagar" data-id="${cliente.id}" data-nombre="${cliente.nombre}" data-dui="${cliente.numeroDui}"><i class="fas fa-dollar-sign"></i> Pagar</button>
@@ -353,6 +369,12 @@
           paraPonerseAlDiaAntes: (parseFloat(creditoData.paraPonerseAlDia) || 0).toFixed(2)
         });
 
+        // CAMBIO: Si el saldo es cero, pon Pagado; si no, revisa si debe volver a Activo
+        let nuevoEstado = saldoActual == 0 ? "Pagado" : creditoData.estadoCredito;
+        if (nuevoEstado !== "Pagado" && paraPonerseAlDia == 0 && capitalAtrasado == 0 && interesActual == 0 && multasAcumuladas == 0) {
+          nuevoEstado = "Activo";
+        }
+
         await window.firebaseUpdateDoc("creditos", cliente.id, {
           saldoActual: (parseFloat(saldoActual) || 0).toFixed(2),
           interesActual: (parseFloat(interesActual) || 0).toFixed(2),
@@ -361,7 +383,7 @@
           multasAcumuladas: (parseFloat(multasAcumuladas) || 0).toFixed(2),
           ultimaActualizacion: fechaPago,
           fechaUltimoCalculoIntereses: fechaPago,
-          estadoCredito: saldoActual == 0 ? "Pagado" : creditoData.estadoCredito,
+          estadoCredito: nuevoEstado,
           amortizacion: amortizacion
         });
 
@@ -380,8 +402,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-

@@ -37,6 +37,7 @@
         if (!ejecutivoNombre) return;
         document.getElementById('resultados').innerHTML = '<div class="loader"></div>';
 
+        // Obtener TODOS los créditos, filtrando por asignadoA en JS
         const creditosRef = collection(db, "creditos");
         const q = query(
           creditosRef,
@@ -158,7 +159,7 @@
     window.addEventListener("DOMContentLoaded", () => {
       onAuthStateChanged(auth, async user => {
         if (!user) return location.href = "login.html";
-        // Obtener el nombre desde la colección 'user'
+        // Buscar el usuario en la colección user por email
         try {
           const usersRef = collection(db, "user");
           const q = query(usersRef, where("email", "==", user.email));
@@ -167,6 +168,7 @@
             alert("No se encontró el usuario en la base de datos.");
             return;
           }
+          // Toma el nombre correcto del usuario autenticado
           const userData = snap.docs[0].data();
           ejecutivoNombre = userData.nombre || user.email;
           document.getElementById("usuario-nombre").textContent = user.email;
@@ -350,4 +352,5 @@
   </div>
 </body>
 </html>
+
 

@@ -1,10 +1,10 @@
-<!-- COPIA Y PEGA TODO ESTE ARCHIVO PARA DEBUG CON LOGS VISIBLES -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Reporte de Colocación de Créditos – DEBUG</title>
+  <title>Reporte de Colocación de Créditos</title>
+  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, orderBy, getDocs, where } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -24,90 +24,14 @@
     const db   = getFirestore(app);
     const auth = getAuth(app);
 
-    let usuarioEmail = null;
+    let usuarioLogueadoEmail = null;
+    let usuarioLogueadoNombre = null;
+    let creditosData = [];
     let fechaDesde = null;
     let fechaHasta = null;
-    let creditosData = [];
 
     function normaliza(str) {
       return (str || '').toString().trim().toLowerCase();
-    }
-
-    async function obtenerCreditos() {
-      try {
-        if (!usuarioEmail) return;
-        document.getElementById('resultados').innerHTML = '<div class="loader"></div>';
-        let logs = [];
-
-        // 1. Traer TODOS los créditos ordenados por fecha
-        const creditosRef = collection(db, "creditos");
-        const q = query(creditosRef, orderBy("fechaInicio", "desc"));
-        const snapshot = await getDocs(q);
-
-        let docs = [];
-        for (const doc of snapshot.docs) {
-          let credito = doc.data();
-          credito.id = doc.id;
-
-          logs.push(`\n-----\n[Crédito ID:${credito.id}] asignadoA: "${credito.asignadoA}"`);
-
-          // 2. Buscar el usuario (en la colección user) cuyo nombre == asignadoA (normalizado)
-          const nombreAsignadoA = normaliza(credito.asignadoA);
-          logs.push(`Buscando en users con nombre = "${nombreAsignadoA}"`);
-
-          const usersRef = collection(db, "user");
-          const userQ = query(usersRef, where("nombre", "==", nombreAsignadoA));
-          const userSnap = await getDocs(userQ);
-
-          if (userSnap.empty) {
-            logs.push("NO SE ENCONTRÓ usuario con ese nombre.");
-            continue;
-          }
-          const usuario = userSnap.docs[0].data();
-          logs.push(`Usuario encontrado, email en base: "${usuario.email}", usuarioEmail actual: "${usuarioEmail}"`);
-
-          // 3. Comparar email exacto contra el logeado
-          if (normaliza(usuario.email) !== normaliza(usuarioEmail)) {
-            logs.push("EMAIL no coincide. Salta este crédito.");
-            continue;
-          }
-          logs.push("EMAIL coincide.");
-
-          // 4. Filtrar por rango de fechas
-          let fechaDoc = credito.fechaInicio;
-          if (typeof fechaDoc === "object" && fechaDoc.seconds) {
-            fechaDoc = new Date(fechaDoc.seconds * 1000);
-          } else if (typeof fechaDoc === "string") {
-            fechaDoc = new Date(fechaDoc);
-          } else {
-            fechaDoc = new Date(fechaDoc);
-          }
-          logs.push(`fechaInicio del crédito: ${fechaDoc}`);
-
-          if (fechaDesde && fechaDoc < fechaDesde) {
-            logs.push(`Crédito fuera de fecha (antes de fechaDesde ${fechaDesde})`);
-            continue;
-          }
-          if (fechaHasta && fechaDoc > new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23,59,59)) {
-            logs.push(`Crédito fuera de fecha (después de fechaHasta ${fechaHasta})`);
-            continue;
-          }
-          credito._fechaObj = fechaDoc;
-
-          docs.push(credito);
-          logs.push("Crédito AGREGADO AL REPORTE.");
-        }
-
-        creditosData = docs;
-        renderCreditos();
-        // Muestra logs en consola (F12)
-        logs.forEach(linea => console.log(linea));
-        if (logs.length === 0) console.log("No se ejecutó ningún ciclo, revisa la consulta a creditos.");
-
-      } catch (err) {
-        document.getElementById('resultados').innerHTML = '<div style="color:#f44; text-align:center">Error al cargar datos</div>';
-        console.error('Error en obtenerCreditos:', err);
-      }
     }
 
     function formatFecha(fecha) {
@@ -117,6 +41,63 @@
     function formatFechaGroup(fecha) {
       const d = new Date(fecha);
       return d.toISOString().slice(0, 10); // yyyy-MM-dd
+    }
+
+    // Buscar usuario logueado en users por su email y obtener su "nombre"
+    async function buscarUsuarioPorEmail(email) {
+      try {
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("email", "==", email));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          return snapshot.docs[0].data();
+        }
+        return null;
+      } catch (err) {
+        alert("Error buscando usuario: " + err);
+        return null;
+      }
+    }
+
+    // Consulta créditos donde asignadoA == usuarioLogueadoNombre
+    async function obtenerCreditos() {
+      if (!usuarioLogueadoNombre) return;
+      document.getElementById('resultados').innerHTML = '<div class="loader"></div>';
+
+      try {
+        const creditosRef = collection(db, "creditos");
+        const q = query(creditosRef, orderBy("fechaInicio", "desc"));
+        const snapshot = await getDocs(q);
+        let docs = [];
+        snapshot.forEach(doc => {
+          let d = doc.data();
+          d.id = doc.id;
+          docs.push(d);
+        });
+
+        // Filtra por asignadoA y fechas
+        docs = docs.filter(doc => {
+          if (normaliza(doc.asignadoA) !== normaliza(usuarioLogueadoNombre)) return false;
+          // Filtro fechas
+          let fechaDoc = doc.fechaInicio;
+          if (typeof fechaDoc === "object" && fechaDoc.seconds) {
+            fechaDoc = new Date(fechaDoc.seconds * 1000);
+          } else if (typeof fechaDoc === "string") {
+            fechaDoc = new Date(fechaDoc);
+          } else {
+            fechaDoc = new Date(fechaDoc);
+          }
+          if (fechaDesde && fechaDoc < fechaDesde) return false;
+          if (fechaHasta && fechaDoc > new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23,59,59)) return false;
+          doc._fechaObj = fechaDoc;
+          return true;
+        });
+
+        creditosData = docs;
+        renderCreditos();
+      } catch (err) {
+        document.getElementById('resultados').innerHTML = '<div style="color:#f44; text-align:center">Error al cargar datos: '+err+'</div>';
+      }
     }
 
     function renderCreditos() {
@@ -188,11 +169,20 @@
       obtenerCreditos();
     }
 
-    window.addEventListener("DOMContentLoaded", () => {
-      onAuthStateChanged(auth, user => {
+    window.addEventListener("DOMContentLoaded", async () => {
+      onAuthStateChanged(auth, async user => {
         if (!user) return location.href = "login.html";
-        usuarioEmail = user.email;
-        document.getElementById("usuario-nombre").textContent = user.email;
+        usuarioLogueadoEmail = (user.email || '').toString().trim().toLowerCase();
+        document.getElementById("usuario-nombre").textContent = usuarioLogueadoEmail;
+
+        // Buscar en users el nombre que corresponde al email logueado
+        const userData = await buscarUsuarioPorEmail(usuarioLogueadoEmail);
+        if (!userData) {
+          alert("No se encontró el usuario en la base de datos.");
+          return;
+        }
+        usuarioLogueadoNombre = userData.nombre;
+
         // Primer día del mes actual hasta hoy
         const now = new Date();
         document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;

@@ -153,7 +153,6 @@
       font-size:.85rem; font-weight:700;
       box-shadow:0 1px 8px #0002;
     }
-    /* Estilos adicionales de botones del panel original */
     .btn-revertir {
       background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%);
       color: #fff !important;
@@ -174,8 +173,6 @@
     .btn-mora-agencia i { color: #fff;}
     .btn-pin, .btn-pin i { color: #222; }
     .btn-pin i { color: #fff59d;}
-
-    /* Nuevos estilos para los botones agregados */
     .btn-cierre-caja {
       background: linear-gradient(90deg, #e7ff72 0%, #13b66b 100%);
       color: #212121;
@@ -186,7 +183,6 @@
       color: #222;
     }
     .btn-cierre-caja i { color: #847900; }
-
     .btn-master-creditos {
       background: linear-gradient(90deg, #607D8B 0%, #37474F 100%);
       color: #fff !important;
@@ -197,7 +193,6 @@
       color: #fff !important;
     }
     .btn-master-creditos i { color: #fff; opacity: 0.93;}
-    /* --- NUEVO BOTÓN DE CUOTAS POR VENCER --- */
     .btn-cuotas-vencer {
       background: linear-gradient(90deg, #F8AF40 0%, #67C8F1 100%);
       color: #24272b !important;
@@ -208,6 +203,18 @@
       color: #111 !important;
     }
     .btn-cuotas-vencer i { color: #222; opacity: 0.98;}
+    /* === NUEVO: Botón Reporte === */
+    .btn-reporte {
+      background: linear-gradient(90deg, #ee0979 0%, #ff6a00 100%);
+      color: #fff !important;
+    }
+    .btn-reporte:active,
+    .btn-reporte:hover {
+      background: linear-gradient(90deg, #ff6a00 60%, #ee0979 100%);
+      color: #fff !important;
+      box-shadow: 0 8px 26px #ee097955;
+    }
+    .btn-reporte i { color: #fff; opacity: 0.95;}
     @media (max-width: 600px) {
       .container { padding:1.2rem 1vw; }
       h1 { font-size: 1.23rem;}
@@ -277,10 +284,14 @@
         <i class="fas fa-database"></i>
         Master de Créditos
       </a>
-      <!-- === BOTÓN DE CUOTAS POR VENCER AGREGADO AQUÍ === -->
       <a href="cuotas_por_vencer_page.html" class="btn-grande btn-cuotas-vencer">
         <i class="fa-solid fa-hourglass-half"></i>
         Cuotas por Vencer
+      </a>
+      <!-- === BOTÓN DE REPORTE INTEGRADO AQUÍ === -->
+      <a href="reporte_page.html" class="btn-grande btn-reporte">
+        <i class="fas fa-chart-bar"></i>
+        Reportes Gerenciales
       </a>
     </div>
   </div>

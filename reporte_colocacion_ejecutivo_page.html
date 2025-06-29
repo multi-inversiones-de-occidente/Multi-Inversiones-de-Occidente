@@ -39,19 +39,20 @@
       return d.toISOString().slice(0, 10); // yyyy-MM-dd
     }
 
+    function normaliza(str) {
+      return (str ?? '').toString().trim().toLowerCase();
+    }
+
     function obtenerCreditos() {
       if (!ejecutivoNombre) return;
 
-      // Muestra el loader
       document.getElementById('resultados').innerHTML = '<div class="loader"></div>';
 
-      // Consulta a Firestore
       const creditosRef = collection(db, "creditos");
-      // NOTA: No se puede usar múltiples rangos sobre el mismo campo con Firebase si usas varios where y orderBy.
+      // NOTA: No se puede usar un where para lower-case y trim en Firebase. Se debe filtrar en JS.
       const q = query(
         creditosRef,
         where("tipoCredito", "==", "Nuevo"),
-        where("asignadoA", "==", ejecutivoNombre),
         orderBy("fechaInicio", "desc")
       );
       getDocs(q).then(snapshot => {
@@ -62,8 +63,10 @@
           docs.push(d);
         });
 
-        // Filtra por rango de fechas en JS
+        // FILTRA por asignadoA igual al usuario (normalizado) y rango de fechas
         docs = docs.filter(doc => {
+          // Normalizar ambos para comparar
+          if (normaliza(doc.asignadoA) !== ejecutivoNombre) return false;
           let fechaDoc = doc.fechaInicio;
           if (typeof fechaDoc === "object" && fechaDoc.seconds) {
             fechaDoc = new Date(fechaDoc.seconds * 1000);
@@ -72,7 +75,7 @@
           } else {
             fechaDoc = new Date(fechaDoc);
           }
-          // Filtros
+          // Filtros por fecha
           if (fechaDesde && fechaDoc < fechaDesde) return false;
           if (fechaHasta && fechaDoc > new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23,59,59)) return false;
           doc._fechaObj = fechaDoc;
@@ -146,7 +149,6 @@
       document.getElementById('resultados').innerHTML = html;
     }
 
-    // Selección de fechas
     function onFechaDesdeChange(e) {
       const val = e.target.value;
       fechaDesde = val ? new Date(val) : null;
@@ -161,10 +163,9 @@
     window.addEventListener("DOMContentLoaded", () => {
       onAuthStateChanged(auth, user => {
         if (!user) return location.href = "login.html";
-        // Toma el nombre del ejecutivo del displayName del usuario
-        ejecutivoNombre = user.displayName ?? user.email ?? '';
+        // Normaliza el nombre del usuario logueado
+        ejecutivoNombre = (user.displayName ?? user.email ?? '').trim().toLowerCase();
         document.getElementById("usuario-nombre").textContent = ejecutivoNombre;
-        // Por defecto: primer día del mes - hoy
         const now = new Date();
         document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
         document.getElementById('fecha-hasta').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;

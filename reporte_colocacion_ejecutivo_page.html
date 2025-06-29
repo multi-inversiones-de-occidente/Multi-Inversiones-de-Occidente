@@ -4,10 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Reporte de Colocación de Créditos</title>
-  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, orderBy, getDocs, where } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -33,15 +32,6 @@
       return (str || '').toString().trim().toLowerCase();
     }
 
-    function formatFecha(fecha) {
-      const d = new Date(fecha);
-      return d.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    }
-    function formatFechaGroup(fecha) {
-      const d = new Date(fecha);
-      return d.toISOString().slice(0, 10); // yyyy-MM-dd
-    }
-
     async function obtenerCreditos() {
       try {
         if (!ejecutivoNombre) return;
@@ -61,9 +51,8 @@
           docs.push(d);
         });
 
-        // Filtra por usuario asignado y fechas
+        // Filtro real por nombre exacto (no email)
         docs = docs.filter(doc => {
-          // --- Comparación flexible por asignadoA ---
           if (normaliza(doc.asignadoA) !== normaliza(ejecutivoNombre)) return false;
           // Filtrar por rango de fechas
           let fechaDoc = doc.fechaInicio;
@@ -86,6 +75,15 @@
         document.getElementById('resultados').innerHTML = '<div style="color:#f44; text-align:center">Error al cargar datos</div>';
         console.error('Error en obtenerCreditos:', err);
       }
+    }
+
+    function formatFecha(fecha) {
+      const d = new Date(fecha);
+      return d.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+    function formatFechaGroup(fecha) {
+      const d = new Date(fecha);
+      return d.toISOString().slice(0, 10); // yyyy-MM-dd
     }
 
     function renderCreditos() {
@@ -158,18 +156,31 @@
     }
 
     window.addEventListener("DOMContentLoaded", () => {
-      onAuthStateChanged(auth, user => {
+      onAuthStateChanged(auth, async user => {
         if (!user) return location.href = "login.html";
-        // Usa displayName si existe, si no, email (normaliza ambos)
-        ejecutivoNombre = (user.displayName || user.email || '').toString().trim().toLowerCase();
-        document.getElementById("usuario-nombre").textContent = user.email;
-        // Primer día del mes actual hasta hoy
-        const now = new Date();
-        document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
-        document.getElementById('fecha-hasta').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-        fechaDesde = new Date(now.getFullYear(), now.getMonth(), 1);
-        fechaHasta = now;
-        obtenerCreditos();
+        // Obtener el nombre desde la colección 'user'
+        try {
+          const usersRef = collection(db, "user");
+          const q = query(usersRef, where("email", "==", user.email));
+          const snap = await getDocs(q);
+          if (snap.empty) {
+            alert("No se encontró el usuario en la base de datos.");
+            return;
+          }
+          const userData = snap.docs[0].data();
+          ejecutivoNombre = userData.nombre || user.email;
+          document.getElementById("usuario-nombre").textContent = user.email;
+
+          // Primer día del mes actual hasta hoy
+          const now = new Date();
+          document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+          document.getElementById('fecha-hasta').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+          fechaDesde = new Date(now.getFullYear(), now.getMonth(), 1);
+          fechaHasta = now;
+          obtenerCreditos();
+        } catch (e) {
+          alert("Error obteniendo usuario: " + e.message);
+        }
       });
       document.getElementById('fecha-desde').addEventListener('change', onFechaDesdeChange);
       document.getElementById('fecha-hasta').addEventListener('change', onFechaHastaChange);

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Reporte de Colocación – Multi Inversiones</title>
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const db   = getFirestore(app);
+    const auth = getAuth(app);
+
+    let ejecutivoNombre = null;
+    let creditosData = [];
+    let fechaDesde = null;
+    let fechaHasta = null;
+
+    // Utilidad para formatear fechas
+    function formatFecha(fecha) {
+      const d = new Date(fecha);
+      return d.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+    function formatFechaGroup(fecha) {
+      const d = new Date(fecha);
+      return d.toISOString().slice(0, 10); // yyyy-MM-dd
+    }
+
+    function obtenerCreditos() {
+      if (!ejecutivoNombre) return;
+
+      // Muestra el loader
+      document.getElementById('resultados').innerHTML = '<div class="loader"></div>';
+
+      // Consulta a Firestore
+      const creditosRef = collection(db, "creditos");
+      // NOTA: No se puede usar múltiples rangos sobre el mismo campo con Firebase si usas varios where y orderBy.
+      const q = query(
+        creditosRef,
+        where("tipoCredito", "==", "Nuevo"),
+        where("asignadoA", "==", ejecutivoNombre),
+        orderBy("fechaInicio", "desc")
+      );
+      getDocs(q).then(snapshot => {
+        let docs = [];
+        snapshot.forEach(doc => {
+          let d = doc.data();
+          d.id = doc.id;
+          docs.push(d);
+        });
+
+        // Filtra por rango de fechas en JS
+        docs = docs.filter(doc => {
+          let fechaDoc = doc.fechaInicio;
+          if (typeof fechaDoc === "object" && fechaDoc.seconds) {
+            fechaDoc = new Date(fechaDoc.seconds * 1000);
+          } else if (typeof fechaDoc === "string") {
+            fechaDoc = new Date(fechaDoc);
+          } else {
+            fechaDoc = new Date(fechaDoc);
+          }
+          // Filtros
+          if (fechaDesde && fechaDoc < fechaDesde) return false;
+          if (fechaHasta && fechaDoc > new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23,59,59)) return false;
+          doc._fechaObj = fechaDoc;
+          return true;
+        });
+
+        creditosData = docs;
+        renderCreditos();
+      }).catch(err => {
+        document.getElementById('resultados').innerHTML = '<div style="color:#f44; text-align:center">Error al cargar datos</div>';
+      });
+    }
+
+    function renderCreditos() {
+      if (!creditosData.length) {
+        document.getElementById('resultados').innerHTML = `<div style="text-align:center;color:#fff7">No hay créditos en el rango seleccionado.</div>`;
+        return;
+      }
+      // Agrupar por fecha
+      const grouped = {};
+      creditosData.forEach(doc => {
+        const key = formatFechaGroup(doc._fechaObj);
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(doc);
+      });
+      let totalGeneral = 0;
+
+      let html = '';
+      for (const fecha in grouped) {
+        let subtotal = 0;
+        html += `
+        <div class="group">
+          <div class="group-header">
+            <i class="fas fa-calendar-alt"></i>
+            <span>${formatFecha(fecha)}</span>
+          </div>
+          <div class="tabla-header">
+            <div>Asignado A</div>
+            <div>Línea de Crédito</div>
+            <div>Nombre</div>
+            <div style="text-align:right">Monto</div>
+          </div>
+        `;
+        grouped[fecha].forEach(doc => {
+          subtotal += Number(doc.montoAprobado || 0);
+          html += `
+            <div class="tabla-row">
+              <div>${doc.asignadoA ?? '-'}</div>
+              <div>${doc.lineaDeCredito ?? '-'}</div>
+              <div>${(doc.nombre ?? '') + ' ' + (doc.apellido ?? '')}</div>
+              <div style="text-align:right;font-weight:700">$${Number(doc.montoAprobado || 0).toFixed(2)}</div>
+            </div>
+          `;
+        });
+        totalGeneral += subtotal;
+        html += `
+          <div class="subtotal">
+            <div style="flex:1"></div>
+            <div><b>Subtotal:</b></div>
+            <div style="text-align:right"><b>$${subtotal.toFixed(2)}</b></div>
+          </div>
+        </div>
+        `;
+      }
+      html += `
+        <div class="total-general">
+          <span>TOTAL GENERAL</span>
+          <span style="font-size:1.19rem;letter-spacing:.7px;">$${totalGeneral.toFixed(2)}</span>
+        </div>
+      `;
+      document.getElementById('resultados').innerHTML = html;
+    }
+
+    // Selección de fechas
+    function onFechaDesdeChange(e) {
+      const val = e.target.value;
+      fechaDesde = val ? new Date(val) : null;
+      obtenerCreditos();
+    }
+    function onFechaHastaChange(e) {
+      const val = e.target.value;
+      fechaHasta = val ? new Date(val) : null;
+      obtenerCreditos();
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      onAuthStateChanged(auth, user => {
+        if (!user) return location.href = "login.html";
+        // Toma el nombre del ejecutivo del displayName del usuario
+        ejecutivoNombre = user.displayName ?? user.email ?? '';
+        document.getElementById("usuario-nombre").textContent = ejecutivoNombre;
+        // Por defecto: primer día del mes - hoy
+        const now = new Date();
+        document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+        document.getElementById('fecha-hasta').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        fechaDesde = new Date(now.getFullYear(), now.getMonth(), 1);
+        fechaHasta = now;
+        obtenerCreditos();
+      });
+      document.getElementById('fecha-desde').addEventListener('change', onFechaDesdeChange);
+      document.getElementById('fecha-hasta').addEventListener('change', onFechaHastaChange);
+    });
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      background: #101212;
+      color: #fff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0; min-height: 100vh;
+    }
+    header {
+      background:#000; padding:1.07rem 0; text-align:center;
+      font-size:1.29rem; letter-spacing:1px; font-weight:700;
+      color:#67C8F1;
+    }
+    .container {
+      max-width: 700px;
+      margin: 2.4rem auto 0 auto;
+      background: #1c1d1f;
+      border-radius: 17px;
+      box-shadow: 0 2px 28px #0005;
+      padding: 2.1rem 1.2rem 2rem 1.2rem;
+      display: flex;
+      flex-direction: column;
+    }
+    #usuario-nombre {
+      color: #F8AF40;
+      font-size: 1.03rem;
+      text-align: right;
+      margin-bottom: 0.4rem;
+      font-weight: 600;
+    }
+    h1 {
+      font-size: 1.36rem;
+      font-weight: bold;
+      text-align: center;
+      color: #00e6c0;
+      margin-bottom: 1.6rem;
+      letter-spacing: .8px;
+    }
+    .filtros-row {
+      display: flex;
+      gap: 1.1rem;
+      justify-content: center;
+      margin-bottom: 1.6rem;
+      flex-wrap: wrap;
+    }
+    .filtro-fecha {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      background: #222;
+      padding: 0.7rem 1.1rem 0.5rem 1.1rem;
+      border-radius: 8px;
+    }
+    .filtro-fecha label {
+      color: #67C8F1;
+      font-size: .97rem;
+      margin-bottom: 4px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .filtro-fecha input[type="date"] {
+      background: #191a1c;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      padding: 0.39rem 0.7rem;
+      font-size: 1.01rem;
+    }
+    .loader {
+      border: 4px solid #232324;
+      border-top: 4px solid #13b66b;
+      border-radius: 50%;
+      width: 46px; height: 46px;
+      animation: spin 1.1s linear infinite;
+      margin: 1.8rem auto;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    .group {
+      margin-bottom: 1.6rem;
+      background: #252c28;
+      border-radius: 14px;
+      box-shadow: 0 1px 8px #0002;
+      padding: 1rem 0.8rem 0.6rem 0.8rem;
+    }
+    .group-header {
+      display: flex;
+      align-items: center;
+      font-size: 1.05rem;
+      color: #8affef;
+      margin-bottom: 8px;
+      font-weight: 600;
+      gap: 8px;
+    }
+    .tabla-header, .tabla-row {
+      display: grid;
+      grid-template-columns: 2fr 2fr 2fr 1fr;
+      gap: 0.7rem;
+      font-size: 0.99rem;
+      align-items: center;
+      margin-bottom: 2px;
+    }
+    .tabla-header {
+      color: #67C8F1;
+      font-weight: 700;
+      border-bottom: 1px solid #27e2a377;
+      margin-bottom: 8px;
+      font-size: 1.02rem;
+    }
+    .tabla-row {
+      color: #e6e6e6;
+      background: #0002;
+      border-radius: 6px;
+      margin-bottom: 2px;
+      padding: 2px 3px;
+    }
+    .subtotal {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 0.8rem;
+      margin-top: 7px;
+      color: #00ffd5;
+      font-size: 1.04rem;
+      font-weight: bold;
+      border-top: 1.5px solid #23e2a377;
+      padding-top: 7px;
+    }
+    .total-general {
+      margin: 1.7rem 0 0.3rem 0;
+      padding: 1.1rem 1.1rem;
+      background: #1f8260;
+      border-radius: 12px;
+      box-shadow: 0 1px 12px #00e6c03a;
+      display: flex; align-items: center; justify-content: space-between;
+      font-weight: bold;
+      font-size: 1.11rem;
+      color: #fff;
+      letter-spacing: 1px;
+    }
+    @media (max-width: 700px) {
+      .container { padding: 1.1rem 1vw; }
+      .tabla-header, .tabla-row { font-size: .94rem;}
+    }
+  </style>
+</head>
+<body>
+  <header>Reporte de Colocación de Créditos</header>
+  <div class="container">
+    <div id="usuario-nombre"></div>
+    <h1>MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.<br><span style="font-size:.97rem;color:#fff;font-weight:400">Colocación de Créditos</span></h1>
+    <div class="filtros-row">
+      <div class="filtro-fecha">
+        <label for="fecha-desde">Desde:</label>
+        <input type="date" id="fecha-desde" />
+      </div>
+      <div class="filtro-fecha">
+        <label for="fecha-hasta">Hasta:</label>
+        <input type="date" id="fecha-hasta" />
+      </div>
+    </div>
+    <div id="resultados"></div>
+  </div>
+</body>
+</html>

@@ -24,6 +24,7 @@
     const auth = getAuth(app);
 
     let ejecutivoNombre = null;
+    let rootEjecutivo = null;
     let creditosData = [];
     let fechaDesde = null;
     let fechaHasta = null;
@@ -61,7 +62,11 @@
 
         // FILTRA por asignadoA igual al usuario (normalizado) y rango de fechas
         docs = docs.filter(doc => {
-          if (normaliza(doc.asignadoA) !== ejecutivoNombre) return false;
+          // acepta ambos: displayName/email y root (antes de @)
+          if (
+            normaliza(doc.asignadoA) !== ejecutivoNombre &&
+            normaliza(doc.asignadoA) !== rootEjecutivo
+          ) return false;
           let fechaDoc = doc.fechaInicio;
           if (typeof fechaDoc === "object" && fechaDoc.seconds) {
             fechaDoc = new Date(fechaDoc.seconds * 1000);
@@ -224,6 +229,7 @@
       onAuthStateChanged(auth, user => {
         if (!user) return location.href = "login.html";
         ejecutivoNombre = (user.displayName ?? user.email ?? '').trim().toLowerCase();
+        rootEjecutivo = ejecutivoNombre.split('@')[0];
         document.getElementById("usuario-nombre").textContent = ejecutivoNombre;
         const now = new Date();
         document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;

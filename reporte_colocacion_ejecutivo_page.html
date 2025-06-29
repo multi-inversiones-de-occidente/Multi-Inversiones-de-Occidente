@@ -85,7 +85,28 @@
         creditosData = docs;
         renderCreditos();
       }).catch(err => {
-        document.getElementById('resultados').innerHTML = '<div style="color:#f44; text-align:center">Error al cargar datos</div>';
+        // Si el error es de índice, lo mostramos claro
+        if (err && err.message && err.message.includes('index')) {
+          document.getElementById('resultados').innerHTML =
+            `<div style="color:#f44; text-align:center">
+              Error: Esta consulta requiere un <b>índice en Firestore</b>.<br>
+              <span style="color:#fff">Abre la consola de tu navegador, haz clic en el link que te aparece y crea el índice.<br>
+              <b>Una vez creado, este reporte funcionará automáticamente.</b></span>
+            </div>`;
+        } else if (err && err.code && err.code === 'permission-denied') {
+          document.getElementById('resultados').innerHTML =
+            `<div style="color:#f44; text-align:center">
+              Permiso denegado: revisa las reglas de seguridad de Firestore.<br>
+              <span style="color:#fff">Dale permiso de lectura temporalmente a todos para probar:<br>
+              <code>allow read, write: if true;</code>
+              </span>
+            </div>`;
+        } else {
+          document.getElementById('resultados').innerHTML =
+            `<div style="color:#f44; text-align:center">
+              Error al cargar datos: <br><span style="color:#fff">${err.message || err}</span>
+            </div>`;
+        }
       });
     }
 
@@ -341,3 +362,4 @@
   </div>
 </body>
 </html>
+

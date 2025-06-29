@@ -23,10 +23,10 @@
     const db   = getFirestore(app);
     const auth = getAuth(app);
 
-    let ejecutivoNombre = null;
-    let creditosData = [];
+    let usuarioEmail = null;
     let fechaDesde = null;
     let fechaHasta = null;
+    let creditosData = [];
 
     function normaliza(str) {
       return (str || '').toString().trim().toLowerCase();
@@ -34,29 +34,36 @@
 
     async function obtenerCreditos() {
       try {
-        if (!ejecutivoNombre) return;
+        if (!usuarioEmail) return;
         document.getElementById('resultados').innerHTML = '<div class="loader"></div>';
 
-        // Obtener TODOS los créditos, filtrando por asignadoA en JS
+        // 1. Traer TODOS los créditos ordenados por fecha
         const creditosRef = collection(db, "creditos");
-        const q = query(
-          creditosRef,
-          orderBy("fechaInicio", "desc")
-        );
+        const q = query(creditosRef, orderBy("fechaInicio", "desc"));
         const snapshot = await getDocs(q);
 
         let docs = [];
-        snapshot.forEach(doc => {
-          let d = doc.data();
-          d.id = doc.id;
-          docs.push(d);
-        });
+        for (const doc of snapshot.docs) {
+          let credito = doc.data();
+          credito.id = doc.id;
 
-        // Filtro real por nombre exacto (no email)
-        docs = docs.filter(doc => {
-          if (normaliza(doc.asignadoA) !== normaliza(ejecutivoNombre)) return false;
-          // Filtrar por rango de fechas
-          let fechaDoc = doc.fechaInicio;
+          // 2. Buscar el usuario (en la colección user) cuyo nombre == asignadoA
+          const nombreAsignadoA = normaliza(credito.asignadoA);
+          if (!nombreAsignadoA) continue;
+
+          // Query exacto para encontrar ese usuario
+          const usersRef = collection(db, "user");
+          const userQ = query(usersRef, where("nombre", "==", nombreAsignadoA));
+          const userSnap = await getDocs(userQ);
+
+          if (userSnap.empty) continue;
+          const usuario = userSnap.docs[0].data();
+
+          // 3. Comparar email exacto contra el logeado
+          if (normaliza(usuario.email) !== normaliza(usuarioEmail)) continue;
+
+          // 4. Filtrar por rango de fechas
+          let fechaDoc = credito.fechaInicio;
           if (typeof fechaDoc === "object" && fechaDoc.seconds) {
             fechaDoc = new Date(fechaDoc.seconds * 1000);
           } else if (typeof fechaDoc === "string") {
@@ -64,11 +71,12 @@
           } else {
             fechaDoc = new Date(fechaDoc);
           }
-          if (fechaDesde && fechaDoc < fechaDesde) return false;
-          if (fechaHasta && fechaDoc > new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23,59,59)) return false;
-          doc._fechaObj = fechaDoc;
-          return true;
-        });
+          if (fechaDesde && fechaDoc < fechaDesde) continue;
+          if (fechaHasta && fechaDoc > new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23,59,59)) continue;
+          credito._fechaObj = fechaDoc;
+
+          docs.push(credito);
+        }
 
         creditosData = docs;
         renderCreditos();
@@ -157,32 +165,18 @@
     }
 
     window.addEventListener("DOMContentLoaded", () => {
-      onAuthStateChanged(auth, async user => {
+      onAuthStateChanged(auth, user => {
         if (!user) return location.href = "login.html";
-        // Buscar el usuario en la colección user por email
-        try {
-          const usersRef = collection(db, "user");
-          const q = query(usersRef, where("email", "==", user.email));
-          const snap = await getDocs(q);
-          if (snap.empty) {
-            alert("No se encontró el usuario en la base de datos.");
-            return;
-          }
-          // Toma el nombre correcto del usuario autenticado
-          const userData = snap.docs[0].data();
-          ejecutivoNombre = userData.nombre || user.email;
-          document.getElementById("usuario-nombre").textContent = user.email;
+        usuarioEmail = user.email;
+        document.getElementById("usuario-nombre").textContent = user.email;
 
-          // Primer día del mes actual hasta hoy
-          const now = new Date();
-          document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
-          document.getElementById('fecha-hasta').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-          fechaDesde = new Date(now.getFullYear(), now.getMonth(), 1);
-          fechaHasta = now;
-          obtenerCreditos();
-        } catch (e) {
-          alert("Error obteniendo usuario: " + e.message);
-        }
+        // Primer día del mes actual hasta hoy
+        const now = new Date();
+        document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+        document.getElementById('fecha-hasta').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        fechaDesde = new Date(now.getFullYear(), now.getMonth(), 1);
+        fechaHasta = now;
+        obtenerCreditos();
       });
       document.getElementById('fecha-desde').addEventListener('change', onFechaDesdeChange);
       document.getElementById('fecha-hasta').addEventListener('change', onFechaHastaChange);
@@ -352,5 +346,4 @@
   </div>
 </body>
 </html>
-
 

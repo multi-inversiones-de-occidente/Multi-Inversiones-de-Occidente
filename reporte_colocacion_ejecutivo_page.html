@@ -1,9 +1,10 @@
+<!-- COPIA Y PEGA TODO ESTE ARCHIVO PARA DEBUG CON LOGS VISIBLES -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Reporte de Colocación de Créditos</title>
+  <title>Reporte de Colocación de Créditos – DEBUG</title>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, orderBy, getDocs, where } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -36,6 +37,7 @@
       try {
         if (!usuarioEmail) return;
         document.getElementById('resultados').innerHTML = '<div class="loader"></div>';
+        let logs = [];
 
         // 1. Traer TODOS los créditos ordenados por fecha
         const creditosRef = collection(db, "creditos");
@@ -47,20 +49,29 @@
           let credito = doc.data();
           credito.id = doc.id;
 
-          // 2. Buscar el usuario (en la colección user) cuyo nombre == asignadoA
-          const nombreAsignadoA = normaliza(credito.asignadoA);
-          if (!nombreAsignadoA) continue;
+          logs.push(`\n-----\n[Crédito ID:${credito.id}] asignadoA: "${credito.asignadoA}"`);
 
-          // Query exacto para encontrar ese usuario
+          // 2. Buscar el usuario (en la colección user) cuyo nombre == asignadoA (normalizado)
+          const nombreAsignadoA = normaliza(credito.asignadoA);
+          logs.push(`Buscando en users con nombre = "${nombreAsignadoA}"`);
+
           const usersRef = collection(db, "user");
           const userQ = query(usersRef, where("nombre", "==", nombreAsignadoA));
           const userSnap = await getDocs(userQ);
 
-          if (userSnap.empty) continue;
+          if (userSnap.empty) {
+            logs.push("NO SE ENCONTRÓ usuario con ese nombre.");
+            continue;
+          }
           const usuario = userSnap.docs[0].data();
+          logs.push(`Usuario encontrado, email en base: "${usuario.email}", usuarioEmail actual: "${usuarioEmail}"`);
 
           // 3. Comparar email exacto contra el logeado
-          if (normaliza(usuario.email) !== normaliza(usuarioEmail)) continue;
+          if (normaliza(usuario.email) !== normaliza(usuarioEmail)) {
+            logs.push("EMAIL no coincide. Salta este crédito.");
+            continue;
+          }
+          logs.push("EMAIL coincide.");
 
           // 4. Filtrar por rango de fechas
           let fechaDoc = credito.fechaInicio;
@@ -71,15 +82,28 @@
           } else {
             fechaDoc = new Date(fechaDoc);
           }
-          if (fechaDesde && fechaDoc < fechaDesde) continue;
-          if (fechaHasta && fechaDoc > new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23,59,59)) continue;
+          logs.push(`fechaInicio del crédito: ${fechaDoc}`);
+
+          if (fechaDesde && fechaDoc < fechaDesde) {
+            logs.push(`Crédito fuera de fecha (antes de fechaDesde ${fechaDesde})`);
+            continue;
+          }
+          if (fechaHasta && fechaDoc > new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23,59,59)) {
+            logs.push(`Crédito fuera de fecha (después de fechaHasta ${fechaHasta})`);
+            continue;
+          }
           credito._fechaObj = fechaDoc;
 
           docs.push(credito);
+          logs.push("Crédito AGREGADO AL REPORTE.");
         }
 
         creditosData = docs;
         renderCreditos();
+        // Muestra logs en consola (F12)
+        logs.forEach(linea => console.log(linea));
+        if (logs.length === 0) console.log("No se ejecutó ningún ciclo, revisa la consulta a creditos.");
+
       } catch (err) {
         document.getElementById('resultados').innerHTML = '<div style="color:#f44; text-align:center">Error al cargar datos</div>';
         console.error('Error en obtenerCreditos:', err);
@@ -169,7 +193,6 @@
         if (!user) return location.href = "login.html";
         usuarioEmail = user.email;
         document.getElementById("usuario-nombre").textContent = user.email;
-
         // Primer día del mes actual hasta hoy
         const now = new Date();
         document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
@@ -346,4 +369,5 @@
   </div>
 </body>
 </html>
+
 

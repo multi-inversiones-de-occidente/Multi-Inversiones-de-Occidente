@@ -7,7 +7,7 @@
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, orderBy, getDocs, where } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -24,7 +24,7 @@
     const db   = getFirestore(app);
     const auth = getAuth(app);
 
-    let user = null;
+    let ejecutivoNombre = null;
     let creditosData = [];
     let fechaDesde = null;
     let fechaHasta = null;
@@ -42,50 +42,65 @@
       return d.toISOString().slice(0, 10); // yyyy-MM-dd
     }
 
-    async function obtenerCreditos() {
-      if (!user) return;
+    async function obtenerCreditosConAsignacionAceptada() {
+      if (!ejecutivoNombre) return;
       document.getElementById('resultados').innerHTML = '<div class="loader"></div>';
 
       const creditosRef = collection(db, "creditos");
-      const q = query(
-        creditosRef,
-        orderBy("fechaInicio", "desc")
-      );
-      getDocs(q).then(snapshot => {
-        let docs = [];
-        snapshot.forEach(doc => {
-          let d = doc.data();
-          d.id = doc.id;
-          docs.push(d);
-        });
+      const q = query(creditosRef, orderBy("fechaInicio", "desc"));
+      const snapshot = await getDocs(q);
 
-        // CORRIGE: filtra por nombre o correo del usuario
-        docs = docs.filter(doc => {
-          const asignadoA = normaliza(doc.asignadoA);
-          const userDisplayName = normaliza(user.displayName);
-          const userEmail = normaliza(user.email);
-
-          if (asignadoA !== userDisplayName && asignadoA !== userEmail) return false;
-          // Filtro por fechas
-          let fechaDoc = doc.fechaInicio;
-          if (typeof fechaDoc === "object" && fechaDoc.seconds) {
-            fechaDoc = new Date(fechaDoc.seconds * 1000);
-          } else if (typeof fechaDoc === "string") {
-            fechaDoc = new Date(fechaDoc);
-          } else {
-            fechaDoc = new Date(fechaDoc);
-          }
-          if (fechaDesde && fechaDoc < fechaDesde) return false;
-          if (fechaHasta && fechaDoc > new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23,59,59)) return false;
-          doc._fechaObj = fechaDoc;
-          return true;
-        });
-
-        creditosData = docs;
-        renderCreditos();
-      }).catch(err => {
-        document.getElementById('resultados').innerHTML = '<div style="color:#f44; text-align:center">Error al cargar datos</div>';
+      let docs = [];
+      snapshot.forEach(doc => {
+        let d = doc.data();
+        d.id = doc.id;
+        docs.push(d);
       });
+
+      // Filtra por usuario asignado y rango de fechas
+      docs = docs.filter(doc => {
+        if (normaliza(doc.asignadoA) !== normaliza(ejecutivoNombre)) return false;
+        let fechaDoc = doc.fechaInicio;
+        if (typeof fechaDoc === "object" && fechaDoc.seconds) {
+          fechaDoc = new Date(fechaDoc.seconds * 1000);
+        } else if (typeof fechaDoc === "string") {
+          fechaDoc = new Date(fechaDoc);
+        } else {
+          fechaDoc = new Date(fechaDoc);
+        }
+        if (fechaDesde && fechaDoc < fechaDesde) return false;
+        if (fechaHasta && fechaDoc > new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23,59,59)) return false;
+        doc._fechaObj = fechaDoc;
+        return true;
+      });
+
+      // Consulta asignacion_de_cuota por cada crédito
+      const resultadosFinales = [];
+      for (const credito of docs) {
+        try {
+          // Preferible filtrar por clienteID y montoAprobado para minimizar falsos positivos
+          const asignacionRef = collection(db, "asignacion_de_cuota");
+          // Puedes usar también solicitudID si está en ambos lados
+          const q2 = query(
+            asignacionRef,
+            where("clienteID", "==", credito.clienteID ?? ""),
+            where("respuestaCliente", "==", "Aceptado")
+          );
+          const snapshot2 = await getDocs(q2);
+
+          if (!snapshot2.empty) {
+            // Toma la primera asignación aceptada que coincida
+            let asignacion = snapshot2.docs[0].data();
+            credito._asignacion = asignacion;
+            resultadosFinales.push(credito);
+          }
+        } catch (e) {
+          // Error en la consulta de asignación
+        }
+      }
+
+      creditosData = resultadosFinales;
+      renderCreditos();
     }
 
     function renderCreditos() {
@@ -93,6 +108,7 @@
         document.getElementById('resultados').innerHTML = `<div style="text-align:center;color:#fff7">No hay créditos en el rango seleccionado.</div>`;
         return;
       }
+      // Agrupa por fecha
       const grouped = {};
       creditosData.forEach(doc => {
         const key = formatFechaGroup(doc._fechaObj);
@@ -112,7 +128,8 @@
           <div class="tabla-header">
             <div>Asignado A</div>
             <div>Línea de Crédito</div>
-            <div>Nombre</div>
+            <div>Cliente</div>
+            <div>Agencia</div>
             <div style="text-align:right">Monto</div>
           </div>
         `;
@@ -123,6 +140,7 @@
               <div>${doc.asignadoA ?? '-'}</div>
               <div>${doc.lineaDeCredito ?? '-'}</div>
               <div>${(doc.nombre ?? '') + ' ' + (doc.apellido ?? '')}</div>
+              <div>${doc._asignacion?.agenciaAsignada ?? '-'}</div>
               <div style="text-align:right;font-weight:700">$${Number(doc.montoAprobado || 0).toFixed(2)}</div>
             </div>
           `;
@@ -149,26 +167,27 @@
     function onFechaDesdeChange(e) {
       const val = e.target.value;
       fechaDesde = val ? new Date(val) : null;
-      obtenerCreditos();
+      obtenerCreditosConAsignacionAceptada();
     }
     function onFechaHastaChange(e) {
       const val = e.target.value;
       fechaHasta = val ? new Date(val) : null;
-      obtenerCreditos();
+      obtenerCreditosConAsignacionAceptada();
     }
 
     window.addEventListener("DOMContentLoaded", () => {
-      onAuthStateChanged(auth, usuario => {
-        if (!usuario) return location.href = "login.html";
-        user = usuario;
-        document.getElementById("usuario-nombre").textContent = usuario.email;
+      onAuthStateChanged(auth, user => {
+        if (!user) return location.href = "login.html";
+        // Usa displayName si existe, si no, email (normaliza ambos)
+        ejecutivoNombre = (user.displayName || user.email || '').toString().trim().toLowerCase();
+        document.getElementById("usuario-nombre").textContent = user.email;
         // Primer día del mes actual hasta hoy
         const now = new Date();
         document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
         document.getElementById('fecha-hasta').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
         fechaDesde = new Date(now.getFullYear(), now.getMonth(), 1);
         fechaHasta = now;
-        obtenerCreditos();
+        obtenerCreditosConAsignacionAceptada();
       });
       document.getElementById('fecha-desde').addEventListener('change', onFechaDesdeChange);
       document.getElementById('fecha-hasta').addEventListener('change', onFechaHastaChange);
@@ -188,7 +207,7 @@
       color:#67C8F1;
     }
     .container {
-      max-width: 700px;
+      max-width: 800px;
       margin: 2.4rem auto 0 auto;
       background: #1c1d1f;
       border-radius: 17px;
@@ -269,7 +288,7 @@
     }
     .tabla-header, .tabla-row {
       display: grid;
-      grid-template-columns: 2fr 2fr 2fr 1fr;
+      grid-template-columns: 2fr 2fr 2fr 2fr 1fr;
       gap: 0.7rem;
       font-size: 0.99rem;
       align-items: center;
@@ -313,9 +332,10 @@
       color: #fff;
       letter-spacing: 1px;
     }
-    @media (max-width: 700px) {
+    @media (max-width: 800px) {
       .container { padding: 1.1rem 1vw; }
       .tabla-header, .tabla-row { font-size: .94rem;}
+      .group-header { font-size: .93rem;}
     }
   </style>
 </head>

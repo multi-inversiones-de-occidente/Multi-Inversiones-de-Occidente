@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Reportes Gerenciales – Multi Inversiones</title>
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    window.addEventListener("DOMContentLoaded", () => {
+      onAuthStateChanged(auth, user => {
+        if (!user) return location.href = "login.html";
+        document.getElementById("usuario-nombre").textContent = user.email;
+      });
+    });
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      background: #181a1b;
+      color: #fff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+    }
+    header {
+      background: #000;
+      padding: 1.1rem 0;
+      text-align: center;
+      font-size: 1.43rem;
+      letter-spacing: 1px;
+      font-weight: 700;
+      color: #67C8F1;
+    }
+    .container {
+      max-width: 560px;
+      margin: 3.2rem auto 0 auto;
+      background: #232324;
+      border-radius: 20px;
+      box-shadow: 0 2px 32px #0006;
+      padding: 2.3rem 1.3rem 2.7rem 1.3rem;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+    }
+    #usuario-nombre {
+      color: #F8AF40;
+      font-size: 1.11rem;
+      text-align: right;
+      margin-bottom: 0.7rem;
+      font-weight: 600;
+    }
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      text-align: center;
+      margin-bottom: 2.7rem;
+      color: #fff;
+      letter-spacing: 1px;
+    }
+    .menu-btn {
+      display: flex;
+      align-items: center;
+      background: #191b1d;
+      border-radius: 14px;
+      padding: 1.3rem 1.2rem;
+      margin-bottom: 1.6rem;
+      cursor: pointer;
+      box-shadow: 0 2px 12px #0003;
+      border: 1px solid #222325;
+      transition: background .14s, transform .12s;
+      text-decoration: none;
+    }
+    .menu-btn:hover {
+      background: linear-gradient(90deg, #67C8F1 0%, #13b66b 100%);
+      color: #222 !important;
+      transform: scale(1.025);
+    }
+    .menu-btn i {
+      font-size: 2rem;
+      color: #19c388;
+      background: #232323;
+      border-radius: 50%;
+      padding: 0.6rem;
+      margin-right: 1.4rem;
+      box-shadow: 0 1px 6px #0004;
+      transition: color .13s;
+    }
+    .menu-btn:hover i { color: #19446a;}
+    .menu-btn .menu-content {
+      flex: 1;
+    }
+    .menu-title {
+      font-size: 1.17rem;
+      font-weight: bold;
+      color: #fff;
+      margin-bottom: 0.2rem;
+      letter-spacing: 0.2px;
+    }
+    .menu-desc {
+      color: #b9b9b9;
+      font-size: .97rem;
+      font-weight: 400;
+      margin-bottom: 0;
+    }
+    .menu-btn .arrow {
+      color: #b1b1b1;
+      font-size: 1.1rem;
+      margin-left: 1rem;
+      transition: color .15s;
+    }
+    .menu-btn:hover .arrow {
+      color: #333;
+    }
+    @media (max-width: 600px) {
+      .container { padding: 1.2rem 1vw; }
+      h1 { font-size: 1.17rem; }
+      .menu-btn { padding: 1rem 0.5rem; }
+      .menu-title { font-size: 1.07rem;}
+      .menu-btn i { font-size: 1.23rem; margin-right: 0.7rem;}
+    }
+  </style>
+</head>
+<body>
+  <header>Reportes Gerenciales</header>
+  <div class="container">
+    <div id="usuario-nombre"></div>
+    <h1>Menú de Reportes</h1>
+    <!-- Botón: Colocación de Créditos -->
+    <a href="reporte_colocacion_ejecutivo_page.html" class="menu-btn">
+      <i class="fas fa-file-signature"></i>
+      <div class="menu-content">
+        <div class="menu-title">Colocación de Créditos</div>
+        <div class="menu-desc">Ver reporte de créditos otorgados</div>
+      </div>
+      <span class="arrow"><i class="fas fa-chevron-right"></i></span>
+    </a>
+    <!-- Botón: Estado de Cuenta Cliente -->
+    <a href="reporte_estado_cuenta_cliente_page.html" class="menu-btn">
+      <i class="fas fa-wallet"></i>
+      <div class="menu-content">
+        <div class="menu-title">Estado de Cuenta de Cliente</div>
+        <div class="menu-desc">Consultar estado de cuenta de cualquier cliente</div>
+      </div>
+      <span class="arrow"><i class="fas fa-chevron-right"></i></span>
+    </a>
+    <!-- Botón: Créditos Revertidos -->
+    <a href="reporte_creditos_revertidos_page.html" class="menu-btn">
+      <i class="fas fa-undo"></i>
+      <div class="menu-content">
+        <div class="menu-title">Créditos Revertidos</div>
+        <div class="menu-desc">Ver reporte de créditos revertidos en tu agencia</div>
+      </div>
+      <span class="arrow"><i class="fas fa-chevron-right"></i></span>
+    </a>
+    <!-- Botón: Pagos Revertidos -->
+    <a href="reporte_pagos_revertidos_page.html" class="menu-btn">
+      <i class="fas fa-undo-alt"></i>
+      <div class="menu-content">
+        <div class="menu-title">Pagos Revertidos</div>
+        <div class="menu-desc">Ver reporte de pagos revertidos en tu agencia</div>
+      </div>
+      <span class="arrow"><i class="fas fa-chevron-right"></i></span>
+    </a>
+  </div>
+</body>
+</html>

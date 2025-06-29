@@ -24,7 +24,7 @@
     const db   = getFirestore(app);
     const auth = getAuth(app);
 
-    let ejecutivoNombre = null;
+    let user = null;
     let creditosData = [];
     let fechaDesde = null;
     let fechaHasta = null;
@@ -43,7 +43,7 @@
     }
 
     async function obtenerCreditos() {
-      if (!ejecutivoNombre) return;
+      if (!user) return;
       document.getElementById('resultados').innerHTML = '<div class="loader"></div>';
 
       const creditosRef = collection(db, "creditos");
@@ -59,11 +59,14 @@
           docs.push(d);
         });
 
-        // Filtra por usuario asignado y fechas
+        // CORRIGE: filtra por nombre o correo del usuario
         docs = docs.filter(doc => {
-          // --- Comparación flexible por asignadoA ---
-          if (normaliza(doc.asignadoA) !== normaliza(ejecutivoNombre)) return false;
-          // Filtrar por rango de fechas
+          const asignadoA = normaliza(doc.asignadoA);
+          const userDisplayName = normaliza(user.displayName);
+          const userEmail = normaliza(user.email);
+
+          if (asignadoA !== userDisplayName && asignadoA !== userEmail) return false;
+          // Filtro por fechas
           let fechaDoc = doc.fechaInicio;
           if (typeof fechaDoc === "object" && fechaDoc.seconds) {
             fechaDoc = new Date(fechaDoc.seconds * 1000);
@@ -155,11 +158,10 @@
     }
 
     window.addEventListener("DOMContentLoaded", () => {
-      onAuthStateChanged(auth, user => {
-        if (!user) return location.href = "login.html";
-        // Usa displayName si existe, si no, email (normaliza ambos)
-        ejecutivoNombre = (user.displayName || user.email || '').toString().trim().toLowerCase();
-        document.getElementById("usuario-nombre").textContent = user.email;
+      onAuthStateChanged(auth, usuario => {
+        if (!usuario) return location.href = "login.html";
+        user = usuario;
+        document.getElementById("usuario-nombre").textContent = usuario.email;
         // Primer día del mes actual hasta hoy
         const now = new Date();
         document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;

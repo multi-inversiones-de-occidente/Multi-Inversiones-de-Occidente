@@ -7,7 +7,7 @@
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, orderBy, getDocs, where } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -24,8 +24,7 @@
     const db   = getFirestore(app);
     const auth = getAuth(app);
 
-    let usuarioLogueadoEmail = null;
-    let usuarioLogueadoNombre = null;
+    let usuarioNombre = "";
     let creditosData = [];
     let fechaDesde = null;
     let fechaHasta = null;
@@ -38,35 +37,16 @@
       const d = new Date(fecha);
       return d.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
-    function formatFechaGroup(fecha) {
-      const d = new Date(fecha);
-      return d.toISOString().slice(0, 10); // yyyy-MM-dd
-    }
 
-    // Buscar usuario logueado en users por su email y obtener su "nombre"
-    async function buscarUsuarioPorEmail(email) {
-      try {
-        const usersRef = collection(db, "users");
-        const q = query(usersRef, where("email", "==", email));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          return snapshot.docs[0].data();
-        }
-        return null;
-      } catch (err) {
-        alert("Error buscando usuario: " + err);
-        return null;
-      }
-    }
-
-    // Consulta créditos donde asignadoA == usuarioLogueadoNombre
     async function obtenerCreditos() {
-      if (!usuarioLogueadoNombre) return;
-      document.getElementById('resultados').innerHTML = '<div class="loader"></div>';
-
       try {
+        if (!usuarioNombre) return;
+        document.getElementById('resultados').innerHTML = '<div class="loader"></div>';
         const creditosRef = collection(db, "creditos");
-        const q = query(creditosRef, orderBy("fechaInicio", "desc"));
+        const q = query(
+          creditosRef,
+          orderBy("fechaInicio", "desc")
+        );
         const snapshot = await getDocs(q);
         let docs = [];
         snapshot.forEach(doc => {
@@ -74,11 +54,11 @@
           d.id = doc.id;
           docs.push(d);
         });
-
-        // Filtra por asignadoA y fechas
+        // Filtra por usuario asignado y fechas
         docs = docs.filter(doc => {
-          if (normaliza(doc.asignadoA) !== normaliza(usuarioLogueadoNombre)) return false;
-          // Filtro fechas
+          // Comparar asignadoA con el nombre del usuario logueado (no email)
+          if (normaliza(doc.asignadoA) !== normaliza(usuarioNombre)) return false;
+          // Filtrar por rango de fechas
           let fechaDoc = doc.fechaInicio;
           if (typeof fechaDoc === "object" && fechaDoc.seconds) {
             fechaDoc = new Date(fechaDoc.seconds * 1000);
@@ -96,66 +76,97 @@
         creditosData = docs;
         renderCreditos();
       } catch (err) {
-        document.getElementById('resultados').innerHTML = '<div style="color:#f44; text-align:center">Error al cargar datos: '+err+'</div>';
+        document.getElementById('resultados').innerHTML = '<div style="color:#f44; text-align:center">Error al cargar datos</div>';
+        console.error(err);
       }
     }
 
     function renderCreditos() {
+      const contenedor = document.getElementById('resultados');
       if (!creditosData.length) {
-        document.getElementById('resultados').innerHTML = `<div style="text-align:center;color:#fff7">No hay créditos en el rango seleccionado.</div>`;
+        contenedor.innerHTML = `<div style="text-align:center;color:#fff7">No hay créditos en el rango seleccionado.</div>`;
+        document.getElementById("btn-imprimir")?.classList.add("oculto");
         return;
       }
-      const grouped = {};
-      creditosData.forEach(doc => {
-        const key = formatFechaGroup(doc._fechaObj);
-        if (!grouped[key]) grouped[key] = [];
-        grouped[key].push(doc);
-      });
       let totalGeneral = 0;
-      let html = '';
-      for (const fecha in grouped) {
-        let subtotal = 0;
-        html += `
-        <div class="group">
-          <div class="group-header">
-            <i class="fas fa-calendar-alt"></i>
-            <span>${formatFecha(fecha)}</span>
-          </div>
-          <div class="tabla-header">
-            <div>Asignado A</div>
-            <div>Línea de Crédito</div>
-            <div>Nombre</div>
-            <div style="text-align:right">Monto</div>
-          </div>
-        `;
-        grouped[fecha].forEach(doc => {
-          subtotal += Number(doc.montoAprobado || 0);
-          html += `
-            <div class="tabla-row">
-              <div>${doc.asignadoA ?? '-'}</div>
-              <div>${doc.lineaDeCredito ?? '-'}</div>
-              <div>${(doc.nombre ?? '') + ' ' + (doc.apellido ?? '')}</div>
-              <div style="text-align:right;font-weight:700">$${Number(doc.montoAprobado || 0).toFixed(2)}</div>
-            </div>
-          `;
-        });
-        totalGeneral += subtotal;
-        html += `
-          <div class="subtotal">
-            <div style="flex:1"></div>
-            <div><b>Subtotal:</b></div>
-            <div style="text-align:right"><b>$${subtotal.toFixed(2)}</b></div>
-          </div>
-        </div>
-        `;
-      }
-      html += `
-        <div class="total-general">
-          <span>TOTAL GENERAL</span>
-          <span style="font-size:1.19rem;letter-spacing:.7px;">$${totalGeneral.toFixed(2)}</span>
-        </div>
+      let html = `
+      <div class="tabla-scroll">
+      <table class="tabla-reporte" id="tabla-reporte">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Agencia</th>
+            <th>Cliente</th>
+            <th>DUI</th>
+            <th>Monto</th>
+            <th>Línea</th>
+            <th>Frecuencia</th>
+            <th>Cuotas</th>
+            <th>Cuota</th>
+            <th>Tasa %</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
       `;
-      document.getElementById('resultados').innerHTML = html;
+      creditosData.forEach(doc => {
+        totalGeneral += Number(doc.montoAprobado || 0);
+        html += `
+          <tr>
+            <td>${formatFecha(doc._fechaObj)}</td>
+            <td>${doc.agenciaAsignada ?? '-'}</td>
+            <td>${(doc.nombre ?? '') + ' ' + (doc.apellido ?? '')}</td>
+            <td>${doc.numeroDui ?? '-'}</td>
+            <td style="text-align:right;">$${Number(doc.montoAprobado || 0).toFixed(2)}</td>
+            <td>${doc.lineaDeCredito ?? '-'}</td>
+            <td>${doc.frecuenciaPago ?? '-'}</td>
+            <td>${doc.numeroCuotas ?? '-'}</td>
+            <td style="text-align:right;">$${Number(doc.cuotaAprobada || 0).toFixed(2)}</td>
+            <td>${doc.tasaAnualCredito ?? '-'}</td>
+            <td>${doc.estadoCredito ?? '-'}</td>
+          </tr>
+        `;
+      });
+      html += `
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" style="text-align:right"><b>TOTAL</b></td>
+            <td style="text-align:right;font-weight:bold;">$${totalGeneral.toFixed(2)}</td>
+            <td colspan="6"></td>
+          </tr>
+        </tfoot>
+      </table>
+      </div>
+      `;
+      contenedor.innerHTML = html;
+      document.getElementById("btn-imprimir")?.classList.remove("oculto");
+    }
+
+    function imprimirTabla() {
+      // Solo imprime la tabla del reporte
+      const contenido = document.getElementById('resultados').innerHTML;
+      const ventana = window.open('', '', 'width=900,height=600');
+      ventana.document.write(`
+        <html>
+        <head>
+          <title>Reporte de Colocación de Créditos</title>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 24px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+            th, td { border: 1px solid #bbb; padding: 6px 10px; font-size: 1rem;}
+            th { background: #19b3ae; color: #fff;}
+            tfoot td { font-size: 1.12rem; background:#eafdfc; font-weight:bold;}
+          </style>
+        </head>
+        <body>
+          <h2>Reporte de Colocación de Créditos</h2>
+          ${contenido}
+        </body>
+        </html>
+      `);
+      ventana.document.close();
+      ventana.print();
     }
 
     function onFechaDesdeChange(e) {
@@ -172,17 +183,23 @@
     window.addEventListener("DOMContentLoaded", async () => {
       onAuthStateChanged(auth, async user => {
         if (!user) return location.href = "login.html";
-        usuarioLogueadoEmail = (user.email || '').toString().trim().toLowerCase();
-        document.getElementById("usuario-nombre").textContent = usuarioLogueadoEmail;
-
-        // Buscar en users el nombre que corresponde al email logueado
-        const userData = await buscarUsuarioPorEmail(usuarioLogueadoEmail);
-        if (!userData) {
+        // Busca el usuario en la colección 'users' para obtener el nombre
+        const usersRef = collection(db, "users");
+        const q = query(usersRef);
+        const snapshot = await getDocs(q);
+        let found = false;
+        snapshot.forEach(docu => {
+          const data = docu.data();
+          if ((data.email || '').trim().toLowerCase() === (user.email || '').trim().toLowerCase()) {
+            usuarioNombre = (data.nombre || '').trim();
+            found = true;
+          }
+        });
+        if (!found) {
           alert("No se encontró el usuario en la base de datos.");
           return;
         }
-        usuarioLogueadoNombre = userData.nombre;
-
+        document.getElementById("usuario-nombre").textContent = user.email;
         // Primer día del mes actual hasta hoy
         const now = new Date();
         document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
@@ -193,6 +210,7 @@
       });
       document.getElementById('fecha-desde').addEventListener('change', onFechaDesdeChange);
       document.getElementById('fecha-hasta').addEventListener('change', onFechaHastaChange);
+      document.getElementById('btn-imprimir').addEventListener('click', imprimirTabla);
     });
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -209,12 +227,12 @@
       color:#67C8F1;
     }
     .container {
-      max-width: 700px;
+      max-width: 1050px;
       margin: 2.4rem auto 0 auto;
       background: #1c1d1f;
       border-radius: 17px;
       box-shadow: 0 2px 28px #0005;
-      padding: 2.1rem 1.2rem 2rem 1.2rem;
+      padding: 2.1rem 1.2rem 2.7rem 1.2rem;
       display: flex;
       flex-direction: column;
     }
@@ -263,6 +281,58 @@
       padding: 0.39rem 0.7rem;
       font-size: 1.01rem;
     }
+    .tabla-scroll {
+      width: 100%;
+      overflow-x: auto;
+      margin-bottom: 1.7rem;
+      margin-top: 12px;
+    }
+    .tabla-reporte {
+      border-radius: 12px;
+      background: #191e1e;
+      width: 100%;
+      min-width: 880px;
+      border-collapse: collapse;
+      margin: auto;
+      font-size: 0.98rem;
+    }
+    .tabla-reporte th, .tabla-reporte td {
+      border: 1px solid #244f4c;
+      padding: 7px 7px;
+      text-align: left;
+    }
+    .tabla-reporte th {
+      background: #0dc5b9;
+      color: #fff;
+      font-weight: bold;
+      text-align: center;
+      font-size: 1.01rem;
+    }
+    .tabla-reporte tr:nth-child(even) td { background: #191e1e; }
+    .tabla-reporte tr:nth-child(odd) td { background: #222627; }
+    .tabla-reporte tfoot td {
+      background: #1b936a;
+      color: #fff;
+      font-weight: bold;
+      font-size: 1.07rem;
+      text-align: right;
+    }
+    #btn-imprimir {
+      margin: 0 auto;
+      background: #19b3ae;
+      color: #fff;
+      border: none;
+      font-size: 1.09rem;
+      font-weight: 600;
+      border-radius: 7px;
+      padding: 10px 30px;
+      cursor: pointer;
+      box-shadow: 0 2px 6px #00e6c042;
+      transition: background .18s;
+      margin-top: 7px;
+      display: block;
+    }
+    #btn-imprimir:hover { background: #11a09a; }
     .loader {
       border: 4px solid #232324;
       border-top: 4px solid #13b66b;
@@ -272,71 +342,14 @@
       margin: 1.8rem auto;
     }
     @keyframes spin { 100% { transform: rotate(360deg); } }
-    .group {
-      margin-bottom: 1.6rem;
-      background: #252c28;
-      border-radius: 14px;
-      box-shadow: 0 1px 8px #0002;
-      padding: 1rem 0.8rem 0.6rem 0.8rem;
-    }
-    .group-header {
-      display: flex;
-      align-items: center;
-      font-size: 1.05rem;
-      color: #8affef;
-      margin-bottom: 8px;
-      font-weight: 600;
-      gap: 8px;
-    }
-    .tabla-header, .tabla-row {
-      display: grid;
-      grid-template-columns: 2fr 2fr 2fr 1fr;
-      gap: 0.7rem;
-      font-size: 0.99rem;
-      align-items: center;
-      margin-bottom: 2px;
-    }
-    .tabla-header {
-      color: #67C8F1;
-      font-weight: 700;
-      border-bottom: 1px solid #27e2a377;
-      margin-bottom: 8px;
-      font-size: 1.02rem;
-    }
-    .tabla-row {
-      color: #e6e6e6;
-      background: #0002;
-      border-radius: 6px;
-      margin-bottom: 2px;
-      padding: 2px 3px;
-    }
-    .subtotal {
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      gap: 0.8rem;
-      margin-top: 7px;
-      color: #00ffd5;
-      font-size: 1.04rem;
-      font-weight: bold;
-      border-top: 1.5px solid #23e2a377;
-      padding-top: 7px;
-    }
-    .total-general {
-      margin: 1.7rem 0 0.3rem 0;
-      padding: 1.1rem 1.1rem;
-      background: #1f8260;
-      border-radius: 12px;
-      box-shadow: 0 1px 12px #00e6c03a;
-      display: flex; align-items: center; justify-content: space-between;
-      font-weight: bold;
-      font-size: 1.11rem;
-      color: #fff;
-      letter-spacing: 1px;
+    .oculto { display: none !important; }
+    @media (max-width: 1100px) {
+      .container { max-width: 99vw; }
+      .tabla-reporte { min-width: 650px; }
     }
     @media (max-width: 700px) {
       .container { padding: 1.1rem 1vw; }
-      .tabla-header, .tabla-row { font-size: .94rem;}
+      .tabla-reporte { font-size: .91rem;}
     }
   </style>
 </head>
@@ -344,7 +357,9 @@
   <header>Reporte de Colocación de Créditos</header>
   <div class="container">
     <div id="usuario-nombre"></div>
-    <h1>MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.<br><span style="font-size:.97rem;color:#fff;font-weight:400">Colocación de Créditos</span></h1>
+    <h1>MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.<br>
+      <span style="font-size:.97rem;color:#fff;font-weight:400">Colocación de Créditos</span>
+    </h1>
     <div class="filtros-row">
       <div class="filtro-fecha">
         <label for="fecha-desde">Desde:</label>
@@ -356,8 +371,10 @@
       </div>
     </div>
     <div id="resultados"></div>
+    <button id="btn-imprimir" class="oculto"><i class="fas fa-print"></i> Imprimir Reporte</button>
   </div>
 </body>
 </html>
+
 
 

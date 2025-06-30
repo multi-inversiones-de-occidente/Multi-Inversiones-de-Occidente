@@ -85,7 +85,7 @@
     let fechaSeleccionada = null;
     let historico = null;
 
-    // PIN Gerente modal - Válida múltiples gerentes y logs
+    // PIN Gerente modal - con logs extendidos
     function showGerentePinDialog() {
       return new Promise((resolve) => {
         let modalRoot = document.getElementById("modal-root");
@@ -113,10 +113,10 @@
               render();
               return;
             }
-            // --- LOG para ver los gerentes encontrados ---
+            // Logs para depuración:
             let gerentesLog = [];
             let pinValido = false;
-            for (const docG of snap.docs) {
+            snap.docs.forEach(docG => {
               const data = docG.data();
               const gerenteHash = typeof data.internalPassword === 'string' ? data.internalPassword.trim() : '';
               gerentesLog.push({
@@ -124,15 +124,20 @@
                 email: data.email,
                 hash: gerenteHash
               });
+              // Logs nuevos para depuración:
               console.log('[PIN-GERENTE] Comparando:', gerenteHash, 'vs', hashHex);
-              if (gerenteHash === hashHex.trim()) {
+              console.log('[PIN-GERENTE] (typeof gerenteHash)', typeof gerenteHash, 'valor:', gerenteHash);
+              console.log('[PIN-GERENTE] (typeof hashHex)', typeof hashHex, 'valor:', hashHex);
+              console.log('[PIN-GERENTE] gerenteHash==hashHex?', gerenteHash === hashHex);
+              console.log('[PIN-GERENTE] gerenteHash.trim()==hashHex.trim()?', gerenteHash.trim() === hashHex.trim());
+              if (String(gerenteHash).trim() === String(hashHex).trim()) {
                 pinValido = true;
-                break; // Si encuentra el PIN correcto, se detiene
               }
-            }
-            console.log('[PIN-GERENTE] Gerentes encontrados para departamento:', userAgencia, '=', gerentesLog.length);
+            });
+            console.log('[PIN-GERENTE] Gerentes encontrados para departamento:', userAgencia, '=', snap.docs.length);
             console.log('[PIN-GERENTE] Detalles gerentes:', gerentesLog);
             console.log('[PIN-GERENTE] Hash ingresado:', hashHex);
+
             if (pinValido) {
               closeModal();
               resolve(true);
@@ -141,9 +146,9 @@
               render();
             }
           } catch (e) {
-            errorMsg = "Error validando PIN: " + e;
+            errorMsg = "Error técnico: " + e;
+            console.error('[PIN-GERENTE][ERROR]', e);
             render();
-            console.error('[PIN-GERENTE] Error:', e);
           }
         }
         function closeModal() { modalRoot.innerHTML = ""; resolve(false);}
@@ -436,4 +441,3 @@
   </script>
 </body>
 </html>
-

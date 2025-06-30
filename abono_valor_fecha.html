@@ -85,7 +85,7 @@
     let fechaSeleccionada = null;
     let historico = null;
 
-    // PIN Gerente modal - con logs extendidos
+    // PIN Gerente modal - CORREGIDO para varios gerentes y bug de resolve
     function showGerentePinDialog() {
       return new Promise((resolve) => {
         let modalRoot = document.getElementById("modal-root");
@@ -126,10 +126,6 @@
               });
               // Logs nuevos para depuración:
               console.log('[PIN-GERENTE] Comparando:', gerenteHash, 'vs', hashHex);
-              console.log('[PIN-GERENTE] (typeof gerenteHash)', typeof gerenteHash, 'valor:', gerenteHash);
-              console.log('[PIN-GERENTE] (typeof hashHex)', typeof hashHex, 'valor:', hashHex);
-              console.log('[PIN-GERENTE] gerenteHash==hashHex?', gerenteHash === hashHex);
-              console.log('[PIN-GERENTE] gerenteHash.trim()==hashHex.trim()?', gerenteHash.trim() === hashHex.trim());
               if (String(gerenteHash).trim() === String(hashHex).trim()) {
                 pinValido = true;
               }
@@ -140,7 +136,7 @@
 
             if (pinValido) {
               closeModal();
-              resolve(true);
+              resolve(true);   // <<<< Ahora sí
             } else {
               errorMsg = "PIN incorrecto";
               render();
@@ -151,7 +147,9 @@
             render();
           }
         }
-        function closeModal() { modalRoot.innerHTML = ""; resolve(false);}
+        function closeModal() {
+          modalRoot.innerHTML = "";
+        }
         function render() {
           modalRoot.innerHTML = `
             <div class="modal-bg">
@@ -166,7 +164,10 @@
               </div>
             </div>
           `;
-          document.getElementById("cancelar-pin").onclick = closeModal;
+          document.getElementById("cancelar-pin").onclick = () => {
+            closeModal();
+            resolve(false);
+          };
           document.getElementById("autorizar-pin").onclick = onOk;
           document.getElementById("gerente-pin-input").onkeydown = e => { if (e.key === "Enter") onOk(); };
           setTimeout(() => document.getElementById("gerente-pin-input").focus(), 30);
@@ -441,3 +442,4 @@
   </script>
 </body>
 </html>
+

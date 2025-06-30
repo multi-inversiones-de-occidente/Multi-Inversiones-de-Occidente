@@ -85,45 +85,65 @@
     let fechaSeleccionada = null;
     let historico = null;
 
-    // PIN Gerente modal - AHORA acepta varios gerentes válidos por agencia
+    // PIN Gerente modal con try/catch y logs
     function showGerentePinDialog() {
       return new Promise((resolve) => {
         let modalRoot = document.getElementById("modal-root");
         let errorMsg = "";
         async function onOk() {
-          const pinValue = document.getElementById("gerente-pin-input").value.trim();
-          if (!pinValue) {
-            errorMsg = "Debes ingresar el PIN del gerente.";
+          try {
+            const pinValue = document.getElementById("gerente-pin-input").value.trim();
+            if (!pinValue) {
+              errorMsg = "Debes ingresar el PIN del gerente.";
+              render();
+              return;
+            }
+            // Hash SHA256
+            const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pinValue));
+            const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+            // Buscar gerentes de la agencia actual
+            const q = query(
+              collection(db, "users"),
+              where("rol", "==", "gerente"),
+              where("department", "==", userAgencia)
+            );
+            const snap = await getDocs(q);
+            console.log("[PIN-GERENTE] Gerentes encontrados para departamento:", userAgencia, "=>", snap.size);
+            let foundGerentes = [];
+            snap.forEach(docG => {
+              const d = docG.data();
+              foundGerentes.push({
+                nombre: d.nombre,
+                email: d.email,
+                hash: d.internalPassword
+              });
+            });
+            console.log("[PIN-GERENTE] Detalles gerentes:", foundGerentes);
+            console.log("[PIN-GERENTE] Hash ingresado:", hashHex);
+
+            if (snap.empty) {
+              errorMsg = "No hay gerente configurado para esta agencia.";
+              render();
+              console.error("[PIN-GERENTE] No se encontró gerente para:", userAgencia);
+              return;
+            }
+            let pinValido = false;
+            snap.docs.forEach(docG => {
+              const gerenteHash = docG.data().internalPassword;
+              if (gerenteHash === hashHex) pinValido = true;
+            });
+            if (pinValido) {
+              closeModal();
+              resolve(true);
+            } else {
+              errorMsg = "PIN incorrecto";
+              render();
+              console.warn("[PIN-GERENTE] PIN ingresado no coincide con ningún gerente en", userAgencia);
+            }
+          } catch (err) {
+            errorMsg = "Error técnico al validar PIN: " + (err.message || err);
             render();
-            return;
-          }
-          // Hash SHA256
-          const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pinValue));
-          const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-          // Buscar gerentes de la agencia actual
-          const q = query(
-            collection(db, "users"),
-            where("rol", "==", "gerente"),
-            where("department", "==", userAgencia)
-          );
-          const snap = await getDocs(q);
-          if (snap.empty) {
-            errorMsg = "No hay gerente configurado para esta agencia.";
-            render();
-            return;
-          }
-          // Buscar si el hash coincide con el de algún gerente de la agencia
-          let pinValido = false;
-          snap.docs.forEach(docG => {
-            const gerenteHash = docG.data().internalPassword;
-            if (gerenteHash === hashHex) pinValido = true;
-          });
-          if (pinValido) {
-            closeModal();
-            resolve(true);
-          } else {
-            errorMsg = "PIN incorrecto";
-            render();
+            console.error("[PIN-GERENTE] Excepción:", err);
           }
         }
         function closeModal() { modalRoot.innerHTML = ""; resolve(false);}

@@ -85,7 +85,7 @@
     let fechaSeleccionada = null;
     let historico = null;
 
-    // --- CAMBIO: Comparación de PIN sin espacios y log detallado ---
+    // PIN Gerente modal - Válida múltiples gerentes y logs
     function showGerentePinDialog() {
       return new Promise((resolve) => {
         let modalRoot = document.getElementById("modal-root");
@@ -113,9 +113,10 @@
               render();
               return;
             }
+            // --- LOG para ver los gerentes encontrados ---
+            let gerentesLog = [];
             let pinValido = false;
-            const gerentesLog = [];
-            snap.docs.forEach(docG => {
+            for (const docG of snap.docs) {
               const data = docG.data();
               const gerenteHash = typeof data.internalPassword === 'string' ? data.internalPassword.trim() : '';
               gerentesLog.push({
@@ -123,13 +124,13 @@
                 email: data.email,
                 hash: gerenteHash
               });
-              // --- CAMBIO: Comparación con .trim() y log ---
               console.log('[PIN-GERENTE] Comparando:', gerenteHash, 'vs', hashHex);
               if (gerenteHash === hashHex.trim()) {
                 pinValido = true;
+                break; // Si encuentra el PIN correcto, se detiene
               }
-            });
-            console.log('[PIN-GERENTE] Gerentes encontrados para departamento:', userAgencia, '=', snap.size);
+            }
+            console.log('[PIN-GERENTE] Gerentes encontrados para departamento:', userAgencia, '=', gerentesLog.length);
             console.log('[PIN-GERENTE] Detalles gerentes:', gerentesLog);
             console.log('[PIN-GERENTE] Hash ingresado:', hashHex);
             if (pinValido) {
@@ -139,10 +140,10 @@
               errorMsg = "PIN incorrecto";
               render();
             }
-          } catch (err) {
-            console.error('[PIN-GERENTE] Error al validar PIN:', err);
-            errorMsg = "Error interno validando el PIN";
+          } catch (e) {
+            errorMsg = "Error validando PIN: " + e;
             render();
+            console.error('[PIN-GERENTE] Error:', e);
           }
         }
         function closeModal() { modalRoot.innerHTML = ""; resolve(false);}
@@ -435,3 +436,4 @@
   </script>
 </body>
 </html>
+

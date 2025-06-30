@@ -17,6 +17,7 @@
     .error { color: #f87171; font-size: 1.05rem; margin-bottom: 10px;}
     .ok-msg { color: #38bdf8; text-align: center; font-weight: bold; margin-bottom: 18px; font-size: 1.09rem;}
     .sim-block { background: #0f172a; color: #fcd34d; border-radius: 11px; margin: 14px 0 16px 0; padding: 15px 18px; font-size: 1.09rem;}
+    .sim-explicacion { color: #60a5fa; font-size: 0.98rem; margin-top: 8px;}
     .list-group { max-height: 180px; overflow-y: auto; margin-bottom: 18px;}
     .list-group-item { background: #181e2b; color: #fff; border-radius: 8px; padding: 8px 14px; margin-bottom: 7px; cursor: pointer; }
     .list-group-item.selected, .list-group-item:hover { background: #fb923c; color: #181818; font-weight: bold;}
@@ -49,6 +50,7 @@
       <input id="fecha-abono" type="date" class="input-main"/>
     </div>
     <div id="simulacion-block" class="sim-block" style="display:none;"></div>
+    <div id="sim-explicacion" class="sim-explicacion" style="display:none;"></div>
     <form id="form-abono" style="display:none;">
       <label class="label" for="monto">Monto del abono ($)</label>
       <input id="monto" class="input-main" type="number" min="0.01" step="0.01" placeholder="0.00" required/>
@@ -85,7 +87,7 @@
     let fechaSeleccionada = null;
     let historico = null;
 
-    // PIN Gerente modal - CORREGIDO para varios gerentes y bug de resolve
+    // --- Modal PIN GERENTE ---
     function showGerentePinDialog() {
       return new Promise((resolve) => {
         let modalRoot = document.getElementById("modal-root");
@@ -136,7 +138,7 @@
 
             if (pinValido) {
               closeModal();
-              resolve(true);   // <<<< Ahora sí
+              resolve(true);
             } else {
               errorMsg = "PIN incorrecto";
               render();
@@ -176,6 +178,8 @@
       });
     }
 
+    // --- FIN MODAL PIN GERENTE ---
+
     // Al autenticarse, carga los créditos de la agencia del usuario
     onAuthStateChanged(auth, async user => {
       if (!user) return location.href = "login.html";
@@ -214,9 +218,10 @@
       document.getElementById("seleccion-fecha").style.display = "block";
       document.getElementById("form-abono").style.display = "none";
       document.getElementById("simulacion-block").style.display = "none";
+      document.getElementById("sim-explicacion").style.display = "none";
     }
 
-    // SIMULACIÓN corregida
+    // --- SIMULACIÓN con lógica ajustada ---
     document.getElementById("fecha-abono").addEventListener("change", () => {
       fechaSeleccionada = document.getElementById("fecha-abono").value;
       if (!fechaSeleccionada || !creditoSeleccionado) return;
@@ -227,6 +232,7 @@
         document.getElementById("simulacion-block").innerHTML = "<b>No puedes seleccionar una fecha antes de la apertura del crédito.</b>";
         document.getElementById("simulacion-block").style.display = "block";
         document.getElementById("form-abono").style.display = "none";
+        document.getElementById("sim-explicacion").style.display = "none";
         return;
       }
 
@@ -242,10 +248,8 @@
       // Calcular cuotas realmente atrasadas SOLO si su fecha < fecha simulada
       let cuotasAtrasadas = 0;
       let capitalAtrasado = 0;
-      let interesesAtrasados = 0;
       let totalOverdueCuota = 0;
       let amortizacion = Array.isArray(creditoSeleccionado.amortizacion) ? creditoSeleccionado.amortizacion : [];
-
       let hoySim = new Date(fechaSim.getFullYear(), fechaSim.getMonth(), fechaSim.getDate());
 
       amortizacion.forEach(cuota => {
@@ -254,13 +258,20 @@
         if (soloFechaCuota < hoySim && (!cuota.estado || cuota.estado !== "Pagada")) {
           cuotasAtrasadas += 1;
           capitalAtrasado += parseFloat(cuota.capital || 0) - parseFloat(cuota.montoPagado || 0);
-          interesesAtrasados += parseFloat(cuota.interes || 0) - parseFloat(cuota.montoPagadoInteres || 0);
           totalOverdueCuota += parseFloat(cuota.cuota || 0);
         }
       });
 
-      // Para ponerse al día SOLO capital e intereses atrasados + multas acumuladas a esa fecha
-      let paraPonerseAlDia = capitalAtrasado + interesesAtrasados + multasAcumuladas;
+      // Lógica financiera solicitada:
+      let paraPonerseAlDia = 0;
+      let explicacion = "";
+      if (cuotasAtrasadas === 0) {
+        paraPonerseAlDia = interesAcumulado + multasAcumuladas;
+        explicacion = "Antes del vencimiento, para ponerse al día solo debe cubrir el interés generado hasta la fecha seleccionada.";
+      } else {
+        paraPonerseAlDia = capitalAtrasado + interesAcumulado + multasAcumuladas;
+        explicacion = "Después del vencimiento, para ponerse al día debe cubrir el interés acumulado + el capital atrasado (cuota vencida) + multas.";
+      }
 
       historico = {
         saldoActual: saldoInicial,
@@ -269,7 +280,6 @@
         paraPonerseAlDia: paraPonerseAlDia,
         cuotasAtrasadas: cuotasAtrasadas,
         capitalAtrasado: capitalAtrasado,
-        interesesAtrasados: interesesAtrasados,
         totalOverdueCuota: totalOverdueCuota,
         fechaSim: fechaSim
       };
@@ -281,11 +291,12 @@
         <b>Para Ponerse al Día:</b> $${historico.paraPonerseAlDia.toFixed(2)}<br>
         <b>Cuotas Atrasadas:</b> ${historico.cuotasAtrasadas}<br>
         <b>Capital Atrasado:</b> $${historico.capitalAtrasado.toFixed(2)}<br>
-        <b>Interés Atrasado:</b> $${historico.interesesAtrasados.toFixed(2)}<br>
         <b>Total Overdue Cuota:</b> $${historico.totalOverdueCuota.toFixed(2)}
       `;
       document.getElementById("simulacion-block").style.display = "block";
       document.getElementById("simulacion-block").innerHTML = html;
+      document.getElementById("sim-explicacion").style.display = "block";
+      document.getElementById("sim-explicacion").innerHTML = `<i class="fa fa-info-circle"></i> ${explicacion}`;
       document.getElementById("form-abono").style.display = "block";
     });
 
@@ -437,6 +448,7 @@
         document.getElementById("seleccion-fecha").style.display = "none";
         document.getElementById("simulacion-block").style.display = "none";
         document.getElementById("form-abono").style.display = "none";
+        document.getElementById("sim-explicacion").style.display = "none";
       }, 2100);
     }
   </script>

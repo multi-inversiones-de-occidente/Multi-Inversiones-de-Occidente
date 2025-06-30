@@ -85,7 +85,7 @@
     let fechaSeleccionada = null;
     let historico = null;
 
-    // PIN Gerente modal con try/catch y logs
+    // --- CAMBIO: Comparación de PIN sin espacios y log detallado ---
     function showGerentePinDialog() {
       return new Promise((resolve) => {
         let modalRoot = document.getElementById("modal-root");
@@ -108,42 +108,41 @@
               where("department", "==", userAgencia)
             );
             const snap = await getDocs(q);
-            console.log("[PIN-GERENTE] Gerentes encontrados para departamento:", userAgencia, "=>", snap.size);
-            let foundGerentes = [];
-            snap.forEach(docG => {
-              const d = docG.data();
-              foundGerentes.push({
-                nombre: d.nombre,
-                email: d.email,
-                hash: d.internalPassword
-              });
-            });
-            console.log("[PIN-GERENTE] Detalles gerentes:", foundGerentes);
-            console.log("[PIN-GERENTE] Hash ingresado:", hashHex);
-
             if (snap.empty) {
               errorMsg = "No hay gerente configurado para esta agencia.";
               render();
-              console.error("[PIN-GERENTE] No se encontró gerente para:", userAgencia);
               return;
             }
             let pinValido = false;
+            const gerentesLog = [];
             snap.docs.forEach(docG => {
-              const gerenteHash = docG.data().internalPassword;
-              if (gerenteHash === hashHex) pinValido = true;
+              const data = docG.data();
+              const gerenteHash = typeof data.internalPassword === 'string' ? data.internalPassword.trim() : '';
+              gerentesLog.push({
+                nombre: data.nombre,
+                email: data.email,
+                hash: gerenteHash
+              });
+              // --- CAMBIO: Comparación con .trim() y log ---
+              console.log('[PIN-GERENTE] Comparando:', gerenteHash, 'vs', hashHex);
+              if (gerenteHash === hashHex.trim()) {
+                pinValido = true;
+              }
             });
+            console.log('[PIN-GERENTE] Gerentes encontrados para departamento:', userAgencia, '=', snap.size);
+            console.log('[PIN-GERENTE] Detalles gerentes:', gerentesLog);
+            console.log('[PIN-GERENTE] Hash ingresado:', hashHex);
             if (pinValido) {
               closeModal();
               resolve(true);
             } else {
               errorMsg = "PIN incorrecto";
               render();
-              console.warn("[PIN-GERENTE] PIN ingresado no coincide con ningún gerente en", userAgencia);
             }
           } catch (err) {
-            errorMsg = "Error técnico al validar PIN: " + (err.message || err);
+            console.error('[PIN-GERENTE] Error al validar PIN:', err);
+            errorMsg = "Error interno validando el PIN";
             render();
-            console.error("[PIN-GERENTE] Excepción:", err);
           }
         }
         function closeModal() { modalRoot.innerHTML = ""; resolve(false);}
@@ -436,4 +435,3 @@
   </script>
 </body>
 </html>
-

@@ -41,39 +41,24 @@
       Esta opción permite registrar un abono en una fecha anterior a la actual. <br>
       <b>Solo personal autorizado puede hacer esta operación.</b> Por seguridad, deberás ingresar el motivo y el PIN de gerente.
     </div>
-
-    <!-- Buscar Cliente -->
     <label class="label" for="busqueda">Buscar cliente por nombre o DUI</label>
     <input id="busqueda" class="input-main" type="text" placeholder="Escribe el nombre o DUI..." autocomplete="off"/>
-
-    <!-- Lista de créditos filtrados -->
     <div id="lista-creditos" class="list-group"></div>
-
-    <!-- Selección de fecha -->
     <div id="seleccion-fecha" style="display:none;">
       <label class="label" for="fecha-abono">Selecciona la fecha del abono</label>
       <input id="fecha-abono" type="date" class="input-main"/>
     </div>
-
-    <!-- Simulación histórica -->
-    <div id="simulacion-block" class="sim-block" style="display:none;">
-      <!-- Aquí se muestra la simulación -->
-    </div>
-
-    <!-- Formulario de abono -->
+    <div id="simulacion-block" class="sim-block" style="display:none;"></div>
     <form id="form-abono" style="display:none;">
       <label class="label" for="monto">Monto del abono ($)</label>
       <input id="monto" class="input-main" type="number" min="0.01" step="0.01" placeholder="0.00" required/>
-
       <label class="label" for="motivo">Motivo del abono (obligatorio)</label>
       <textarea id="motivo" class="input-motivo" placeholder="Motivo del abono..." required></textarea>
-
       <button type="submit" class="btn-main">Registrar Abono a Valor Fecha</button>
       <div id="ok-msg" class="ok-msg" style="display:none;"></div>
     </form>
   </div>
   <div id="modal-root"></div>
-  <!-- Lógica y Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -197,7 +182,7 @@
       document.getElementById("simulacion-block").style.display = "none";
     }
 
-    // SIMULACIÓN
+    // SIMULACIÓN corregida
     document.getElementById("fecha-abono").addEventListener("change", () => {
       fechaSeleccionada = document.getElementById("fecha-abono").value;
       if (!fechaSeleccionada || !creditoSeleccionado) return;
@@ -213,29 +198,35 @@
 
       let saldoInicial = parseFloat(creditoSeleccionado.saldoInicial || creditoSeleccionado.montoCredito || 0);
       let tasaDiaria = parseFloat(creditoSeleccionado.tasaDiariaCredito || 0);
-      let saldoActual = saldoInicial;
-      let interesAcumulado = 0;
       let multasAcumuladas = parseFloat(creditoSeleccionado.multasAcumuladas || 0) || 0;
-      let paraPonerseAlDia = 0;
+
+      // Interés acumulado hasta fecha simulada (referencia informativa)
       let dias = Math.floor((fechaSim - fechaApertura) / (1000 * 60 * 60 * 24));
       dias = dias > 0 ? dias : 0;
-      interesAcumulado = saldoInicial * tasaDiaria * dias;
+      let interesAcumulado = saldoInicial * tasaDiaria * dias;
 
+      // Calcular cuotas realmente atrasadas SOLO si su fecha < fecha simulada
       let cuotasAtrasadas = 0;
       let capitalAtrasado = 0;
+      let interesesAtrasados = 0;
       let totalOverdueCuota = 0;
       let amortizacion = Array.isArray(creditoSeleccionado.amortizacion) ? creditoSeleccionado.amortizacion : [];
 
+      let hoySim = new Date(fechaSim.getFullYear(), fechaSim.getMonth(), fechaSim.getDate());
+
       amortizacion.forEach(cuota => {
         let fechaCuota = new Date(cuota.fecha);
-        if (fechaCuota <= fechaSim && (!cuota.estado || cuota.estado !== "Pagada")) {
+        let soloFechaCuota = new Date(fechaCuota.getFullYear(), fechaCuota.getMonth(), fechaCuota.getDate());
+        if (soloFechaCuota < hoySim && (!cuota.estado || cuota.estado !== "Pagada")) {
           cuotasAtrasadas += 1;
-          capitalAtrasado += parseFloat(cuota.cuota || 0) - parseFloat(cuota.montoPagado || 0);
+          capitalAtrasado += parseFloat(cuota.capital || 0) - parseFloat(cuota.montoPagado || 0);
+          interesesAtrasados += parseFloat(cuota.interes || 0) - parseFloat(cuota.montoPagadoInteres || 0);
           totalOverdueCuota += parseFloat(cuota.cuota || 0);
         }
       });
 
-      paraPonerseAlDia = capitalAtrasado + interesAcumulado + multasAcumuladas;
+      // Para ponerse al día SOLO capital e intereses atrasados + multas acumuladas a esa fecha
+      let paraPonerseAlDia = capitalAtrasado + interesesAtrasados + multasAcumuladas;
 
       historico = {
         saldoActual: saldoInicial,
@@ -244,17 +235,19 @@
         paraPonerseAlDia: paraPonerseAlDia,
         cuotasAtrasadas: cuotasAtrasadas,
         capitalAtrasado: capitalAtrasado,
+        interesesAtrasados: interesesAtrasados,
         totalOverdueCuota: totalOverdueCuota,
         fechaSim: fechaSim
       };
 
       let html = `
         <b>Saldo ese día:</b> $${historico.saldoActual.toFixed(2)}<br>
-        <b>Interés Actual:</b> $${historico.interesActual.toFixed(2)}<br>
+        <b>Interés Acumulado (referencia):</b> $${historico.interesActual.toFixed(2)}<br>
         <b>Multas Acumuladas:</b> $${historico.multasAcumuladas.toFixed(2)}<br>
         <b>Para Ponerse al Día:</b> $${historico.paraPonerseAlDia.toFixed(2)}<br>
         <b>Cuotas Atrasadas:</b> ${historico.cuotasAtrasadas}<br>
         <b>Capital Atrasado:</b> $${historico.capitalAtrasado.toFixed(2)}<br>
+        <b>Interés Atrasado:</b> $${historico.interesesAtrasados.toFixed(2)}<br>
         <b>Total Overdue Cuota:</b> $${historico.totalOverdueCuota.toFixed(2)}
       `;
       document.getElementById("simulacion-block").style.display = "block";
@@ -262,7 +255,7 @@
       document.getElementById("form-abono").style.display = "block";
     });
 
-    // APLICAR ABONO RETROACTIVO
+    // ---- Lógica de registro de abono retroactivo y todo lo demás igual ----
     document.getElementById("form-abono").onsubmit = async function(e) {
       e.preventDefault();
       if (!creditoSeleccionado || !fechaSeleccionada) return alert("Selecciona cliente y fecha.");
@@ -283,7 +276,7 @@
       for (let i = 0; i < amortizacion.length; i++) {
         let cuota = amortizacion[i];
         let fechaCuota = new Date(cuota.fecha);
-        // Aseguramos inicialización correcta de los campos
+        // Inicializar campos
         if (typeof cuota.montoPagadoInteres !== "number") cuota.montoPagadoInteres = 0;
         if (typeof cuota.montoPagado !== "number") cuota.montoPagado = 0;
         if (fechaCuota <= new Date(fechaSeleccionada + "T23:59:59")) {

@@ -100,7 +100,7 @@
     let fechaSeleccionada = null;
     let historico = null;
 
-    // ---------------- PIN Modal (idéntico reversión) -----------------
+    // PIN Gerente modal
     function showGerentePinDialog() {
       return new Promise((resolve) => {
         let modalRoot = document.getElementById("modal-root");
@@ -156,19 +156,14 @@
         render();
       });
     }
-    // ---------------------------------------------------------------
 
     // Al autenticarse, carga los créditos de la agencia del usuario
     onAuthStateChanged(auth, async user => {
       if (!user) return location.href = "login.html";
       usuarioActual = user.displayName || user.email || "Usuario desconocido";
       userId = user.uid;
-
-      // Obtener agencia (department)
       const docUser = await getDoc(doc(db, "users", user.uid));
       userAgencia = docUser.exists() && docUser.data().department ? docUser.data().department : "";
-
-      // Cargar créditos agencia
       const q = query(collection(db, "creditos"), where("agenciaAsignada", "==", userAgencia));
       const snap = await getDocs(q);
       creditosAgencia = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -180,7 +175,6 @@
       const listaDiv = document.getElementById("lista-creditos");
       listaDiv.innerHTML = "";
       if (!queryTxt) return;
-
       const filtrados = creditosAgencia.filter(credito =>
         (credito.nombre && credito.nombre.toLowerCase().includes(queryTxt)) ||
         (credito.numeroDui && credito.numeroDui.includes(queryTxt))
@@ -221,12 +215,10 @@
       let tasaDiaria = parseFloat(creditoSeleccionado.tasaDiariaCredito || 0);
       let saldoActual = saldoInicial;
       let interesAcumulado = 0;
-      let multasAcumuladas = 0;
+      let multasAcumuladas = parseFloat(creditoSeleccionado.multasAcumuladas || 0) || 0;
       let paraPonerseAlDia = 0;
-
       let dias = Math.floor((fechaSim - fechaApertura) / (1000 * 60 * 60 * 24));
       dias = dias > 0 ? dias : 0;
-
       interesAcumulado = saldoInicial * tasaDiaria * dias;
 
       let cuotasAtrasadas = 0;
@@ -270,7 +262,7 @@
       document.getElementById("form-abono").style.display = "block";
     });
 
-    // ---------------- APLICAR ABONO RETROACTIVO --------------------
+    // APLICAR ABONO RETROACTIVO
     document.getElementById("form-abono").onsubmit = async function(e) {
       e.preventDefault();
       if (!creditoSeleccionado || !fechaSeleccionada) return alert("Selecciona cliente y fecha.");
@@ -278,63 +270,108 @@
       const motivo = document.getElementById("motivo").value.trim();
       if (!monto || !motivo) return alert("Completa todos los campos.");
 
-      // 1. Validar PIN gerente
+      // Validar PIN gerente
       const autorizado = await showGerentePinDialog();
       if (!autorizado) return alert("PIN de gerente incorrecto o cancelado.");
 
-      // 2. Aplicar el abono solo sobre cuotas vencidas hasta la fecha seleccionada
+      // Aplicar el abono solo sobre cuotas vencidas hasta la fecha seleccionada
       let abonoRestante = monto;
       let amortizacion = Array.isArray(creditoSeleccionado.amortizacion) ? creditoSeleccionado.amortizacion : [];
-      let pagoCapital = 0;
       let pagoInteres = 0;
+      let pagoCapital = 0;
 
       for (let i = 0; i < amortizacion.length; i++) {
         let cuota = amortizacion[i];
         let fechaCuota = new Date(cuota.fecha);
+        // Aseguramos inicialización correcta de los campos
+        if (typeof cuota.montoPagadoInteres !== "number") cuota.montoPagadoInteres = 0;
+        if (typeof cuota.montoPagado !== "number") cuota.montoPagado = 0;
         if (fechaCuota <= new Date(fechaSeleccionada + "T23:59:59")) {
-          let pagado = parseFloat(cuota.montoPagado || 0);
-          let totalCuota = parseFloat(cuota.cuota || 0);
-          let pendiente = totalCuota - pagado;
-          if (pendiente > 0 && abonoRestante > 0) {
-            // Se asume que el pago primero cubre intereses, luego capital
-            let interesCuota = parseFloat(cuota.interes || 0);
-            let capitalCuota = parseFloat(cuota.capital || 0);
-            let interesPendiente = interesCuota - (cuota.pagoInteres ? parseFloat(cuota.pagoInteres) : 0);
-            let capitalPendiente = capitalCuota - (cuota.pagoCapital ? parseFloat(cuota.pagoCapital) : 0);
+          let pagadoInteres = parseFloat(cuota.montoPagadoInteres || 0);
+          let pagadoCapital = parseFloat(cuota.montoPagado || 0);
+          let interesCuota = parseFloat(cuota.interes || 0);
+          let capitalCuota = parseFloat(cuota.capital || 0);
 
-            // Paga el interés de la cuota primero
-            let pagoInteresA = Math.min(interesPendiente, abonoRestante);
-            if (!cuota.pagoInteres) cuota.pagoInteres = 0;
-            cuota.pagoInteres = parseFloat(cuota.pagoInteres) + pagoInteresA;
-            pagoInteres += pagoInteresA;
-            abonoRestante -= pagoInteresA;
+          let pendienteInteres = interesCuota - pagadoInteres;
+          let pendienteCapital = capitalCuota - pagadoCapital;
 
-            // Luego paga el capital de la cuota
-            let pagoCapitalA = Math.min(capitalPendiente, abonoRestante);
-            if (!cuota.pagoCapital) cuota.pagoCapital = 0;
-            cuota.pagoCapital = parseFloat(cuota.pagoCapital) + pagoCapitalA;
-            pagoCapital += pagoCapitalA;
-            abonoRestante -= pagoCapitalA;
+          // 1. Paga interés primero
+          let abonoInteres = Math.min(pendienteInteres, abonoRestante);
+          cuota.montoPagadoInteres = pagadoInteres + abonoInteres;
+          pagoInteres += abonoInteres;
+          abonoRestante -= abonoInteres;
 
-            cuota.montoPagado = parseFloat(cuota.pagoInteres) + parseFloat(cuota.pagoCapital);
+          // 2. Luego paga capital
+          let abonoCapital = Math.min(pendienteCapital, abonoRestante);
+          cuota.montoPagado = pagadoCapital + abonoCapital;
+          pagoCapital += abonoCapital;
+          abonoRestante -= abonoCapital;
 
-            if (Math.abs(cuota.montoPagado - totalCuota) < 0.01) {
-              cuota.estado = "Pagada";
-              cuota.fechaPagoReal = fechaSeleccionada;
-            } else if (cuota.montoPagado > 0) {
-              cuota.estado = "Parcial";
-              cuota.fechaPagoReal = fechaSeleccionada;
+          // 3. Estado de cuota
+          if (
+            Math.abs(cuota.montoPagadoInteres - interesCuota) < 0.01 &&
+            Math.abs(cuota.montoPagado - capitalCuota) < 0.01
+          ) {
+            cuota.estado = "Pagada";
+            cuota.fechaPagoReal = fechaSeleccionada;
+          } else if (cuota.montoPagado > 0 || cuota.montoPagadoInteres > 0) {
+            cuota.estado = "Parcial";
+            cuota.fechaPagoReal = fechaSeleccionada;
+          }
+        }
+      }
+
+      // SOBRANTE: Aplica a la siguiente cuota pendiente (solo a capital)
+      if (abonoRestante > 0) {
+        for (let j = 0; j < amortizacion.length && abonoRestante > 0; j++) {
+          let cuotaSig = amortizacion[j];
+          if (
+            new Date(cuotaSig.fecha) > new Date(fechaSeleccionada + "T23:59:59") &&
+            cuotaSig.estado !== "Pagada"
+          ) {
+            if (typeof cuotaSig.montoPagado !== "number") cuotaSig.montoPagado = 0;
+            let pagadoCapital = parseFloat(cuotaSig.montoPagado || 0);
+            let capitalCuota = parseFloat(cuotaSig.capital || 0);
+            let pendienteCapital = capitalCuota - pagadoCapital;
+            let abono = Math.min(pendienteCapital, abonoRestante);
+            cuotaSig.montoPagado = pagadoCapital + abono;
+            pagoCapital += abono;
+            abonoRestante -= abono;
+
+            if (
+              Math.abs(cuotaSig.montoPagado - capitalCuota) < 0.01
+            ) {
+              cuotaSig.estado = "Pagada";
+              cuotaSig.fechaPagoReal = fechaSeleccionada;
+            } else if (cuotaSig.montoPagado > 0) {
+              cuotaSig.estado = "Parcial";
+              cuotaSig.fechaPagoReal = fechaSeleccionada;
             }
           }
         }
       }
 
-      // 3. Registrar el pago retroactivo
+      // Calcula nuevo saldo actual (solo lo que falta de capital en todas las cuotas)
+      let saldoActual = amortizacion
+        .filter(c => c.estado !== "Pagada")
+        .reduce((acc, c) => acc + Math.max(0, parseFloat(c.capital || 0) - (parseFloat(c.montoPagado) || 0)), 0);
+
+      // Calcula nuevo interesActual (solo intereses desde la fecha del pago retroactivo hasta hoy sobre saldo actual)
+      let hoy = new Date();
+      let diasInteres = Math.floor((hoy - new Date(fechaSeleccionada + "T23:59:59")) / (1000 * 60 * 60 * 24));
+      diasInteres = diasInteres > 0 ? diasInteres : 0;
+      let tasaDiaria = parseFloat(creditoSeleccionado.tasaDiariaCredito || 0);
+      let interesActual = saldoActual * tasaDiaria * diasInteres;
+
+      // paraPonerseAlDia = interesActual
+      let paraPonerseAlDia = interesActual;
+
+      // Registrar el pago retroactivo
       await addDoc(collection(db, "pagos"), {
         creditoID: creditoSeleccionado.id,
         montoPagado: monto,
-        pagoCapital: pagoCapital.toFixed(2),
         pagoInteres: pagoInteres.toFixed(2),
+        pagoCapital: pagoCapital.toFixed(2),
         fechaPago: new Date(fechaSeleccionada + "T12:00:00").toISOString(),
         nombres: creditoSeleccionado.nombre,
         sucursal: userAgencia,
@@ -345,7 +382,7 @@
         fechaRegistro: new Date().toISOString(),
       });
 
-      // 4. Registrar el movimiento en caja
+      // Registrar el movimiento en caja
       await addDoc(collection(db, "movimientos_caja"), {
         tipoMovimiento: 'Ingreso',
         monto: monto,
@@ -354,14 +391,15 @@
         usuarioID: userId,
       });
 
-      // 5. Actualizar el crédito
+      // Actualizar el crédito (sin tocar multas)
       await updateDoc(doc(db, "creditos", creditoSeleccionado.id), {
         amortizacion: amortizacion,
-        saldoActual: (parseFloat(creditoSeleccionado.saldoActual) - pagoCapital).toFixed(2),
-        interesActual: (parseFloat(creditoSeleccionado.interesActual || 0) - pagoInteres).toFixed(2)
+        saldoActual: saldoActual.toFixed(2),
+        interesActual: interesActual.toFixed(2),
+        paraPonerseAlDia: paraPonerseAlDia.toFixed(2)
       });
 
-      // 6. Reinicia ciclo visual:
+      // Reinicia ciclo visual:
       document.getElementById("ok-msg").textContent = "Abono retroactivo registrado correctamente.";
       document.getElementById("ok-msg").style.display = "block";
       setTimeout(() => {
@@ -374,11 +412,7 @@
         document.getElementById("form-abono").style.display = "none";
       }, 2100);
     }
-    // ---------------------------------------------------------------
-
   </script>
 </body>
 </html>
-
-
 

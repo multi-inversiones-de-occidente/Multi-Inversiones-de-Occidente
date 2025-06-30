@@ -85,7 +85,7 @@
     let fechaSeleccionada = null;
     let historico = null;
 
-    // PIN Gerente modal
+    // PIN Gerente modal - AHORA acepta varios gerentes válidos por agencia
     function showGerentePinDialog() {
       return new Promise((resolve) => {
         let modalRoot = document.getElementById("modal-root");
@@ -100,17 +100,25 @@
           // Hash SHA256
           const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pinValue));
           const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-          // Buscar gerente
-          const q = query(collection(db, "users"), where("rol", "==", "gerente"));
+          // Buscar gerentes de la agencia actual
+          const q = query(
+            collection(db, "users"),
+            where("rol", "==", "gerente"),
+            where("department", "==", userAgencia)
+          );
           const snap = await getDocs(q);
           if (snap.empty) {
-            errorMsg = "No hay gerente configurado.";
+            errorMsg = "No hay gerente configurado para esta agencia.";
             render();
             return;
           }
-          const gerente = snap.docs[0].data();
-          const gerenteHash = gerente.internalPassword;
-          if (gerenteHash === hashHex) {
+          // Buscar si el hash coincide con el de algún gerente de la agencia
+          let pinValido = false;
+          snap.docs.forEach(docG => {
+            const gerenteHash = docG.data().internalPassword;
+            if (gerenteHash === hashHex) pinValido = true;
+          });
+          if (pinValido) {
             closeModal();
             resolve(true);
           } else {

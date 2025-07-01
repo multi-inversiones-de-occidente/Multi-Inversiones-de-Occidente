@@ -27,7 +27,7 @@
     .modal-row { margin-bottom: 18px; }
     .input-group { display: flex; align-items: center; background: #f5f8fb; border-radius: 8px; padding-left: 10px; border: 1px solid #dedede;}
     .input-group span { color: #13b66b; font-size: 1.15rem; font-weight: bold; margin-right: 5px;}
-    .input-group input { border: none; background: transparent; padding: 10px 6px 10px 0; color: #222; font-size: 1.12rem; outline: none; width: 100%;}
+    .input-group input { border: none; background: transparent; padding: 10px 6px 10px 0; color: #222; font-size: 1.12rem; outline: none; width: 100%; }
     .modal-btns { display: flex; gap: 13px; margin-top: 10px; justify-content: flex-end;}
     .modal-btn-cancel { background: #e74c3c; color: #fff; border: none; padding: 10px 18px; border-radius: 7px; cursor: pointer; font-weight: bold; transition: background .17s;}
     .modal-btn-cancel:hover { background: #bb2c1a; }
@@ -230,7 +230,7 @@
       render();
     }
 
-    // === LÓGICA DE PAGO SIN pendienteDeCuota ===
+    // === LÓGICA DE PAGO AJUSTADA CON TOLERANCIA DE CENTAVOS ===
     async function realizarPago(cliente, montoNum) {
       try {
         const user = auth.currentUser;
@@ -272,6 +272,7 @@
 
         let restante = montoNum;
         let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
+        const tolerancia = 0.10; // Tolerancia de centavos
 
         // 1. Multas
         if (restante >= multasAcumuladas) {
@@ -299,6 +300,7 @@
         while (restante > 0 && cuotaIndex < amortizacion.length) {
           let cuota = amortizacion[cuotaIndex];
           let capitalPendiente = parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0);
+
           if (capitalPendiente > 0 && interesActual === 0) {
             let abonoCapital = Math.min(restante, capitalPendiente);
             cuota.montoPagado += abonoCapital;
@@ -307,11 +309,13 @@
             if (saldoActual < 0) saldoActual = 0;
             restante -= abonoCapital;
           }
-          // Estado de la cuota
-          if (
-            ((parseFloat(cuota.montoPagadoInteres) || 0) >= parseFloat(cuota.interes || 0)) &&
-            ((parseFloat(cuota.montoPagado) || 0) >= parseFloat(cuota.capital || 0))
-          ) {
+
+          // === AJUSTE DE TOLERANCIA DE CENTAVOS EN CADA CUOTA ===
+          const faltaInteres = Math.abs((parseFloat(cuota.interes) || 0) - (parseFloat(cuota.montoPagadoInteres) || 0));
+          const faltaCapital = Math.abs((parseFloat(cuota.capital) || 0) - (parseFloat(cuota.montoPagado) || 0));
+          if (faltaInteres <= tolerancia && faltaCapital <= tolerancia) {
+            cuota.montoPagadoInteres = parseFloat(cuota.interes) || 0;
+            cuota.montoPagado = parseFloat(cuota.capital) || 0;
             cuota.estado = "Pagada";
             cuota.fechaPagoReal = fechaPago;
           } else if (
@@ -402,3 +406,4 @@
   </script>
 </body>
 </html>
+

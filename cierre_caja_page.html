@@ -32,10 +32,7 @@
     let saldoInicial = 0;
 
     function toDateString(date) {
-      const yyyy = date.getFullYear();
-      const mm = String(date.getMonth() + 1).padStart(2, '0');
-      const dd = String(date.getDate()).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
+      return date.toISOString().slice(0,10);
     }
     function formatMoney(n) {
       return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -88,12 +85,7 @@
           for (const docMov of snap.docs) {
             const movData = docMov.data();
             if (!movData.fecha) continue;
-            // === CORREGIDO: Fecha local (no substring UTC) ===
-            const d = new Date(movData.fecha);
-            const yyyy = d.getFullYear();
-            const mm = String(d.getMonth() + 1).padStart(2, '0');
-            const dd = String(d.getDate()).padStart(2, '0');
-            movDatesSet.add(`${yyyy}-${mm}-${dd}`);
+            movDatesSet.add(movData.fecha.substring(0,10));
           }
         }
 
@@ -109,11 +101,7 @@
               const movData = docMov.data();
               if (!movData.fecha) continue;
               if (movData.cierre !== true) {
-                const d = new Date(movData.fecha);
-                const yyyy = d.getFullYear();
-                const mm = String(d.getMonth() + 1).padStart(2, '0');
-                const dd = String(d.getDate()).padStart(2, '0');
-                movDatesSet.add(`${yyyy}-${mm}-${dd}`);
+                movDatesSet.add(movData.fecha.substring(0,10));
               }
             }
           }
@@ -158,18 +146,13 @@
 
       saldoInicial = await obtenerSaldoInicial(agenciaActual);
 
-      // Parsear fecha en local
-      const [y, m, d] = fecha.split('-').map(Number);
-      const start = new Date(y, m - 1, d, 0, 0, 0, 0);
-      const end   = new Date(y, m - 1, d, 23, 59, 59, 999);
-
       // 1. Movimientos manuales
       for (const coll of ["movimientosCaja", "movimientos_caja"]) {
         const q = query(
           collection(db, coll),
           where("agencia", "==", agenciaActual),
-          where("fecha", ">=", start),
-          where("fecha", "<=", end)
+          where("fecha", ">=", `${fecha}T00:00:00`),
+          where("fecha", "<=", `${fecha}T23:59:59`)
         );
         const snap = await getDocs(q);
         for (const docMov of snap.docs) {
@@ -185,9 +168,10 @@
       const pagosSnap = await getDocs(
         query(
           collection(db, "pagos"),
+          // CAMBIA "sucursal" por "agencia" si así está en tu base
           where("sucursal", "==", agenciaActual),
-          where("fechaPago", ">=", start),
-          where("fechaPago", "<=", end)
+          where("fechaPago", ">=", `${fecha}T00:00:00`),
+          where("fechaPago", "<=", `${fecha}T23:59:59`)
         )
       );
       for (const docPago of pagosSnap.docs) {
@@ -223,7 +207,7 @@
               <td>${m.descripcion || ""}</td>
               <td>${formatMoney(m.monto || 0)}</td>
               <td>${m.usuario || ""}</td>
-              <td>${(new Date(m.fecha)).toLocaleString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true, day: '2-digit', month: '2-digit', year: 'numeric'})}</td>
+              <td>${(m.fecha || "").replace('T', ' ').replace('.000Z','').slice(0,16)}</td>
             </tr>`
           ).join('');
       }

@@ -164,14 +164,14 @@
         }
       }
 
-      // 2. PAGOS de clientes (NO anulados)
+      // 2. PAGOS de clientes (NO anulados, NO cierre:true)
       const pagosSnap = await getDocs(
         query(
           collection(db, "pagos"),
-          // CAMBIA "sucursal" por "agencia" si así está en tu base
           where("sucursal", "==", agenciaActual),
           where("fechaPago", ">=", `${fecha}T00:00:00`),
-          where("fechaPago", "<=", `${fecha}T23:59:59`)
+          where("fechaPago", "<=", `${fecha}T23:59:59`),
+          where("cierre", "in", [false, null]) // <--- AQUI el filtro para que sólo traiga pagos no cerrados
         )
       );
       for (const docPago of pagosSnap.docs) {
@@ -274,15 +274,19 @@
         gerente_nombre: gerenteNombre
       });
 
-      // Actualiza movimientos manuales (NO pagos)
+      // Actualiza movimientos manuales y pagos (¡Ahora ambos!)
       for (const m of movimientosDelDia) {
         if (m.origen === "movimiento") {
           try {
             const docRefMov = doc(db, m.coll, m.id);
             await updateDoc(docRefMov, { cierre: true });
           } catch (e) {}
+        } else if (m.origen === "pago") {
+          try {
+            const docRefPago = doc(db, "pagos", m.id);
+            await updateDoc(docRefPago, { cierre: true });
+          } catch (e) {}
         }
-        // Los pagos NO se actualizan porque no tienen campo cierre
       }
 
       alert("¡Cierre realizado y registrado exitosamente!");

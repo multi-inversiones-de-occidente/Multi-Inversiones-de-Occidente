@@ -310,10 +310,11 @@
             restante -= abonoCapital;
           }
 
-          // === AJUSTE DE TOLERANCIA DE CENTAVOS EN CADA CUOTA ===
-          const faltaInteres = Math.abs((parseFloat(cuota.interes) || 0) - (parseFloat(cuota.montoPagadoInteres) || 0));
-          const faltaCapital = Math.abs((parseFloat(cuota.capital) || 0) - (parseFloat(cuota.montoPagado) || 0));
-          if (faltaInteres <= tolerancia && faltaCapital <= tolerancia) {
+          // === AJUSTE DE ESTADO CORREGIDO ===
+          if (
+            (parseFloat(cuota.montoPagadoInteres) || 0) + tolerancia >= (parseFloat(cuota.interes) || 0) &&
+            (parseFloat(cuota.montoPagado) || 0) + tolerancia >= (parseFloat(cuota.capital) || 0)
+          ) {
             cuota.montoPagadoInteres = parseFloat(cuota.interes) || 0;
             cuota.montoPagado = parseFloat(cuota.capital) || 0;
             cuota.estado = "Pagada";
@@ -406,4 +407,5 @@
   </script>
 </body>
 </html>
+
 

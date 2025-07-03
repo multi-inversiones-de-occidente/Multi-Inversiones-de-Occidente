@@ -65,7 +65,9 @@
     }
 
     // Estado
-    let selectedDate = new Date();
+    // ========= CAMBIO: SIEMPRE inicia en el día actual a las 00:00:00 =========
+    let now = new Date();
+    let selectedDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
     let agenciaActual = "";
 
     function renderFecha() {
@@ -139,7 +141,6 @@
       const pagoSnap = await getDocs(
         query(
           collection(db, "pagos"),
-          // ==== CAMBIA 'sucursal' por 'agencia' aquí si tu campo es agencia en vez de sucursal ====
           where("sucursal", "==", agenciaActual),
           where("fechaPago", ">=", startIso),
           where("fechaPago", "<=", endIso)
@@ -258,3 +259,4 @@
   </script>
 </body>
 </html>
+

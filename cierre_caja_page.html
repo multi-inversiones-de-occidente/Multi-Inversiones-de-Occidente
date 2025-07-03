@@ -37,11 +37,14 @@
     function formatMoney(n) {
       return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     }
-    // Rango UTC puro
-    function getDiaUTCRange(fechaLocal) {
+    // Rango UTC local de El Salvador (sin desfase)
+    function getDiaSVRange(fechaLocal) {
+      // El Salvador UTC-6
+      const dateStart = new Date(`${fechaLocal}T00:00:00-06:00`);
+      const dateEnd = new Date(`${fechaLocal}T23:59:59.999-06:00`);
       return [
-        fechaLocal + "T00:00:00.000Z",
-        fechaLocal + "T23:59:59.999Z"
+        dateStart.toISOString(),
+        dateEnd.toISOString()
       ];
     }
 
@@ -141,7 +144,7 @@
       });
     }
 
-    // Incluye PAGOS como ingresos (ahora, siempre trata pago sin cierre como cierre:false)
+    // Incluye PAGOS como ingresos (siempre muestra pagos sin campo cierre o cierre:false)
     async function cargarMovimientosYTotales(fecha) {
       document.getElementById("tabla-movs").innerHTML = `<tr><td colspan="6" style="text-align:center">Cargando movimientos...</td></tr>`;
       movimientosDelDia = [];
@@ -150,8 +153,8 @@
 
       saldoInicial = await obtenerSaldoInicial(agenciaActual);
 
-      // ==== RANGO UTC CORRECTO ====
-      const [fechaInicioUTC, fechaFinUTC] = getDiaUTCRange(fecha);
+      // ==== RANGO UTC CORRECTO El Salvador ====
+      const [fechaInicioUTC, fechaFinUTC] = getDiaSVRange(fecha);
 
       // 1. Movimientos manuales
       for (const coll of ["movimientosCaja", "movimientos_caja"]) {

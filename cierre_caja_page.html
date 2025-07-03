@@ -38,6 +38,19 @@
       return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     }
 
+    // NUEVO: Convierte una fecha local (YYYY-MM-DD) al rango UTC de El Salvador
+    function getUTCFilterRange(fechaLocal) {
+      const tzOffset = 6; // UTC-6 para El Salvador
+      const start = new Date(`${fechaLocal}T00:00:00`);
+      const end = new Date(`${fechaLocal}T23:59:59`);
+      start.setHours(start.getHours() + tzOffset);
+      end.setHours(end.getHours() + tzOffset);
+      return [
+        start.toISOString().slice(0, 19) + "Z",
+        end.toISOString().slice(0, 19) + "Z"
+      ];
+    }
+
     // NUEVO: Obtener el saldo inicial del último cierre de caja
     async function obtenerSaldoInicial(agencia) {
       const cierresRef = collection(db, "cierres_caja");
@@ -146,13 +159,16 @@
 
       saldoInicial = await obtenerSaldoInicial(agenciaActual);
 
+      // ==== RANGO UTC CORRECTO ====
+      const [fechaInicioUTC, fechaFinUTC] = getUTCFilterRange(fecha);
+
       // 1. Movimientos manuales
       for (const coll of ["movimientosCaja", "movimientos_caja"]) {
         const q = query(
           collection(db, coll),
           where("agencia", "==", agenciaActual),
-          where("fecha", ">=", `${fecha}T00:00:00`),
-          where("fecha", "<=", `${fecha}T23:59:59`)
+          where("fecha", ">=", fechaInicioUTC),
+          where("fecha", "<=", fechaFinUTC)
         );
         const snap = await getDocs(q);
         for (const docMov of snap.docs) {
@@ -169,9 +185,9 @@
         query(
           collection(db, "pagos"),
           where("sucursal", "==", agenciaActual),
-          where("fechaPago", ">=", `${fecha}T00:00:00`),
-          where("fechaPago", "<=", `${fecha}T23:59:59`),
-          where("cierre", "in", [false, null]) // <--- AQUI el filtro para que sólo traiga pagos no cerrados
+          where("fechaPago", ">=", fechaInicioUTC),
+          where("fechaPago", "<=", fechaFinUTC),
+          where("cierre", "in", [false, null])
         )
       );
       for (const docPago of pagosSnap.docs) {
@@ -378,4 +394,5 @@
   </div>
 </body>
 </html>
+
 

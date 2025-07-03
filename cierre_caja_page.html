@@ -37,21 +37,15 @@
     function formatMoney(n) {
       return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     }
-
-    // NUEVO: Convierte una fecha local (YYYY-MM-DD) al rango UTC de El Salvador
-    function getUTCFilterRange(fechaLocal) {
-      const tzOffset = 6; // UTC-6 para El Salvador
-      const start = new Date(`${fechaLocal}T00:00:00`);
-      const end = new Date(`${fechaLocal}T23:59:59`);
-      start.setHours(start.getHours() + tzOffset);
-      end.setHours(end.getHours() + tzOffset);
+    // NUEVO: Rango UTC puro (sin sumar/restar)
+    function getDiaUTCRange(fechaLocal) {
       return [
-        start.toISOString().slice(0, 19) + "Z",
-        end.toISOString().slice(0, 19) + "Z"
+        fechaLocal + "T00:00:00.000Z",
+        fechaLocal + "T23:59:59.999Z"
       ];
     }
 
-    // NUEVO: Obtener el saldo inicial del último cierre de caja
+    // Obtener el saldo inicial del último cierre de caja
     async function obtenerSaldoInicial(agencia) {
       const cierresRef = collection(db, "cierres_caja");
       const q = query(
@@ -101,7 +95,6 @@
             movDatesSet.add(movData.fecha.substring(0,10));
           }
         }
-
         // Si NO hay campo cierre en muchos, buscamos todos los movimientos y los que no tengan campo "cierre"
         if (movDatesSet.size === 0) {
           for (const coll of ["movimientosCaja", "movimientos_caja"]) {
@@ -119,7 +112,6 @@
             }
           }
         }
-
         // Filtrar las que ya están cerradas
         const cierresQ = query(collection(db, "cierres_caja"), where("agencia", "==", agenciaActual));
         const cierresSnap = await getDocs(cierresQ);
@@ -160,7 +152,7 @@
       saldoInicial = await obtenerSaldoInicial(agenciaActual);
 
       // ==== RANGO UTC CORRECTO ====
-      const [fechaInicioUTC, fechaFinUTC] = getUTCFilterRange(fecha);
+      const [fechaInicioUTC, fechaFinUTC] = getDiaUTCRange(fecha);
 
       // 1. Movimientos manuales
       for (const coll of ["movimientosCaja", "movimientos_caja"]) {
@@ -179,7 +171,6 @@
           if (movData.tipo === "Egreso") totalEgresos += Number(movData.monto || 0);
         }
       }
-
       // 2. PAGOS de clientes (NO anulados, NO cierre:true)
       const pagosSnap = await getDocs(
         query(
@@ -207,7 +198,6 @@
           totalIngresos += Number(data.montoPagado) || 0;
         }
       }
-
       // Ordena por fecha
       movimientosDelDia.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
 
@@ -394,5 +384,6 @@
   </div>
 </body>
 </html>
+
 
 

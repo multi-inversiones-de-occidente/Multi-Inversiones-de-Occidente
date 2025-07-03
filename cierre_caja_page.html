@@ -37,7 +37,7 @@
     function formatMoney(n) {
       return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     }
-    // NUEVO: Rango UTC puro (sin sumar/restar)
+    // Rango UTC puro
     function getDiaUTCRange(fechaLocal) {
       return [
         fechaLocal + "T00:00:00.000Z",
@@ -45,7 +45,6 @@
       ];
     }
 
-    // Obtener el saldo inicial del último cierre de caja
     async function obtenerSaldoInicial(agencia) {
       const cierresRef = collection(db, "cierres_caja");
       const q = query(
@@ -142,7 +141,7 @@
       });
     }
 
-    // Incluye PAGOS como ingresos
+    // Incluye PAGOS como ingresos (ahora, siempre trata pago sin cierre como cierre:false)
     async function cargarMovimientosYTotales(fecha) {
       document.getElementById("tabla-movs").innerHTML = `<tr><td colspan="6" style="text-align:center">Cargando movimientos...</td></tr>`;
       movimientosDelDia = [];
@@ -177,25 +176,28 @@
           collection(db, "pagos"),
           where("sucursal", "==", agenciaActual),
           where("fechaPago", ">=", fechaInicioUTC),
-          where("fechaPago", "<=", fechaFinUTC),
-          where("cierre", "in", [false, null])
+          where("fechaPago", "<=", fechaFinUTC)
         )
       );
       for (const docPago of pagosSnap.docs) {
         const data = docPago.data();
         if (!("anulado" in data) || !data.anulado) {
-          movimientosDelDia.push({
-            id: docPago.id,
-            coll: "pagos",
-            tipo: "Ingreso",
-            descripcion: "Pago de cliente",
-            monto: Number(data.montoPagado) || 0,
-            usuario: data.cajeroNombre || "",
-            fecha: data.fechaPago,
-            cierre: false,
-            origen: "pago"
-          });
-          totalIngresos += Number(data.montoPagado) || 0;
+          // Considera cierre:false si no existe el campo
+          const cierrePago = data.hasOwnProperty("cierre") ? data.cierre : false;
+          if (cierrePago === false || cierrePago === null) {
+            movimientosDelDia.push({
+              id: docPago.id,
+              coll: "pagos",
+              tipo: "Ingreso",
+              descripcion: "Pago de cliente",
+              monto: Number(data.montoPagado) || 0,
+              usuario: data.cajeroNombre || "",
+              fecha: data.fechaPago,
+              cierre: cierrePago,
+              origen: "pago"
+            });
+            totalIngresos += Number(data.montoPagado) || 0;
+          }
         }
       }
       // Ordena por fecha
@@ -384,6 +386,7 @@
   </div>
 </body>
 </html>
+
 
 
 

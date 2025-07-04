@@ -73,7 +73,7 @@
 
     let pagoDoc = null, pagoData = null, userId = null;
 
-    // --- PIN GERENTE MODAL ---
+    // --- PIN GERENTE MODAL (MODIFICADO PARA VALIDAR TODOS LOS GERENTES) ---
     function showGerentePinDialog() {
       return new Promise((resolve) => {
         let modalRoot = document.getElementById("modal-root");
@@ -88,7 +88,7 @@
           // Hash SHA256 (simple, solo en frontend para demo)
           const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pinValue));
           const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-          // Buscar gerente
+          // Buscar TODOS los gerentes
           const q = query(collection(db, "users"), where("rol", "==", "gerente"));
           const snap = await getDocs(q);
           if (snap.empty) {
@@ -96,9 +96,14 @@
             render();
             return;
           }
-          const gerente = snap.docs[0].data();
-          const gerenteHash = gerente.internalPassword;
-          if (gerenteHash === hashHex) {
+          // Comparar el hash con TODOS los gerentes
+          let autorizado = false;
+          snap.forEach(docSnap => {
+            if ((docSnap.data().internalPassword || "") === hashHex) {
+              autorizado = true;
+            }
+          });
+          if (autorizado) {
             closeModal();
             resolve(true);
           } else {
@@ -304,8 +309,6 @@
       }
 
       // --- Recalcular paraPonerseAlDia correctamente: SOLO interés + capitalAtrasado (sin multas) ---
-      // NOTA: El capital atrasado es el de la cuota vencida, y si justo es el día de vencimiento, es el capital de la cuota actual.
-      // Si tienes lógica avanzada para calcular el capitalAtrasado correcto, reemplázalo aquí.
       let paraPonerseAlDia = interesActual + capitalAtrasado;
 
       // 4. Actualiza el crédito
@@ -354,5 +357,6 @@
   </script>
 </body>
 </html>
+
 
 

@@ -13,18 +13,29 @@
     .filtros { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 1.9em; align-items: flex-end;}
     .filtros label { display:block; font-size:1.08rem; font-weight:500; margin-bottom:2px;}
     .filtros input[type="date"] { background: #202324; color: #fff; border: 1.5px solid #515151; border-radius: 7px; font-size: 1.08rem; padding: 8px 12px;}
-    .btn-filtrar { background: #F8AF40; color: #181818; border: none; border-radius: 8px; font-size: 1.07rem; font-weight: 600; padding: 10px 22px; cursor: pointer; }
-    .btn-filtrar:active, .btn-filtrar:hover { background: #d98b1a;}
+    .btn-filtrar, .btn-imprimir, .btn-excel { background: #F8AF40; color: #181818; border: none; border-radius: 8px; font-size: 1.07rem; font-weight: 600; padding: 10px 22px; cursor: pointer; margin-right: 8px;}
+    .btn-filtrar:active, .btn-filtrar:hover,
+    .btn-imprimir:active, .btn-imprimir:hover,
+    .btn-excel:active, .btn-excel:hover { background: #d98b1a;}
     table { width:100%; border-collapse:collapse; margin-bottom:24px; margin-top: 1.4rem;}
     th, td { border-bottom: 1px solid #313336; padding: 9px 6px; text-align: left; font-size: 1.04rem;}
     th { color: #F8AF40; background: #18191b;}
     tr:last-child td { border-bottom: none;}
     .sumas { font-weight: bold; color: #F8AF40; border-top: 2px solid #F8AF40;}
     .nada {text-align:center; color:#bbb; padding:18px 0 24px 0;}
+    .botonera { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 15px; }
     @media (max-width: 740px){
       .container {padding:1.1rem .7rem;}
       .filtros { flex-direction:column; gap:11px;}
       th, td { font-size:.97rem;}
+      .botonera {flex-direction: column; gap:7px;}
+    }
+    @media print {
+      body, html { background: #fff !important; color: #000 !important;}
+      .container { box-shadow: none !important; background: #fff !important; color: #000;}
+      .filtros, .botonera, header { display: none !important;}
+      table { background: #fff !important; color: #000 !important;}
+      th { color: #000 !important; background: #f8f8f8 !important;}
     }
   </style>
 </head>
@@ -43,14 +54,19 @@
       </div>
       <button class="btn-filtrar" id="btn-filtrar"><i class="fas fa-filter"></i> Filtrar</button>
     </div>
+    <div class="botonera">
+      <button class="btn-imprimir" id="btn-imprimir"><i class="fas fa-print"></i> Imprimir Reporte</button>
+      <button class="btn-excel" id="btn-excel"><i class="fas fa-file-excel"></i> Generar Excel</button>
+    </div>
     <div id="tabla-resultados"></div>
   </div>
 
-  <!-- Firebase + lógica -->
+  <!-- Firebase + lógica + ExcelJS CDN -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+    import ExcelJS from "https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
@@ -64,6 +80,21 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
+    let pagosFiltrados = [];
+
+    // Fechas por defecto (21 de junio 2025 hasta hoy)
+    function fechaActualISO() {
+      const hoy = new Date();
+      const yyyy = hoy.getFullYear();
+      const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+      const dd = String(hoy.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    window.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("desde").value = "2025-06-21";
+      document.getElementById("hasta").value = fechaActualISO();
+    });
+
     // Bloquea acceso a usuarios no autenticados
     onAuthStateChanged(auth, user => {
       if (!user) {
@@ -72,6 +103,11 @@
     });
 
     document.getElementById("btn-filtrar").onclick = cargarPagos;
+    document.getElementById("btn-imprimir").onclick = () => {
+      if (!pagosFiltrados.length) return alert("No hay datos para imprimir.");
+      window.print();
+    };
+    document.getElementById("btn-excel").onclick = generarExcel;
 
     async function cargarPagos() {
       const desde = document.getElementById("desde").value;
@@ -81,6 +117,7 @@
 
       if (!desde || !hasta) {
         tablaDiv.innerHTML = `<div class="nada">Seleccione el rango de fechas.</div>`;
+        pagosFiltrados = [];
         return;
       }
 
@@ -98,6 +135,7 @@
 
       if (pagosSnap.empty) {
         tablaDiv.innerHTML = `<div class="nada">No se encontraron pagos en ese rango.</div>`;
+        pagosFiltrados = [];
         return;
       }
 
@@ -106,6 +144,7 @@
 
       for (const docPago of pagosSnap.docs) {
         const p = docPago.data();
+        if (p.anulado) continue; // OMITIR PAGOS ANULADOS
 
         // Busca datos del crédito si no los tienes en caché
         if (!creditosCache[p.creditoID]) {
@@ -132,6 +171,9 @@
         });
       }
 
+      // Guarda pagos filtrados para exportar/imprimir
+      pagosFiltrados = pagos;
+
       // Sumas
       let totalPagado = pagos.reduce((a, b) => a + b.montoPagado, 0);
       let totalCapital = pagos.reduce((a, b) => a + b.pagoCapital, 0);
@@ -139,7 +181,7 @@
 
       // Render tabla
       let html = `
-        <table>
+        <table id="tabla-pagos">
           <thead>
             <tr>
               <th>Fecha de Pago</th>
@@ -176,7 +218,53 @@
 
       tablaDiv.innerHTML = html;
     }
+
+    // --- Descargar Excel ---
+    async function generarExcel() {
+      if (!pagosFiltrados.length) return alert("No hay datos para exportar.");
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Recuperación");
+
+      sheet.addRow([
+        "Fecha de Pago", "Cliente", "Monto Pagado", "Capital", "Abono de Interés", "Ejecutivo"
+      ]);
+
+      pagosFiltrados.forEach(p => {
+        sheet.addRow([
+          p.fechaPago,
+          p.cliente,
+          p.montoPagado,
+          p.pagoCapital,
+          p.pagoInteres,
+          p.ejecutivo
+        ]);
+      });
+
+      // Totales
+      const totalPagado = pagosFiltrados.reduce((a,b)=>a+b.montoPagado,0);
+      const totalCapital = pagosFiltrados.reduce((a,b)=>a+b.pagoCapital,0);
+      const totalInteres = pagosFiltrados.reduce((a,b)=>a+b.pagoInteres,0);
+
+      sheet.addRow([]);
+      sheet.addRow([
+        "Totales", "",
+        totalPagado, totalCapital, totalInteres, ""
+      ]);
+
+      // Descargar
+      const buf = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buf], {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "reporte_recuperacion.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   </script>
 </body>
 </html>
+
 

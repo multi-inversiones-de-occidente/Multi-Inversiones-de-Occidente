@@ -73,42 +73,67 @@
 
     let pagoDoc = null, pagoData = null, userId = null;
 
-    // --- PIN GERENTE MODAL (igual que en revertir créditos: busca TODOS los gerentes y compara el hash) ---
+    // --- PIN GERENTE MODAL (con logs) ---
     function showGerentePinDialog() {
       return new Promise((resolve) => {
         let modalRoot = document.getElementById("modal-root");
         let errorMsg = "";
         async function onOk() {
-          const pinValue = document.getElementById("gerente-pin-input").value.trim();
-          if (!pinValue) {
-            errorMsg = "Debes ingresar el PIN del gerente.";
-            render();
-            return;
-          }
-          // Hash SHA256 (simple, solo en frontend para demo)
-          const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pinValue));
-          const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-          // Buscar TODOS los gerentes
-          const q = query(collection(db, "users"), where("rol", "==", "gerente"));
-          const snap = await getDocs(q);
-          if (snap.empty) {
-            errorMsg = "No hay gerente configurado.";
-            render();
-            return;
-          }
-          // Validar contra TODOS los hashes de gerentes (igual que revertir créditos)
-          let valido = false;
-          snap.forEach(gerente => {
-            if ((gerente.data().internalPassword || "") === hashHex) {
-              valido = true;
+          try {
+            const pinValue = document.getElementById("gerente-pin-input").value.trim();
+            console.log("[PIN Dialog] PIN ingresado:", pinValue);
+            if (!pinValue) {
+              errorMsg = "Debes ingresar el PIN del gerente.";
+              render();
+              return;
             }
-          });
-          if (valido) {
-            closeModal();
-            resolve(true);
-          } else {
-            errorMsg = "PIN incorrecto";
-            render();
+            // Hash SHA256 (simple, solo en frontend para demo)
+            const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pinValue));
+            const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+            console.log("[PIN Dialog] Hash generado:", hashHex);
+
+            // Buscar TODOS los gerentes
+            let snap;
+            try {
+              const q = query(collection(db, "users"), where("rol", "==", "gerente"));
+              snap = await getDocs(q);
+              console.log("[PIN Dialog] Usuarios gerente encontrados:", snap.size);
+            } catch (e) {
+              console.error("[PIN Dialog] Error buscando gerentes en Firestore:", e);
+              alert("Error buscando gerentes: " + (e.message || e));
+              resolve(false);
+              return;
+            }
+            if (snap.empty) {
+              errorMsg = "No hay gerente configurado.";
+              console.error("[PIN Dialog] No hay gerente configurado en la base.");
+              render();
+              return;
+            }
+            // Validar contra TODOS los hashes de gerentes (igual que revertir créditos)
+            let valido = false;
+            let hashes = [];
+            snap.forEach(gerente => {
+              hashes.push(gerente.data().internalPassword || "NULL");
+              if ((gerente.data().internalPassword || "") === hashHex) {
+                valido = true;
+              }
+            });
+            console.log("[PIN Dialog] Hashes de gerentes:", hashes);
+
+            if (valido) {
+              console.log("[PIN Dialog] PIN validado correctamente.");
+              closeModal();
+              resolve(true);
+            } else {
+              errorMsg = "PIN incorrecto";
+              console.warn("[PIN Dialog] PIN incorrecto.");
+              render();
+            }
+          } catch (err) {
+            console.error("[PIN Dialog] Error inesperado:", err);
+            alert("Error inesperado en la validación del PIN: " + (err.message || err));
+            resolve(false);
           }
         }
         function closeModal() { modalRoot.innerHTML = ""; resolve(false);}
@@ -126,7 +151,10 @@
               </div>
             </div>
           `;
-          document.getElementById("cancelar-pin").onclick = closeModal;
+          document.getElementById("cancelar-pin").onclick = () => { 
+            console.log("[PIN Dialog] Cancelado por usuario.");
+            closeModal();
+          };
           document.getElementById("autorizar-pin").onclick = onOk;
           document.getElementById("gerente-pin-input").onkeydown = e => { if (e.key === "Enter") onOk(); };
           setTimeout(() => document.getElementById("gerente-pin-input").focus(), 30);
@@ -157,34 +185,39 @@
 
     // --- Buscar Pago ---
     async function buscarPago() {
-      document.getElementById("pago-card").innerHTML = "";
-      const correlativo = document.getElementById("correlativo").value.trim();
-      if (!correlativo) return;
+      try {
+        document.getElementById("pago-card").innerHTML = "";
+        const correlativo = document.getElementById("correlativo").value.trim();
+        if (!correlativo) return;
 
-      document.getElementById("buscar-btn").disabled = true;
-      document.getElementById("buscar-btn").innerHTML = '<span class="spinner"></span> Buscando...';
-      pagoDoc = pagoData = null;
+        document.getElementById("buscar-btn").disabled = true;
+        document.getElementById("buscar-btn").innerHTML = '<span class="spinner"></span> Buscando...';
+        pagoDoc = pagoData = null;
 
-      const pagosQ = query(collection(db, "pagos"), where("correlativo", "==", correlativo));
-      const pagosSnap = await getDocs(pagosQ);
-      document.getElementById("buscar-btn").disabled = false;
-      document.getElementById("buscar-btn").innerHTML = '<i class="fas fa-search"></i> Buscar Pago';
+        const pagosQ = query(collection(db, "pagos"), where("correlativo", "==", correlativo));
+        const pagosSnap = await getDocs(pagosQ);
+        document.getElementById("buscar-btn").disabled = false;
+        document.getElementById("buscar-btn").innerHTML = '<i class="fas fa-search"></i> Buscar Pago';
 
-      if (pagosSnap.empty) {
-        document.getElementById("pago-card").innerHTML = `<div style="color:#d30013;font-weight:bold;text-align:center;padding:22px;">No se encontró ningún pago con ese correlativo</div>`;
-        return;
+        if (pagosSnap.empty) {
+          document.getElementById("pago-card").innerHTML = `<div style="color:#d30013;font-weight:bold;text-align:center;padding:22px;">No se encontró ningún pago con ese correlativo</div>`;
+          console.warn("[buscarPago] No se encontró el pago con correlativo:", correlativo);
+          return;
+        }
+        pagoDoc = pagosSnap.docs[0];
+        pagoData = pagoDoc.data();
+
+        renderPagoInfo();
+      } catch (e) {
+        console.error("[buscarPago] Error buscando pago:", e);
+        alert("Error buscando pago: " + (e.message || e));
       }
-      pagoDoc = pagosSnap.docs[0];
-      pagoData = pagoDoc.data();
-
-      renderPagoInfo();
     }
 
-    // --- Render Card Pago (COMPLETO: Detalle, cajero, paraPonerseAlDiaAntes) ---
+    // --- Render Card Pago ---
     function renderPagoInfo() {
       const card = document.getElementById("pago-card");
       if (!pagoData) return;
-
       card.innerHTML = `
         <div class="card-pago">
           <div><b>Ticket:</b> ${pagoData.correlativo}</div>
@@ -221,7 +254,6 @@
       const hoy = new Date(fechaHoy);
       for (const cuota of amortizacion) {
         if ((cuota.estado === "Pendiente" || cuota.estado === "Parcial") && cuota.fecha) {
-          // Si la fecha de la cuota es menor o igual a hoy
           const fechaCuota = new Date(cuota.fecha);
           if (fechaCuota <= hoy) {
             capitalAtrasado += parseFloat(cuota.capital || 0);
@@ -233,144 +265,185 @@
 
     // --- Lógica robusta de reversión de pago, restaurando paraPonerseAlDia correctamente ---
     async function revertirPago() {
-      if (!pagoData || pagoData.anulado) return;
-      const motivo = document.getElementById("motivo").value.trim();
-      if (!motivo) {
-        document.getElementById("motivo").style.borderColor = "#d30013";
-        document.getElementById("motivo").focus();
-        return;
-      }
-      const btn = document.getElementById("revertir-btn");
-      btn.disabled = true;
-      btn.innerHTML = `<span class="spinner"></span> Revirtiendo...`;
+      try {
+        if (!pagoData || pagoData.anulado) {
+          console.warn("[revertirPago] Pago nulo o ya anulado");
+          return;
+        }
+        const motivo = document.getElementById("motivo").value.trim();
+        if (!motivo) {
+          document.getElementById("motivo").style.borderColor = "#d30013";
+          document.getElementById("motivo").focus();
+          alert("Debes ingresar un motivo de reversión.");
+          return;
+        }
+        const btn = document.getElementById("revertir-btn");
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner"></span> Revirtiendo...`;
 
-      // 1. Validación gerente
-      const autorizado = await showGerentePinDialog();
-      if (!autorizado) {
-        btn.disabled = false;
-        btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
-        return;
-      }
+        // 1. Validación gerente
+        const autorizado = await showGerentePinDialog();
+        console.log("[revertirPago] Resultado PIN autorizado:", autorizado);
+        if (!autorizado) {
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
+          return;
+        }
 
-      // 2. Validaciones extra (pagos posteriores)
-      const posterioresQ = query(
-        collection(db, "pagos"),
-        where("creditoID", "==", pagoData.creditoID),
-        where("fechaPago", ">", pagoData.fechaPago)
-      );
-      const posterioresSnap = await getDocs(posterioresQ);
-      if (!posterioresSnap.empty) {
-        btn.disabled = false;
-        btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
-        alert("No puedes revertir pagos con abonos posteriores.");
-        return;
-      }
+        // 2. Validaciones extra (pagos posteriores)
+        let posterioresSnap;
+        try {
+          const posterioresQ = query(
+            collection(db, "pagos"),
+            where("creditoID", "==", pagoData.creditoID),
+            where("fechaPago", ">", pagoData.fechaPago)
+          );
+          posterioresSnap = await getDocs(posterioresQ);
+        } catch (e) {
+          console.error("[revertirPago] Error buscando pagos posteriores:", e);
+          alert("Error buscando pagos posteriores: " + (e.message || e));
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
+          return;
+        }
+        if (!posterioresSnap.empty) {
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
+          alert("No puedes revertir pagos con abonos posteriores.");
+          return;
+        }
 
-      // 3. Restaurar el crédito
-      const creditoRef = doc(db, "creditos", pagoData.creditoID);
-      const creditoSnap = await getDoc(creditoRef);
-      if (!creditoSnap.exists()) {
-        alert("No se encontró el crédito.");
-        btn.disabled = false;
-        btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
-        return;
-      }
-      const credito = creditoSnap.data();
+        // 3. Restaurar el crédito
+        const creditoRef = doc(db, "creditos", pagoData.creditoID);
+        let creditoSnap, credito;
+        try {
+          creditoSnap = await getDoc(creditoRef);
+          if (!creditoSnap.exists()) throw new Error("No se encontró el crédito.");
+          credito = creditoSnap.data();
+        } catch (e) {
+          console.error("[revertirPago] Error buscando crédito:", e);
+          alert("No se encontró el crédito: " + (e.message || e));
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
+          return;
+        }
 
-      let saldoActual = parseFloat(credito.saldoActual || "0");
-      let interesActual = parseFloat(credito.interesActual || "0");
-      let multasAcumuladas = parseFloat(credito.multasAcumuladas || "0");
-      let historialMultas = Array.isArray(credito.historialMultas) ? [...credito.historialMultas] : [];
-      // --- REVISIÓN ---
-      // El capital atrasado NO se restaura directamente, sino se recalcula al final
-      // let capitalAtrasado = parseFloat(credito.capitalAtrasado || "0");
-      // --- USAR paraPonerseAlDiaAntes SOLO como respaldo, pero recalcular tras la reversión ---
-      saldoActual += parseFloat(pagoData.pagoCapital || "0");
-      interesActual += parseFloat(pagoData.pagoInteres || "0");
-      multasAcumuladas += parseFloat(pagoData.pagoMultas || "0");
+        let saldoActual = parseFloat(credito.saldoActual || "0");
+        let interesActual = parseFloat(credito.interesActual || "0");
+        let multasAcumuladas = parseFloat(credito.multasAcumuladas || "0");
+        let historialMultas = Array.isArray(credito.historialMultas) ? [...credito.historialMultas] : [];
 
-      // Tabla de amortización: restaurar cuotas
-      let nuevaAmortizacion = Array.isArray(credito.amortizacion) ? [...credito.amortizacion] : [];
-      if (Array.isArray(nuevaAmortizacion) && nuevaAmortizacion.length > 0 && pagoData.pagoCapital) {
-        let montoRestante = parseFloat(pagoData.pagoCapital || "0");
-        for (let i = nuevaAmortizacion.length - 1; i >= 0 && montoRestante > 0; i--) {
-          let cuota = nuevaAmortizacion[i];
-          let pagado = parseFloat(cuota.montoPagado || "0");
-          if (pagado > 0) {
-            if (pagado <= montoRestante) {
-              montoRestante -= pagado;
-              cuota.montoPagado = 0;
-              cuota.montoPagadoInteres = 0;
-              cuota.estado = "Pendiente";
-              cuota.fechaPagoReal = null;
-            } else {
-              cuota.montoPagado = pagado - montoRestante;
-              cuota.estado = "Parcial";
-              cuota.fechaPagoReal = null;
-              montoRestante = 0;
+        saldoActual += parseFloat(pagoData.pagoCapital || "0");
+        interesActual += parseFloat(pagoData.pagoInteres || "0");
+        multasAcumuladas += parseFloat(pagoData.pagoMultas || "0");
+
+        let nuevaAmortizacion = Array.isArray(credito.amortizacion) ? [...credito.amortizacion] : [];
+        if (Array.isArray(nuevaAmortizacion) && nuevaAmortizacion.length > 0 && pagoData.pagoCapital) {
+          let montoRestante = parseFloat(pagoData.pagoCapital || "0");
+          for (let i = nuevaAmortizacion.length - 1; i >= 0 && montoRestante > 0; i--) {
+            let cuota = nuevaAmortizacion[i];
+            let pagado = parseFloat(cuota.montoPagado || "0");
+            if (pagado > 0) {
+              if (pagado <= montoRestante) {
+                montoRestante -= pagado;
+                cuota.montoPagado = 0;
+                cuota.montoPagadoInteres = 0;
+                cuota.estado = "Pendiente";
+                cuota.fechaPagoReal = null;
+              } else {
+                cuota.montoPagado = pagado - montoRestante;
+                cuota.estado = "Parcial";
+                cuota.fechaPagoReal = null;
+                montoRestante = 0;
+              }
             }
           }
         }
-      }
 
-      // --- Corregir multa indebida si aplica ---
-      if (pagoData.pagoMultas && parseFloat(pagoData.pagoMultas) > 0 && pagoData.numeroCuota) {
-        // Buscar multa por cuota atrasada de ese número de cuota y quitarla si la fecha de pago es igual a la fecha de vencimiento de la cuota
-        const cuotaPagada = nuevaAmortizacion.find(c => String(c.numeroCuota) === String(pagoData.numeroCuota));
-        if (cuotaPagada && cuotaPagada.fecha === pagoData.fechaPago?.substring(0, 10)) {
-          historialMultas = historialMultas.filter(m =>
-            !(m.tipo === "por cuota atrasada" && String(m.cuotaNumero) === String(pagoData.numeroCuota))
-          );
-          multasAcumuladas -= parseFloat(pagoData.pagoMultas || "0");
+        // --- Corregir multa indebida si aplica ---
+        if (pagoData.pagoMultas && parseFloat(pagoData.pagoMultas) > 0 && pagoData.numeroCuota) {
+          const cuotaPagada = nuevaAmortizacion.find(c => String(c.numeroCuota) === String(pagoData.numeroCuota));
+          if (cuotaPagada && cuotaPagada.fecha === pagoData.fechaPago?.substring(0, 10)) {
+            historialMultas = historialMultas.filter(m =>
+              !(m.tipo === "por cuota atrasada" && String(m.cuotaNumero) === String(pagoData.numeroCuota))
+            );
+            multasAcumuladas -= parseFloat(pagoData.pagoMultas || "0");
+          }
         }
+
+        // --- NUEVA LÓGICA: Calcular capital atrasado correctamente ---
+        let fechaHoy = (new Date()).toISOString().substring(0, 10); // yyyy-mm-dd
+        let capitalAtrasado = calcularCapitalAtrasado(nuevaAmortizacion, fechaHoy);
+
+        let paraPonerseAlDia = interesActual + capitalAtrasado;
+
+        // 4. Actualiza el crédito
+        try {
+          await updateDoc(creditoRef, {
+            saldoActual: saldoActual.toFixed(2),
+            interesActual: interesActual.toFixed(2),
+            multasAcumuladas: multasAcumuladas.toFixed(2),
+            paraPonerseAlDia: paraPonerseAlDia.toFixed(2),
+            estadoCredito: "Activo",
+            amortizacion: nuevaAmortizacion,
+            historialMultas,
+            capitalAtrasado: capitalAtrasado.toFixed(2),
+            cuotasAtrasadas: 0
+          });
+        } catch (e) {
+          console.error("[revertirPago] Error actualizando crédito:", e);
+          alert("Error actualizando crédito: " + (e.message || e));
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
+          return;
+        }
+
+        // 5. Marca pago como anulado y log
+        try {
+          await updateDoc(doc(db, "pagos", pagoDoc.id), {
+            anulado: true,
+            fechaReversion: new Date().toISOString(),
+            usuarioReversion: userId,
+            motivoReversion: motivo,
+          });
+        } catch (e) {
+          console.error("[revertirPago] Error actualizando pago:", e);
+          alert("Error marcando pago como anulado: " + (e.message || e));
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
+          return;
+        }
+
+        // 6. Registra egreso en caja
+        try {
+          await addDoc(collection(db, "movimientos_caja"), {
+            tipoMovimiento: 'Egreso',
+            monto: -parseFloat(pagoData.montoPagado || "0"),
+            fecha: new Date().toISOString(),
+            referencia: 'Reversión de pago ' + pagoDoc.id,
+            usuarioID: userId,
+          });
+        } catch (e) {
+          console.error("[revertirPago] Error registrando egreso en caja:", e);
+          alert("Error registrando egreso en caja: " + (e.message || e));
+          // No hacemos return porque esto no debe detener la reversión
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
+        showSuccessDialog("El pago fue reversado correctamente.");
+        console.log("[revertirPago] Ciclo de reversión finalizado correctamente.");
+      } catch (err) {
+        console.error("[revertirPago] Error inesperado en reversión:", err);
+        alert("Error inesperado en reversión: " + (err.message || err));
       }
-
-      // --- NUEVA LÓGICA: Calcular capital atrasado correctamente con la fecha de hoy (o de reversión) ---
-      let fechaHoy = (new Date()).toISOString().substring(0, 10); // yyyy-mm-dd
-      let capitalAtrasado = calcularCapitalAtrasado(nuevaAmortizacion, fechaHoy);
-
-      // --- Recalcular paraPonerseAlDia correctamente: SOLO interés + capitalAtrasado (sin multas) ---
-      let paraPonerseAlDia = interesActual + capitalAtrasado;
-
-      // 4. Actualiza el crédito
-      await updateDoc(creditoRef, {
-        saldoActual: saldoActual.toFixed(2),
-        interesActual: interesActual.toFixed(2),
-        multasAcumuladas: multasAcumuladas.toFixed(2),
-        paraPonerseAlDia: paraPonerseAlDia.toFixed(2),
-        estadoCredito: "Activo",
-        amortizacion: nuevaAmortizacion,
-        historialMultas,
-        capitalAtrasado: capitalAtrasado.toFixed(2),
-        cuotasAtrasadas: 0
-      });
-
-      // 5. Marca pago como anulado y log
-      await updateDoc(doc(db, "pagos", pagoDoc.id), {
-        anulado: true,
-        fechaReversion: new Date().toISOString(),
-        usuarioReversion: userId,
-        motivoReversion: motivo,
-      });
-
-      // 6. Registra egreso en caja
-      await addDoc(collection(db, "movimientos_caja"), {
-        tipoMovimiento: 'Egreso',
-        monto: -parseFloat(pagoData.montoPagado || "0"),
-        fecha: new Date().toISOString(),
-        referencia: 'Reversión de pago ' + pagoDoc.id,
-        usuarioID: userId,
-      });
-
-      btn.disabled = false;
-      btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
-      showSuccessDialog("El pago fue reversado correctamente.");
     }
 
     // --- Firebase Auth para saber userID ---
     onAuthStateChanged(auth, user => {
       if (!user) return location.href = "login.html";
       userId = user.uid;
+      console.log("[auth] Usuario logueado:", user.uid, user.email);
     });
 
     document.getElementById("buscar-btn").onclick = buscarPago;
@@ -378,6 +451,7 @@
   </script>
 </body>
 </html>
+
 
 
 

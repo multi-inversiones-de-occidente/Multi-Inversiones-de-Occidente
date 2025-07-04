@@ -8,7 +8,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, updateDoc, doc, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
-    import { sha256 } from "https://cdn.jsdelivr.net/npm/js-sha256@0.9.0/+esm";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
@@ -38,6 +37,14 @@
     const loading = () => document.getElementById('loading');
     const alertInfo = (msg) => { alert(msg); };
     const limpiarDetalle = () => { boxDetalle().style.display = 'none'; motivoInput().value = ""; btnRevertir().disabled = true; };
+
+    // --- NUEVA FUNCIÓN DE HASH (WebCrypto API) ---
+    async function sha256(str) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(str);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
 
     // Cargar info gerente
     async function cargarDatosGerente(uid) {
@@ -108,19 +115,30 @@
       btnRevertir().disabled = false;
     };
 
-    // Pedir y validar PIN interno
+    // --- FUNCIÓN MEJORADA: Pedir PIN y validar contra TODOS los gerentes de la agencia ---
     async function pedirPin() {
-      let pin = prompt("Ingresa el PIN interno para autorizar la reversión:");
+      let pin = prompt("Por seguridad, ingresa tu PIN de gerente:");
       if (!pin) return false;
-      const hash = sha256(pin);
-      // Busca hash del gerente
-      const snap = await getDocs(query(collection(db, "users"), where("rol", "==", "gerente"), where("department", "==", agencia), where("__name__", "==", gerenteUid)));
+      const pinHash = await sha256(pin);
+
+      // Buscar todos los gerentes de la agencia
+      const snap = await getDocs(query(
+        collection(db, "users"),
+        where("rol", "==", "gerente"),
+        where("department", "==", agencia)
+      ));
       if (snap.empty) {
-        alertInfo("No se encontró gerente o PIN.");
+        alertInfo("No se encontraron gerentes para esta agencia.");
         return false;
       }
-      const gerenteHash = snap.docs[0].data().internalPassword || "";
-      if (gerenteHash === hash) {
+      // Comparar el hash con TODOS los gerentes
+      let match = false;
+      snap.forEach(docSnap => {
+        if ((docSnap.data().internalPassword || "") === pinHash) {
+          match = true;
+        }
+      });
+      if (match) {
         return true;
       } else {
         alertInfo("PIN incorrecto.");
@@ -254,3 +272,4 @@
   </div>
 </body>
 </html>
+

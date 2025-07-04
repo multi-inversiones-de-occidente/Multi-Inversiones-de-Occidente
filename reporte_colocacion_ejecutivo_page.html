@@ -86,6 +86,7 @@
       if (!creditosData.length) {
         contenedor.innerHTML = `<div style="text-align:center;color:#fff7">No hay créditos en el rango seleccionado.</div>`;
         document.getElementById("btn-imprimir")?.classList.add("oculto");
+        document.getElementById("btn-pdf")?.classList.add("oculto");
         return;
       }
       let totalGeneral = 0;
@@ -141,6 +142,7 @@
       `;
       contenedor.innerHTML = html;
       document.getElementById("btn-imprimir")?.classList.remove("oculto");
+      document.getElementById("btn-pdf")?.classList.remove("oculto");
     }
 
     function imprimirTabla() {
@@ -167,6 +169,66 @@
       `);
       ventana.document.close();
       ventana.print();
+    }
+
+    // ----- NUEVA FUNCIÓN PDF -----
+    async function descargarPDF() {
+      if (!creditosData.length) return;
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF('l', 'pt', 'a4'); // 'l' = landscape
+      const fecha = new Date();
+      const titulo = "Reporte de Colocación de Créditos";
+      const empresa = "MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.";
+      const usuario = document.getElementById("usuario-nombre").textContent;
+
+      doc.setFontSize(15);
+      doc.text(empresa, 40, 40);
+      doc.setFontSize(11);
+      doc.text(titulo, 40, 60);
+      doc.text(`Usuario: ${usuario}`, 40, 78);
+      doc.text(`Fecha de generación: ${fecha.toLocaleString('es-SV')}`, 40, 94);
+
+      // Encabezados
+      const head = [[
+        "Fecha", "Agencia", "Cliente", "DUI", "Monto", "Línea", "Frecuencia", "Cuotas", "Cuota", "Tasa %", "Estado"
+      ]];
+
+      // Filas
+      const body = creditosData.map(doc => [
+        formatFecha(doc._fechaObj),
+        doc.agenciaAsignada ?? '-',
+        (doc.nombre ?? '') + ' ' + (doc.apellido ?? ''),
+        doc.numeroDui ?? '-',
+        `$${Number(doc.montoAprobado || 0).toFixed(2)}`,
+        doc.lineaDeCredito ?? '-',
+        doc.frecuenciaPago ?? '-',
+        doc.numeroCuotas ?? '-',
+        `$${Number(doc.cuotaAprobada || 0).toFixed(2)}`,
+        doc.tasaAnualCredito ?? '-',
+        doc.estadoCredito ?? '-'
+      ]);
+
+      // Total al final
+      let totalGeneral = creditosData.reduce((sum, d) => sum + Number(d.montoAprobado || 0), 0);
+
+      // Tabla con autoTable
+      doc.autoTable({
+        head: head,
+        body: body,
+        startY: 110,
+        theme: 'striped',
+        headStyles: { fillColor: [13, 197, 185], textColor: [255,255,255], fontStyle: 'bold' },
+        foot: [[
+          "", "", "", "TOTAL",
+          `$${totalGeneral.toFixed(2)}`,
+          "", "", "", "", "", ""
+        ]],
+        footStyles: { fillColor: [27, 147, 106], textColor: [255,255,255], fontStyle: 'bold' },
+        styles: { fontSize: 9, cellPadding: 3 }
+      });
+
+      doc.save(`reporte_creditos_${fecha.toLocaleDateString('es-SV').replace(/\//g, '-')}.pdf`);
     }
 
     function onFechaDesdeChange(e) {
@@ -211,8 +273,12 @@
       document.getElementById('fecha-desde').addEventListener('change', onFechaDesdeChange);
       document.getElementById('fecha-hasta').addEventListener('change', onFechaHastaChange);
       document.getElementById('btn-imprimir').addEventListener('click', imprimirTabla);
+      document.getElementById('btn-pdf').addEventListener('click', descargarPDF);
     });
   </script>
+  <!-- Librerías para PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body {
@@ -317,8 +383,8 @@
       font-size: 1.07rem;
       text-align: right;
     }
-    #btn-imprimir {
-      margin: 0 auto;
+    #btn-imprimir, #btn-pdf {
+      margin: 0 auto 0.4rem auto;
       background: #19b3ae;
       color: #fff;
       border: none;
@@ -329,10 +395,9 @@
       cursor: pointer;
       box-shadow: 0 2px 6px #00e6c042;
       transition: background .18s;
-      margin-top: 7px;
       display: block;
     }
-    #btn-imprimir:hover { background: #11a09a; }
+    #btn-imprimir:hover, #btn-pdf:hover { background: #11a09a; }
     .loader {
       border: 4px solid #232324;
       border-top: 4px solid #13b66b;
@@ -371,10 +436,12 @@
       </div>
     </div>
     <div id="resultados"></div>
-    <button id="btn-imprimir" class="oculto"><i class="fas fa-print"></i> Imprimir Reporte</button>
+    <button id="btn-imprimir" class="oculto"><i class="fas fa-print"></i> Imprimir</button>
+    <button id="btn-pdf" class="oculto"><i class="fas fa-file-pdf"></i> Descargar PDF</button>
   </div>
 </body>
 </html>
+
 
 
 

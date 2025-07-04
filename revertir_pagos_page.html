@@ -73,7 +73,7 @@
 
     let pagoDoc = null, pagoData = null, userId = null;
 
-    // --- PIN GERENTE MODAL (MODIFICADO PARA VALIDAR TODOS LOS GERENTES) ---
+    // --- PIN GERENTE MODAL (igual que en revertir créditos: busca TODOS los gerentes y compara el hash) ---
     function showGerentePinDialog() {
       return new Promise((resolve) => {
         let modalRoot = document.getElementById("modal-root");
@@ -96,14 +96,14 @@
             render();
             return;
           }
-          // Comparar el hash con TODOS los gerentes
-          let autorizado = false;
-          snap.forEach(docSnap => {
-            if ((docSnap.data().internalPassword || "") === hashHex) {
-              autorizado = true;
+          // Validar contra TODOS los hashes de gerentes (igual que revertir créditos)
+          let valido = false;
+          snap.forEach(gerente => {
+            if ((gerente.data().internalPassword || "") === hashHex) {
+              valido = true;
             }
           });
-          if (autorizado) {
+          if (valido) {
             closeModal();
             resolve(true);
           } else {
@@ -215,6 +215,22 @@
       document.getElementById("revertir-btn").onclick = revertirPago;
     }
 
+    // --- Función para calcular el capital atrasado correctamente (usando array de amortización y fecha actual) ---
+    function calcularCapitalAtrasado(amortizacion, fechaHoy) {
+      let capitalAtrasado = 0;
+      const hoy = new Date(fechaHoy);
+      for (const cuota of amortizacion) {
+        if ((cuota.estado === "Pendiente" || cuota.estado === "Parcial") && cuota.fecha) {
+          // Si la fecha de la cuota es menor o igual a hoy
+          const fechaCuota = new Date(cuota.fecha);
+          if (fechaCuota <= hoy) {
+            capitalAtrasado += parseFloat(cuota.capital || 0);
+          }
+        }
+      }
+      return capitalAtrasado;
+    }
+
     // --- Lógica robusta de reversión de pago, restaurando paraPonerseAlDia correctamente ---
     async function revertirPago() {
       if (!pagoData || pagoData.anulado) return;
@@ -265,9 +281,10 @@
       let interesActual = parseFloat(credito.interesActual || "0");
       let multasAcumuladas = parseFloat(credito.multasAcumuladas || "0");
       let historialMultas = Array.isArray(credito.historialMultas) ? [...credito.historialMultas] : [];
-      let capitalAtrasado = parseFloat(credito.capitalAtrasado || "0");
+      // --- REVISIÓN ---
+      // El capital atrasado NO se restaura directamente, sino se recalcula al final
+      // let capitalAtrasado = parseFloat(credito.capitalAtrasado || "0");
       // --- USAR paraPonerseAlDiaAntes SOLO como respaldo, pero recalcular tras la reversión ---
-      // saldoActual, interesActual, multasAcumuladas: se suman los valores pagados para deshacer el pago
       saldoActual += parseFloat(pagoData.pagoCapital || "0");
       interesActual += parseFloat(pagoData.pagoInteres || "0");
       multasAcumuladas += parseFloat(pagoData.pagoMultas || "0");
@@ -307,6 +324,10 @@
           multasAcumuladas -= parseFloat(pagoData.pagoMultas || "0");
         }
       }
+
+      // --- NUEVA LÓGICA: Calcular capital atrasado correctamente con la fecha de hoy (o de reversión) ---
+      let fechaHoy = (new Date()).toISOString().substring(0, 10); // yyyy-mm-dd
+      let capitalAtrasado = calcularCapitalAtrasado(nuevaAmortizacion, fechaHoy);
 
       // --- Recalcular paraPonerseAlDia correctamente: SOLO interés + capitalAtrasado (sin multas) ---
       let paraPonerseAlDia = interesActual + capitalAtrasado;

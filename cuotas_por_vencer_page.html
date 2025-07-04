@@ -211,7 +211,8 @@
         let d = doc.data();
         if (!Array.isArray(d.amortizacion)) return;
         (d.amortizacion).forEach(cuota => {
-          if (cuota.estado === "Pendiente" && cuota.fecha) {
+          // Mostrar todas menos las pagadas:
+          if (["Pendiente", "Parcial", "Atrasado"].includes(cuota.estado) && cuota.fecha) {
             let fcuota = new Date(cuota.fecha);
             let fcuotaUTC = new Date(Date.UTC(fcuota.getUTCFullYear(), fcuota.getUTCMonth(), fcuota.getUTCDate()));
             let dias = diasEntreUTC(fcuotaUTC, hoyUTC);
@@ -230,7 +231,8 @@
                 interes: cuota.interes,
                 total: cuota.cuota,
                 saldo: d.saldoActual,
-                telefono: d.telefono
+                telefono: d.telefono,
+                clase: clase
               });
             }
           }
@@ -261,5 +263,3 @@
   </script>
 </body>
 </html>
-
-

@@ -201,7 +201,7 @@
       document.getElementById("revertir-btn").onclick = revertirPago;
     }
 
-    // --- Lógica robusta de reversión de pago, restaurando paraPonerseAlDiaAntes ---
+    // --- Lógica robusta de reversión de pago, restaurando paraPonerseAlDiaAntes y corrigiendo multa indebida ---
     async function revertirPago() {
       if (!pagoData || pagoData.anulado) return;
       const motivo = document.getElementById("motivo").value.trim();
@@ -286,14 +286,54 @@
         }
       }
 
+      // --- CORREGIR MULTA INDEBIDA: si hay multa de "por cuota atrasada" y el pago fue el mismo día de vencimiento, eliminarla ---
+      let nuevoHistorialMultas = Array.isArray(credito.historialMultas) ? [...credito.historialMultas] : [];
+      let multaEliminada = 0;
+      // Busca la cuota del pago por número (si existe el campo) o por fecha.
+      let numCuota = pagoData.numeroCuota !== undefined ? pagoData.numeroCuota : null;
+      let fechaPago = pagoData.fechaPago ? new Date(pagoData.fechaPago) : null;
+
+      if (fechaPago && nuevaAmortizacion.length > 0) {
+        let cuotaEncontrada = null;
+        // Busca por número de cuota si está
+        if (numCuota !== null) {
+          cuotaEncontrada = nuevaAmortizacion.find(q => q.numeroCuota == numCuota);
+        }
+        // Si no, busca la cuota cuya fecha sea igual al pago
+        if (!cuotaEncontrada) {
+          cuotaEncontrada = nuevaAmortizacion.find(q => {
+            let fechaCuota = new Date(q.fecha);
+            return fechaCuota.toISOString().slice(0,10) === fechaPago.toISOString().slice(0,10);
+          });
+        }
+        if (cuotaEncontrada) {
+          // Busca multas tipo "por cuota atrasada" para esa cuota y mismo día
+          nuevoHistorialMultas = nuevoHistorialMultas.filter(m => {
+            let esMismaCuota = m.cuotaNumero == cuotaEncontrada.numeroCuota;
+            let esMismoTipo = m.tipo === "por cuota atrasada";
+            let fechaMulta = new Date(m.fecha);
+            let mismoDia = fechaMulta.toISOString().slice(0,10) === fechaPago.toISOString().slice(0,10);
+            // Si coincide todo, suma la multa eliminada
+            if (esMismaCuota && esMismoTipo && mismoDia) {
+              multaEliminada += parseFloat(m.monto || 0);
+              return false; // eliminar
+            }
+            return true; // mantener
+          });
+        }
+      }
+
+      multasAcumuladas = (multasAcumuladas - multaEliminada).toFixed(2);
+
       // 4. Actualiza el crédito
       await updateDoc(creditoRef, {
         saldoActual: saldoActual.toFixed(2),
         interesActual: interesActual.toFixed(2),
-        multasAcumuladas: multasAcumuladas.toFixed(2),
+        multasAcumuladas: multasAcumuladas,
         paraPonerseAlDia: paraPonerseAlDia.toFixed(2),
         estadoCredito: "Activo",
-        amortizacion: nuevaAmortizacion
+        amortizacion: nuevaAmortizacion,
+        historialMultas: nuevoHistorialMultas
       });
 
       // 5. Marca pago como anulado y log
@@ -315,7 +355,7 @@
 
       btn.disabled = false;
       btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
-      showSuccessDialog("El pago fue reversado correctamente.");
+      showSuccessDialog("El pago fue reversado correctamente y se corrigió cualquier multa indebida.");
     }
 
     // --- Firebase Auth para saber userID ---
@@ -329,3 +369,4 @@
   </script>
 </body>
 </html>
+

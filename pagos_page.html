@@ -335,6 +335,16 @@
           cuotaIndex++;
         }
 
+        // === SEGUNDO RECORRIDO: Asignar fechaPagoReal si falta ===
+        for (let cuota of amortizacion) {
+          if (
+            cuota.estado === "Pagada" &&
+            (!cuota.fechaPagoReal || cuota.fechaPagoReal === null)
+          ) {
+            cuota.fechaPagoReal = fechaPago;
+          }
+        }
+
         // 4. Recalcular indicadores globales
         paraPonerseAlDia = 0;
         let capitalAtrasado = 0;
@@ -407,5 +417,6 @@
   </script>
 </body>
 </html>
+
 
 

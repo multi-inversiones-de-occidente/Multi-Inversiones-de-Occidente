@@ -62,11 +62,22 @@
       margin-bottom: 2.5px;
       font-weight: 500;
       gap: 12px;
+      flex-wrap: wrap;            /* Permite que el contenido salte de línea si no cabe */
+      word-break: break-all;      /* Rompe palabras largas o números */
     }
     .detail-row strong {
       color: #333;
       min-width: 108px;
       font-weight: 700;
+      flex-shrink: 0;
+    }
+    .detail-row span {
+      min-width: 65px;            /* Da más espacio a los montos */
+      max-width: 100%;
+      text-align: right;
+      word-break: break-all;
+      display: inline-block;
+      flex-shrink: 1;
     }
     .divider {
       border: none;
@@ -143,6 +154,7 @@
       .container { max-width: 98vw; padding: 1.3rem 2vw; }
       .ticket-title { font-size: 1.1rem;}
     }
+    /* --- ESTILOS PARA IMPRESIÓN (A4, ANCHO Y FUENTE AJUSTADOS) --- */
     @media print {
       body, html {
         background: #fff !important;
@@ -152,15 +164,20 @@
         display: none !important;
       }
       .container {
-        box-shadow: none !important;
-        margin: 0 !important;
-        border-radius: 0 !important;
-        background: #fff !important;
-        width: 95vw !important;
-        max-width: 95vw !important;
+        width: 100%;
+        max-width: 18cm !important;   /* Ocupa casi todo el ancho de A4, margen para estética */
         min-width: 0 !important;
-        padding: 1.5cm 1.3cm 1.2cm 1.3cm !important;
+        margin: 0 auto !important;
+        padding: 1.2cm 1.2cm 1cm 1.2cm !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
         border: none !important;
+        background: #fff !important;
+      }
+      .ticket-details,
+      .detail-row,
+      .detail-row span {
+        font-size: 0.97rem !important; /* Baja el tamaño de fuente para no cortar números */
       }
     }
   </style>
@@ -239,5 +256,6 @@
   </script>
 </body>
 </html>
+
 
 

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Recuperación – Entrega de Intereses</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background: #191d20; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
+    header { background: #000; padding: 1.1rem 0; text-align: center; font-size: 1.7rem; font-weight: 700; color: #F8AF40;}
+    .container { max-width: 980px; margin: 2.2rem auto 0 auto; background: #23272c; border-radius: 16px; box-shadow: 0 2px 22px #0008; padding: 2.2rem 1.6rem 1.7rem 1.6rem;}
+    h2 { color: #F8AF40; margin-bottom: 1.6rem; text-align: center; }
+    .filtros { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 1.9em; align-items: flex-end;}
+    .filtros label { display:block; font-size:1.08rem; font-weight:500; margin-bottom:2px;}
+    .filtros input[type="date"] { background: #202324; color: #fff; border: 1.5px solid #515151; border-radius: 7px; font-size: 1.08rem; padding: 8px 12px;}
+    .btn-filtrar { background: #F8AF40; color: #181818; border: none; border-radius: 8px; font-size: 1.07rem; font-weight: 600; padding: 10px 22px; cursor: pointer; }
+    .btn-filtrar:active, .btn-filtrar:hover { background: #d98b1a;}
+    table { width:100%; border-collapse:collapse; margin-bottom:24px; margin-top: 1.4rem;}
+    th, td { border-bottom: 1px solid #313336; padding: 9px 6px; text-align: left; font-size: 1.04rem;}
+    th { color: #F8AF40; background: #18191b;}
+    tr:last-child td { border-bottom: none;}
+    .sumas { font-weight: bold; color: #F8AF40; border-top: 2px solid #F8AF40;}
+    .nada {text-align:center; color:#bbb; padding:18px 0 24px 0;}
+    @media (max-width: 740px){
+      .container {padding:1.1rem .7rem;}
+      .filtros { flex-direction:column; gap:11px;}
+      th, td { font-size:.97rem;}
+    }
+  </style>
+</head>
+<body>
+  <header>Recuperación</header>
+  <div class="container">
+    <h2>Entrega de Intereses</h2>
+    <div class="filtros">
+      <div>
+        <label for="desde">Desde:</label>
+        <input type="date" id="desde"/>
+      </div>
+      <div>
+        <label for="hasta">Hasta:</label>
+        <input type="date" id="hasta"/>
+      </div>
+      <button class="btn-filtrar" id="btn-filtrar"><i class="fas fa-filter"></i> Filtrar</button>
+    </div>
+    <div id="tabla-resultados"></div>
+  </div>
+
+  <!-- Firebase + lógica -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    document.getElementById("btn-filtrar").onclick = cargarPagos;
+
+    async function cargarPagos() {
+      const desde = document.getElementById("desde").value;
+      const hasta = document.getElementById("hasta").value;
+      const tablaDiv = document.getElementById("tabla-resultados");
+      tablaDiv.innerHTML = "<div style='text-align:center;padding:25px;'>Cargando...</div>";
+
+      if (!desde || !hasta) {
+        tablaDiv.innerHTML = `<div class="nada">Seleccione el rango de fechas.</div>`;
+        return;
+      }
+
+      // Rango para incluir TODO el último día
+      const desdeISO = new Date(desde + "T00:00:00").toISOString();
+      const hastaISO = new Date(hasta + "T23:59:59").toISOString();
+
+      // Consulta los pagos dentro del rango de fechas
+      const pagosQ = query(
+        collection(db, "pagos"),
+        where("fechaPago", ">=", desdeISO),
+        where("fechaPago", "<=", hastaISO)
+      );
+      const pagosSnap = await getDocs(pagosQ);
+
+      if (pagosSnap.empty) {
+        tablaDiv.innerHTML = `<div class="nada">No se encontraron pagos en ese rango.</div>`;
+        return;
+      }
+
+      let pagos = [];
+      let creditosCache = {};
+
+      for (const docPago of pagosSnap.docs) {
+        const p = docPago.data();
+
+        // Busca datos del crédito si no los tienes en caché
+        if (!creditosCache[p.creditoID]) {
+          const credSnap = await getDoc(doc(db, "creditos", p.creditoID));
+          if (credSnap.exists()) {
+            const c = credSnap.data();
+            creditosCache[p.creditoID] = {
+              nombre: c.nombre || "",
+              apellido: c.apellido || "",
+              ejecutivo: c.asignadoA || ""
+            };
+          } else {
+            creditosCache[p.creditoID] = { nombre: "", apellido: "", ejecutivo: "" };
+          }
+        }
+
+        pagos.push({
+          fechaPago: p.fechaPago ? p.fechaPago.substring(0, 10) : "",
+          cliente: creditosCache[p.creditoID].nombre + " " + creditosCache[p.creditoID].apellido,
+          montoPagado: parseFloat(p.montoPagado || 0),
+          pagoCapital: parseFloat(p.pagoCapital || 0),
+          pagoInteres: parseFloat(p.pagoInteres || 0),
+          ejecutivo: creditosCache[p.creditoID].ejecutivo
+        });
+      }
+
+      // Sumas
+      let totalPagado = pagos.reduce((a, b) => a + b.montoPagado, 0);
+      let totalCapital = pagos.reduce((a, b) => a + b.pagoCapital, 0);
+      let totalInteres = pagos.reduce((a, b) => a + b.pagoInteres, 0);
+
+      // Render tabla
+      let html = `
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha de Pago</th>
+              <th>Cliente</th>
+              <th>Monto Pagado</th>
+              <th>Capital</th>
+              <th>Abono de Interés</th>
+              <th>Ejecutivo</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              pagos.map(p=>`
+                <tr>
+                  <td>${p.fechaPago}</td>
+                  <td>${p.cliente}</td>
+                  <td>$${p.montoPagado.toFixed(2)}</td>
+                  <td>$${p.pagoCapital.toFixed(2)}</td>
+                  <td>$${p.pagoInteres.toFixed(2)}</td>
+                  <td>${p.ejecutivo}</td>
+                </tr>
+              `).join("")
+            }
+            <tr class="sumas">
+              <td colspan="2">Totales</td>
+              <td>$${totalPagado.toFixed(2)}</td>
+              <td>$${totalCapital.toFixed(2)}</td>
+              <td>$${totalInteres.toFixed(2)}</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+
+      tablaDiv.innerHTML = html;
+    }
+  </script>
+</body>
+</html>

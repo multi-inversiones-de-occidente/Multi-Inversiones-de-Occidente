@@ -62,11 +62,11 @@
   </div>
 
   <!-- Firebase + lógica + ExcelJS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
-    import ExcelJS from "https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
@@ -222,7 +222,7 @@
     // --- Descargar Excel ---
     async function generarExcel() {
       if (!pagosFiltrados.length) return alert("No hay datos para exportar.");
-      const workbook = new ExcelJS.Workbook();
+      const workbook = new window.ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("Recuperación");
 
       sheet.addRow([
@@ -266,5 +266,4 @@
   </script>
 </body>
 </html>
-
 

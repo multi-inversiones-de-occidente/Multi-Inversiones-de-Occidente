@@ -175,7 +175,7 @@
       renderPagoInfo();
     }
 
-    // --- Render Card Pago ---
+    // --- Render Card Pago (COMPLETO: Detalle, cajero, paraPonerseAlDiaAntes) ---
     function renderPagoInfo() {
       const card = document.getElementById("pago-card");
       if (!pagoData) return;
@@ -184,16 +184,25 @@
         <div class="card-pago">
           <div><b>Ticket:</b> ${pagoData.correlativo}</div>
           <div><b>Cliente:</b> ${pagoData.nombres}</div>
+          <div><b>Agencia:</b> ${pagoData.sucursal}</div>
+          <div><b>Cajero:</b> ${pagoData.cajeroNombre || ""}</div>
           <div><b>Monto pagado:</b> $${parseFloat(pagoData.montoPagado).toFixed(2)}</div>
           <div><b>Fecha de pago:</b> ${pagoData.fechaPago ? pagoData.fechaPago.replace("T", " ").substring(0,16) : ""}</div>
-          <div><b>Agencia:</b> ${pagoData.sucursal}</div>
           <div style="margin:8px 0 6px 0;">
             <i class="fas ${pagoData.anulado ? 'fa-times-circle anulado' : 'fa-check-circle vigente'}"></i>
             <span class="estado ${pagoData.anulado ? 'anulado' : 'vigente'}">
               ESTADO: ${pagoData.anulado ? 'ANULADO' : 'VIGENTE'}
             </span>
           </div>
-          <label for="motivo">Motivo de reversión (obligatorio):</label>
+          <div style="margin-top:10px;">
+            <b>Detalle del Pago:</b><br>
+            <span style="color:#0c8028;"><b>↳ Capital:</b> $${parseFloat(pagoData.pagoCapital || 0).toFixed(2)}</span><br>
+            <span style="color:#1873ad;"><b>↳ Interés:</b> $${parseFloat(pagoData.pagoInteres || 0).toFixed(2)}</span><br>
+            <span style="color:#b1440e;"><b>↳ Multas:</b> $${parseFloat(pagoData.pagoMultas || 0).toFixed(2)}</span><br>
+            <span><b>↳ Saldo restante:</b> $${parseFloat(pagoData.saldoRestante || 0).toFixed(2)}</span><br>
+            <span><b>↳ Para ponerse al día antes:</b> $${parseFloat(pagoData.paraPonerseAlDiaAntes || 0).toFixed(2)}</span>
+          </div>
+          <label for="motivo" style="margin-top:16px;">Motivo de reversión (obligatorio):</label>
           <textarea id="motivo" class="input-motivo" maxlength="100" ${pagoData.anulado ? "disabled" : ""}></textarea>
           <button class="btn-revertir" id="revertir-btn" ${pagoData.anulado ? "disabled" : ""}><i class="fas fa-undo"></i>Revertir Pago</button>
         </div>
@@ -250,6 +259,7 @@
       let saldoActual = parseFloat(credito.saldoActual || "0");
       let interesActual = parseFloat(credito.interesActual || "0");
       let multasAcumuladas = parseFloat(credito.multasAcumuladas || "0");
+      let historialMultas = Array.isArray(credito.historialMultas) ? [...credito.historialMultas] : [];
       // --- USAR paraPonerseAlDiaAntes SI EXISTE ---
       let paraPonerseAlDia = pagoData.paraPonerseAlDiaAntes !== undefined && pagoData.paraPonerseAlDiaAntes !== null
         ? parseFloat(pagoData.paraPonerseAlDiaAntes)
@@ -264,19 +274,16 @@
       let nuevaAmortizacion = Array.isArray(credito.amortizacion) ? [...credito.amortizacion] : [];
       if (Array.isArray(nuevaAmortizacion) && nuevaAmortizacion.length > 0 && pagoData.pagoCapital) {
         let montoRestante = parseFloat(pagoData.pagoCapital || "0");
-        // Recorre de atrás para adelante para revertir la última cuota pagada (comportamiento estándar)
         for (let i = nuevaAmortizacion.length - 1; i >= 0 && montoRestante > 0; i--) {
           let cuota = nuevaAmortizacion[i];
           let pagado = parseFloat(cuota.montoPagado || "0");
           if (pagado > 0) {
             if (pagado <= montoRestante) {
-              // Quita el pago total de esta cuota
               montoRestante -= pagado;
               cuota.montoPagado = 0;
               cuota.estado = "Pendiente";
               cuota.fechaPagoReal = null;
             } else {
-              // Quita solo una parte
               cuota.montoPagado = pagado - montoRestante;
               cuota.estado = "Parcial";
               cuota.fechaPagoReal = null;
@@ -286,54 +293,30 @@
         }
       }
 
-      // --- CORREGIR MULTA INDEBIDA: si hay multa de "por cuota atrasada" y el pago fue el mismo día de vencimiento, eliminarla ---
-      let nuevoHistorialMultas = Array.isArray(credito.historialMultas) ? [...credito.historialMultas] : [];
-      let multaEliminada = 0;
-      // Busca la cuota del pago por número (si existe el campo) o por fecha.
-      let numCuota = pagoData.numeroCuota !== undefined ? pagoData.numeroCuota : null;
-      let fechaPago = pagoData.fechaPago ? new Date(pagoData.fechaPago) : null;
-
-      if (fechaPago && nuevaAmortizacion.length > 0) {
-        let cuotaEncontrada = null;
-        // Busca por número de cuota si está
-        if (numCuota !== null) {
-          cuotaEncontrada = nuevaAmortizacion.find(q => q.numeroCuota == numCuota);
-        }
-        // Si no, busca la cuota cuya fecha sea igual al pago
-        if (!cuotaEncontrada) {
-          cuotaEncontrada = nuevaAmortizacion.find(q => {
-            let fechaCuota = new Date(q.fecha);
-            return fechaCuota.toISOString().slice(0,10) === fechaPago.toISOString().slice(0,10);
-          });
-        }
-        if (cuotaEncontrada) {
-          // Busca multas tipo "por cuota atrasada" para esa cuota y mismo día
-          nuevoHistorialMultas = nuevoHistorialMultas.filter(m => {
-            let esMismaCuota = m.cuotaNumero == cuotaEncontrada.numeroCuota;
-            let esMismoTipo = m.tipo === "por cuota atrasada";
-            let fechaMulta = new Date(m.fecha);
-            let mismoDia = fechaMulta.toISOString().slice(0,10) === fechaPago.toISOString().slice(0,10);
-            // Si coincide todo, suma la multa eliminada
-            if (esMismaCuota && esMismoTipo && mismoDia) {
-              multaEliminada += parseFloat(m.monto || 0);
-              return false; // eliminar
-            }
-            return true; // mantener
-          });
+      // --- Corregir multa indebida si aplica ---
+      // Si la fecha de pago es igual a la fecha de vencimiento de la cuota y hay una multa aplicada, eliminarla
+      // Nota: Se asume que pagoData.numeroCuota corresponde a la cuota pagada
+      if (pagoData.pagoMultas && parseFloat(pagoData.pagoMultas) > 0 && pagoData.numeroCuota) {
+        // Buscar multa por cuota atrasada de ese número de cuota y quitarla si la fecha de pago es igual a la fecha de vencimiento de la cuota
+        const cuotaPagada = nuevaAmortizacion.find(c => String(c.numeroCuota) === String(pagoData.numeroCuota));
+        if (cuotaPagada && cuotaPagada.fecha === pagoData.fechaPago?.substring(0, 10)) {
+          // Eliminar multa del historialMultas y restar de multasAcumuladas
+          historialMultas = historialMultas.filter(m =>
+            !(m.tipo === "por cuota atrasada" && String(m.cuotaNumero) === String(pagoData.numeroCuota))
+          );
+          multasAcumuladas -= parseFloat(pagoData.pagoMultas || "0");
         }
       }
-
-      multasAcumuladas = (multasAcumuladas - multaEliminada).toFixed(2);
 
       // 4. Actualiza el crédito
       await updateDoc(creditoRef, {
         saldoActual: saldoActual.toFixed(2),
         interesActual: interesActual.toFixed(2),
-        multasAcumuladas: multasAcumuladas,
+        multasAcumuladas: multasAcumuladas.toFixed(2),
         paraPonerseAlDia: paraPonerseAlDia.toFixed(2),
         estadoCredito: "Activo",
         amortizacion: nuevaAmortizacion,
-        historialMultas: nuevoHistorialMultas
+        historialMultas
       });
 
       // 5. Marca pago como anulado y log
@@ -355,7 +338,7 @@
 
       btn.disabled = false;
       btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
-      showSuccessDialog("El pago fue reversado correctamente y se corrigió cualquier multa indebida.");
+      showSuccessDialog("El pago fue reversado correctamente.");
     }
 
     // --- Firebase Auth para saber userID ---
@@ -369,4 +352,5 @@
   </script>
 </body>
 </html>
+
 

@@ -1,261 +1,266 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8"/>
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Ticket de Pago – Multi Inversiones</title>
+  <title>Reimpresión de Tickets – Multi Inversiones</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body {
-      background: #f8f8f8;
-      color: #222;
+      background: #111314;
+      color: #fff;
       font-family: 'Segoe UI', Arial, sans-serif;
       margin: 0;
       min-height: 100vh;
     }
     header {
-      background: #000;
-      padding: 1rem 0;
+      background: #191b21;
+      padding: 1.25rem 0 1.25rem 0;
       text-align: center;
-      font-size: 1.45rem;
+      font-size: 1.7rem;
       letter-spacing: 1px;
-      font-weight: 700;
-      color: #67C8F1;
+      font-weight: 800;
+      color: #ffe37a;
+      margin-bottom: 2.5rem;
     }
-    .container {
-      width: 100%;
-      max-width: 450px;
-      margin: 2.5rem auto 0 auto;
-      background: #fff;
-      border-radius: 14px;
-      box-shadow: 0 2px 18px #0003;
-      padding: 2.3cm 1.3cm 1.2cm 1.3cm;
-      min-height: 360px;
-      border: 1.5px solid #e6e6e6;
+    .center-card {
+      max-width: 400px;
+      margin: 44px auto 0 auto;
+      background: #17191c;
+      border-radius: 18px;
+      box-shadow: 0 6px 32px #0005;
+      padding: 2.2rem 1.5rem 2.4rem 1.5rem;
+      min-height: 260px;
+      text-align: center;
     }
-    .ticket-title {
-      font-size: 1.45rem;
-      color: #13b66b;
+    .titulo-buscar {
+      font-size: 1.18rem;
       font-weight: bold;
-      margin-bottom: 7px;
-      text-align: center;
-      letter-spacing: 1px;
-    }
-    .ticket-header {
-      text-align: center;
-      margin-bottom: 10px;
-    }
-    .ticket-logo {
-      height: 55px;
-      margin-bottom: 9px;
-      margin-top: 3px;
-    }
-    .ticket-details {
-      font-size: 1.04rem;
-      margin-bottom: 14px;
-      padding: 7px 0 0 0;
-    }
-    .detail-row {
+      margin-bottom: 18px;
+      letter-spacing: .5px;
       display: flex;
-      justify-content: space-between;
-      font-size: 1.04rem;
-      margin-bottom: 2.5px;
+      align-items: center;
+      gap: 10px;
+      color: #fff;
+    }
+    .input-main {
+      width: 100%;
+      background: #262a31;
+      color: #fff;
+      border: 1.5px solid #32353b;
+      border-radius: 10px;
+      font-size: 1.07rem;
+      padding: 13px 12px;
+      margin-bottom: 1em;
+      outline: none;
+      box-sizing: border-box;
       font-weight: 500;
-      gap: 12px;
-      flex-wrap: wrap;            /* Permite que el contenido salte de línea si no cabe */
-      word-break: break-all;      /* Rompe palabras largas o números */
+      letter-spacing: 1px;
+      transition: border-color .18s;
     }
-    .detail-row strong {
-      color: #333;
-      min-width: 108px;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
-    .detail-row span {
-      min-width: 65px;            /* Da más espacio a los montos */
-      max-width: 100%;
-      text-align: right;
-      word-break: break-all;
-      display: inline-block;
-      flex-shrink: 1;
-    }
-    .divider {
-      border: none;
-      border-top: 1.4px dashed #d9d9d9;
-      margin: 10px 0 12px 0;
-    }
-    .final-msg {
-      color: #13b66b;
-      font-weight: 700;
-      text-align: center;
-      font-size: 1.11rem;
-      margin-top: 10px;
-    }
-    .volver-btn {
-      display: block;
-      margin: 28px auto 0 auto;
-      padding: 11px 25px;
+    .input-main:focus { border-color: #FFD600; }
+    .btn-main {
+      width: 100%;
       background: #13b66b;
       color: #fff;
-      font-size: 1.08rem;
+      font-size: 1.11rem;
       font-weight: bold;
       border: none;
       border-radius: 9px;
+      padding: 13px 0;
       cursor: pointer;
-      box-shadow: 0 1px 10px #0b854c25;
-      transition: background .18s;
-      letter-spacing: 0.6px;
-      text-decoration: none;
-      text-align: center;
+      margin-top: 0.7em;
+      transition: background .17s;
     }
-    .volver-btn:hover {
-      background: #0b854c;
-      color: #fff;
-      text-decoration: none;
+    .btn-main:active,
+    .btn-main:hover { background: #0b854c; }
+    .ticket-box {
+      margin-top: 35px;
     }
+    .ticket-header {
+      font-size: 1.12rem;
+      color: #13b66b;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .ticket-details {
+      background: #fff;
+      color: #181818;
+      border-radius: 10px;
+      padding: 16px 15px 16px 15px;
+      box-shadow: 0 2px 12px #0003;
+      text-align: left;
+      font-size: 1.03rem;
+      margin-bottom: 22px;
+    }
+    .ticket-details strong { color: #111; min-width: 110px; display: inline-block; }
     .btn-imprimir {
       display: block;
-      margin: 0 auto 18px auto;
-      padding: 11px 25px;
+      margin: 0 auto 0 auto;
+      padding: 12px 28px;
       background: #f8af40;
       color: #232323;
-      font-size: 1.03rem;
+      font-size: 1.04rem;
       font-weight: bold;
       border: none;
-      border-radius: 9px;
+      border-radius: 10px;
       cursor: pointer;
-      box-shadow: 0 1px 9px #f8af4035;
-      transition: background .14s;
-      letter-spacing: .5px;
+      box-shadow: 0 1px 10px #f8af4045;
+      transition: background .17s;
       text-align: center;
+      margin-top: 6px;
     }
     .btn-imprimir:hover {
-      background: #ffa600;
-      color: #222;
+      background: #ffd600;
+      color: #232323;
     }
-    .firma {
-      margin-top: 28px;
-      margin-bottom: 8px;
-      height: 44px;
-      border-bottom: 1.2px solid #bdbdbd;
-      width: 68%;
-      margin-left: 0;
-      margin-right: auto;
-      display: block;
-    }
-    .firma-label {
-      font-size: 0.93rem;
-      color: #787878;
-      margin-top: 2px;
-      margin-left: 2px;
-      margin-bottom: 12px;
+    .error-msg {
+      color: #ff6363;
+      font-weight: bold;
+      margin-top: 18px;
+      font-size: 1.08rem;
     }
     @media (max-width: 540px) {
-      .container { max-width: 98vw; padding: 1.3rem 2vw; }
-      .ticket-title { font-size: 1.1rem;}
-    }
-    /* --- ESTILOS PARA IMPRESIÓN (A4, ANCHO Y FUENTE AJUSTADOS) --- */
-    @media print {
-      body, html {
-        background: #fff !important;
-        margin: 0 !important; padding: 0 !important;
-      }
-      header, .volver-btn, .btn-imprimir {
-        display: none !important;
-      }
-      .container {
-        width: 100%;
-        max-width: 18cm !important;   /* Ocupa casi todo el ancho de A4, margen para estética */
-        min-width: 0 !important;
-        margin: 0 auto !important;
-        padding: 1.2cm 1.2cm 1cm 1.2cm !important;
-        box-shadow: none !important;
-        border-radius: 0 !important;
-        border: none !important;
-        background: #fff !important;
-      }
-      .ticket-details,
-      .detail-row,
-      .detail-row span {
-        font-size: 0.97rem !important; /* Baja el tamaño de fuente para no cortar números */
-      }
+      .center-card { max-width: 97vw; padding: 1.1rem 2vw;}
     }
   </style>
 </head>
 <body>
-  <header>Ticket de Pago</header>
-  <div class="container" id="ticket-print">
-    <button class="btn-imprimir" onclick="window.print()">
-      <i class="fas fa-print"></i> Imprimir Ticket
-    </button>
-    <div class="ticket-header">
-      <img src="assets/logo_mi_bw.png" class="ticket-logo" alt="Multi Inversiones"/>
-      <div style="font-size:1.02rem;color:#13b66b;font-weight:600;">
-        Multi Inversiones de Occidente
+  <header>Reimpresión de Tickets</header>
+  <div class="center-card">
+    <form id="formBuscarTicket" autocomplete="off">
+      <div class="titulo-buscar">
+        <i class="fas fa-search"></i> Buscar Ticket por Correlativo
       </div>
-      <div style="color:#444;font-size:0.93rem;">
-        Llama al 6991-9989 – Credicash, aprobado en 20 minutos
-      </div>
-    </div>
-    <div class="ticket-title">
-      <i class="fas fa-receipt"></i> Comprobante de Pago
-    </div>
-    <div class="ticket-details">
-      <div class="detail-row"><strong>Ticket No.:</strong> <span id="correlativo"></span></div>
-      <div class="detail-row"><strong>Agencia:</strong> <span id="agencia"></span></div>
-      <div class="detail-row"><strong>Fecha y Hora:</strong> <span id="fecha"></span></div>
-      <div class="detail-row"><strong>Cajero:</strong> <span id="cajero"></span></div>
-      <div class="detail-row"><strong>Cliente:</strong> <span id="cliente"></span></div>
-      <div class="detail-row"><strong>DUI:</strong> <span id="dui"></span></div>
-      <div class="detail-row"><strong>Línea de Crédito:</strong> <span id="linea"></span></div>
-      <div class="detail-row"><strong>Monto Pagado:</strong> $<span id="monto"></span></div>
-      <div class="detail-row"><strong>Pago Capital:</strong> $<span id="pagoCapital"></span></div>
-      <div class="detail-row"><strong>Pago Interés:</strong> $<span id="pagoInteres"></span></div>
-      <div class="detail-row"><strong>Pago Multas:</strong> $<span id="pagoMultas"></span></div>
-      <div class="detail-row"><strong>Saldo Restante:</strong> $<span id="saldoRestante"></span></div>
-    </div>
-    <hr class="divider"/>
-    <div class="firma"></div>
-    <div class="firma-label">Firma del cliente</div>
-    <div class="final-msg">
-      ¡Gracias por su pago!
-    </div>
-    <a class="volver-btn" href="pagos_page.html"><i class="fas fa-arrow-left"></i> Volver al Panel de Caja</a>
+      <input type="text" class="input-main" id="input-correlativo" placeholder="Correlativo..." maxlength="15" required />
+      <button class="btn-main" type="submit"><i class="fas fa-search"></i> Buscar Ticket</button>
+    </form>
+    <div id="ticket-container" class="ticket-box"></div>
+    <div id="error-msg" class="error-msg" style="display:none"></div>
   </div>
-  <script>
-    // --- Extrae parámetros de la URL y los muestra en el comprobante ---
-    function getParam(name) {
-      const params = new URLSearchParams(window.location.search);
-      return params.get(name) || '';
-    }
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
-    // Formato legible fecha/hora ISO
-    function formatoFecha(fechaISO) {
-      if (!fechaISO) return '';
-      const fecha = new Date(fechaISO);
-      if (isNaN(fecha.getTime())) return fechaISO;
-      return fecha.toLocaleString('es-SV', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        hour12: true
-      });
-    }
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
 
-    document.getElementById('correlativo').textContent   = getParam('correlativo');
-    document.getElementById('agencia').textContent       = getParam('agencia');
-    document.getElementById('fecha').textContent         = formatoFecha(getParam('fecha'));
-    document.getElementById('cajero').textContent        = getParam('cajero');
-    document.getElementById('cliente').textContent       = getParam('cliente');
-    document.getElementById('dui').textContent           = getParam('dui');
-    document.getElementById('linea').textContent         = getParam('linea');
-    document.getElementById('monto').textContent         = parseFloat(getParam('monto') || '0').toFixed(2);
-    document.getElementById('pagoCapital').textContent   = parseFloat(getParam('pagoCapital') || '0').toFixed(2);
-    document.getElementById('pagoInteres').textContent   = parseFloat(getParam('pagoInteres') || '0').toFixed(2);
-    document.getElementById('pagoMultas').textContent    = parseFloat(getParam('pagoMultas') || '0').toFixed(2);
-    document.getElementById('saldoRestante').textContent = parseFloat(getParam('saldoRestante') || '0').toFixed(2);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    let usuarioListo = false;
+    let usuario = null;
+
+    onAuthStateChanged(auth, user => {
+      if (!user) {
+        window.location.href = "login.html";
+      } else {
+        usuarioListo = true;
+        usuario = user;
+      }
+    });
+
+    document.getElementById('formBuscarTicket').onsubmit = async function(e) {
+      e.preventDefault();
+      if (!usuarioListo) {
+        document.getElementById("error-msg").textContent = "Espera a que se inicie sesión...";
+        document.getElementById("error-msg").style.display = "block";
+        return;
+      }
+      document.getElementById("error-msg").style.display = "none";
+      document.getElementById("ticket-container").innerHTML = "";
+
+      const correlativoInput = document.getElementById('input-correlativo').value.trim();
+      if (!correlativoInput) return;
+
+      // Buscar como string y como número
+      let correlativoNum = Number(correlativoInput);
+      let correlativosBuscar = [correlativoInput];
+      if (!isNaN(correlativoNum) && correlativoInput !== "") correlativosBuscar.push(correlativoNum);
+
+      let ticket = null;
+      // Busca en pagos
+      const pagosQuery = query(collection(db, "pagos"), where("correlativo", "in", correlativosBuscar));
+      const pagosSnap = await getDocs(pagosQuery);
+      if (!pagosSnap.empty) {
+        ticket = { ...pagosSnap.docs[0].data(), tipo: "pago" };
+      }
+
+      // Si no en pagos, busca en movimientosCaja
+      if (!ticket) {
+        const movCajaQuery = query(collection(db, "movimientosCaja"), where("correlativo", "in", correlativosBuscar));
+        const movCajaSnap = await getDocs(movCajaQuery);
+        if (!movCajaSnap.empty) {
+          ticket = { ...movCajaSnap.docs[0].data(), tipo: "movimientoCaja" };
+        }
+      }
+
+      // Si no en movimientos_caja (con guión bajo)
+      if (!ticket) {
+        const movCaja2Query = query(collection(db, "movimientos_caja"), where("correlativo", "in", correlativosBuscar));
+        const movCaja2Snap = await getDocs(movCaja2Query);
+        if (!movCaja2Snap.empty) {
+          ticket = { ...movCaja2Snap.docs[0].data(), tipo: "movimientoCaja" };
+        }
+      }
+
+      if (!ticket) {
+        document.getElementById("error-msg").textContent = "No se encontró ningún ticket con ese correlativo.";
+        document.getElementById("error-msg").style.display = "block";
+        return;
+      }
+
+      let html = '';
+      if (ticket.tipo === "pago") {
+        html = `
+          <div class="ticket-header"><i class="fas fa-receipt"></i> Comprobante de Pago</div>
+          <div class="ticket-details">
+            <div><strong>Correlativo:</strong> ${ticket.correlativo}</div>
+            <div><strong>Cliente:</strong> ${ticket.nombres || ticket.clienteNombre || '-'}</div>
+            ${ticket.apellido ? `<div><strong>Apellido:</strong> ${ticket.apellido}</div>` : ""}
+            ${ticket.numeroDui ? `<div><strong>DUI:</strong> ${ticket.numeroDui}</div>` : ""}
+            <div><strong>Monto Pagado:</strong> $${Number(ticket.montoPagado).toFixed(2)}</div>
+            <div><strong>Pago Capital:</strong> $${Number(ticket.pagoCapital || 0).toFixed(2)}</div>
+            <div><strong>Pago Interés:</strong> $${Number(ticket.pagoInteres || 0).toFixed(2)}</div>
+            <div><strong>Pago Multas:</strong> $${Number(ticket.pagoMultas || 0).toFixed(2)}</div>
+            <div><strong>Saldo Restante:</strong> $${Number(ticket.saldoRestante || 0).toFixed(2)}</div>
+            <div><strong>Fecha:</strong> ${(ticket.fechaPago || ticket.timestamp || '-').toString().slice(0,19).replace('T',' ')}</div>
+            <div><strong>Agencia:</strong> ${ticket.sucursal || ticket.agencia || '-'}</div>
+          </div>
+          <button class="btn-imprimir" onclick="window.print()"><i class="fas fa-print"></i> Imprimir Ticket</button>
+        `;
+      } else {
+        html = `
+          <div class="ticket-header"><i class="fas fa-receipt"></i> Comprobante de Movimiento de Caja</div>
+          <div class="ticket-details">
+            <div><strong>Correlativo:</strong> ${ticket.correlativo}</div>
+            <div><strong>Tipo:</strong> ${ticket.descripcion || ticket.tipo || '-'}</div>
+            <div><strong>Nombre:</strong> ${ticket.nombre || '-'}</div>
+            <div><strong>Monto:</strong> $${Number(ticket.monto || 0).toFixed(2)}</div>
+            <div><strong>Usuario:</strong> ${ticket.usuario || '-'}</div>
+            <div><strong>Fecha:</strong> ${(ticket.fecha || ticket.timestamp || '-').toString().slice(0,19).replace('T',' ')}</div>
+            <div><strong>Agencia:</strong> ${ticket.agencia || '-'}</div>
+            <div><strong>Observaciones:</strong> ${ticket.observaciones || '-'}</div>
+          </div>
+          <button class="btn-imprimir" onclick="window.print()"><i class="fas fa-print"></i> Imprimir Ticket</button>
+        `;
+      }
+
+      document.getElementById("ticket-container").innerHTML = html;
+    };
   </script>
 </body>
 </html>
+
 
 
 

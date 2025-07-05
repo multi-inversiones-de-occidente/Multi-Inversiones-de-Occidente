@@ -48,18 +48,29 @@
       if (!uid) return;
       document.getElementById('resultado').innerHTML = `<div class="cargando">Calculando...</div>`;
       let capitalAtrasado = 0, carteraTotal = 0, moraPct = 0;
-      // Trae créditos asignados al usuario
+      // Trae créditos asignados al usuario y que NO estén "Revertido"
       const creds = await getDocs(
-        query(collection(db, "creditos"), where("asignadoAUid", "==", uid))
+        query(collection(db, "creditos"), 
+              where("asignadoAUid", "==", uid),
+              where("estadoCredito", "!=", "Revertido"))
       );
       creds.forEach(docu => {
         const d = docu.data();
-        const ca = typeof d.capitalAtrasado === 'number'
-          ? d.capitalAtrasado : parseFloat(d.capitalAtrasado || 0);
+        // Para cartera total: suma todos menos "Revertido" (ya filtrado arriba)
         const sa = typeof d.saldoActual === 'number'
           ? d.saldoActual : parseFloat(d.saldoActual || 0);
-        capitalAtrasado += ca;
         carteraTotal += sa;
+
+        // Para mora: suma el capitalAtrasado solo si tiene alguna cuota "Atrasado"
+        let tieneAtrasado = false;
+        if (Array.isArray(d.amortizacion)) {
+          tieneAtrasado = d.amortizacion.some(q => q.estado === "Atrasado");
+        }
+        if (tieneAtrasado) {
+          const ca = typeof d.capitalAtrasado === 'number'
+            ? d.capitalAtrasado : parseFloat(d.capitalAtrasado || 0);
+          capitalAtrasado += ca;
+        }
       });
       moraPct = carteraTotal > 0 ? (capitalAtrasado / carteraTotal) * 100 : 0;
       document.getElementById('resultado').innerHTML = `
@@ -114,3 +125,4 @@
   </div>
 </body>
 </html>
+

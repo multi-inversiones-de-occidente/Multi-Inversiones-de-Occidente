@@ -45,21 +45,28 @@
       const creditosSnap = await getDocs(query(collection(db, "creditos"), where("agenciaAsignada", "==", department)));
       let capAtrasado = 0;
       let carteraTotal = 0;
+
       creditosSnap.forEach(doc => {
         const d = doc.data();
+        // Excluir créditos revertidos para cartera total
+        const estadoCredito = d.estadoCredito || "";
+        // ¿Suma a cartera total? Solo si NO es "Revertido"
+        if (estadoCredito !== "Revertido") {
+          let sa = typeof d.saldoActual === "number" ? d.saldoActual : parseFloat(d.saldoActual || "0");
+          carteraTotal += sa;
+        }
 
-        // SOLO SUMA SI ALGUNA CUOTA TIENE ESTADO "Atrasado"
+        // SOLO suma el capital atrasado si ALGUNA cuota está "Atrasado"
         let tieneCuotaAtrasada = false;
         if (Array.isArray(d.amortizacion)) {
           tieneCuotaAtrasada = d.amortizacion.some(q => q.estado === "Atrasado");
         }
         if (tieneCuotaAtrasada) {
           let ca = typeof d.capitalAtrasado === "number" ? d.capitalAtrasado : parseFloat(d.capitalAtrasado || "0");
-          let sa = typeof d.saldoActual === "number" ? d.saldoActual : parseFloat(d.saldoActual || "0");
           capAtrasado += ca;
-          carteraTotal += sa;
         }
       });
+
       const moraPct = carteraTotal > 0 ? (capAtrasado / carteraTotal) * 100 : 0;
 
       // 3. Actualiza en pantalla

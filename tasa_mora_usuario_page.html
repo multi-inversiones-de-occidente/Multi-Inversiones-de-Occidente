@@ -39,38 +39,44 @@
       select.innerHTML = '<option value="">Selecciona un usuario</option>';
       snap.forEach(docu => {
         const d = docu.data();
-        usersList.push({ uid: docu.id, nombre: `${d.nombre ?? ""} ${d.apellido ?? ""}`.trim() });
-        select.innerHTML += `<option value="${docu.id}">${d.nombre ?? ""} ${d.apellido ?? ""}</option>`;
+        // Usar el nombre completo como value
+        const nombreCompleto = `${d.nombre ?? ""} ${d.apellido ?? ""}`.trim();
+        usersList.push({ nombre: nombreCompleto });
+        select.innerHTML += `<option value="${nombreCompleto}">${nombreCompleto}</option>`;
       });
     }
 
-    async function calcularMoraPorUsuario(uid) {
-      if (!uid) return;
+    async function calcularMoraPorUsuario(nombreSeleccionado) {
+      if (!nombreSeleccionado) {
+        document.getElementById('resultado').innerHTML = '';
+        return;
+      }
       document.getElementById('resultado').innerHTML = `<div class="cargando">Calculando...</div>`;
       let capitalAtrasado = 0, carteraTotal = 0, moraPct = 0;
-      // Trae créditos asignados al usuario y que NO estén "Revertido"
+      // Trae créditos asignados al usuario por nombre
       const creds = await getDocs(
-        query(collection(db, "creditos"), 
-              where("asignadoAUid", "==", uid),
-              where("estadoCredito", "!=", "Revertido"))
+        query(
+          collection(db, "creditos"),
+          where("asignadoA", "==", nombreSeleccionado),
+          where("estadoCredito", "!=", "Revertido")
+        )
       );
       creds.forEach(docu => {
         const d = docu.data();
-        // Para cartera total: suma todos menos "Revertido" (ya filtrado arriba)
-        const sa = typeof d.saldoActual === 'number'
-          ? d.saldoActual : parseFloat(d.saldoActual || 0);
-        carteraTotal += sa;
-
-        // Para mora: suma el capitalAtrasado solo si tiene alguna cuota "Atrasado"
-        let tieneAtrasado = false;
+        // Solo suma el capitalAtrasado si alguna cuota está "Atrasado"
+        let tieneCuotaAtrasada = false;
         if (Array.isArray(d.amortizacion)) {
-          tieneAtrasado = d.amortizacion.some(q => q.estado === "Atrasado");
+          tieneCuotaAtrasada = d.amortizacion.some(q => q.estado === "Atrasado");
         }
-        if (tieneAtrasado) {
+        if (tieneCuotaAtrasada) {
           const ca = typeof d.capitalAtrasado === 'number'
             ? d.capitalAtrasado : parseFloat(d.capitalAtrasado || 0);
           capitalAtrasado += ca;
         }
+        // Cartera total siempre suma saldoActual, excepto Revertido (ya está filtrado)
+        const sa = typeof d.saldoActual === 'number'
+          ? d.saldoActual : parseFloat(d.saldoActual || 0);
+        carteraTotal += sa;
       });
       moraPct = carteraTotal > 0 ? (capitalAtrasado / carteraTotal) * 100 : 0;
       document.getElementById('resultado').innerHTML = `

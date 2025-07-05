@@ -230,7 +230,7 @@
       render();
     }
 
-    // === LÓGICA DE PAGO ROBUSTA: Distribuye monto a cada cuota ===
+    // === LÓGICA DE PAGO ROBUSTA CORREGIDA: Solo intereses exigibles, luego capital, nunca intereses futuros ===
     async function realizarPago(cliente, montoNum) {
       try {
         const user = auth.currentUser;
@@ -251,7 +251,7 @@
         let multasAcumuladas = parseFloat(creditoData.multasAcumuladas || 0);
         let paraPonerseAlDia = parseFloat(creditoData.paraPonerseAlDia || 0);
 
-        // Interés corrido
+        // Interés corrido sólo hasta hoy
         let fechaUltimoCalculo = creditoData.fechaUltimoCalculoIntereses
           ? new Date(creditoData.fechaUltimoCalculoIntereses)
           : new Date(creditoData.fechaInicio);
@@ -284,11 +284,13 @@
           restante = 0;
         }
 
-        // 2. PAGO CUOTA POR CUOTA: Primero interés, luego capital, en orden
+        // 2. PAGO SOLO DE CUOTAS EXIGIBLES A LA FECHA: primero interés exigible, luego capital exigible
         for (let i = 0; i < amortizacion.length && restante > 0; i++) {
           let cuota = amortizacion[i];
+          // La cuota es exigible si su fecha <= hoy (ya venció o es el día)
+          if (new Date(cuota.fecha) > ahora) break; // ya no hay más exigibles
 
-          // 2.1 Pagar interés pendiente de la cuota
+          // 2.1 Pagar interés pendiente de la cuota actual (sólo si es exigible)
           let interesPendiente = parseFloat(cuota.interes || 0) - (parseFloat(cuota.montoPagadoInteres) || 0);
           if (interesPendiente > 0) {
             let abonoInteres = Math.min(restante, interesPendiente);
@@ -299,7 +301,7 @@
             if (restante <= 0) break;
           }
 
-          // 2.2 Pagar capital pendiente de la cuota (solo si interés ya está cubierto)
+          // 2.2 Pagar capital pendiente de la cuota actual (solo si el interés ya está cubierto)
           let capitalPendiente = parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0);
           if (interesPendiente <= tolerancia && capitalPendiente > 0) {
             let abonoCapital = Math.min(restante, capitalPendiente);
@@ -335,6 +337,25 @@
           }
         }
 
+        // 3. SI SOBRA DINERO, se abona SOLO A CAPITAL de las cuotas siguientes, **no a intereses futuros**
+        for (let i = 0; i < amortizacion.length && restante > 0; i++) {
+          let cuota = amortizacion[i];
+          // Sólo cuotas futuras (no exigibles): fecha > ahora, y solo capital
+          if (new Date(cuota.fecha) <= ahora) continue;
+
+          let capitalPendiente = parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0);
+          if (capitalPendiente > 0) {
+            let abonoCapital = Math.min(restante, capitalPendiente);
+            cuota.montoPagado += abonoCapital;
+            pagoCapital += abonoCapital;
+            saldoActual -= abonoCapital;
+            if (saldoActual < 0) saldoActual = 0;
+            restante -= abonoCapital;
+            // NO abona a intereses futuros
+          }
+          if (restante <= 0) break;
+        }
+
         // SEGUNDO RECORRIDO: Asignar fechaPagoReal si falta
         for (let cuota of amortizacion) {
           if (
@@ -345,7 +366,7 @@
           }
         }
 
-        // 3. Recalcular indicadores globales
+        // 4. Recalcular indicadores globales
         paraPonerseAlDia = 0;
         let capitalAtrasado = 0;
         const hoy = new Date();

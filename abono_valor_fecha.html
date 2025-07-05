@@ -399,6 +399,7 @@
         montoPagado: monto,
         pagoInteres: pagoInteres.toFixed(2),
         pagoCapital: pagoCapital.toFixed(2),
+        saldoRestante: saldoActual.toFixed(2),    // <-- AGREGADO AQUI
         fechaPago: new Date(fechaSeleccionada + "T12:00:00").toISOString(),
         nombres: creditoSeleccionado.nombre,
         sucursal: userAgencia,
@@ -442,3 +443,4 @@
   </script>
 </body>
 </html>
+

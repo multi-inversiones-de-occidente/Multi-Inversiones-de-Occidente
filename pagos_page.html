@@ -345,7 +345,7 @@
           }
         }
 
-        // 4. Recalcular indicadores globales
+        // 4. Recalcular indicadores globales (CORREGIDO: ya no sumamos interesActual aquí)
         paraPonerseAlDia = 0;
         let capitalAtrasado = 0;
         const hoy = new Date();
@@ -357,7 +357,7 @@
             let faltaInteres = Math.max(0, parseFloat(cuota.interes || 0) - (parseFloat(cuota.montoPagadoInteres) || 0));
             paraPonerseAlDia += faltaCapital + faltaInteres;
             capitalAtrasado += faltaCapital;
-            interesActual += faltaInteres;
+            // CORREGIDO: NO volver a sumar faltaInteres a interesActual aquí
           }
         }
         saldoActual = amortizacion
@@ -370,8 +370,8 @@
           clienteID: creditoData.clienteID,
           creditoID: cliente.id,
           nombres: creditoData.nombre,
-          apellido: creditoData.apellido || "",           // <-- NUEVO CAMPO: Apellido
-          numeroDui: creditoData.numeroDui || "",         // <-- NUEVO CAMPO: número de DUI
+          apellido: creditoData.apellido || "",
+          numeroDui: creditoData.numeroDui || "",
           montoPagado: montoNum,
           fechaPago: fechaPago,
           pagoMultas: (parseFloat(pagoMultas) || 0).toFixed(2),

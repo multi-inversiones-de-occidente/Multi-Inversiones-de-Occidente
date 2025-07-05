@@ -317,6 +317,9 @@
         pagosAll = pagosAll.concat(snapPagos.docs.map(doc => ({id: doc.id, ...doc.data()})));
       }
 
+      // 3.1 Filtrar anulados (solo mostrar si anulado !== true)
+      pagosAll = pagosAll.filter(pago => pago.anulado !== true);
+
       if (pagosAll.length === 0) {
         document.getElementById("tickets-dui-container").innerHTML =
           `<div style="color:#ff6363;text-align:center;padding:34px 0;">No se encontraron pagos para este DUI.</div>`;

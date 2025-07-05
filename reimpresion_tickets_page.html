@@ -122,12 +122,14 @@
     }
     @media (max-width: 540px) {
       .center-card { max-width: 97vw; padding: 1.1rem 2vw;}
+      .ticket-details { font-size: .97rem;}
     }
   </style>
 </head>
 <body>
   <header>Reimpresión de Tickets</header>
   <div class="center-card">
+    <!-- BUSCAR POR CORRELATIVO -->
     <form id="formBuscarTicket" autocomplete="off">
       <div class="titulo-buscar">
         <i class="fas fa-search"></i> Buscar Ticket por Correlativo
@@ -137,10 +139,22 @@
     </form>
     <div id="ticket-container" class="ticket-box"></div>
     <div id="error-msg" class="error-msg" style="display:none"></div>
+
+    <!-- BUSCAR POR DUI -->
+    <div style="margin-top:2.2em;">
+      <div class="titulo-buscar">
+        <i class="fas fa-id-card"></i> Buscar Tickets por DUI del Cliente
+      </div>
+      <form id="formBuscarDui" autocomplete="off" style="margin-bottom:1em;">
+        <input type="text" class="input-main" id="input-dui" placeholder="DUI del cliente..." maxlength="15" required />
+        <button class="btn-main" type="submit"><i class="fas fa-search"></i> Buscar por DUI</button>
+      </form>
+      <div id="tickets-dui-container"></div>
+    </div>
   </div>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, getDoc, doc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -169,6 +183,7 @@
       }
     });
 
+    // --- BUSCAR POR CORRELATIVO ---
     document.getElementById('formBuscarTicket').onsubmit = async function(e) {
       e.preventDefault();
       if (!usuarioListo) {
@@ -219,13 +234,23 @@
         return;
       }
 
+      let dui = "";
+      // Si es de pagos, intenta traer el DUI
+      if (ticket.tipo === "pago" && ticket.creditoID) {
+        const creditoDoc = await getDoc(doc(db, "creditos", ticket.creditoID));
+        if (creditoDoc.exists()) {
+          dui = creditoDoc.data().numeroDui || "";
+        }
+      }
+
       let html = '';
       if (ticket.tipo === "pago") {
         html = `
           <div class="ticket-header"><i class="fas fa-receipt"></i> Comprobante de Pago</div>
           <div class="ticket-details">
             <div><strong>Correlativo:</strong> ${ticket.correlativo}</div>
-            <div><strong>Cliente:</strong> ${ticket.nombres || ticket.clienteNombre || '-'}</div>
+            <div><strong>Cliente:</strong> ${(ticket.nombres || ticket.clienteNombre || '-')}</div>
+            <div><strong>DUI:</strong> ${dui || '-'}</div>
             <div><strong>Monto Pagado:</strong> $${Number(ticket.montoPagado).toFixed(2)}</div>
             <div><strong>Pago Capital:</strong> $${Number(ticket.pagoCapital || 0).toFixed(2)}</div>
             <div><strong>Pago Interés:</strong> $${Number(ticket.pagoInteres || 0).toFixed(2)}</div>
@@ -255,7 +280,138 @@
 
       document.getElementById("ticket-container").innerHTML = html;
     };
+
+    // --- BUSQUEDA DE TICKETS POR DUI ---
+    document.getElementById('formBuscarDui').onsubmit = async function(e) {
+      e.preventDefault();
+      document.getElementById("tickets-dui-container").innerHTML = "";
+      const duiInput = document.getElementById('input-dui').value.trim();
+      if (!duiInput) return;
+
+      // 1. Buscar todos los créditos con ese DUI
+      const creditosRef = collection(db, "creditos");
+      const qCred = query(creditosRef, where("numeroDui", "==", duiInput));
+      const snapCred = await getDocs(qCred);
+
+      if (snapCred.empty) {
+        document.getElementById("tickets-dui-container").innerHTML =
+          `<div style="color:#ff6363;text-align:center;padding:34px 0;">No se encontraron créditos con ese DUI.</div>`;
+        return;
+      }
+
+      // 2. Tomar todos los creditosID encontrados
+      const creditosIDs = snapCred.docs.map(doc => doc.id);
+      if (creditosIDs.length === 0) {
+        document.getElementById("tickets-dui-container").innerHTML =
+          `<div style="color:#ff6363;text-align:center;padding:34px 0;">No se encontraron créditos activos con ese DUI.</div>`;
+        return;
+      }
+
+      // 3. Buscar pagos de esos creditos
+      const pagosRef = collection(db, "pagos");
+      let pagosAll = [];
+      for (let i = 0; i < creditosIDs.length; i += 10) {
+        const creditosSlice = creditosIDs.slice(i, i+10);
+        const qPagos = query(pagosRef, where("creditoID", "in", creditosSlice));
+        const snapPagos = await getDocs(qPagos);
+        pagosAll = pagosAll.concat(snapPagos.docs.map(doc => ({id: doc.id, ...doc.data()})));
+      }
+
+      if (pagosAll.length === 0) {
+        document.getElementById("tickets-dui-container").innerHTML =
+          `<div style="color:#ff6363;text-align:center;padding:34px 0;">No se encontraron pagos para este DUI.</div>`;
+        return;
+      }
+
+      // 4. Ordenar por fecha de pago descendente (más nuevos primero)
+      pagosAll.sort((a, b) => {
+        const fa = new Date(a.fechaPago || a.timestamp || 0).getTime();
+        const fb = new Date(b.fechaPago || b.timestamp || 0).getTime();
+        return fb - fa;
+      });
+
+      // 5. Mostrar los tickets bonitos
+      let html = "";
+      for (let pago of pagosAll) {
+        html += `
+          <div class="ticket-details" style="margin-bottom:18px;">
+            <div><strong>Fecha:</strong> ${(pago.fechaPago || pago.timestamp || '-').toString().slice(0,19).replace('T',' ')}</div>
+            <div><strong>Correlativo:</strong> ${pago.correlativo || "<span style='color:#888'>Sin correlativo</span>"}</div>
+            <div><strong>Cliente:</strong> ${(pago.nombres || "")}</div>
+            <div><strong>Monto Pagado:</strong> $${Number(pago.montoPagado).toFixed(2)}</div>
+            <div><strong>Pago Capital:</strong> $${Number(pago.pagoCapital || 0).toFixed(2)}</div>
+            <div><strong>Pago Interés:</strong> $${Number(pago.pagoInteres || 0).toFixed(2)}</div>
+            <div><strong>Pago Multas:</strong> $${Number(pago.pagoMultas || 0).toFixed(2)}</div>
+            <div><strong>Saldo Restante:</strong> $${Number(pago.saldoRestante || 0).toFixed(2)}</div>
+            <button class="btn-imprimir" onclick="imprimirTicketPorId('${pago.id}')">
+              <i class="fas fa-print"></i> Imprimir Ticket
+            </button>
+          </div>
+        `;
+      }
+      document.getElementById("tickets-dui-container").innerHTML = html;
+    };
+
+    // --- IMPRIMIR TICKET INDIVIDUAL POR ID ---
+    window.imprimirTicketPorId = async function(pagoId) {
+      const docRef = doc(db, "pagos", pagoId);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        alert("No se encontró el ticket.");
+        return;
+      }
+      const pago = docSnap.data();
+
+      // Buscar el DUI en el crédito
+      let dui = "";
+      if (pago.creditoID) {
+        const creditoDoc = await getDoc(doc(db, "creditos", pago.creditoID));
+        if (creditoDoc.exists()) {
+          dui = creditoDoc.data().numeroDui || "";
+        }
+      }
+
+      let printHtml = `
+        <html>
+        <head>
+          <title>Imprimir Ticket</title>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; background: #fff; color: #232323; margin:0; }
+            .ticket-container { max-width: 420px; margin: 28px auto; background: #fff; border-radius: 11px; box-shadow: 0 2px 14px #0002; padding: 2.2rem 1.6rem 1.3rem 1.6rem; }
+            .ticket-header { font-size: 1.22rem; color: #13b66b; font-weight: 700; margin-bottom: 9px; text-align:center; }
+            .ticket-details strong { color: #333; min-width: 110px; display: inline-block; }
+            .ticket-details { font-size: 1.04rem; padding:7px 0 0 0; }
+          </style>
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        </head>
+        <body>
+          <div class="ticket-container">
+            <div class="ticket-header"><i class="fas fa-receipt"></i> Comprobante de Pago</div>
+            <div class="ticket-details">
+              <div><strong>Fecha:</strong> ${(pago.fechaPago || pago.timestamp || '-').toString().slice(0,19).replace('T',' ')}</div>
+              <div><strong>Correlativo:</strong> ${pago.correlativo || "<span style='color:#888'>Sin correlativo</span>"}</div>
+              <div><strong>Cliente:</strong> ${(pago.nombres || "")}</div>
+              <div><strong>DUI:</strong> ${dui || '-'}</div>
+              <div><strong>Monto Pagado:</strong> $${Number(pago.montoPagado).toFixed(2)}</div>
+              <div><strong>Pago Capital:</strong> $${Number(pago.pagoCapital || 0).toFixed(2)}</div>
+              <div><strong>Pago Interés:</strong> $${Number(pago.pagoInteres || 0).toFixed(2)}</div>
+              <div><strong>Pago Multas:</strong> $${Number(pago.pagoMultas || 0).toFixed(2)}</div>
+              <div><strong>Saldo Restante:</strong> $${Number(pago.saldoRestante || 0).toFixed(2)}</div>
+            </div>
+            <div style="text-align:center;margin-top:28px;">
+              <button onclick="window.print()" style="background:#13b66b;color:#fff;font-size:1.03rem;padding:10px 30px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">Imprimir</button>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+      const printWindow = window.open('', '_blank', 'width=600,height=600');
+      printWindow.document.write(printHtml);
+      printWindow.document.close();
+      setTimeout(() => { printWindow.focus(); }, 500);
+    };
   </script>
 </body>
 </html>
+
 

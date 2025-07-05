@@ -23,10 +23,6 @@
     const db   = getFirestore(app);
     const auth = getAuth(app);
 
-    // Referencias a los elementos HTML
-    let nombreAgencia = document;
-    let statsBox = document;
-
     // Formatea moneda $#,##0.00
     function formatoDinero(valor) {
       return valor.toLocaleString("es-SV", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
@@ -49,12 +45,22 @@
       const creditosSnap = await getDocs(query(collection(db, "creditos"), where("agenciaAsignada", "==", department)));
       let capAtrasado = 0;
       let carteraTotal = 0;
+      let creditosMora = 0; // OPCIONAL: contador de créditos realmente en mora
+
       creditosSnap.forEach(doc => {
         const d = doc.data();
-        let ca = typeof d.capitalAtrasado === "number" ? d.capitalAtrasado : parseFloat(d.capitalAtrasado || "0");
-        let sa = typeof d.saldoActual === "number" ? d.saldoActual : parseFloat(d.saldoActual || "0");
-        capAtrasado += ca;
-        carteraTotal += sa;
+        // Solo contar créditos en mora si tienen al menos una cuota atrasada
+        let tieneCuotaAtrasada = false;
+        if (Array.isArray(d.amortizacion)) {
+          tieneCuotaAtrasada = d.amortizacion.some(q => q.estado === "Atrasado");
+        }
+        if (tieneCuotaAtrasada) {
+          let ca = typeof d.capitalAtrasado === "number" ? d.capitalAtrasado : parseFloat(d.capitalAtrasado || "0");
+          let sa = typeof d.saldoActual === "number" ? d.saldoActual : parseFloat(d.saldoActual || "0");
+          capAtrasado += ca;
+          carteraTotal += sa;
+          creditosMora++;
+        }
       });
       const moraPct = carteraTotal > 0 ? (capAtrasado / carteraTotal) * 100 : 0;
 
@@ -62,6 +68,7 @@
       document.getElementById("capital-mora").textContent = formatoDinero(capAtrasado);
       document.getElementById("cartera-total").textContent = formatoDinero(carteraTotal);
       document.getElementById("pct-mora").textContent = moraPct.toFixed(2) + "%";
+      document.getElementById("creditos-mora").textContent = creditosMora;
 
       document.getElementById('loading').style.display = "none";
       document.getElementById('box-mora').style.display = "block";
@@ -136,6 +143,14 @@
       text-align: center;
       color: #fff;
     }
+    .creditos-mora-label {
+      font-size: .98rem;
+      color: #F9F871;
+      font-weight: 600;
+      margin-top: 6px;
+      display: block;
+      text-align: right;
+    }
   </style>
 </head>
 <body>
@@ -158,6 +173,7 @@
         <span class="dato-mora-label">% Mora</span>
         <span class="dato-mora-valor valor-pct" id="pct-mora">0.00%</span>
       </div>
+      <span class="creditos-mora-label"># Créditos en Mora: <span id="creditos-mora">0</span></span>
     </div>
   </div>
 </body>

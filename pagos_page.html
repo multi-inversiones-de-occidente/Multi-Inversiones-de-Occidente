@@ -370,6 +370,8 @@
           clienteID: creditoData.clienteID,
           creditoID: cliente.id,
           nombres: creditoData.nombre,
+          apellido: creditoData.apellido || "",           // <-- NUEVO CAMPO: Apellido
+          numeroDui: creditoData.numeroDui || "",         // <-- NUEVO CAMPO: número de DUI
           montoPagado: montoNum,
           fechaPago: fechaPago,
           pagoMultas: (parseFloat(pagoMultas) || 0).toFixed(2),
@@ -417,6 +419,7 @@
   </script>
 </body>
 </html>
+
 
 
 

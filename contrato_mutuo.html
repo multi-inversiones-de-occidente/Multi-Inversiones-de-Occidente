@@ -2,22 +2,22 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Contrato Mutuo</title>
+  <title>Contrato de Mutuo</title>
   <style>
-    body { font-family: 'Segoe UI', Arial, sans-serif; background: #fff; color: #222; padding: 2rem;}
-    .contrato { max-width: 950px; margin: 0 auto; background: #fff; padding: 36px; border-radius: 13px; box-shadow: 0 4px 24px #0002; }
-    .bold { font-weight: 600; }
-    .firma { margin-top: 48px; margin-bottom: 24px; }
-    .notario { margin-top: 40px; }
-    .center { text-align: center; }
-    hr { margin: 28px 0; }
+    body { font-family: 'Times New Roman', Times, serif; background: #fff; color: #222; margin: 0; padding: 0;}
+    .contrato { max-width: 950px; margin: 40px auto; background: #fff; padding: 48px 60px 36px 60px; border-radius: 13px; box-shadow: 0 4px 24px #0002; font-size: 18px; line-height: 1.6; text-align: justify; }
+    .firma { margin: 65px 0 36px 0; text-align: center; }
+    .firma_linea { margin-top: 35px; margin-bottom: 6px; display: inline-block; border-bottom: 1.2px solid #222; width: 320px; height: 28px; }
+    .titulo { text-align: center; font-weight: bold; margin-bottom: 35px; font-size: 22px; letter-spacing: 2px; }
+    .separador { margin: 55px 0 45px 0; border: none; border-bottom: 1px dashed #4444; height: 0; width: 100%; }
+    @media print { .contrato { page-break-after: always; box-shadow: none; } body { background: #fff !important; } }
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
-    // Configuración Firebase
+    // CONFIGURACIÓN FIREBASE
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -31,7 +31,7 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // Frecuencias y destinos
+    // FRECUENCIAS Y DESTINOS
     const FRECUENCIAS = {
       semanal:    { singular: "SEMANAL",    plural: "SEMANALES"    },
       catorcenal: { singular: "CATORCENAL", plural: "CATORCENALES" },
@@ -41,59 +41,109 @@
     const DESTINOS = {
       Credicash: "Gastos personales",
       Credicel:  "Compra de teléfono celular",
-      Amuebla2:  "Compra de Muebles al Crédito"
+      Amuebla2:  "Compra de muebles al crédito"
     };
 
-    // Utilidades
+    // NUMERO A LETRAS (para cualquier cifra de DUI, edad, etc.)
     function numeroALetras(num) {
-      const unidades = ["","UNO","DOS","TRES","CUATRO","CINCO","SEIS","SIETE","OCHO","NUEVE"];
-      const decenas  = ["","DIEZ","VEINTE","TREINTA","CUARENTA","CINCUENTA","SESENTA","SETENTA","OCHENTA","NOVENTA"];
-      const centenas = ["","CIEN","DOSCIENTOS","TRESCIENTOS","CUATROCIENTOS","QUINIENTOS","SEISCIENTOS","SETECIENTOS","OCHOCIENTOS","NOVECIENTOS"];
-      num = parseInt(num);
-      if(isNaN(num)||num<0) return num;
-      if(num===0) return "CERO";
-      if(num<10) return unidades[num];
-      if(num<100) return decenas[Math.floor(num/10)] + (num%10>0?" Y "+unidades[num%10]:"");
-      if(num<1000) return centenas[Math.floor(num/100)] + (num%100>0?" "+numeroALetras(num%100):"");
-      if(num<10000){
-        if(num===1000) return "MIL";
-        return unidades[Math.floor(num/1000)]+" MIL"+(num%1000>0?" "+numeroALetras(num%1000):"");
+      const UNIDADES = ['','UNO','DOS','TRES','CUATRO','CINCO','SEIS','SIETE','OCHO','NUEVE'];
+      const DECENAS = ['','DIEZ','VEINTE','TREINTA','CUARENTA','CINCUENTA','SESENTA','SETENTA','OCHENTA','NOVENTA'];
+      const CENTENAS = ['','CIEN','DOSCIENTOS','TRESCIENTOS','CUATROCIENTOS','QUINIENTOS','SEISCIENTOS','SETECIENTOS','OCHOCIENTOS','NOVECIENTOS'];
+      function section(n) {
+        if (n === 0) return '';
+        if (n < 10) return UNIDADES[n];
+        if (n < 100) return DECENAS[Math.floor(n/10)] + (n%10>0 ? ' Y '+UNIDADES[n%10] : '');
+        if (n < 1000) return CENTENAS[Math.floor(n/100)] + (n%100>0 ? ' '+section(n%100) : '');
+        if (n < 1000000) {
+          let miles = Math.floor(n/1000);
+          let resto = n % 1000;
+          if (miles === 1) return 'MIL' + (resto > 0 ? ' ' + section(resto) : '');
+          return section(miles) + ' MIL' + (resto > 0 ? ' ' + section(resto) : '');
+        }
+        if (n < 1000000000) {
+          let millones = Math.floor(n/1000000);
+          let resto = n % 1000000;
+          if (millones === 1) return 'UN MILLÓN' + (resto > 0 ? ' ' + section(resto) : '');
+          return section(millones) + ' MILLONES' + (resto > 0 ? ' ' + section(resto) : '');
+        }
+        return n.toString();
       }
-      return num.toString();
+      num = parseInt(num, 10);
+      if(isNaN(num) || num < 0) return '';
+      if(num === 0) return 'CERO';
+      return section(num);
     }
-    function calcularEdad(str) {
-      if(!str) return '';
-      const n = new Date(str), h = new Date();
+
+    // DUI a letras (correcto para toda la cifra izquierda)
+    function duiALetras(dui) {
+      if (!dui) return "";
+      let partes = dui.split("-");
+      if (partes.length < 2) return "";
+      let izqTexto = numeroALetras(parseInt(partes[0], 10));
+      let derTexto = numeroALetras(parseInt(partes[1], 10));
+      return `${izqTexto} GUION ${derTexto}`;
+    }
+
+    // Decimales a letras para cuotas (ej: 11.55)
+    function decimalALetras(n) {
+      n = parseFloat(n);
+      let ent = Math.floor(n);
+      let dec = Math.round((n - ent) * 100);
+      if(dec === 0) return numeroALetras(ent);
+      return `${numeroALetras(ent)} PUNTO ${(dec < 10 ? "CERO " : "") + numeroALetras(dec)}`;
+    }
+
+    // Fechas y años a letras
+    function fechaALetras(fecha) {
+      if(!fecha) return "";
+      const meses = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+      let d = new Date(fecha);
+      let dia = numeroALetras(d.getDate()).toLowerCase();
+      let mes = meses[d.getMonth()];
+      let anio = anioALetras(d.getFullYear());
+      return `${dia} de ${mes} del año ${anio}`;
+    }
+    function anioALetras(a) {
+      const map = {
+        2024: "dos mil veinticuatro",
+        2025: "dos mil veinticinco",
+        2026: "dos mil veintiséis",
+        2027: "dos mil veintisiete",
+        2028: "dos mil veintiocho",
+        2029: "dos mil veintinueve",
+        2030: "dos mil treinta"
+      };
+      return map[a] || numeroALetras(a).toLowerCase();
+    }
+
+    // Edad
+    function calcularEdad(fechaNacimiento, refFecha) {
+      if(!fechaNacimiento) return '';
+      let n = new Date(fechaNacimiento);
+      let h = refFecha ? new Date(refFecha) : new Date();
       let edad = h.getFullYear() - n.getFullYear();
-      const m = h.getMonth() - n.getMonth();
-      if(m<0||(m===0&&h.getDate()<n.getDate())) edad--;
+      if (h.getMonth() < n.getMonth() || (h.getMonth() === n.getMonth() && h.getDate() < n.getDate())) edad--;
       return edad;
     }
-    function edadALetras(e) {
-      let n = parseInt(e, 10);
-      if(isNaN(n)||n<1) return "";
-      return numeroALetras(n).toLowerCase();
+
+    // Hora y minutos a letras
+    function horaALetras(hora) {
+      let h = parseInt(hora, 10);
+      if(isNaN(h)) return "";
+      return numeroALetras(h).toLowerCase();
     }
-    function duiALetras(dui) {
-      if(!dui) return "";
-      let partes = dui.replace(/[^\d-]/g,'').split('-');
-      if(partes.length<2) return dui;
-      let izq = partes[0];
-      let der = partes[1];
-      let izqTexto = numeroALetras(izq);
-      let derTexto = numeroALetras(der);
-      return izqTexto + " GUION " + derTexto;
+    function minutosALetras(min) {
+      let m = parseInt(min, 10);
+      if(isNaN(m)) return "";
+      return numeroALetras(m).toLowerCase();
     }
-    function parseFecha(str) {
-      if(!str) return {dia:'',mes:'',anio:''};
-      const d = new Date(str);
-      const meses = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
-      return { dia: d.getDate().toString().padStart(2,'0'), mes: meses[d.getMonth()], anio: d.getFullYear() };
-    }
+
+    // Obtener ID desde la URL
     function getParam(name){
       return new URLSearchParams(window.location.search).get(name);
     }
 
+    // ==== FUNCIÓN PRINCIPAL ====
     async function loadContrato() {
       const id = getParam("id");
       if(!id){ document.getElementById('contrato').innerText="ID no especificado."; return; }
@@ -114,64 +164,83 @@
           const uSnap = await getDoc(doc(db,"user",a.clienteID));
           const u = uSnap.exists()?uSnap.data():{};
 
+          // ========== LOGS ==========
+          console.log('Asignacion:', a);
+          console.log('Solicitud:', s);
+          console.log('Usuario:', u);
+
           // Fechas cuotas
           const am = Array.isArray(a.amortizacion)?a.amortizacion:[];
-          const f1 = am[0]?parseFecha(am[0].fecha):{dia:'',mes:'',anio:''};
-          const fn = am[am.length-1]?parseFecha(am[am.length-1].fecha):{dia:'',mes:'',anio:''};
+          const f1 = am[0]?.fecha || null; // fecha primera cuota
+          const fn = am[am.length-1]?.fecha || null; // fecha última cuota
 
-          // Datos variables
+          // ==== VARIABLES DINÁMICAS ====
+          const nombre = [s.nombre, s.apellido].filter(Boolean).join(" ");
+          const edadNum = calcularEdad(u.dateOfBirth, a.fechaAsignacion);
+          const edadTexto = numeroALetras(edadNum).toLowerCase();
+          const profesion = s.profesion || '';
+          const dui = s.numeroDui || '';
+          const duiLetras = duiALetras(dui);
           const monto = a.montoAprobado || '';
           const montoLet = numeroALetras(monto);
-          const cant = a.numeroCuotas || am.length || '';
-          const cuota = a.cuota || (am[0]?.cuota)||'';
-          const tasaAnual = parseFloat(a.tasaAnual||0);
-          const interesMes = tasaAnual?Math.round(tasaAnual/12):'';
-          const freqKey = (a.frecuenciaPago||"catorcenal").toLowerCase();
-          const freqS = (FRECUENCIAS[freqKey]?.singular)||"CATORCENAL";
-          const freqP = (FRECUENCIAS[freqKey]?.plural)||"CATORCENALES";
-          const diaPago = f1.dia;
-
-          // Destino según línea
-          const destino = DESTINOS[a.lineaDeCredito||a.creditLine]||"";
-          // Recargo moratorio texto fijo
-          const recargoTxt = "TRES DÓLARES DE LOS ESTADOS UNIDOS DE AMERICA ($3.00) por cuota atrasada, y se suman OCHO DÓLARES DE LOS ESTADOS UNIDOS DE AMERICA ($8.00) si en el mes la cuenta está en mora";
-
-          // Fecha/hora contrato
-          let fc = a.fechaAsignacion?.toDate?.()||new Date();
-          const fcObj = parseFecha(fc);
-          const hh = fc.getHours().toString().padStart(2,'0');
-          const mm = fc.getMinutes().toString().padStart(2,'0');
-
-          // Datos deudor
-          const nombre = `${s.nombre||''}${s.apellido?(' '+s.apellido):''}`;
-          const edadNum = calcularEdad(u.dateOfBirth);
-          const edadTxt = edadALetras(edadNum);
-          const prof   = s.profesion||'';
-          const dui    = s.numeroDui||'';
-          const duiTxt = duiALetras(dui);
-
-          // Notario (fijo)
+          const cuota = a.cuota || (am[0]?.cuota) || '';
+          const cuotasNum = a.numeroCuotas || am.length || '';
+          const cuotasLet = numeroALetras(cuotasNum);
+          const lineaDeCredito = a.lineaDeCredito || a.creditLine || '';
+          const destino = DESTINOS[lineaDeCredito] || '';
+          const tasaAnual = parseFloat(a.tasaAnual || 0);
+          const interesMes = tasaAnual? Math.round(tasaAnual/12): '';
+          const frecuencia = (a.frecuenciaPago||"catorcenal").toLowerCase();
+          const freqSing = (FRECUENCIAS[frecuencia]?.singular) || "CATORCENAL";
+          const freqPlur = (FRECUENCIAS[frecuencia]?.plural) || "CATORCENALES";
+          const recargoMoratorio = 3;
+          const recargoExtra = 8;
+          // fechas de firma y vencimiento
+          const fechaFirma = a.fechaAsignacion?.toDate ? a.fechaAsignacion.toDate() : new Date();
+          const fechaVencimiento = fn || '';
+          const horaFirma = fechaFirma.getHours();
+          const minFirma = fechaFirma.getMinutes();
           const notario = "JOSE ANTONIO MAZARIEGO CACERES";
 
           // Renderizado exacto legal
           const html = `
-            <div class="center"><b>CONTRATO DE MUTUO</b></div>
-            <br>
-            YO, <span class="bold">${nombre}</span>, de <span class="bold">${edadTxt}</span> años de edad, Profesión u Oficio <span class="bold">${prof}</span>, con Documento Único de Identidad <span class="bold">${dui}</span> (<span class="bold">${duiTxt}</span>); ya homologado; en adelante denominado /a "El o la Deudor/a", por medio del presente documento OTORGO: /////I) MONTO: Que en éste acto recibo en calidad de Mutuo de parte del señor MANUEL EDUARDO SINTIGO CAISHPAL, mayor de edad, Soltero, Estudiante, del domicilio del distrito de Ahuachapán, municipio de Ahuachapán Centro, departamento de Ahuachapán, portador de su Documento Único de Identidad número cero tres millones novecientos ochenta y siete mil novecientos diecisiete – siete; ya homologado, en representación de la Sociedad MULTI INVERSIONES DE OCCIDENTE S.A DE C.V, de nacionalidad salvadoreña, con Número de Identificación Tributaria cero uno cero uno - cero tres cero nueve uno nueve - uno cero uno – dos y con Número de Registro (NRC) dos ocho cuatro cero dos dos – nueve, del domicilio del distrito de Ahuachapán, municipio de Ahuachapán Centro, departamento de Ahuachapán, la cantidad de <span class="bold">${monto} (${montoLet}) DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA</span> en concepto de préstamo, obligándome a utilizar dicho monto para: <span class="bold">${destino}</span>; II) INTERESES: Con una tasa de interés del <span class="bold">${interesMes}</span> POR CIENTO MENSUAL sobre saldos insolutos, en caso de incumplimiento de los uno o más pagos parciales me obligo a pagar, a partir del siguiente día un recargo equivalente <span class="bold">${recargoTxt}</span>, en concepto de recargo moratorio; III) PLAZO Y FORMA DE PAGO: La suma recibida, más sus intereses correspondientes, la pagaré a la Sociedad Acreedora, dentro del plazo de <span class="bold">${cant} ${freqS}</span>, siendo que el presente contrato vencen el día <span class="bold">${fn.dia}</span> de <span class="bold">${fn.mes}</span> del año DOS MIL <span class="bold">${fn.anio}</span>, por lo que pagare en la siguiente forma: Por medio de <span class="bold">${cant}</span> cuotas, <span class="bold">${freqP}</span> de <span class="bold">${cuota}</span> DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA, que comprenden intereses y capital, incluido el Impuesto de Impuesto a la Transferencia de Bienes Muebles y a la Prestación de Servicios; obligándome el o la deudor/a a pagar la primera cuota el día <span class="bold">${f1.dia}</span> de <span class="bold">${f1.mes}</span> del año dos mil <span class="bold">${f1.anio}</span> y así sucesivamente el día <span class="bold">${diaPago}</span> de cada uno de los <span class="bold">${freqP}</span> comprendido dentro del plazo, hasta su total cancelación.- IV) LUGAR DE PAGO: Todo pago lo haré en las oficinas de la Sociedad Acreedora las cuales se encuentran en ésta población, en la misma clase de moneda que la recibida.- El plazo de la presente obligación caducará y la Sociedad acreedor podrá exigir el pago de la deuda en su totalidad como si fuere de plazo vencido en cualquiera de los siguientes casos: a) Por falta de pago tal como se ha acordado; b) Por ejecución promovida contra el deudor por terceras personas o por el acreedor por deuda distinta; c) Por ausencia temporal o definitiva o por muerte del o la deudor/a; d) Por incumplimiento en el pago del capital asimismo por la no entrega de la totalidad de la deuda; y e) Por incumplimiento de cualquiera de las estipulaciones de éste contrato; V) DOMICILIO Y RENUNCIAS: Para todos los efectos judiciales y extrajudiciales de ésta obligación señalo como domicilio especial el de la ciudad de Ahuachapán, departamento de Ahuachapán, a cuyos tribunales me someto expresamente, renuncio al derecho de apelar al decreto de embargo, sentencia de remate y demás diligencias alzables del Juicio Ejecutivo y sus incidentes y al de exigir fianza al depositario que se nombre de los bienes que se me embarguen el cual será de elección del acreedor; VI) GASTOS Y HONORARIOS: Los gastos de éste documento los de su cancelación y cuantas otras diligencias hiciere el acreedor en el cobro o con motivo de éste adeudo serán por mi cuenta, así como las llamadas Costas Procesales y Gastos Personales, aunque conforme a las reglas generales no debiera ser condenado en costas, de forma voluntaria accedo a la cancelación de los mismos.- VII) Queda entendido que la mora en el pago del capital en la forma estipulada anteriormente o por el acreedor por deuda distinta a la presente hará caducar el plazo y la obligación será exigible en su totalidad.- ///// En fe de todo lo anterior, firmo el presente contrato, en el distrito de Ahuachapán, municipio de Ahuachapán, departamento de Ahuachapán, el día <span class="bold">${fcObj.dia}</span> de <span class="bold">${fcObj.mes}</span> dos mil <span class="bold">${fcObj.anio}</span>.<br><br>
+            <div class="titulo">CONTRATO DE MUTUO</div>
+            YO, <b>${nombre}</b>, de <b>${edadTexto}</b> años de edad, Profesión u Oficio <b>${profesion}</b>, con Documento Único de Identidad <b>${dui} (${duiLetras})</b>; ya homologado; en adelante denominado /a "El o la Deudor/a", por medio del presente documento OTORGO:
+            <br><br>
+            /////I) MONTO: Que en éste acto recibo en calidad de Mutuo de parte del señor MANUEL EDUARDO SINTIGO CAISHPAL, mayor de edad, Soltero, Estudiante, del domicilio del distrito de Ahuachapán, municipio de Ahuachapán Centro, departamento de Ahuachapán, portador de su Documento Único de Identidad número cero tres millones novecientos ochenta y siete mil novecientos diecisiete – siete; ya homologado, en representación de la Sociedad MULTI INVERSIONES DE OCCIDENTE S.A DE C.V, de nacionalidad salvadoreña, con Número de Identificación Tributaria cero uno cero uno - cero tres cero nueve uno nueve - uno cero uno – dos y con Número de Registro (NRC) dos ocho cuatro cero dos dos – nueve, del domicilio del distrito de Ahuachapán, municipio de Ahuachapán Centro, departamento de Ahuachapán, la cantidad de <b>${monto} (${montoLet}) DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA</b> en concepto de préstamo, obligándome a utilizar dicho monto para: <b>${destino}</b>;
+            II) INTERESES: Con una tasa de interés del <b>${interesMes}</b> POR CIENTO MENSUAL sobre saldos insolutos, en caso de incumplimiento de los uno o más pagos parciales me obligo a pagar, a partir del siguiente día un recargo equivalente <b>TRES DÓLARES DE LOS ESTADOS UNIDOS DE AMERICA ($3.00)</b> por cuota atrasada, y se suman <b>OCHO DÓLARES DE LOS ESTADOS UNIDOS DE AMERICA ($8.00)</b> si en el mes la cuenta está en mora, en concepto de recargo moratorio;
+            III) PLAZO Y FORMA DE PAGO: La suma recibida, más sus intereses correspondientes, la pagaré a la Sociedad Acreedora, dentro del plazo de <b>${cuotasLet} ${freqSing}</b>, siendo que el presente contrato vencen el día <b>${fechaALetras(fechaVencimiento)}</b>, por lo que pagare en la siguiente forma: Por medio de <b>${cuotasLet}</b> cuotas, <b>${freqPlur}</b> de <b>${cuota} (${decimalALetras(cuota)}) DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA</b>, que comprenden intereses y capital, incluido el Impuesto de Impuesto a la Transferencia de Bienes Muebles y a la Prestación de Servicios; obligándome el o la deudor/a a pagar la primera cuota el día <b>${fechaALetras(f1)}</b> y así sucesivamente el día correspondiente de cada uno de los <b>${freqPlur}</b> comprendido dentro del plazo, hasta su total cancelación.-
+            IV) LUGAR DE PAGO: Todo pago lo haré en las oficinas de la Sociedad Acreedora las cuales se encuentran en ésta población, en la misma clase de moneda que la recibida.- El plazo de la presente obligación caducará y la Sociedad acreedor podrá exigir el pago de la deuda en su totalidad como si fuere de plazo vencido en cualquiera de los siguientes casos: a) Por falta de pago tal como se ha acordado; b) Por ejecución promovida contra el deudor por terceras personas o por el acreedor por deuda distinta; c) Por ausencia temporal o definitiva o por muerte del o la deudor/a; d) Por incumplimiento en el pago del capital asimismo por la no entrega de la totalidad de la deuda; y e) Por incumplimiento de cualquiera de las estipulaciones de éste contrato;
+            V) DOMICILIO Y RENUNCIAS: Para todos los efectos judiciales y extrajudiciales de ésta obligación señalo como domicilio especial el de la ciudad de Ahuachapán, departamento de Ahuachapán, a cuyos tribunales me someto expresamente, renuncio al derecho de apelar al decreto de embargo, sentencia de remate y demás diligencias alzables del Juicio Ejecutivo y sus incidentes y al de exigir fianza al depositario que se nombre de los bienes que se me embarguen el cual será de elección del acreedor;
+            VI) GASTOS Y HONORARIOS: Los gastos de éste documento los de su cancelación y cuantas otras diligencias hiciere el acreedor en el cobro o con motivo de éste adeudo serán por mi cuenta, así como las llamadas Costas Procesales y Gastos Personales, aunque conforme a las reglas generales no debiera ser condenado en costas, de forma voluntaria accedo a la cancelación de los mismos.-
+            VII) Queda entendido que la mora en el pago del capital en la forma estipulada anteriormente o por el acreedor por deuda distinta a la presente hará caducar el plazo y la obligación será exigible en su totalidad.-
+            <br><br>
+            ///// En fe de todo lo anterior, firmo el presente contrato, en el distrito de Ahuachapán, municipio de Ahuachapán, departamento de Ahuachapán, el día <b>${fechaALetras(fechaFirma)}</b>.
             <div class="firma">
-              f. _______________________________<br>
+              <div class="firma_linea"></div><br>
               Deudor/a
             </div>
+            <div class="separador"></div>
+            En el distrito de Ahuachapán, municipio de Ahuachapán, departamento de Ahuachapán, a las <b>${horaALetras(horaFirma)}</b> horas con <b>${minutosALetras(minFirma)}</b> minutos del día <b>${fechaALetras(fechaFirma)}</b>.- Ante mí, <b>${notario}</b>, Notario, del domicilio del distrito de Ahuachapán, comparece <b>${nombre}</b>, de <b>${edadTexto}</b> años de edad, Profesión u Oficio <b>${profesion}</b>, a quien no conozco pero lo o la identifico por medio de su Documento Único de Identidad número <b>${dui} (${duiLetras})</b>; Y ME DICE: Que reconoce como propios los conceptos vertidos en el anterior documento, así como la firma que lo calza, otorgado en ésta ciudad el día de hoy y redactado en una hoja útil por medio del cual se desglosan las siguientes cláusulas que literalmente dicen: /////////
             <br><br>
-            En el distrito de Ahuachapán, municipio de Ahuachapán, departamento de Ahuachapán, a las <span class="bold">${hh}</span> horas con <span class="bold">${mm}</span> minutos del día <span class="bold">${fcObj.dia}</span> del mes de <span class="bold">${fcObj.mes}</span> de dos mil <span class="bold">${fcObj.anio}</span>.- Ante mí, JOSE ANTONIO MAZARIEGO CACERES, Notario, del domicilio del distrito de Ahuachapán, comparece <span class="bold">${nombre}</span>, de <span class="bold">${edadTxt}</span> de edad, Profesión u Oficio <span class="bold">${prof}</span>, a quien no conozco pero lo o la identifico por medio de su Documento Único de Identidad número <span class="bold">${dui}</span> (<span class="bold">${duiTxt}</span>); Y ME DICE: Que reconoce como propios los conceptos vertidos en el anterior documento, así como la firma que lo calza, otorgado en ésta ciudad el día de hoy y redactado en una hoja útil por medio del cual se desglosan las siguientes cláusulas que literalmente dicen: ///////// I) MONTO: Que en éste acto recibo en calidad de Mutuo de parte del señor MANUEL EDUARDO SINTIGO CAISHPAL, mayor de edad, Soltero, Estudiante, del domicilio del distrito de Ahuachapán, municipio de Ahuachapán Centro, departamento de Ahuachapán, portador de su Documento Único de Identidad número cero tres millones novecientos ochenta y siete mil novecientos diecisiete – siete; ya homologado, en representación de la Sociedad MULTI INVERSIONES DE OCCIDENTE S.A DE C.V, de nacionalidad salvadoreña, con Número de Identificación Tributaria cero uno cero uno - cero tres cero nueve uno nueve - uno cero uno – dos y con Número de Registro (NRC) dos ocho cuatro cero dos dos – nueve, del domicilio del distrito de Ahuachapán, municipio de Ahuachapán Centro, departamento de Ahuachapán, la cantidad de <span class="bold">${monto} (${montoLet}) DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA</span> en concepto de préstamo, obligándome a utilizar dicho monto para: <span class="bold">${destino}</span>; II) INTERESES: Con una tasa de interés del <span class="bold">${interesMes}</span>  POR CIENTO MENSUAL sobre saldos insolutos, en caso de incumplimiento de los uno o más pagos parciales me obligo a pagar, a partir del siguiente día un recargo equivalente <span class="bold">${recargoTxt}</span>, en concepto de recargo moratorio; III) PLAZO Y FORMA DE PAGO: La suma recibida, más sus intereses correspondientes, la pagaré a la Sociedad Acreedora, dentro del plazo de <span class="bold">${cant} ${freqS}</span>, siendo que el presente contrato vencen el día <span class="bold">${fn.dia}</span> de <span class="bold">${fn.mes}</span> del año DOS MIL <span class="bold">${fn.anio}</span>, por lo que pagare en la siguiente forma: Por medio de <span class="bold">${cant}</span> cuotas, <span class="bold">${freqP}</span> de <span class="bold">${cuota}</span> DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA, que comprenden intereses y capital, incluido el Impuesto de Impuesto a la Transferencia de Bienes Muebles y a la Prestación de Servicios; obligándome el o la deudor/a a pagar la primera cuota el día <span class="bold">${f1.dia}</span> de <span class="bold">${f1.mes}</span> del año dos mil <span class="bold">${f1.anio}</span> y así sucesivamente el día <span class="bold">${diaPago}</span> de cada uno de los <span class="bold">${freqP}</span> comprendido dentro del plazo, hasta su total cancelación.- IV) LUGAR DE PAGO: Todo pago lo haré en las oficinas de la Sociedad Acreedora las cuales se encuentran en ésta población, en la misma clase de moneda que la recibida.- El plazo de la presente obligación caducará y la Sociedad acreedor podrá exigir el pago de la deuda en su totalidad como si fuere de plazo vencido en cualquiera de los siguientes casos: a) Por falta de pago tal como se ha acordado; b) Por ejecución promovida contra el deudor por terceras personas o por el acreedor por deuda distinta; c) Por ausencia temporal o definitiva o por muerte del o la deudor/a; d) Por incumplimiento en el pago del capital asimismo por la no entrega de la totalidad de la deuda; y e) Por incumplimiento de cualquiera de las estipulaciones de éste contrato; V) DOMICILIO Y RENUNCIAS: Para todos los efectos judiciales y extrajudiciales de ésta obligación señalo como domicilio especial el de la ciudad de Ahuachapán, departamento de Ahuachapán, a cuyos tribunales me someto expresamente, renuncio al derecho de apelar al decreto de embargo, sentencia de remate y demás diligencias alzables del Juicio Ejecutivo y sus incidentes y al de exigir fianza al depositario que se nombre de los bienes que se me embarguen el cual será de elección del acreedor; VI) GASTOS Y HONORARIOS: Los gastos de éste documento los de su cancelación y cuantas otras diligencias hiciere el acreedor en el cobro o con motivo de éste adeudo serán por mi cuenta, así como las llamadas Costas Procesales y Gastos Personales, aunque conforme a las reglas generales no debiera ser condenado en costas, de forma voluntaria accedo a la cancelación de los mismos.- VII) Queda entendido que la mora en el pago del capital en la forma estipulada anteriormente o por el acreedor por deuda distinta a la presente hará caducar el plazo y la obligación será exigible en su totalidad.- //////////VIII) Y ME DICE EL/ LA COMPARECIENTE: Que la firma que aparece al calce del anterior documento es suya, por haber sido puesta de su puño y letra, y como tal la reconoce, ratificando todos los conceptos, y reconociendo todas las obligaciones que se consignan en el mismo.- Yo, el Notario DOY FE: a) Que la firma de la persona compareciente es auténtica, por haber sido puesta a mi presencia de su puño y letra quien también han reconocido como suyos los conceptos y obligaciones contenidos en el documento que antecede.- b) De haber tenido a la vista el Testimonio de Escritura Matriz de Sociedad Anónima celebrada en la ciudad de Ahuachapán, a las dieciséis horas con cuarenta minutos del día tres de septiembre del año, dos mil diecinueve, realizada ante los oficios notariales de la Licenciada BRENDA MARGARITA LAGUAN, de este domicilio, inscrita en el Centro Nacional de Registros, Registro de Comercio, Departamento de Documentos Mercantiles, de la ciudad de Santa Ana, a las once horas y quince minutos del día veintisiete de septiembre de dos mil diecinueve, en el registro número TREINTA Y CINCO, del Libro Número CUATRO MIL CIENTO TREINTA Y CUATRO, del Registro de Sociedades del Folio CIENTO OCHENTA, al Folio CIENTO NOVENTA Y UNO, correspondiente a la Sociedad MULTI INVERSIONES DE OCCIDENTE S.A DE C.V.- Así se expresó el o la compareciente, a quien expliqué los efectos legales de esta acta notarial que consta de dos hojas, y leído que le fue por mí íntegramente lo escrito, en un solo acto, ratifica su contenido y firmamos.- DOY FE.-<br><br>
+            I) MONTO: Que en éste acto recibo en calidad de Mutuo de parte del señor MANUEL EDUARDO SINTIGO CAISHPAL, mayor de edad, Soltero, Estudiante, del domicilio del distrito de Ahuachapán, municipio de Ahuachapán Centro, departamento de Ahuachapán, portador de su Documento Único de Identidad número cero tres millones novecientos ochenta y siete mil novecientos diecisiete – siete; ya homologado, en representación de la Sociedad MULTI INVERSIONES DE OCCIDENTE S.A DE C.V, de nacionalidad salvadoreña, con Número de Identificación Tributaria cero uno cero uno - cero tres cero nueve uno nueve - uno cero uno – dos y con Número de Registro (NRC) dos ocho cuatro cero dos dos – nueve, del domicilio del distrito de Ahuachapán, municipio de Ahuachapán Centro, departamento de Ahuachapán, la cantidad de <b>${monto} (${montoLet}) DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA</b> en concepto de préstamo, obligándome a utilizar dicho monto para: <b>${destino}</b>;
+            II) INTERESES: Con una tasa de interés del <b>${interesMes}</b> POR CIENTO MENSUAL sobre saldos insolutos, en caso de incumplimiento de los uno o más pagos parciales me obligo a pagar, a partir del siguiente día un recargo equivalente <b>TRES DÓLARES DE LOS ESTADOS UNIDOS DE AMERICA ($3.00)</b> por cuota atrasada, y se suman <b>OCHO DÓLARES DE LOS ESTADOS UNIDOS DE AMERICA ($8.00)</b> si en el mes la cuenta está en mora, en concepto de recargo moratorio;
+            III) PLAZO Y FORMA DE PAGO: La suma recibida, más sus intereses correspondientes, la pagaré a la Sociedad Acreedora, dentro del plazo de <b>${cuotasLet} ${freqSing}</b>, siendo que el presente contrato vencen el día <b>${fechaALetras(fechaVencimiento)}</b>, por lo que pagare en la siguiente forma: Por medio de <b>${cuotasLet}</b> cuotas, <b>${freqPlur}</b> de <b>${cuota} (${decimalALetras(cuota)}) DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA</b>, que comprenden intereses y capital, incluido el Impuesto de Impuesto a la Transferencia de Bienes Muebles y a la Prestación de Servicios; obligándome el o la deudor/a a pagar la primera cuota el día <b>${fechaALetras(f1)}</b> y así sucesivamente el día correspondiente de cada uno de los <b>${freqPlur}</b> comprendido dentro del plazo, hasta su total cancelación.-
+            IV) LUGAR DE PAGO: Todo pago lo haré en las oficinas de la Sociedad Acreedora las cuales se encuentran en ésta población, en la misma clase de moneda que la recibida.- El plazo de la presente obligación caducará y la Sociedad acreedor podrá exigir el pago de la deuda en su totalidad como si fuere de plazo vencido en cualquiera de los siguientes casos: a) Por falta de pago tal como se ha acordado; b) Por ejecución promovida contra el deudor por terceras personas o por el acreedor por deuda distinta; c) Por ausencia temporal o definitiva o por muerte del o la deudor/a; d) Por incumplimiento en el pago del capital asimismo por la no entrega de la totalidad de la deuda; y e) Por incumplimiento de cualquiera de las estipulaciones de éste contrato;
+            V) DOMICILIO Y RENUNCIAS: Para todos los efectos judiciales y extrajudiciales de ésta obligación señalo como domicilio especial el de la ciudad de Ahuachapán, departamento de Ahuachapán, a cuyos tribunales me someto expresamente, renuncio al derecho de apelar al decreto de embargo, sentencia de remate y demás diligencias alzables del Juicio Ejecutivo y sus incidentes y al de exigir fianza al depositario que se nombre de los bienes que se me embarguen el cual será de elección del acreedor;
+            VI) GASTOS Y HONORARIOS: Los gastos de éste documento los de su cancelación y cuantas otras diligencias hiciere el acreedor en el cobro o con motivo de éste adeudo serán por mi cuenta, así como las llamadas Costas Procesales y Gastos Personales, aunque conforme a las reglas generales no debiera ser condenado en costas, de forma voluntaria accedo a la cancelación de los mismos.-
+            VII) Queda entendido que la mora en el pago del capital en la forma estipulada anteriormente o por el acreedor por deuda distinta a la presente hará caducar el plazo y la obligación será exigible en su totalidad.-
+            <br><br>
+            //////////VIII) Y ME DICE EL/ LA COMPARECIENTE: Que la firma que aparece al calce del anterior documento es suya, por haber sido puesta de su puño y letra, y como tal la reconoce, ratificando todos los conceptos, y reconociendo todas las obligaciones que se consignan en el mismo.- Yo, el Notario DOY FE: a) Que la firma de la persona compareciente es auténtica, por haber sido puesta a mi presencia de su puño y letra quien también han reconocido como suyos los conceptos y obligaciones contenidos en el documento que antecede.- b) De haber tenido a la vista el Testimonio de Escritura Matriz de Sociedad Anónima celebrada en la ciudad de Ahuachapán, a las dieciséis horas con cuarenta minutos del día tres de septiembre del año, dos mil diecinueve, realizada ante los oficios notariales de la Licenciada BRENDA MARGARITA LAGUAN, de este domicilio, inscrita en el Centro Nacional de Registros, Registro de Comercio, Departamento de Documentos Mercantiles, de la ciudad de Santa Ana, a las once horas y quince minutos del día veintisiete de septiembre de dos mil diecinueve, en el registro número TREINTA Y CINCO, del Libro Número CUATRO MIL CIENTO TREINTA Y CUATRO, del Registro de Sociedades del Folio CIENTO OCHENTA, al Folio CIENTO NOVENTA Y UNO, correspondiente a la Sociedad MULTI INVERSIONES DE OCCIDENTE S.A DE C.V.- Así se expresó el o la compareciente, a quien expliqué los efectos legales de esta acta notarial que consta de dos hojas, y leído que le fue por mí íntegramente lo escrito, en un solo acto, ratifica su contenido y firmamos.- DOY FE.-
             <div class="firma">
-              f. _______________________________<br>
+              <div class="firma_linea"></div><br>
               Deudor/a
             </div>
           `;
           document.getElementById('contrato').innerHTML = html;
         } catch(e){
           document.getElementById('contrato').innerHTML = `<div style="color:red;">Error: ${e.message}</div>`;
+          console.error(e);
         }
       });
     }

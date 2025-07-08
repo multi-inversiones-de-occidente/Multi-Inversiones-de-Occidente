@@ -218,33 +218,8 @@
       `;
       document.getElementById('contrato').innerHTML = html;
     }
-
-    // EJEMPLO DE USO (elimina esto en producción, solo para prueba):
-    window.addEventListener("DOMContentLoaded", function() {
-      // Cambia estos datos por los de tu backend/Firebase
-      const datos = {
-        nombre: "William alexis torres Flores",
-        fechaNacimiento: "2006-12-20T00:00:00.000",
-        profesion: "Comerciante",
-        dui: "07633793-8",
-        monto: 150,
-        tasa: 16,
-        frecuencia: "semanal", // semanal, catorcenal, quincenal, mensual
-        cuotas: 18,
-        cuotaValor: 11.55,
-        lineaDeCredito: "Credicash", // Credicash, Credicel, Amuebla2
-        fechaPrimerCuota: "2025-07-14",
-        fechaVencimiento: "2025-11-10",
-        recargoMoratorio: 3,
-        recargoExtra: 8,
-        fechaFirma: "2025-07-07T16:24:30",
-        horaFirma: 16,
-        minFirma: 24,
-        notario: "JOSE ANTONIO MAZARIEGO CACERES"
-      };
-      renderContrato(datos);
-    });
-    // EN PRODUCCIÓN: Solo llama renderContrato(tusDatos) cuando tengas todos los datos reales.
+    // *** EN PRODUCCIÓN: ***
+    // renderContrato(datos)  --> cuando tengas todos los valores reales.
   </script>
 </head>
 <body>

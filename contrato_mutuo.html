@@ -55,7 +55,7 @@
     }
   </style>
   <script>
-    // FUNCIONES UTILITARIAS =========================
+    // FUNCIONES UTILITARIAS
     const FRECUENCIAS = {
       semanal:    { singular: "SEMANAL",    plural: "SEMANALES"    },
       catorcenal: { singular: "CATORCENAL", plural: "CATORCENALES" },
@@ -145,7 +145,7 @@
       return numeroALetras(m).toLowerCase();
     }
 
-    // FUNCIÓN PRINCIPAL PARA ARMAR EL CONTRATO ======================
+    // FUNCIÓN PRINCIPAL PARA ARMAR EL CONTRATO
     function renderContrato(datos) {
       // --- Calculados
       let edadNum = calcularEdad(datos.fechaNacimiento, datos.fechaFirma);
@@ -192,34 +192,12 @@
       `;
       document.getElementById('contrato').innerHTML = html;
     }
+    // USO EN PRODUCCIÓN:
+    // 1. Trae tus datos desde backend/Firebase y arma un objeto "datos" con los campos.
+    // 2. Llama a renderContrato(datos);
 
-    // EJEMPLO DE USO (ELIMINA ESTO EN PRODUCCIÓN Y USA TUS DATOS REALES)
-    window.addEventListener("DOMContentLoaded", function() {
-      // --- SÓLO DE EJEMPLO ---
-      const datos = {
-        nombre: "JUAN PÉREZ LÓPEZ",
-        fechaNacimiento: "2006-12-20T00:00:00.000",
-        profesion: "Estudiante",
-        dui: "06737112-9",
-        monto: 175,
-        tasa: 16,
-        frecuencia: "catorcenal", // semanal, catorcenal, quincenal, mensual
-        cuotas: 16,
-        cuotaValor: 19.77,
-        lineaDeCredito: "Credicel", // Credicash, Credicel, Amuebla2
-        fechaPrimerCuota: "2025-07-19",
-        fechaVencimiento: "2026-03-01",
-        recargoMoratorio: 3,
-        recargoExtra: 8,
-        fechaFirma: "2025-07-06",
-        horaFirma: 13,
-        minFirma: 20,
-        notario: "JOSE ANTONIO MAZARIEGO CACERES"
-      };
-      renderContrato(datos);
-    });
-
-    // EN PRODUCCIÓN: Llama a renderContrato(datos) con tus datos reales traídos de Firebase o backend.
+    // Ejemplo de llamada (NO lo dejes en producción, solo aquí para que veas la función)
+    // renderContrato(tusDatosDinamicos);
   </script>
 </head>
 <body>

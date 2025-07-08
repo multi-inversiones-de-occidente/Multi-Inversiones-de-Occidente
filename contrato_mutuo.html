@@ -54,8 +54,24 @@
       body { background: #fff !important; }
     }
   </style>
-  <script>
-    // FUNCIONES UTILITARIAS
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+
+    // Tu configuración de Firebase:
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Funciones utilitarias (idénticas a las anteriores)
     const FRECUENCIAS = {
       semanal:    { singular: "SEMANAL",    plural: "SEMANALES"    },
       catorcenal: { singular: "CATORCENAL", plural: "CATORCENALES" },
@@ -145,43 +161,23 @@
       return numeroALetras(m).toLowerCase();
     }
 
-    // FUNCIÓN PRINCIPAL PARA ARMAR EL CONTRATO (CON LOGS)
+    // Render contrato
     function renderContrato(datos) {
-      // LOG DE ENTRADA
-      console.log("🚩 Datos recibidos en renderContrato:", datos);
+      // LOGS
+      console.log("🚩 Datos recibidos:", datos);
+      Object.entries(datos).forEach(([k,v])=>console.log(`${k}:`, v));
 
-      // Logs de verificación de campos clave
-      [
-        'nombre', 'fechaNacimiento', 'profesion', 'dui', 'monto', 'tasa', 'frecuencia', 'cuotas', 'cuotaValor',
-        'lineaDeCredito', 'fechaPrimerCuota', 'fechaVencimiento', 'recargoMoratorio', 'recargoExtra',
-        'fechaFirma', 'horaFirma', 'minFirma', 'notario'
-      ].forEach(field => {
-        if (!datos[field]) {
-          console.error(`❌ FALTA el campo requerido: ${field}`);
-        }
-      });
-
-      // LOG DE TIPOS Y VALORES
-      Object.entries(datos).forEach(([k,v]) => {
-        console.log(`Tipo de "${k}":`, typeof v, v);
-      });
-
-      // --- Calculados y logs intermedios ---
       let edadNum = calcularEdad(datos.fechaNacimiento, datos.fechaFirma);
       let edadTexto = edadALetras(edadNum);
       let duiLetras = duiALetras(datos.dui);
-      let freqKey = datos.frecuencia ? datos.frecuencia.toLowerCase() : "";
+      let freqKey = datos.frecuencia.toLowerCase();
       let freqSing = FRECUENCIAS[freqKey]?.singular || "CATORCENAL";
       let freqPlur = FRECUENCIAS[freqKey]?.plural || "CATORCENALES";
       let destino = DESTINOS[datos.lineaDeCredito] || "";
+      // LOGS
+      console.log("Edad:", edadNum, edadTexto, "Frecuencia:", freqKey, "Destino:", destino);
 
-      // Logs de cálculos
-      console.log("Edad (num):", edadNum, "Edad (letras):", edadTexto);
-      console.log("DUI (letras):", duiLetras);
-      console.log("Frecuencia:", freqKey, "Singular:", freqSing, "Plural:", freqPlur);
-      console.log("Destino:", destino);
-
-      // --- HTML GENERACIÓN ---
+      // HTML
       let html = `
       <div class="titulo">CONTRATO DE MUTUO</div>
       YO, <b>${datos.nombre}</b>, de <b>${edadTexto}</b> años de edad, Profesión u Oficio <b>${datos.profesion}</b>, con Documento Único de Identidad <b>${datos.dui} (${duiLetras})</b>; ya homologado; en adelante denominado /a "El o la Deudor/a", por medio del presente documento OTORGO:
@@ -218,8 +214,78 @@
       `;
       document.getElementById('contrato').innerHTML = html;
     }
-    // *** EN PRODUCCIÓN: ***
-    // renderContrato(datos)  --> cuando tengas todos los valores reales.
+
+    // OBTENER ID DE LA URL
+    function getParam(name) {
+      return new URLSearchParams(window.location.search).get(name);
+    }
+
+    // CARGAR Y RENDERIZAR
+    async function cargarDatosYRenderizar() {
+      try {
+        const asignacionID = getParam('id');
+        if (!asignacionID) throw new Error("No hay ID de asignación en la URL");
+
+        // 1. Asignacion de cuota
+        const asignacionSnap = await getDoc(doc(db, "asignacion_de_cuota", asignacionID));
+        if (!asignacionSnap.exists()) throw new Error("No se encontró la asignación de cuota");
+        const asignacion = asignacionSnap.data();
+        console.log("✔ Asignación encontrada", asignacion);
+
+        // 2. Solicitud asociada
+        const solicitudSnap = await getDoc(doc(db, "Archivo Solicitudes", asignacion.solicitudID));
+        if (!solicitudSnap.exists()) throw new Error("No se encontró la solicitud");
+        const solicitud = solicitudSnap.data();
+        console.log("✔ Solicitud encontrada", solicitud);
+
+        // 3. Usuario asociado
+        const userSnap = await getDoc(doc(db, "user", asignacion.clienteID));
+        if (!userSnap.exists()) throw new Error("No se encontró el usuario");
+        const user = userSnap.data();
+        console.log("✔ Usuario encontrado", user);
+
+        // 4. Armar datos
+        const amort = asignacion.amortizacion || [];
+        const fechaPrimerCuota = amort[0]?.fecha || '';
+        const fechaVencimiento = amort[amort.length-1]?.fecha || '';
+        const fechaFirma = asignacion.fechaAsignacion?.toDate ? asignacion.fechaAsignacion.toDate() : new Date();
+        const horaFirma = fechaFirma.getHours();
+        const minFirma = fechaFirma.getMinutes();
+
+        const datos = {
+          nombre: (solicitud.nombre || '') + (solicitud.apellido ? (' ' + solicitud.apellido) : ''),
+          fechaNacimiento: user.dateOfBirth || '',
+          profesion: solicitud.profesion || '',
+          dui: solicitud.numeroDui || '',
+          monto: asignacion.montoAprobado || '',
+          tasa: Math.round((asignacion.tasaAnual || 0)/12), // mensual
+          frecuencia: (asignacion.frecuenciaPago || '').toLowerCase(),
+          cuotas: asignacion.numeroCuotas || amort.length || '',
+          cuotaValor: asignacion.cuota || (amort[0]?.cuota)||'',
+          lineaDeCredito: asignacion.lineaDeCredito || '',
+          fechaPrimerCuota: fechaPrimerCuota,
+          fechaVencimiento: fechaVencimiento,
+          recargoMoratorio: 3,
+          recargoExtra: 8,
+          fechaFirma: fechaFirma,
+          horaFirma: horaFirma,
+          minFirma: minFirma,
+          notario: "JOSE ANTONIO MAZARIEGO CACERES"
+        };
+
+        // LOG completo
+        console.log("Objeto datos final para renderContrato:", datos);
+
+        renderContrato(datos);
+
+      } catch (e) {
+        document.getElementById('contrato').innerHTML =
+          `<div style="color:red;">❌ Error: ${e.message}</div>`;
+        console.error(e);
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", cargarDatosYRenderizar);
   </script>
 </head>
 <body>

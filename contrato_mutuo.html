@@ -116,15 +116,18 @@
           const aSnap = await getDoc(doc(db,"asignacion_de_cuota",id));
           if(!aSnap.exists()) throw new Error("Asignación no encontrada.");
           const a = aSnap.data();
+          console.log("[LOG] Asignación:", a);
 
           // 2. Solicitud
           const sSnap = await getDoc(doc(db,"Archivo Solicitudes",a.solicitudID));
           if(!sSnap.exists()) throw new Error("Solicitud no encontrada.");
           const s = sSnap.data();
+          console.log("[LOG] Solicitud:", s);
 
           // 3. Usuario
           const uSnap = await getDoc(doc(db,"user",a.clienteID));
           const u = uSnap.exists()?uSnap.data():{};
+          console.log("[LOG] Usuario:", u);
 
           // Fechas cuotas
           const am = Array.isArray(a.amortizacion)?a.amortizacion:[];
@@ -137,13 +140,27 @@
           const cant = a.numeroCuotas || am.length || '';
           const cuota = a.cuota || (am[0]?.cuota)||'';
           const tasaAnual = parseFloat(a.tasaAnual||0);
-          // Cambiado: ahora muestra tasa mensual real con 2 decimales
           const interesMes = tasaAnual ? (tasaAnual / 12).toFixed(2) : '';
           const freqKey = (a.frecuenciaPago||"catorcenal").toLowerCase();
           const freq = FRECUENCIAS[freqKey] || FRECUENCIAS["catorcenal"];
 
-          // Destino según línea
-          const destino = DESTINOS[a.creditLine]||"[DESTINO]";
+          // LOGS CLAVES
+          console.log("[LOG] creditLine (como creditLine):", a.creditLine);
+          console.log("[LOG] lineaDeCredito (como lineaDeCredito):", a.lineaDeCredito);
+          console.log("[LOG] destino elegido creditLine:", DESTINOS[a.creditLine]);
+          console.log("[LOG] destino elegido lineaDeCredito:", DESTINOS[a.lineaDeCredito]);
+          console.log("[LOG] Fecha de nacimiento (u.dateOfBirth):", u.dateOfBirth);
+
+          // Elegimos la clave que SÍ tenga valor
+          let lineaDeCredito = a.creditLine || a.lineaDeCredito || '';
+          if (!lineaDeCredito) {
+            console.warn("¡No se encontró línea de crédito en asignación!");
+          }
+          const destino = DESTINOS[lineaDeCredito] || "[DESTINO]";
+          if (destino === "[DESTINO]") {
+            console.warn("¡No se pudo mapear la línea de crédito a un destino conocido!", lineaDeCredito);
+          }
+
           // Recargo moratorio texto fijo
           const recargoTxt = "TRES DÓLARES DE LOS ESTADOS UNIDOS DE AMERICA ($3.00) por cuota atrasada, y se suman OCHO DÓLARES DE LOS ESTADOS UNIDOS DE AMERICA ($8.00) si en el mes la cuenta está en mora";
 
@@ -156,7 +173,13 @@
 
           // Datos deudor
           const nombre = `${s.nombre||''}${s.apellido?(' '+s.apellido):''}`.trim() || "[NOMBRE]";
-          const edadTexto = edadALetras(u.dateOfBirth);
+          let edadTexto = "[EDAD]";
+          try {
+            edadTexto = edadALetras(u.dateOfBirth);
+            console.log("[LOG] Edad calculada:", edadTexto);
+          } catch(e){
+            console.error("[ERROR] Fallo en cálculo de edad:", e, u.dateOfBirth);
+          }
           const profesion  = s.profesion||"[PROFESIÓN]";
           const dui = s.numeroDui||"[DUI]";
           const duiTexto = duiALetras(dui);
@@ -221,6 +244,7 @@
           document.getElementById('contrato').innerHTML = html;
         } catch(e){
           document.getElementById('contrato').innerHTML = `<div style="color:red;">Error: ${e.message}</div>`;
+          console.error("[ERROR] en generación de contrato:", e);
         }
       });
     }

@@ -125,7 +125,7 @@
           console.log("[LOG] Solicitud:", s);
 
           // 3. Usuario
-          const uSnap = await getDoc(doc(db,"user",a.clienteID));
+          const uSnap = await getDoc(doc(db,"users",a.clienteID)); // ojo: coleccion "users" (plural)
           const u = uSnap.exists()?uSnap.data():{};
           console.log("[LOG] Usuario:", u);
 
@@ -144,18 +144,9 @@
           const freqKey = (a.frecuenciaPago||"catorcenal").toLowerCase();
           const freq = FRECUENCIAS[freqKey] || FRECUENCIAS["catorcenal"];
 
-          // LOGS CLAVES
-          console.log("[LOG] creditLine (como creditLine):", a.creditLine);
-          console.log("[LOG] lineaDeCredito (como lineaDeCredito):", a.lineaDeCredito);
-          console.log("[LOG] destino elegido creditLine:", DESTINOS[a.creditLine]);
-          console.log("[LOG] destino elegido lineaDeCredito:", DESTINOS[a.lineaDeCredito]);
-          console.log("[LOG] Fecha de nacimiento (u.dateOfBirth):", u.dateOfBirth);
-
-          // Elegimos la clave que SÍ tenga valor
-          let lineaDeCredito = a.creditLine || a.lineaDeCredito || '';
-          if (!lineaDeCredito) {
-            console.warn("¡No se encontró línea de crédito en asignación!");
-          }
+          // Línea de crédito solo desde la solicitud
+          let lineaDeCredito = s.creditLine || s.lineaDeCredito || '';
+          console.log("[LOG] lineaDeCredito detectada (de solicitud):", lineaDeCredito);
           const destino = DESTINOS[lineaDeCredito] || "[DESTINO]";
           if (destino === "[DESTINO]") {
             console.warn("¡No se pudo mapear la línea de crédito a un destino conocido!", lineaDeCredito);
@@ -173,12 +164,17 @@
 
           // Datos deudor
           const nombre = `${s.nombre||''}${s.apellido?(' '+s.apellido):''}`.trim() || "[NOMBRE]";
+
+          // Fecha de nacimiento desde user
+          let dateOfBirth = u.dateOfBirth || u.dateofBirth || u.fechaNacimiento || '';
+          console.log("[LOG] Fecha de nacimiento detectada (user):", dateOfBirth);
+
           let edadTexto = "[EDAD]";
           try {
-            edadTexto = edadALetras(u.dateOfBirth);
+            edadTexto = edadALetras(dateOfBirth);
             console.log("[LOG] Edad calculada:", edadTexto);
           } catch(e){
-            console.error("[ERROR] Fallo en cálculo de edad:", e, u.dateOfBirth);
+            console.error("[ERROR] Fallo en cálculo de edad:", e, dateOfBirth);
           }
           const profesion  = s.profesion||"[PROFESIÓN]";
           const dui = s.numeroDui||"[DUI]";
@@ -257,6 +253,7 @@
   </div>
 </body>
 </html>
+
 
 
 

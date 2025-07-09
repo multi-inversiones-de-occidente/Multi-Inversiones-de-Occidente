@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Historial de Pagos por Cliente</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background: #191a22; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
+    .container { max-width: 550px; margin: 2.2rem auto 0 auto; background: #1c1e28; border-radius: 16px; box-shadow: 0 2px 22px #0008; padding: 2.4rem 1.4rem 2rem 1.4rem;}
+    .titulo { font-size: 1.55rem; color: #45d0fa; font-weight: bold; margin-bottom: .5em; text-align: center;}
+    .resumen-totales { background: #1e2630; border-radius: 12px; margin-bottom: 19px; padding: 14px 18px 9px 18px; box-shadow: 0 1px 7px #0002;}
+    .resumen-totales .res-label { font-size: 1.01rem; color: #aad8f2; font-weight: 500; }
+    .resumen-totales .res-num { font-size: 1.09rem; color: #fff; font-weight: bold; }
+    .bloque-ultimo-pago { background: #22324a; border-left: 6px solid #46e178; border-radius: 11px; margin-bottom: 20px; padding: 13px 17px; box-shadow: 0 1px 7px #0002;}
+    .bloque-ultimo-pago span { font-size: 1.01rem; }
+    .tabla-historial { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.99rem; }
+    .tabla-historial th, .tabla-historial td { padding: 7px 10px; border-bottom: 1px solid #2b2e38; }
+    .tabla-historial th { background: #223045; color: #fff; font-weight: 700;}
+    .tabla-historial tr:last-child td { border-bottom: none; }
+    .resaltado { background: #202d40 !important; color: #4be1a7 !important; }
+    .empty-msg { text-align:center; color:#ccc; padding: 32px 0;}
+    @media (max-width:600px){.container{padding:1.1rem .15rem;}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="titulo">Historial de Pagos</div>
+    <div style="margin-bottom:13px;">
+      <label>Cliente ID:</label>
+      <input id="clienteID-input" type="text" placeholder="Ingresa el ClienteID..." style="width:75%;padding:8px 12px;border-radius:8px;border:none;">
+      <button id="buscar-btn" style="padding:7px 17px;border-radius:8px;border:none;background:#45d0fa;color:#192f46;font-weight:bold;cursor:pointer;"><i class="fas fa-search"></i> Buscar</button>
+    </div>
+    <div id="resumen-totales"></div>
+    <div id="ultimo-pago"></div>
+    <table class="tabla-historial">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Monto</th>
+          <th>Capital</th>
+          <th>Interés</th>
+          <th>Multas</th>
+          <th>Cajero</th>
+          <th>Saldo Restante</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-pagos"></tbody>
+    </table>
+    <div id="empty-msg" class="empty-msg" style="display:none"></div>
+  </div>
+
+  <!-- Firebase y lógica -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    function formatDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return d.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
+        d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true });
+    }
+
+    document.getElementById('buscar-btn').onclick = cargarHistorial;
+    document.getElementById('clienteID-input').onkeydown = e => { if (e.key === "Enter") cargarHistorial(); };
+
+    async function cargarHistorial() {
+      const clienteID = document.getElementById('clienteID-input').value.trim();
+      document.getElementById('tabla-pagos').innerHTML = "";
+      document.getElementById('resumen-totales').innerHTML = "";
+      document.getElementById('ultimo-pago').innerHTML = "";
+      document.getElementById('empty-msg').style.display = 'none';
+
+      if (!clienteID) return alert("Debes ingresar el ClienteID");
+
+      // Pagos de este cliente, excluyendo ANULADOS
+      const pagosQ = query(
+        collection(db, "pagos"),
+        where("clienteID", "==", clienteID),
+        orderBy("fechaPago", "asc")
+      );
+      const pagosSnap = await getDocs(pagosQ);
+
+      let pagos = [];
+      pagosSnap.forEach(doc => {
+        const d = doc.data();
+        if (!d.anulado) pagos.push(d);
+      });
+
+      if (!pagos.length) {
+        document.getElementById('empty-msg').textContent = "No se encontraron pagos para este cliente.";
+        document.getElementById('empty-msg').style.display = '';
+        return;
+      }
+
+      // Calcular totales y cuotas pactadas
+      let totalPagado = 0, totalCapital = 0, totalInteres = 0, totalMultas = 0;
+      let cuotasPactadas = 0, creditoID = pagos[0].creditoID;
+      pagos.forEach(d => {
+        totalPagado += Number(d.montoPagado || 0);
+        totalCapital += Number(d.pagoCapital || 0);
+        totalInteres += Number(d.pagoInteres || 0);
+        totalMultas += Number(d.pagoMultas || 0);
+      });
+
+      // Buscar número de cuotas pactadas (opcional)
+      let cuotasPagadas = pagos.length;
+
+      // Traer cuotas pactadas si posible (extra)
+      let cuotasTotales = '';
+      try {
+        if (creditoID) {
+          const creditoSnap = await getDocs(query(collection(db, "creditos"), where("__name__", "==", creditoID)));
+          if (!creditoSnap.empty) {
+            const credito = creditoSnap.docs[0].data();
+            cuotasTotales = credito.numeroCuotas || "";
+          }
+        }
+      } catch {}
+
+      // Render resumen totales
+      document.getElementById('resumen-totales').innerHTML = `
+        <div class="resumen-totales">
+          <span class="res-label">Total pagado:</span> <span class="res-num">$${totalPagado.toFixed(2)}</span> <br>
+          <span class="res-label">Total a capital:</span> <span class="res-num">$${totalCapital.toFixed(2)}</span> <br>
+          <span class="res-label">Total a intereses:</span> <span class="res-num">$${totalInteres.toFixed(2)}</span> <br>
+          <span class="res-label">Total a multas:</span> <span class="res-num">$${totalMultas.toFixed(2)}</span> <br>
+          <span class="res-label">Pagos realizados:</span> <span class="res-num">${cuotasPagadas}${cuotasTotales ? " / " + cuotasTotales : ""} cuotas</span>
+        </div>
+      `;
+
+      // Render último pago (resaltado)
+      let ultimo = pagos[pagos.length - 1];
+      document.getElementById('ultimo-pago').innerHTML = `
+        <div class="bloque-ultimo-pago">
+          <span><b>Último pago realizado</b></span><br>
+          <span><b>Fecha:</b> ${formatDate(ultimo.fechaPago)}</span><br>
+          <span><b>Monto pagado:</b> $${Number(ultimo.montoPagado).toFixed(2)}</span><br>
+          <span><b>Cajero:</b> ${ultimo.cajeroNombre || ''}</span><br>
+          <span><b>Capital:</b> $${Number(ultimo.pagoCapital || 0).toFixed(2)} &nbsp; 
+                <b>Interés:</b> $${Number(ultimo.pagoInteres || 0).toFixed(2)} &nbsp;
+                <b>Multas:</b> $${Number(ultimo.pagoMultas || 0).toFixed(2)}</span><br>
+          <span><b>Saldo restante después del pago:</b> $${Number(ultimo.saldoRestante || 0).toFixed(2)}</span>
+        </div>
+      `;
+
+      // Render tabla historial
+      document.getElementById('tabla-pagos').innerHTML = pagos.map((d, i) => `
+        <tr class="${i === pagos.length - 1 ? 'resaltado' : ''}">
+          <td>${formatDate(d.fechaPago)}</td>
+          <td>$${Number(d.montoPagado).toFixed(2)}</td>
+          <td>$${Number(d.pagoCapital || 0).toFixed(2)}</td>
+          <td>$${Number(d.pagoInteres || 0).toFixed(2)}</td>
+          <td>$${Number(d.pagoMultas || 0).toFixed(2)}</td>
+          <td>${d.cajeroNombre || ''}</td>
+          <td>$${Number(d.saldoRestante || 0).toFixed(2)}</td>
+        </tr>
+      `).join('');
+    }
+  </script>
+</body>
+</html>

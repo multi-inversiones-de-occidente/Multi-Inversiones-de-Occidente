@@ -6,30 +6,153 @@
   <title>Historial de Pagos por Cliente</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body { background: #191a22; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
-    .container { max-width: 550px; margin: 2.2rem auto 0 auto; background: #1c1e28; border-radius: 16px; box-shadow: 0 2px 22px #0008; padding: 2.4rem 1.4rem 2rem 1.4rem;}
-    .titulo { font-size: 1.55rem; color: #45d0fa; font-weight: bold; margin-bottom: .5em; text-align: center;}
-    .resumen-totales { background: #1e2630; border-radius: 12px; margin-bottom: 19px; padding: 14px 18px 9px 18px; box-shadow: 0 1px 7px #0002;}
-    .resumen-totales .res-label { font-size: 1.01rem; color: #aad8f2; font-weight: 500; }
-    .resumen-totales .res-num { font-size: 1.09rem; color: #fff; font-weight: bold; }
-    .bloque-ultimo-pago { background: #22324a; border-left: 6px solid #46e178; border-radius: 11px; margin-bottom: 20px; padding: 13px 17px; box-shadow: 0 1px 7px #0002;}
-    .bloque-ultimo-pago span { font-size: 1.01rem; }
-    .tabla-historial { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.99rem; }
-    .tabla-historial th, .tabla-historial td { padding: 7px 10px; border-bottom: 1px solid #2b2e38; }
-    .tabla-historial th { background: #223045; color: #fff; font-weight: 700;}
+    body {
+      background: #f7fafd;
+      color: #22293d;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 550px;
+      margin: 2.2rem auto 0 auto;
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 6px 26px #3ad6d888, 0 1.5px 18px #0001;
+      padding: 2.5rem 1.7rem 2.2rem 1.7rem;
+    }
+    .titulo {
+      font-size: 1.65rem;
+      color: #16b0bb;
+      font-weight: bold;
+      margin-bottom: 1.1em;
+      text-align: center;
+      letter-spacing: 0.5px;
+    }
+    .input-group {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 17px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .input-group label {
+      color: #6b82a7;
+      font-size: 1.03rem;
+      font-weight: 500;
+      margin-right: 6px;
+    }
+    .input-group input {
+      width: 75%;
+      padding: 9px 12px;
+      border-radius: 8px;
+      border: 1.2px solid #c8eaf7;
+      font-size: 1.04rem;
+      transition: border-color 0.15s;
+      outline: none;
+      background: #f5faff;
+      color: #234;
+      font-weight: 600;
+    }
+    .input-group input:focus {
+      border-color: #16b0bb;
+      background: #e7fafd;
+    }
+    .input-group button {
+      padding: 8px 19px;
+      border-radius: 8px;
+      border: none;
+      background: linear-gradient(90deg,#16b0bb 40%,#3586ea 100%);
+      color: #fff;
+      font-weight: 600;
+      font-size: 1.07rem;
+      cursor: pointer;
+      box-shadow: 0 2px 10px #16d0bb22;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      transition: background 0.13s, transform .11s;
+    }
+    .input-group button:hover {
+      background: #158196;
+      transform: scale(1.04);
+    }
+    .resumen-totales {
+      background: #effafd;
+      border-radius: 14px;
+      margin-bottom: 21px;
+      padding: 15px 20px 12px 20px;
+      box-shadow: 0 1.5px 7px #16d0bb13;
+      font-size: 1.03rem;
+    }
+    .resumen-totales .res-label {
+      color: #19bb5b;
+      font-weight: 600;
+      font-size: 1.03rem;
+    }
+    .resumen-totales .res-num {
+      color: #22293d;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+    .bloque-ultimo-pago {
+      background: linear-gradient(100deg, #16d0ba19 0, #ffc34e1b 100%);
+      border-left: 6px solid #19bb5b;
+      border-radius: 13px;
+      margin-bottom: 22px;
+      padding: 16px 22px 12px 17px;
+      box-shadow: 0 1px 8px #16d0bb10;
+      color: #21222b;
+    }
+    .bloque-ultimo-pago b { color: #16b0bb; }
+    .tabla-historial {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 1.02rem;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 1.5px 7px #16d0bb08;
+      overflow: hidden;
+    }
+    .tabla-historial th, .tabla-historial td {
+      padding: 7px 11px;
+      border-bottom: 1px solid #e8eff5;
+    }
+    .tabla-historial th {
+      background: #16b0bb;
+      color: #fff;
+      font-weight: 700;
+      font-size: 1.04rem;
+      letter-spacing: .7px;
+      border: none;
+    }
     .tabla-historial tr:last-child td { border-bottom: none; }
-    .resaltado { background: #202d40 !important; color: #4be1a7 !important; }
-    .empty-msg { text-align:center; color:#ccc; padding: 32px 0;}
-    @media (max-width:600px){.container{padding:1.1rem .15rem;}}
+    .resaltado {
+      background: #e3fce9 !important;
+      color: #0b8b64 !important;
+      font-weight: bold;
+    }
+    .empty-msg {
+      text-align: center;
+      color: #babec8;
+      padding: 37px 0 18px 0;
+      font-size: 1.1rem;
+    }
+    @media (max-width:600px){
+      .container { padding:1.1rem .12rem; }
+      .input-group input { width: 100%; }
+      .input-group { flex-direction: column; align-items: stretch; gap: 9px;}
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="titulo">Historial de Pagos</div>
-    <div style="margin-bottom:13px;">
-      <label>Cliente ID:</label>
-      <input id="clienteID-input" type="text" placeholder="Ingresa el ClienteID..." style="width:75%;padding:8px 12px;border-radius:8px;border:none;">
-      <button id="buscar-btn" style="padding:7px 17px;border-radius:8px;border:none;background:#45d0fa;color:#192f46;font-weight:bold;cursor:pointer;"><i class="fas fa-search"></i> Buscar</button>
+    <div class="titulo"><i class="fas fa-receipt"></i> Historial de Pagos</div>
+    <div class="input-group">
+      <label for="clienteID-input">Cliente ID:</label>
+      <input id="clienteID-input" type="text" placeholder="Ingresa el ClienteID...">
+      <button id="buscar-btn"><i class="fas fa-search"></i> Buscar</button>
     </div>
     <div id="resumen-totales"></div>
     <div id="ultimo-pago"></div>
@@ -67,6 +190,12 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    // Obtiene clienteID de la URL si existe
+    function getClienteIDParam() {
+      const url = new URL(window.location.href);
+      return url.searchParams.get("clienteID") || "";
+    }
+
     function formatDate(iso) {
       if (!iso) return '';
       const d = new Date(iso);
@@ -74,8 +203,18 @@
         d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true });
     }
 
+    // Acciones de carga
     document.getElementById('buscar-btn').onclick = cargarHistorial;
     document.getElementById('clienteID-input').onkeydown = e => { if (e.key === "Enter") cargarHistorial(); };
+
+    // Si hay clienteID en la URL, autocompleta y busca automáticamente
+    window.addEventListener("DOMContentLoaded", () => {
+      const param = getClienteIDParam();
+      if (param) {
+        document.getElementById('clienteID-input').value = param;
+        cargarHistorial();
+      }
+    });
 
     async function cargarHistorial() {
       const clienteID = document.getElementById('clienteID-input').value.trim();
@@ -84,7 +223,11 @@
       document.getElementById('ultimo-pago').innerHTML = "";
       document.getElementById('empty-msg').style.display = 'none';
 
-      if (!clienteID) return alert("Debes ingresar el ClienteID");
+      if (!clienteID) {
+        document.getElementById('empty-msg').textContent = "Debes ingresar el ClienteID.";
+        document.getElementById('empty-msg').style.display = '';
+        return;
+      }
 
       // Pagos de este cliente, excluyendo ANULADOS
       const pagosQ = query(
@@ -116,14 +259,13 @@
         totalMultas += Number(d.pagoMultas || 0);
       });
 
-      // Buscar número de cuotas pactadas (opcional)
+      // Buscar número de cuotas pactadas
       let cuotasPagadas = pagos.length;
-
-      // Traer cuotas pactadas si posible (extra)
       let cuotasTotales = '';
       try {
         if (creditoID) {
-          const creditoSnap = await getDocs(query(collection(db, "creditos"), where("__name__", "==", creditoID)));
+          const credQ = query(collection(db, "creditos"), where("__name__", "==", creditoID));
+          const creditoSnap = await getDocs(credQ);
           if (!creditoSnap.empty) {
             const credito = creditoSnap.docs[0].data();
             cuotasTotales = credito.numeroCuotas || "";
@@ -173,3 +315,4 @@
   </script>
 </body>
 </html>
+

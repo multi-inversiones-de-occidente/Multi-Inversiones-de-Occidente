@@ -37,9 +37,7 @@
     function formatMoney(n) {
       return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     }
-    // Rango UTC local de El Salvador (sin desfase)
     function getDiaSVRange(fechaLocal) {
-      // El Salvador UTC-6
       const dateStart = new Date(`${fechaLocal}T00:00:00-06:00`);
       const dateEnd = new Date(`${fechaLocal}T23:59:59.999-06:00`);
       return [
@@ -71,7 +69,6 @@
       onAuthStateChanged(auth, async user => {
         if (!user) return location.href = "login.html";
         gerenteId = user.uid;
-        // Cargar info del gerente
         const snap = await getDocs(query(collection(db, "users"), where("__name__", "==", gerenteId)));
         if (snap.empty) {
           document.getElementById("select-fecha").innerHTML = `<option>No se encontró gerente</option>`;
@@ -82,7 +79,6 @@
         gerenteNombre = `${gerenteData.nombre || ""} ${gerenteData.apellido || ""}`.trim();
         document.getElementById("gerente-nombre").innerText = gerenteNombre || user.email;
 
-        // Buscar todas las fechas de movimientos SIN cierre en las 2 colecciones
         let movDatesSet = new Set();
         for (const coll of ["movimientosCaja", "movimientos_caja"]) {
           const q = query(
@@ -97,7 +93,6 @@
             movDatesSet.add(movData.fecha.substring(0,10));
           }
         }
-        // Si NO hay campo cierre en muchos, buscamos todos los movimientos y los que no tengan campo "cierre"
         if (movDatesSet.size === 0) {
           for (const coll of ["movimientosCaja", "movimientos_caja"]) {
             const q = query(
@@ -114,7 +109,6 @@
             }
           }
         }
-        // Filtrar las que ya están cerradas
         const cierresQ = query(collection(db, "cierres_caja"), where("agencia", "==", agenciaActual));
         const cierresSnap = await getDocs(cierresQ);
         let fechasCerradas = new Set();
@@ -126,7 +120,6 @@
         diasPendientes = Array.from(movDatesSet).filter(f => !fechasCerradas.has(f));
         diasPendientes.sort();
 
-        // Si no hay pendientes, permitir hoy para cierre
         if (diasPendientes.length === 0) {
           const hoy = toDateString(new Date());
           diasPendientes = [hoy];
@@ -144,7 +137,6 @@
       });
     }
 
-    // Incluye PAGOS como ingresos (siempre muestra pagos sin campo cierre o cierre:false)
     async function cargarMovimientosYTotales(fecha) {
       document.getElementById("tabla-movs").innerHTML = `<tr><td colspan="6" style="text-align:center">Cargando movimientos...</td></tr>`;
       movimientosDelDia = [];
@@ -153,10 +145,9 @@
 
       saldoInicial = await obtenerSaldoInicial(agenciaActual);
 
-      // ==== RANGO UTC CORRECTO El Salvador ====
       const [fechaInicioUTC, fechaFinUTC] = getDiaSVRange(fecha);
 
-      // 1. Movimientos manuales
+      // 1. Movimientos manuales (filtra anulado: true)
       for (const coll of ["movimientosCaja", "movimientos_caja"]) {
         const q = query(
           collection(db, coll),
@@ -168,6 +159,7 @@
         for (const docMov of snap.docs) {
           const movData = docMov.data();
           if (movData.cierre === true) continue;
+          if (movData.anulado === true) continue; // <--- FILTRO NUEVO
           movimientosDelDia.push({ id: docMov.id, coll, ...movData, origen: "movimiento" });
           if (movData.tipo === "Ingreso") totalIngresos += Number(movData.monto || 0);
           if (movData.tipo === "Egreso") totalEgresos += Number(movData.monto || 0);
@@ -185,7 +177,6 @@
       for (const docPago of pagosSnap.docs) {
         const data = docPago.data();
         if (!("anulado" in data) || !data.anulado) {
-          // Considera cierre:false si no existe el campo
           const cierrePago = data.hasOwnProperty("cierre") ? data.cierre : false;
           if (cierrePago === false || cierrePago === null) {
             movimientosDelDia.push({
@@ -203,10 +194,7 @@
           }
         }
       }
-      // Ordena por fecha
       movimientosDelDia.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-
-      // Render tabla
       if (movimientosDelDia.length === 0) {
         document.getElementById("tabla-movs").innerHTML =
           `<tr><td colspan="6" style="text-align:center;color:#fff6">No hay movimientos para este día.</td></tr>`;
@@ -285,7 +273,6 @@
         gerente_nombre: gerenteNombre
       });
 
-      // Actualiza movimientos manuales y pagos (¡Ahora ambos!)
       for (const m of movimientosDelDia) {
         if (m.origen === "movimiento") {
           try {
@@ -389,6 +376,7 @@
   </div>
 </body>
 </html>
+
 
 
 

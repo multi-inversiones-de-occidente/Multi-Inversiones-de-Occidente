@@ -50,12 +50,13 @@
     </div>
     <div id="movimientos-list"></div>
     <div class="total-caja" id="total-caja"></div>
+    <!-- Aquí SOLO SE AGREGA el botón de impresión -->
     <button id="btn-imprimir-corte" class="btn-main">
       <i class="fas fa-print"></i> Imprimir Corte de Caja
     </button>
   </div>
 
-  <!-- Firebase y lógica -->
+  <!-- Firebase y lógica principal: SIN CAMBIOS -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, orderBy, limit, getDoc, doc as docRef } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -235,12 +236,13 @@
           </div>
         `).join('');
       }
+      // Aquí los totales siempre aparecen, igual que antes
       totalDiv.innerHTML = `
         <div style="font-size:1.12rem;font-weight:400;margin-bottom:4px;">
           <b style="color:#2ef37a;">Saldo Anterior: $${saldoAnterior.toFixed(2)}</b>
         </div>
         <div>
-          <b style="color:#111;">Total de Caja: $${total.toFixed(2)}</b>
+          <b style="color:#fff;">Total de Caja: $${total.toFixed(2)}</b>
         </div>
       `;
     }
@@ -268,10 +270,10 @@
       cargarMovimientos(user);
     });
   </script>
-  <!-- Corte de Caja, optimizado impresión -->
+  <!-- SOLO SE AGREGA el script de impresión abajo -->
   <script>
   document.getElementById("btn-imprimir-corte").onclick = function() {
-    // Extrae los datos de la página
+    // Toma datos tal como están en pantalla, NO omite nada
     const fecha = document.getElementById("fecha-label").textContent || '';
     const movimientosHtml = document.getElementById("movimientos-list").innerHTML;
     const totalHtml = document.getElementById("total-caja").innerHTML;

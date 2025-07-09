@@ -89,15 +89,16 @@
 
     // Mapear frecuencia de pago (clave firestore) a formato documento
     const FRECUENCIAS = {
-      semanal:    { singular: "SEMANAL",    plural: "SEMANALES"    },
-      catorcenal: { singular: "CATORCENAL", plural: "CATORCENALES" },
-      quincenal:  { singular: "QUINCENAL",  plural: "QUINCENALES"  },
-      mensual:    { singular: "MENSUAL",    plural: "MENSUALES"    }
+      semanal:    { singular: "semana", plural: "semanas", adjetivo: "semanal", adjetivoPlural: "semanales" },
+      catorcenal: { singular: "catorcena", plural: "catorcenas", adjetivo: "catorcenal", adjetivoPlural: "catorcenales" },
+      quincenal:  { singular: "quincena", plural: "quincenas", adjetivo: "quincenal", adjetivoPlural: "quincenales" },
+      mensual:    { singular: "mes", plural: "meses", adjetivo: "mensual", adjetivoPlural: "mensuales" }
     };
+
     // Mapear creditLine a destino de crédito
     const DESTINOS = {
-      Credicash: "Gastos personales",
-      Credicel:  "Compra de teléfono celular",
+      Credicash: "Gastos Personales",
+      Credicel:  "Compra de Teléfono Celular",
       Amuebla2:  "Compra de Muebles al Crédito"
     };
 
@@ -127,8 +128,8 @@
 
           // Fechas cuotas
           const am = Array.isArray(a.amortizacion)?a.amortizacion:[];
-          const f1 = am[0]?.fecha || "";
-          const fn = am[am.length-1]?.fecha || "";
+          const fechaInicio = am[0]?.fecha || "";
+          const fechaVencimiento = am[am.length-1]?.fecha || "";
 
           // Datos variables
           const monto = a.montoAprobado || '';
@@ -136,10 +137,10 @@
           const cant = a.numeroCuotas || am.length || '';
           const cuota = a.cuota || (am[0]?.cuota)||'';
           const tasaAnual = parseFloat(a.tasaAnual||0);
-          const interesMes = tasaAnual?Math.round(tasaAnual/12):'';
+          // Cambiado: ahora muestra tasa mensual real con 2 decimales
+          const interesMes = tasaAnual ? (tasaAnual / 12).toFixed(2) : '';
           const freqKey = (a.frecuenciaPago||"catorcenal").toLowerCase();
-          const freqS = (FRECUENCIAS[freqKey]?.singular)||"CATORCENAL";
-          const freqP = (FRECUENCIAS[freqKey]?.plural)||"CATORCENALES";
+          const freq = FRECUENCIAS[freqKey] || FRECUENCIAS["catorcenal"];
 
           // Destino según línea
           const destino = DESTINOS[a.creditLine]||"[DESTINO]";
@@ -163,6 +164,10 @@
           // Notario (fijo)
           const notario = "JOSE ANTONIO MAZARIEGO CACERES";
 
+          // Frase de plazo corregida
+          const plazoFrase = `${numeroALetras(cant).toLowerCase()} (${cant}) ${freq.plural}`;
+          const cuotasFrase = `${numeroALetras(cant).toLowerCase()} (${cant}) cuotas, ${freq.adjetivoPlural} de $${cuota} (${decimalALetras(cuota)}) DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA`;
+
           // Renderizado exacto legal
           const html = `
           <div class="contrato">
@@ -171,9 +176,9 @@
           <br><br>
           I) MONTO: Que en éste acto recibo en calidad de Mutuo de parte del señor MANUEL EDUARDO SINTIGO CAISHPAL, mayor de edad, Soltero, Estudiante, del domicilio del distrito de Ahuachapán, municipio de Ahuachapán Centro, departamento de Ahuachapán, portador de su Documento Único de Identidad número cero tres millones novecientos ochenta y siete mil novecientos diecisiete – siete; ya homologado, en representación de la Sociedad MULTI INVERSIONES DE OCCIDENTE S.A DE C.V, de nacionalidad salvadoreña, con Número de Identificación Tributaria cero uno cero uno - cero tres cero nueve uno nueve - uno cero uno – dos y con Número de Registro (NRC) dos ocho cuatro cero dos dos – nueve, del domicilio del distrito de Ahuachapán, municipio de Ahuachapán Centro, departamento de Ahuachapán, la cantidad de <span class="bold">$${monto} (${decimalALetras(monto)}) DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA</span> en concepto de préstamo, obligándome a utilizar dicho monto para: <span class="bold">${destino}</span>;
           <br><br>
-          II) INTERESES: Con una tasa de interés del <span class="bold">${interesMes}</span> POR CIENTO MENSUAL sobre saldos insolutos, en caso de incumplimiento de los uno o más pagos parciales me obligo a pagar, a partir del siguiente día un recargo equivalente <span class="bold">${recargoTxt}</span>, en concepto de recargo moratorio;
+          II) INTERESES: Con una tasa de interés del <span class="bold">${interesMes}</span> POR CIENTO MENSUAL sobre saldos insolutos, en caso de incumplimiento de uno o más pagos parciales me obligo a pagar, a partir del siguiente día un recargo equivalente <span class="bold">${recargoTxt}</span>, en concepto de recargo moratorio;
           <br><br>
-          III) PLAZO Y FORMA DE PAGO: La suma recibida, más sus intereses correspondientes, la pagaré a la Sociedad Acreedora, dentro del plazo de <span class="bold">${numeroALetras(cant).toLowerCase()} (${cant}) ${freqS}</span>, siendo que el presente contrato vencen el día <span class="bold">${fechaALetras(fn)}</span>, por lo que pagare en la siguiente forma: Por medio de <span class="bold">${numeroALetras(cant).toLowerCase()} (${cant})</span> cuotas, <span class="bold">${freqP}</span> de <span class="bold">$${cuota} (${decimalALetras(cuota)}) DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA</span>, que comprenden intereses y capital, incluido el Impuesto de Impuesto a la Transferencia de Bienes Muebles y a la Prestación de Servicios; obligándome el o la deudor/a a pagar la primera cuota el día <span class="bold">${fechaALetras(f1)}</span> y así sucesivamente el día correspondiente de cada uno de los <span class="bold">${freqP}</span> comprendido dentro del plazo, hasta su total cancelación.-
+          III) PLAZO Y FORMA DE PAGO: La suma recibida, más sus intereses correspondientes, la pagaré a la Sociedad Acreedora, dentro del plazo de <span class="bold">${plazoFrase}</span>, siendo que el presente contrato vence el día <span class="bold">${fechaALetras(fechaVencimiento)}</span>, por lo que pagare en la siguiente forma: Por medio de <span class="bold">${cuotasFrase}</span>, que comprenden intereses y capital, incluido el Impuesto a la Transferencia de Bienes Muebles y a la Prestación de Servicios; obligándome el o la deudor/a a pagar la primera cuota el día <span class="bold">${fechaALetras(fechaInicio)}</span> y así sucesivamente el día correspondiente de cada uno de los <span class="bold">${freq.adjetivoPlural}</span> comprendido dentro del plazo, hasta su total cancelación.-
           <br><br>
           IV) LUGAR DE PAGO: Todo pago lo haré en las oficinas de la Sociedad Acreedora las cuales se encuentran en ésta población, en la misma clase de moneda que la recibida.- El plazo de la presente obligación caducará y la Sociedad acreedor podrá exigir el pago de la deuda en su totalidad como si fuere de plazo vencido en cualquiera de los siguientes casos: a) Por falta de pago tal como se ha acordado; b) Por ejecución promovida contra el deudor por terceras personas o por el acreedor por deuda distinta; c) Por ausencia temporal o definitiva o por muerte del o la deudor/a; d) Por incumplimiento en el pago del capital asimismo por la no entrega de la totalidad de la deuda; y e) Por incumplimiento de cualquiera de las estipulaciones de éste contrato;
           <br><br>
@@ -194,9 +199,9 @@
           <br><br>
           I) MONTO: Que en éste acto recibo en calidad de Mutuo de parte del señor MANUEL EDUARDO SINTIGO CAISHPAL, mayor de edad, Soltero, Estudiante, del domicilio del distrito de Ahuachapán, municipio de Ahuachapán Centro, departamento de Ahuachapán, portador de su Documento Único de Identidad número cero tres millones novecientos ochenta y siete mil novecientos diecisiete – siete; ya homologado, en representación de la Sociedad MULTI INVERSIONES DE OCCIDENTE S.A DE C.V, de nacionalidad salvadoreña, con Número de Identificación Tributaria cero uno cero uno - cero tres cero nueve uno nueve - uno cero uno – dos y con Número de Registro (NRC) dos ocho cuatro cero dos dos – nueve, del domicilio del distrito de Ahuachapán, municipio de Ahuachapán Centro, departamento de Ahuachapán, la cantidad de <span class="bold">$${monto} (${decimalALetras(monto)}) DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA</span> en concepto de préstamo, obligándome a utilizar dicho monto para: <span class="bold">${destino}</span>;
           <br><br>
-          II) INTERESES: Con una tasa de interés del <span class="bold">${interesMes}</span> POR CIENTO MENSUAL sobre saldos insolutos, en caso de incumplimiento de los uno o más pagos parciales me obligo a pagar, a partir del siguiente día un recargo equivalente <span class="bold">${recargoTxt}</span>, en concepto de recargo moratorio;
+          II) INTERESES: Con una tasa de interés del <span class="bold">${interesMes}</span> POR CIENTO MENSUAL sobre saldos insolutos, en caso de incumplimiento de uno o más pagos parciales me obligo a pagar, a partir del siguiente día un recargo equivalente <span class="bold">${recargoTxt}</span>, en concepto de recargo moratorio;
           <br><br>
-          III) PLAZO Y FORMA DE PAGO: La suma recibida, más sus intereses correspondientes, la pagaré a la Sociedad Acreedora, dentro del plazo de <span class="bold">${numeroALetras(cant).toLowerCase()} (${cant}) ${freqS}</span>, siendo que el presente contrato vencen el día <span class="bold">${fechaALetras(fn)}</span>, por lo que pagare en la siguiente forma: Por medio de <span class="bold">${numeroALetras(cant).toLowerCase()} (${cant})</span> cuotas, <span class="bold">${freqP}</span> de <span class="bold">$${cuota} (${decimalALetras(cuota)}) DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA</span>, que comprenden intereses y capital, incluido el Impuesto de Impuesto a la Transferencia de Bienes Muebles y a la Prestación de Servicios; obligándome el o la deudor/a a pagar la primera cuota el día <span class="bold">${fechaALetras(f1)}</span> y así sucesivamente el día correspondiente de cada uno de los <span class="bold">${freqP}</span> comprendido dentro del plazo, hasta su total cancelación.-
+          III) PLAZO Y FORMA DE PAGO: La suma recibida, más sus intereses correspondientes, la pagaré a la Sociedad Acreedora, dentro del plazo de <span class="bold">${plazoFrase}</span>, siendo que el presente contrato vence el día <span class="bold">${fechaALetras(fechaVencimiento)}</span>, por lo que pagare en la siguiente forma: Por medio de <span class="bold">${cuotasFrase}</span>, que comprenden intereses y capital, incluido el Impuesto a la Transferencia de Bienes Muebles y a la Prestación de Servicios; obligándome el o la deudor/a a pagar la primera cuota el día <span class="bold">${fechaALetras(fechaInicio)}</span> y así sucesivamente el día correspondiente de cada uno de los <span class="bold">${freq.adjetivoPlural}</span> comprendido dentro del plazo, hasta su total cancelación.-
           <br><br>
           IV) LUGAR DE PAGO: Todo pago lo haré en las oficinas de la Sociedad Acreedora las cuales se encuentran en ésta población, en la misma clase de moneda que la recibida.- El plazo de la presente obligación caducará y la Sociedad acreedor podrá exigir el pago de la deuda en su totalidad como si fuere de plazo vencido en cualquiera de los siguientes casos: a) Por falta de pago tal como se ha acordado; b) Por ejecución promovida contra el deudor por terceras personas o por el acreedor por deuda distinta; c) Por ausencia temporal o definitiva o por muerte del o la deudor/a; d) Por incumplimiento en el pago del capital asimismo por la no entrega de la totalidad de la deuda; y e) Por incumplimiento de cualquiera de las estipulaciones de éste contrato;
           <br><br>
@@ -228,5 +233,6 @@
   </div>
 </body>
 </html>
+
 
 

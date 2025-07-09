@@ -6,6 +6,7 @@
   <title>Historial de Pagos por Cliente</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
+    /* ...Mismos estilos anteriores... */
     body {
       background: #f7fafd;
       color: #22293d;
@@ -177,6 +178,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
@@ -189,8 +191,8 @@
     };
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const auth = getAuth(app);
 
-    // Obtiene clienteID de la URL si existe
     function getClienteIDParam() {
       const url = new URL(window.location.href);
       return url.searchParams.get("clienteID") || "";
@@ -203,18 +205,27 @@
         d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true });
     }
 
-    // Acciones de carga
-    document.getElementById('buscar-btn').onclick = cargarHistorial;
-    document.getElementById('clienteID-input').onkeydown = e => { if (e.key === "Enter") cargarHistorial(); };
-
-    // Si hay clienteID en la URL, autocompleta y busca automáticamente
-    window.addEventListener("DOMContentLoaded", () => {
-      const param = getClienteIDParam();
-      if (param) {
-        document.getElementById('clienteID-input').value = param;
-        cargarHistorial();
+    // Autenticación antes de todo
+    let usuarioAutenticado = null;
+    onAuthStateChanged(auth, user => {
+      if (!user) {
+        window.location.href = "login.html";
+      } else {
+        usuarioAutenticado = user;
+        const param = getClienteIDParam();
+        if (param) {
+          document.getElementById('clienteID-input').value = param;
+          cargarHistorial();
+        }
       }
     });
+
+    document.getElementById('buscar-btn').onclick = () => {
+      if (usuarioAutenticado) cargarHistorial();
+    };
+    document.getElementById('clienteID-input').onkeydown = e => {
+      if (e.key === "Enter" && usuarioAutenticado) cargarHistorial();
+    };
 
     async function cargarHistorial() {
       const clienteID = document.getElementById('clienteID-input').value.trim();
@@ -229,88 +240,93 @@
         return;
       }
 
-      // Pagos de este cliente, excluyendo ANULADOS
-      const pagosQ = query(
-        collection(db, "pagos"),
-        where("clienteID", "==", clienteID),
-        orderBy("fechaPago", "asc")
-      );
-      const pagosSnap = await getDocs(pagosQ);
-
-      let pagos = [];
-      pagosSnap.forEach(doc => {
-        const d = doc.data();
-        if (!d.anulado) pagos.push(d);
-      });
-
-      if (!pagos.length) {
-        document.getElementById('empty-msg').textContent = "No se encontraron pagos para este cliente.";
-        document.getElementById('empty-msg').style.display = '';
-        return;
-      }
-
-      // Calcular totales y cuotas pactadas
-      let totalPagado = 0, totalCapital = 0, totalInteres = 0, totalMultas = 0;
-      let cuotasPactadas = 0, creditoID = pagos[0].creditoID;
-      pagos.forEach(d => {
-        totalPagado += Number(d.montoPagado || 0);
-        totalCapital += Number(d.pagoCapital || 0);
-        totalInteres += Number(d.pagoInteres || 0);
-        totalMultas += Number(d.pagoMultas || 0);
-      });
-
-      // Buscar número de cuotas pactadas
-      let cuotasPagadas = pagos.length;
-      let cuotasTotales = '';
       try {
-        if (creditoID) {
-          const credQ = query(collection(db, "creditos"), where("__name__", "==", creditoID));
-          const creditoSnap = await getDocs(credQ);
-          if (!creditoSnap.empty) {
-            const credito = creditoSnap.docs[0].data();
-            cuotasTotales = credito.numeroCuotas || "";
-          }
+        // Pagos de este cliente, excluyendo ANULADOS
+        const pagosQ = query(
+          collection(db, "pagos"),
+          where("clienteID", "==", clienteID),
+          orderBy("fechaPago", "asc")
+        );
+        const pagosSnap = await getDocs(pagosQ);
+
+        let pagos = [];
+        pagosSnap.forEach(doc => {
+          const d = doc.data();
+          if (!d.anulado) pagos.push(d);
+        });
+
+        if (!pagos.length) {
+          document.getElementById('empty-msg').textContent = "No se encontraron pagos para este cliente.";
+          document.getElementById('empty-msg').style.display = '';
+          return;
         }
-      } catch {}
 
-      // Render resumen totales
-      document.getElementById('resumen-totales').innerHTML = `
-        <div class="resumen-totales">
-          <span class="res-label">Total pagado:</span> <span class="res-num">$${totalPagado.toFixed(2)}</span> <br>
-          <span class="res-label">Total a capital:</span> <span class="res-num">$${totalCapital.toFixed(2)}</span> <br>
-          <span class="res-label">Total a intereses:</span> <span class="res-num">$${totalInteres.toFixed(2)}</span> <br>
-          <span class="res-label">Total a multas:</span> <span class="res-num">$${totalMultas.toFixed(2)}</span> <br>
-          <span class="res-label">Pagos realizados:</span> <span class="res-num">${cuotasPagadas}${cuotasTotales ? " / " + cuotasTotales : ""} cuotas</span>
-        </div>
-      `;
+        // Calcular totales y cuotas pactadas
+        let totalPagado = 0, totalCapital = 0, totalInteres = 0, totalMultas = 0;
+        let cuotasPactadas = 0, creditoID = pagos[0].creditoID;
+        pagos.forEach(d => {
+          totalPagado += Number(d.montoPagado || 0);
+          totalCapital += Number(d.pagoCapital || 0);
+          totalInteres += Number(d.pagoInteres || 0);
+          totalMultas += Number(d.pagoMultas || 0);
+        });
 
-      // Render último pago (resaltado)
-      let ultimo = pagos[pagos.length - 1];
-      document.getElementById('ultimo-pago').innerHTML = `
-        <div class="bloque-ultimo-pago">
-          <span><b>Último pago realizado</b></span><br>
-          <span><b>Fecha:</b> ${formatDate(ultimo.fechaPago)}</span><br>
-          <span><b>Monto pagado:</b> $${Number(ultimo.montoPagado).toFixed(2)}</span><br>
-          <span><b>Cajero:</b> ${ultimo.cajeroNombre || ''}</span><br>
-          <span><b>Capital:</b> $${Number(ultimo.pagoCapital || 0).toFixed(2)} &nbsp; 
-                <b>Interés:</b> $${Number(ultimo.pagoInteres || 0).toFixed(2)} &nbsp;
-                <b>Multas:</b> $${Number(ultimo.pagoMultas || 0).toFixed(2)}</span><br>
-          <span><b>Saldo restante después del pago:</b> $${Number(ultimo.saldoRestante || 0).toFixed(2)}</span>
-        </div>
-      `;
+        // Buscar número de cuotas pactadas
+        let cuotasPagadas = pagos.length;
+        let cuotasTotales = '';
+        try {
+          if (creditoID) {
+            const credQ = query(collection(db, "creditos"), where("__name__", "==", creditoID));
+            const creditoSnap = await getDocs(credQ);
+            if (!creditoSnap.empty) {
+              const credito = creditoSnap.docs[0].data();
+              cuotasTotales = credito.numeroCuotas || "";
+            }
+          }
+        } catch {}
 
-      // Render tabla historial
-      document.getElementById('tabla-pagos').innerHTML = pagos.map((d, i) => `
-        <tr class="${i === pagos.length - 1 ? 'resaltado' : ''}">
-          <td>${formatDate(d.fechaPago)}</td>
-          <td>$${Number(d.montoPagado).toFixed(2)}</td>
-          <td>$${Number(d.pagoCapital || 0).toFixed(2)}</td>
-          <td>$${Number(d.pagoInteres || 0).toFixed(2)}</td>
-          <td>$${Number(d.pagoMultas || 0).toFixed(2)}</td>
-          <td>${d.cajeroNombre || ''}</td>
-          <td>$${Number(d.saldoRestante || 0).toFixed(2)}</td>
-        </tr>
-      `).join('');
+        // Render resumen totales
+        document.getElementById('resumen-totales').innerHTML = `
+          <div class="resumen-totales">
+            <span class="res-label">Total pagado:</span> <span class="res-num">$${totalPagado.toFixed(2)}</span> <br>
+            <span class="res-label">Total a capital:</span> <span class="res-num">$${totalCapital.toFixed(2)}</span> <br>
+            <span class="res-label">Total a intereses:</span> <span class="res-num">$${totalInteres.toFixed(2)}</span> <br>
+            <span class="res-label">Total a multas:</span> <span class="res-num">$${totalMultas.toFixed(2)}</span> <br>
+            <span class="res-label">Pagos realizados:</span> <span class="res-num">${cuotasPagadas}${cuotasTotales ? " / " + cuotasTotales : ""} cuotas</span>
+          </div>
+        `;
+
+        // Render último pago (resaltado)
+        let ultimo = pagos[pagos.length - 1];
+        document.getElementById('ultimo-pago').innerHTML = `
+          <div class="bloque-ultimo-pago">
+            <span><b>Último pago realizado</b></span><br>
+            <span><b>Fecha:</b> ${formatDate(ultimo.fechaPago)}</span><br>
+            <span><b>Monto pagado:</b> $${Number(ultimo.montoPagado).toFixed(2)}</span><br>
+            <span><b>Cajero:</b> ${ultimo.cajeroNombre || ''}</span><br>
+            <span><b>Capital:</b> $${Number(ultimo.pagoCapital || 0).toFixed(2)} &nbsp; 
+                  <b>Interés:</b> $${Number(ultimo.pagoInteres || 0).toFixed(2)} &nbsp;
+                  <b>Multas:</b> $${Number(ultimo.pagoMultas || 0).toFixed(2)}</span><br>
+            <span><b>Saldo restante después del pago:</b> $${Number(ultimo.saldoRestante || 0).toFixed(2)}</span>
+          </div>
+        `;
+
+        // Render tabla historial
+        document.getElementById('tabla-pagos').innerHTML = pagos.map((d, i) => `
+          <tr class="${i === pagos.length - 1 ? 'resaltado' : ''}">
+            <td>${formatDate(d.fechaPago)}</td>
+            <td>$${Number(d.montoPagado).toFixed(2)}</td>
+            <td>$${Number(d.pagoCapital || 0).toFixed(2)}</td>
+            <td>$${Number(d.pagoInteres || 0).toFixed(2)}</td>
+            <td>$${Number(d.pagoMultas || 0).toFixed(2)}</td>
+            <td>${d.cajeroNombre || ''}</td>
+            <td>$${Number(d.saldoRestante || 0).toFixed(2)}</td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        document.getElementById('empty-msg').textContent = "Error de permisos: debes iniciar sesión para ver los pagos.";
+        document.getElementById('empty-msg').style.display = '';
+      }
     }
   </script>
 </body>

@@ -89,10 +89,8 @@
       let ultimaFechaVencimiento = null;
       if (Array.isArray(amortizacion)) {
         for (const cuota of amortizacion) {
-          // Estado puede ser "Pendiente", "Parcial", "Pagada"
           if (cuota.estado === "Pendiente") cuotasPendientes++;
           if (cuota.estado === "Parcial" || cuota.estado === "Pendiente") cuotasAtrasadas++;
-          // Buscar la última fecha
           if (cuota.fecha) {
             const fechaNum = new Date(cuota.fecha).getTime();
             if (!ultimaFechaVencimiento || fechaNum > ultimaFechaVencimiento) {
@@ -139,15 +137,15 @@
 
           // Tasa Anual según línea de crédito
           let tasaAnual = TASAS_ANUALES[c.lineaDeCredito] || "-";
-          // Tasa Diaria = tasa anual / 360
           let tasaDiaria = (tasaAnual !== "-") ? (tasaAnual / 360).toFixed(4) : "-";
 
           // Botón de historial de pagos: solo si existe clienteID
           let btnHistorial = "";
           if (c.clienteID) {
             btnHistorial = `
-              <button class="btn-history" onclick="window.open('historial_pagos_cliente.html?clienteID=${c.clienteID}', '_self')">
-                <span class="material-icons">history</span> Ver Historial de Pagos
+              <button class="btn-history" onclick="window.open('historial_pagos_cliente.html?clienteID=${encodeURIComponent(c.clienteID)}', '_self')">
+                <span class="material-icons">history</span>
+                Historial de Pagos
               </button>
             `;
           }
@@ -205,86 +203,144 @@
   </script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
-    body { background: #101012; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
-    .main { max-width: 500px; margin: 0 auto; padding: 1.5rem 1rem 3rem 1rem; }
-    .cabecera {
-      background: linear-gradient(90deg,#ffb30044 0,#aee2fa22 100%);
-      border-radius: 18px; padding: 22px 18px 17px 18px;
-      margin-bottom: 18px; box-shadow: 0 2px 14px #0002;
+    body {
+      background: #f7fafd;
+      color: #21222b;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      min-height: 100vh;
     }
-    .title { font-size: 2.1rem; font-weight: bold; color: #fff;}
-    .subtitle { color: #ffe5b7; font-size: 1rem; margin-top: 2px;}
-    .detalles { margin-bottom: 35px; }
+    .main {
+      max-width: 510px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 3rem 1rem;
+    }
+    .cabecera {
+      background: linear-gradient(100deg, #16d0ba 0, #ffc34e 100%);
+      border-radius: 20px;
+      padding: 23px 18px 15px 18px;
+      margin-bottom: 22px;
+      box-shadow: 0 3px 24px #0001;
+      text-align: left;
+    }
+    .title {
+      font-size: 2.05rem;
+      font-weight: bold;
+      color: #213;
+    }
+    .subtitle {
+      color: #567488;
+      font-size: 1.08rem;
+      margin-top: 2px;
+    }
+    .detalles {
+      margin-bottom: 37px;
+    }
     .detail-card {
-      background: #191927;
-      border-radius: 12px;
-      margin-bottom: 12px;
-      display: flex; align-items: flex-start;
-      box-shadow: 0 2px 8px #0001;
-      padding: 11px 18px;
-      gap: 13px;
+      background: #fff;
+      border-radius: 13px;
+      margin-bottom: 13px;
+      display: flex;
+      align-items: flex-start;
+      box-shadow: 0 1.5px 8px #0001;
+      padding: 10px 17px;
+      gap: 14px;
+      border: 1.3px solid #e6e6ef;
+      transition: box-shadow .15s;
+    }
+    .detail-card:hover {
+      box-shadow: 0 4px 18px #16d0bb22;
     }
     .detail-card .icon {
-      width: 36px; height: 36px;
-      display: flex; align-items: center; justify-content: center;
-      background: #37335b; border-radius: 50%;
-      margin-right: 6px; margin-top: 3px;
+      width: 38px;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f7fafd;
+      border-radius: 50%;
+      margin-right: 6px;
+      margin-top: 3px;
       flex-shrink: 0;
+      box-shadow: 0 1.5px 4px #16d0bb14;
     }
-    .detail-card .material-icons { color: #ffb300; font-size: 22px;}
-    .detail-label { color: #ffe7b5; font-size: 1rem;}
-    .detail-value { color: #fff; font-size: 1.14rem; font-weight: bold;}
+    .detail-card .material-icons {
+      color: #16b0bb;
+      font-size: 22px;
+    }
+    .detail-label {
+      color: #8e9bb1;
+      font-size: 1.01rem;
+    }
+    .detail-value {
+      color: #21222b;
+      font-size: 1.14rem;
+      font-weight: bold;
+    }
     .loader {
-      width: 44px; height: 44px; margin: 55px auto 70px auto; border-radius: 50%;
-      border: 4.5px solid #ffb300; border-top: 4.5px solid #eee0; animation: spin 1s linear infinite;
+      width: 44px;
+      height: 44px;
+      margin: 55px auto 70px auto;
+      border-radius: 50%;
+      border: 4.5px solid #ffc34e;
+      border-top: 4.5px solid #eee0;
+      animation: spin 1s linear infinite;
       display: block;
     }
     @keyframes spin { 100% { transform: rotate(360deg); } }
-    .notfound { color: #fff9; font-size: 1.22rem; text-align: center; margin: 70px 0;}
+    .notfound {
+      color: #183449;
+      font-size: 1.2rem;
+      text-align: center;
+      margin: 70px 0;
+    }
     .acciones-modernas {
       display: flex;
-      gap: 12px;
+      gap: 16px;
       justify-content: stretch;
-      margin-top: 40px;
+      margin-top: 38px;
       margin-bottom: 8px;
-      background: #191927e0;
-      padding: 21px 14px 13px 14px;
+      background: #fff;
+      padding: 19px 12px 11px 12px;
       border-radius: 15px;
-      box-shadow: 0 2px 14px #0002;
+      box-shadow: 0 2px 16px #0001;
       flex-wrap: wrap;
+      border: 1.3px solid #e6e6ef;
     }
-    .btn-action,
-    .btn-history {
+    .btn-action, .btn-history {
       flex: 1 1 0;
       min-width: 145px;
-      background: #228be6;
+      background: #16b0bb;
       border: none;
       color: #fff;
-      font-size: 1.08rem;
-      padding: 13px 10px;
-      border-radius: 11px;
+      font-size: 1.09rem;
+      padding: 12px 7px;
+      border-radius: 10px;
       font-weight: 600;
       cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      gap: 9px;
-      box-shadow: 0 2px 12px #0001;
-      transition: background 0.17s, transform 0.10s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 1.5px 8px #16d0bb26;
+      transition: background 0.17s, transform 0.10s, box-shadow .16s;
       margin-bottom: 8px;
+      border: 1.3px solid #16d0bb00;
+      outline: none;
     }
-    .btn-action.green { background: #22b573; }
-    .btn-action.blue { background: #228be6; }
-    .btn-history {
-      background: #8e44ad;
-    }
-    .btn-action:hover,
-    .btn-history:hover {
-      background: #173b63;
+    .btn-action.blue { background: #3586ea; }
+    .btn-action.green { background: #19bb5b; }
+    .btn-history { background: #9161e2; }
+    .btn-action:hover, .btn-history:hover {
+      background: #21344b;
       transform: translateY(-2px) scale(1.04);
       color: #fff;
+      box-shadow: 0 4px 22px #16d0bb33;
+      border: 1.3px solid #16b0bb;
     }
-    .btn-action.green:hover { background: #179154; }
-    .btn-action.blue:hover { background: #12549c; }
-    .btn-history:hover { background: #69269d;}
+    .btn-action.green:hover { background: #12874d;}
+    .btn-action.blue:hover { background: #23559c;}
+    .btn-history:hover { background: #6a49ad;}
     @media (max-width: 570px) {
       .main { max-width: 99vw; padding: 1rem .4rem 2rem .4rem;}
       .cabecera { font-size: 1.13rem;}

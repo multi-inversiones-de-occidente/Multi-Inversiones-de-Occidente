@@ -7,157 +7,164 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body {
-      background: #f7fafb;
-      color: #2b2e38;
+      background: #f7fafd;
+      color: #22293d;
       font-family: 'Segoe UI', Arial, sans-serif;
       margin: 0;
       min-height: 100vh;
     }
     .container {
-      max-width: 550px;
+      max-width: 700px;
       margin: 2.2rem auto 0 auto;
       background: #fff;
-      border-radius: 19px;
-      box-shadow: 0 4px 28px #3fd6c622;
-      padding: 2.4rem 1.4rem 2rem 1.4rem;
-      border: 1.7px solid #e8f3fb;
-      transition: box-shadow 0.2s;
-    }
-    .container:focus-within {
-      box-shadow: 0 6px 32px #18c8e477;
+      border-radius: 22px;
+      box-shadow: 0 6px 26px #3ad6d888, 0 1.5px 18px #0001;
+      padding: 2.8rem 2.2rem 2.3rem 2.2rem;
     }
     .titulo {
-      font-size: 1.7rem;
-      color: #16a8c9;
+      font-size: 1.65rem;
+      color: #16b0bb;
       font-weight: bold;
-      margin-bottom: .5em;
+      margin-bottom: 1.1em;
       text-align: center;
-      letter-spacing: 1px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
+      letter-spacing: 0.5px;
     }
-    .titulo i {
-      color: #18c8e4;
-      font-size: 1.45em;
-    }
-    .filtro-cliente {
+    .input-group {
       display: flex;
-      gap: 10px;
+      gap: 12px;
+      margin-bottom: 17px;
       align-items: center;
-      justify-content: center;
-      margin-bottom: 19px;
       flex-wrap: wrap;
     }
-    .input-cliente {
-      flex: 1 1 0;
-      min-width: 190px;
-      padding: 9px 14px;
+    .input-group label {
+      color: #6b82a7;
+      font-size: 1.03rem;
+      font-weight: 500;
+      margin-right: 6px;
+    }
+    .input-group input {
+      width: 75%;
+      padding: 9px 12px;
       border-radius: 8px;
-      border: 1.5px solid #d8eff6;
-      font-size: 1.08rem;
-      background: #f8fbfc;
-      color: #336;
+      border: 1.2px solid #c8eaf7;
+      font-size: 1.04rem;
+      transition: border-color 0.15s;
       outline: none;
-      transition: border 0.16s;
+      background: #f5faff;
+      color: #234;
+      font-weight: 600;
     }
-    .input-cliente:focus {
-      border-color: #3fd6c6;
+    .input-group input:focus {
+      border-color: #16b0bb;
+      background: #e7fafd;
     }
-    .btn-buscar {
-      background: linear-gradient(90deg,#16a8c9 0,#3fd6c6 100%);
-      color: #fff;
-      font-weight: 700;
-      padding: 9px 24px;
-      border: none;
+    .input-group button {
+      padding: 8px 19px;
       border-radius: 8px;
-      font-size: 1.06rem;
+      border: none;
+      background: linear-gradient(90deg,#16b0bb 40%,#3586ea 100%);
+      color: #fff;
+      font-weight: 600;
+      font-size: 1.07rem;
       cursor: pointer;
-      transition: background 0.13s, transform 0.10s;
-      box-shadow: 0 1px 9px #3fd6c632;
+      box-shadow: 0 2px 10px #16d0bb22;
       display: flex;
       align-items: center;
       gap: 7px;
+      transition: background 0.13s, transform .11s;
     }
-    .btn-buscar:active, .btn-buscar:hover {
-      background: #0f7990;
-      color: #fff;
+    .input-group button:hover {
+      background: #158196;
       transform: scale(1.04);
     }
     .resumen-totales {
-      background: #eafcff;
-      border-radius: 12px;
-      margin-bottom: 19px;
-      padding: 14px 18px 9px 18px;
-      box-shadow: 0 1px 7px #3fd6c612;
-      color: #2a4b59;
-      font-size: 1.06rem;
+      background: #effafd;
+      border-radius: 14px;
+      margin-bottom: 21px;
+      padding: 15px 20px 12px 20px;
+      box-shadow: 0 1.5px 7px #16d0bb13;
+      font-size: 1.03rem;
     }
-    .resumen-totales .res-label { font-size: 1.01rem; color: #15b7c2; font-weight: 600; }
-    .resumen-totales .res-num { font-size: 1.08rem; color: #1b3645; font-weight: bold; }
+    .resumen-totales .res-label {
+      color: #19bb5b;
+      font-weight: 600;
+      font-size: 1.03rem;
+    }
+    .resumen-totales .res-num {
+      color: #22293d;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
     .bloque-ultimo-pago {
-      background: #dcffe7;
-      border-left: 6px solid #39d177;
-      border-radius: 12px;
-      margin-bottom: 20px;
-      padding: 13px 17px 7px 17px;
-      box-shadow: 0 2px 9px #32f7b32a;
-      color: #195;
+      background: linear-gradient(100deg, #16d0ba19 0, #ffc34e1b 100%);
+      border-left: 6px solid #19bb5b;
+      border-radius: 13px;
+      margin-bottom: 22px;
+      padding: 16px 22px 12px 17px;
+      box-shadow: 0 1px 8px #16d0bb10;
+      color: #21222b;
     }
-    .bloque-ultimo-pago span, .bloque-ultimo-pago b { font-size: 1.01rem; }
+    .bloque-ultimo-pago b { color: #16b0bb; }
     .tabla-historial {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 12px;
-      font-size: 0.99rem;
-      background: #f8fcff;
-      border-radius: 13px;
-      box-shadow: 0 1px 7px #3fd6c618;
+      margin-top: 8px;
+      font-size: 1.02rem;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 1.5px 7px #16d0bb08;
       overflow: hidden;
+      table-layout: fixed;
+      word-break: break-word;
     }
     .tabla-historial th, .tabla-historial td {
-      padding: 8px 10px;
-      border-bottom: 1.2px solid #def4fa;
-      text-align: center;
+      padding: 11px 13px;
+      border-bottom: 1px solid #e8eff5;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .tabla-historial th {
-      background: #18c8e4;
+      background: #16b0bb;
       color: #fff;
       font-weight: 700;
-      letter-spacing: 1px;
-      font-size: 1.06rem;
+      font-size: 1.04rem;
+      letter-spacing: .7px;
+      border: none;
     }
     .tabla-historial tr:last-child td { border-bottom: none; }
     .resaltado {
-      background: #e1fff5 !important;
-      color: #28b999 !important;
+      background: #e3fce9 !important;
+      color: #0b8b64 !important;
       font-weight: bold;
     }
     .empty-msg {
       text-align: center;
-      color: #888;
-      padding: 32px 0;
-      font-size: 1.15rem;
+      color: #babec8;
+      padding: 37px 0 18px 0;
+      font-size: 1.1rem;
     }
-    @media (max-width:600px){
-      .container{padding:1.1rem .13rem;}
-      .tabla-historial th, .tabla-historial td { font-size: .95rem; }
-      .filtro-cliente { flex-direction: column; gap: 7px;}
-      .input-cliente { width: 99%; }
-      .btn-buscar { width: 99%; justify-content: center;}
+    @media (max-width: 950px){
+      .container { max-width: 99vw; padding:1.2rem .3rem 2rem .3rem;}
+      .tabla-historial th, .tabla-historial td { padding: 7px 4px; font-size: 0.98rem;}
+      .input-group input { width: 100%; }
+    }
+    @media (max-width: 600px){
+      .container { padding:1.1rem .12rem; }
+      .input-group input { width: 100%; }
+      .input-group { flex-direction: column; align-items: stretch; gap: 9px;}
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="titulo"><i class="fas fa-file-invoice-dollar"></i> Historial de Pagos</div>
-    <form id="filtro-form" class="filtro-cliente" onsubmit="return false;">
-      <input id="clienteID-input" class="input-cliente" type="text" placeholder="ClienteID..." autocomplete="off">
-      <button class="btn-buscar" id="buscar-btn" type="submit">
-        <i class="fas fa-search"></i> Buscar
-      </button>
-    </form>
+    <div class="titulo"><i class="fas fa-receipt"></i> Historial de Pagos</div>
+    <div class="input-group">
+      <label for="clienteID-input">Cliente ID:</label>
+      <input id="clienteID-input" type="text" placeholder="Ingresa el ClienteID...">
+      <button id="buscar-btn"><i class="fas fa-search"></i> Buscar</button>
+    </div>
     <div id="resumen-totales"></div>
     <div id="ultimo-pago"></div>
     <table class="tabla-historial">
@@ -169,7 +176,7 @@
           <th>Interés</th>
           <th>Multas</th>
           <th>Cajero</th>
-          <th>Saldo<br>Restante</th>
+          <th>Saldo Restante</th>
         </tr>
       </thead>
       <tbody id="tabla-pagos"></tbody>
@@ -196,6 +203,11 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
+    function getClienteIDParam() {
+      const url = new URL(window.location.href);
+      return url.searchParams.get("clienteID") || "";
+    }
+
     function formatDate(iso) {
       if (!iso) return '';
       const d = new Date(iso);
@@ -203,135 +215,128 @@
         d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true });
     }
 
-    // Detectar clienteID desde la URL al cargar la página
-    function getClienteIDFromURL() {
-      const url = new URL(window.location.href);
-      return url.searchParams.get("clienteID");
-    }
-
-    // Cargar historial SOLO si hay sesión iniciada y clienteID presente
+    // Autenticación antes de todo
     let usuarioAutenticado = null;
-    let clienteID_actual = null;
-
-    // Asignar valor al input y buscar automáticamente si hay clienteID en URL
-    window.addEventListener('DOMContentLoaded', () => {
-      const urlClienteID = getClienteIDFromURL();
-      if (urlClienteID) {
-        document.getElementById('clienteID-input').value = urlClienteID;
-        clienteID_actual = urlClienteID;
-      }
-      // Esperar la sesión antes de buscar automáticamente
-      onAuthStateChanged(auth, user => {
-        if (!user) {
-          window.location.href = "login.html";
-          return;
-        }
+    onAuthStateChanged(auth, user => {
+      if (!user) {
+        window.location.href = "login.html";
+      } else {
         usuarioAutenticado = user;
-        if (clienteID_actual) {
-          cargarHistorial(clienteID_actual);
+        const param = getClienteIDParam();
+        if (param) {
+          document.getElementById('clienteID-input').value = param;
+          cargarHistorial();
         }
-      });
+      }
     });
 
-    document.getElementById('filtro-form').onsubmit = function(e){
-      const id = document.getElementById('clienteID-input').value.trim();
-      if (id) {
-        cargarHistorial(id);
-      }
-    }
+    document.getElementById('buscar-btn').onclick = () => {
+      if (usuarioAutenticado) cargarHistorial();
+    };
+    document.getElementById('clienteID-input').onkeydown = e => {
+      if (e.key === "Enter" && usuarioAutenticado) cargarHistorial();
+    };
 
-    async function cargarHistorial(clienteID) {
+    async function cargarHistorial() {
+      const clienteID = document.getElementById('clienteID-input').value.trim();
       document.getElementById('tabla-pagos').innerHTML = "";
       document.getElementById('resumen-totales').innerHTML = "";
       document.getElementById('ultimo-pago').innerHTML = "";
       document.getElementById('empty-msg').style.display = 'none';
 
-      if (!usuarioAutenticado) {
+      if (!clienteID) {
+        document.getElementById('empty-msg').textContent = "Debes ingresar el ClienteID.";
+        document.getElementById('empty-msg').style.display = '';
+        return;
+      }
+
+      try {
+        // Pagos de este cliente, excluyendo ANULADOS
+        const pagosQ = query(
+          collection(db, "pagos"),
+          where("clienteID", "==", clienteID),
+          orderBy("fechaPago", "asc")
+        );
+        const pagosSnap = await getDocs(pagosQ);
+
+        let pagos = [];
+        pagosSnap.forEach(doc => {
+          const d = doc.data();
+          if (!d.anulado) pagos.push(d);
+        });
+
+        if (!pagos.length) {
+          document.getElementById('empty-msg').textContent = "No se encontraron pagos para este cliente.";
+          document.getElementById('empty-msg').style.display = '';
+          return;
+        }
+
+        // Calcular totales y cuotas pactadas
+        let totalPagado = 0, totalCapital = 0, totalInteres = 0, totalMultas = 0;
+        let cuotasPactadas = 0, creditoID = pagos[0].creditoID;
+        pagos.forEach(d => {
+          totalPagado += Number(d.montoPagado || 0);
+          totalCapital += Number(d.pagoCapital || 0);
+          totalInteres += Number(d.pagoInteres || 0);
+          totalMultas += Number(d.pagoMultas || 0);
+        });
+
+        // Buscar número de cuotas pactadas
+        let cuotasPagadas = pagos.length;
+        let cuotasTotales = '';
+        try {
+          if (creditoID) {
+            const credQ = query(collection(db, "creditos"), where("__name__", "==", creditoID));
+            const creditoSnap = await getDocs(credQ);
+            if (!creditoSnap.empty) {
+              const credito = creditoSnap.docs[0].data();
+              cuotasTotales = credito.numeroCuotas || "";
+            }
+          }
+        } catch {}
+
+        // Render resumen totales
+        document.getElementById('resumen-totales').innerHTML = `
+          <div class="resumen-totales">
+            <span class="res-label">Total pagado:</span> <span class="res-num">$${totalPagado.toFixed(2)}</span> <br>
+            <span class="res-label">Total a capital:</span> <span class="res-num">$${totalCapital.toFixed(2)}</span> <br>
+            <span class="res-label">Total a intereses:</span> <span class="res-num">$${totalInteres.toFixed(2)}</span> <br>
+            <span class="res-label">Total a multas:</span> <span class="res-num">$${totalMultas.toFixed(2)}</span> <br>
+            <span class="res-label">Pagos realizados:</span> <span class="res-num">${cuotasPagadas}${cuotasTotales ? " / " + cuotasTotales : ""} cuotas</span>
+          </div>
+        `;
+
+        // Render último pago (resaltado)
+        let ultimo = pagos[pagos.length - 1];
+        document.getElementById('ultimo-pago').innerHTML = `
+          <div class="bloque-ultimo-pago">
+            <span><b>Último pago realizado</b></span><br>
+            <span><b>Fecha:</b> ${formatDate(ultimo.fechaPago)}</span><br>
+            <span><b>Monto pagado:</b> $${Number(ultimo.montoPagado).toFixed(2)}</span><br>
+            <span><b>Cajero:</b> ${ultimo.cajeroNombre || ''}</span><br>
+            <span><b>Capital:</b> $${Number(ultimo.pagoCapital || 0).toFixed(2)} &nbsp; 
+                  <b>Interés:</b> $${Number(ultimo.pagoInteres || 0).toFixed(2)} &nbsp;
+                  <b>Multas:</b> $${Number(ultimo.pagoMultas || 0).toFixed(2)}</span><br>
+            <span><b>Saldo restante después del pago:</b> $${Number(ultimo.saldoRestante || 0).toFixed(2)}</span>
+          </div>
+        `;
+
+        // Render tabla historial
+        document.getElementById('tabla-pagos').innerHTML = pagos.map((d, i) => `
+          <tr class="${i === pagos.length - 1 ? 'resaltado' : ''}">
+            <td>${formatDate(d.fechaPago)}</td>
+            <td>$${Number(d.montoPagado).toFixed(2)}</td>
+            <td>$${Number(d.pagoCapital || 0).toFixed(2)}</td>
+            <td>$${Number(d.pagoInteres || 0).toFixed(2)}</td>
+            <td>$${Number(d.pagoMultas || 0).toFixed(2)}</td>
+            <td>${d.cajeroNombre || ''}</td>
+            <td>$${Number(d.saldoRestante || 0).toFixed(2)}</td>
+          </tr>
+        `).join('');
+      } catch (err) {
         document.getElementById('empty-msg').textContent = "Error de permisos: debes iniciar sesión para ver los pagos.";
         document.getElementById('empty-msg').style.display = '';
-        return;
       }
-
-      // Pagos de este cliente, excluyendo ANULADOS
-      const pagosQ = query(
-        collection(db, "pagos"),
-        where("clienteID", "==", clienteID),
-        orderBy("fechaPago", "asc")
-      );
-      const pagosSnap = await getDocs(pagosQ);
-
-      let pagos = [];
-      pagosSnap.forEach(doc => {
-        const d = doc.data();
-        if (!d.anulado) pagos.push(d);
-      });
-
-      if (!pagos.length) {
-        document.getElementById('empty-msg').textContent = "No se encontraron pagos para este cliente.";
-        document.getElementById('empty-msg').style.display = '';
-        return;
-      }
-
-      // Calcular totales y cuotas pactadas
-      let totalPagado = 0, totalCapital = 0, totalInteres = 0, totalMultas = 0;
-      let cuotasPagadas = pagos.length, cuotasTotales = '', creditoID = pagos[0].creditoID;
-      pagos.forEach(d => {
-        totalPagado += Number(d.montoPagado || 0);
-        totalCapital += Number(d.pagoCapital || 0);
-        totalInteres += Number(d.pagoInteres || 0);
-        totalMultas += Number(d.pagoMultas || 0);
-      });
-
-      // Buscar número de cuotas pactadas (opcional)
-      try {
-        if (creditoID) {
-          const q = query(collection(db, "creditos"), where("__name__", "==", creditoID));
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            const credito = snap.docs[0].data();
-            cuotasTotales = credito.numeroCuotas || "";
-          }
-        }
-      } catch {}
-
-      // Render resumen totales
-      document.getElementById('resumen-totales').innerHTML = `
-        <div class="resumen-totales">
-          <span class="res-label">Total pagado:</span> <span class="res-num">$${totalPagado.toFixed(2)}</span> <br>
-          <span class="res-label">Total a capital:</span> <span class="res-num">$${totalCapital.toFixed(2)}</span> <br>
-          <span class="res-label">Total a intereses:</span> <span class="res-num">$${totalInteres.toFixed(2)}</span> <br>
-          <span class="res-label">Total a multas:</span> <span class="res-num">$${totalMultas.toFixed(2)}</span> <br>
-          <span class="res-label">Pagos realizados:</span> <span class="res-num">${cuotasPagadas}${cuotasTotales ? " / " + cuotasTotales : ""} cuotas</span>
-        </div>
-      `;
-
-      // Render último pago (resaltado)
-      let ultimo = pagos[pagos.length - 1];
-      document.getElementById('ultimo-pago').innerHTML = `
-        <div class="bloque-ultimo-pago">
-          <span><b>Último pago realizado</b></span><br>
-          <span><b>Fecha:</b> ${formatDate(ultimo.fechaPago)}</span><br>
-          <span><b>Monto pagado:</b> $${Number(ultimo.montoPagado).toFixed(2)}</span><br>
-          <span><b>Cajero:</b> ${ultimo.cajeroNombre || ''}</span><br>
-          <span><b>Capital:</b> $${Number(ultimo.pagoCapital || 0).toFixed(2)} &nbsp; 
-                <b>Interés:</b> $${Number(ultimo.pagoInteres || 0).toFixed(2)} &nbsp;
-                <b>Multas:</b> $${Number(ultimo.pagoMultas || 0).toFixed(2)}</span><br>
-          <span><b>Saldo restante después del pago:</b> $${Number(ultimo.saldoRestante || 0).toFixed(2)}</span>
-        </div>
-      `;
-
-      // Render tabla historial
-      document.getElementById('tabla-pagos').innerHTML = pagos.map((d, i) => `
-        <tr class="${i === pagos.length - 1 ? 'resaltado' : ''}">
-          <td>${formatDate(d.fechaPago)}</td>
-          <td>$${Number(d.montoPagado).toFixed(2)}</td>
-          <td>$${Number(d.pagoCapital || 0).toFixed(2)}</td>
-          <td>$${Number(d.pagoInteres || 0).toFixed(2)}</td>
-          <td>$${Number(d.pagoMultas || 0).toFixed(2)}</td>
-          <td>${d.cajeroNombre || ''}</td>
-          <td>$${Number(d.saldoRestante || 0).toFixed(2)}</td>
-        </tr>
-      `).join('');
     }
   </script>
 </body>

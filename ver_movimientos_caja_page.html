@@ -20,6 +20,22 @@
     .mov-sub { font-size: .98rem; color: #8ae1fc;}
     .total-caja { margin-top: 14px; background: #101212; border-radius: 10px; text-align: center; padding: 18px; font-size: 1.32rem; font-weight: bold; color: #fff;}
     .empty-msg { text-align:center; color:#ccc; padding: 32px 0;}
+    .btn-main {
+      width: 100%;
+      background: #13b66b;
+      color: #fff;
+      font-size: 1.11rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 9px;
+      padding: 13px 0;
+      cursor: pointer;
+      margin-top: 1.4em;
+      transition: background .17s;
+      margin-bottom: 0.7em;
+    }
+    .btn-main:active,
+    .btn-main:hover { background: #0b854c; }
     @media (max-width:600px){.container{padding:1.2rem .3rem;}}
   </style>
 </head>
@@ -34,6 +50,9 @@
     </div>
     <div id="movimientos-list"></div>
     <div class="total-caja" id="total-caja"></div>
+    <button id="btn-imprimir-corte" class="btn-main">
+      <i class="fas fa-print"></i> Imprimir Corte de Caja
+    </button>
   </div>
 
   <!-- Firebase y lógica -->
@@ -65,7 +84,6 @@
     }
 
     // Estado
-    // ========= CAMBIO: SIEMPRE inicia en el día actual a las 00:00:00 =========
     let now = new Date();
     let selectedDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
     let agenciaActual = "";
@@ -146,7 +164,6 @@
           where("fechaPago", "<=", endIso)
         )
       );
-      // 2a. Construir set de clienteID únicos
       const clienteIDSet = new Set();
       const pagosList = [];
       pagoSnap.forEach(doc => {
@@ -157,7 +174,7 @@
         }
       });
 
-      // 2b. Buscar nombre y apellido de users (en bloques de 10)
+      // Buscar nombre y apellido de users (en bloques de 10)
       let clientesData = {};
       const ids = Array.from(clienteIDSet).filter(Boolean);
       for (let i = 0; i < ids.length; i += 10) {
@@ -173,7 +190,6 @@
         }));
       }
 
-      // 2c. Añadir a movimientos
       pagosList.forEach(data => {
         let clienteNombre = "Cliente";
         if (data.clienteID && clientesData[data.clienteID]) {
@@ -193,10 +209,7 @@
         });
       });
 
-      // Ordenar por hora descendente
       movimientos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-
-      // === Aquí aplicamos la lógica de saldo anterior ===
       const saldoAnterior = await obtenerSaldoAnterior(agenciaActual, selectedDate);
 
       let totalIngresos = 0.0;
@@ -208,7 +221,6 @@
 
       const total = saldoAnterior + totalIngresos - totalEgresos;
 
-      // Renderiza lista
       if (movimientos.length === 0) {
         listDiv.innerHTML = `<div class="empty-msg">No hay movimientos registrados.</div>`;
       } else {
@@ -228,7 +240,7 @@
           <b style="color:#2ef37a;">Saldo Anterior: $${saldoAnterior.toFixed(2)}</b>
         </div>
         <div>
-          <b style="color:#fff;">Total de Caja: $${total.toFixed(2)}</b>
+          <b style="color:#111;">Total de Caja: $${total.toFixed(2)}</b>
         </div>
       `;
     }
@@ -250,13 +262,59 @@
       });
     };
 
-    // Carga inicial tras login
     onAuthStateChanged(auth, user => {
       if (!user) return location.href = "login.html";
       renderFecha();
       cargarMovimientos(user);
     });
   </script>
+  <!-- Corte de Caja, optimizado impresión -->
+  <script>
+  document.getElementById("btn-imprimir-corte").onclick = function() {
+    // Extrae los datos de la página
+    const fecha = document.getElementById("fecha-label").textContent || '';
+    const movimientosHtml = document.getElementById("movimientos-list").innerHTML;
+    const totalHtml = document.getElementById("total-caja").innerHTML;
+
+    const printHtml = `
+      <html>
+      <head>
+        <title>Corte de Caja – Multi Inversiones</title>
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; color: #222; margin: 0; background: #fff; }
+          .header-corte { text-align: center; font-size: 1.55rem; font-weight: bold; margin: 18px 0 4px 0; color: #00527c; }
+          .fecha-corte { text-align: center; margin-bottom: 12px; font-size: 1.06rem; }
+          .mov-card { border: 1px solid #eee; border-radius: 10px; margin-bottom: 8px; padding: 10px 13px; background: #fff;}
+          .mov-title { font-weight: bold; font-size: 1.01rem; margin-bottom: 3px;}
+          .mov-sub { font-size: .97rem; color: #333;}
+          .totales-corte { font-size: 1.13rem; font-weight: bold; margin: 20px 0 18px 0; text-align: center;}
+          .firmas-corte { margin-top:52px; display:flex; justify-content:space-between; }
+          .firma { width:47%; border-top:1.5px solid #222; text-align:center; padding-top:5px; font-size:1rem; }
+          @media print {
+            .mov-card, .header-corte, .totales-corte, .firma, .fecha-corte { background: #fff !important; color: #222 !important;}
+            body { background: #fff !important; color: #222 !important;}
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header-corte">CORTE DE CAJA</div>
+        <div class="fecha-corte">${fecha}</div>
+        <div>${movimientosHtml}</div>
+        <div class="totales-corte">${totalHtml}</div>
+        <div class="firmas-corte">
+          <div class="firma">Firma de Caja</div>
+          <div class="firma">Firma de Gerente</div>
+        </div>
+      </body>
+      </html>
+    `;
+    const w = window.open('', '', 'width=900,height=800');
+    w.document.write(printHtml);
+    w.document.close();
+    setTimeout(() => { w.focus(); }, 300);
+  }
+  </script>
 </body>
 </html>
+
 

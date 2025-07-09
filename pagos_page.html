@@ -424,7 +424,19 @@
           amortizacion: amortizacion
         });
 
-        window.location.href = `ticket_page.html?correlativo=${correlativoStr}&cliente=${encodeURIComponent(creditoData.nombre)}&monto=${montoNum.toFixed(2)}&agencia=${encodeURIComponent(sucursal)}&fecha=${encodeURIComponent(fechaPago)}&pagoCapital=${(parseFloat(pagoCapital)||0).toFixed(2)}&pagoInteres=${(parseFloat(pagoInteres)||0).toFixed(2)}&pagoMultas=${(parseFloat(pagoMultas)||0).toFixed(2)}&saldoRestante=${(parseFloat(saldoActual)||0).toFixed(2)}`;
+        // *** AQUÍ ES EL ÚNICO CAMBIO ***
+        window.location.href = `ticket_page.html?correlativo=${correlativoStr}` +
+          `&cliente=${encodeURIComponent(creditoData.nombre)}` +
+          `&apellido=${encodeURIComponent(creditoData.apellido || '')}` +
+          `&numeroDui=${encodeURIComponent(creditoData.numeroDui || '')}` +
+          `&monto=${montoNum.toFixed(2)}` +
+          `&agencia=${encodeURIComponent(sucursal)}` +
+          `&fecha=${encodeURIComponent(fechaPago)}` +
+          `&pagoCapital=${(parseFloat(pagoCapital)||0).toFixed(2)}` +
+          `&pagoInteres=${(parseFloat(pagoInteres)||0).toFixed(2)}` +
+          `&pagoMultas=${(parseFloat(pagoMultas)||0).toFixed(2)}` +
+          `&saldoRestante=${(parseFloat(saldoActual)||0).toFixed(2)}`;
+
       } catch (e) {
         alert("Error al realizar el pago: " + e.message);
       }

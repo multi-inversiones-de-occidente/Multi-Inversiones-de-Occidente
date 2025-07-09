@@ -83,7 +83,6 @@
     }
 
     function obtenerCuotas(amortizacion) {
-      // Cuenta las cuotas pendientes y atrasadas en el array
       let cuotasPendientes = 0;
       let cuotasAtrasadas = 0;
       let ultimaFechaVencimiento = null;
@@ -131,21 +130,23 @@
           }
           const c = snap.data();
 
-          // Calcular campos derivados
           let amortizacion = c.amortizacion || [];
           let cuotas = obtenerCuotas(amortizacion);
-
-          // Tasa Anual según línea de crédito
           let tasaAnual = TASAS_ANUALES[c.lineaDeCredito] || "-";
           let tasaDiaria = (tasaAnual !== "-") ? (tasaAnual / 360).toFixed(4) : "-";
 
-          // Botón de historial de pagos: solo si existe clienteID
-          let btnHistorial = "";
+          let btnHistorial = "", btnReferencias = "";
           if (c.clienteID) {
             btnHistorial = `
               <button class="btn-history" onclick="window.open('historial_pagos_cliente.html?clienteID=${encodeURIComponent(c.clienteID)}', '_self')">
                 <span class="material-icons">history</span>
                 Historial de Pagos
+              </button>
+            `;
+            btnReferencias = `
+              <button class="btn-action orange" onclick="window.open('referencias_cliente.html?clienteID=${encodeURIComponent(c.clienteID)}', '_self')">
+                <span class="material-icons">contacts</span>
+                Referencias
               </button>
             `;
           }
@@ -191,6 +192,7 @@
                 <span class="material-icons">trending_up</span> Proyección
               </button>
               ${btnHistorial}
+              ${btnReferencias}
             </div>
           `;
         } catch (err) {
@@ -330,6 +332,7 @@
     }
     .btn-action.blue { background: #3586ea; }
     .btn-action.green { background: #19bb5b; }
+    .btn-action.orange { background: #f9ad46; color: #fff; }
     .btn-history { background: #9161e2; }
     .btn-action:hover, .btn-history:hover {
       background: #21344b;
@@ -340,6 +343,7 @@
     }
     .btn-action.green:hover { background: #12874d;}
     .btn-action.blue:hover { background: #23559c;}
+    .btn-action.orange:hover { background: #b47723;}
     .btn-history:hover { background: #6a49ad;}
     @media (max-width: 570px) {
       .main { max-width: 99vw; padding: 1rem .4rem 2rem .4rem;}

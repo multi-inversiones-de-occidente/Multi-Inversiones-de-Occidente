@@ -142,6 +142,16 @@
           // Tasa Diaria = tasa anual / 360
           let tasaDiaria = (tasaAnual !== "-") ? (tasaAnual / 360).toFixed(4) : "-";
 
+          // Botón de historial de pagos: solo si existe clienteID
+          let btnHistorial = "";
+          if (c.clienteID) {
+            btnHistorial = `
+              <button class="btn-history" onclick="window.open('historial_pagos_cliente.html?clienteID=${c.clienteID}', '_self')">
+                <span class="material-icons">history</span> Ver Historial de Pagos
+              </button>
+            `;
+          }
+
           document.getElementById("main-detail").innerHTML = `
             <div class="cabecera">
               <div class="title">${(c.nombre || "") + " " + (c.apellido || "")}</div>
@@ -175,16 +185,14 @@
               ${detailTile("Para Ponerse al Día", money(c.paraPonerseAlDia), "paid")}
               ${detailTile("Última actualización", formateaFecha(c.ultimaActualizacion), "update")}
             </div>
-            <div class="acciones">
-              <button class="btn-accent" onclick="window.open('amortizacion.html?id=${creditoId}', '_self')">
-                <span class="material-icons">view_list</span> Ver Plan de Pagos
+            <div class="acciones-modernas">
+              <button class="btn-action blue" onclick="window.open('amortizacion.html?id=${creditoId}', '_self')">
+                <span class="material-icons">view_list</span> Plan de Pagos
               </button>
-              <button class="btn-green" onclick="window.open('proyeccion.html?id=${creditoId}', '_self')">
-                <span class="material-icons">trending_up</span> Hacer Proyección
+              <button class="btn-action green" onclick="window.open('proyeccion.html?id=${creditoId}', '_self')">
+                <span class="material-icons">trending_up</span> Proyección
               </button>
-              <button class="btn-accent" style="background:#8e44ad;" onclick="window.open('historial_pagos.html?clienteID=${c.clienteID}', '_self')">
-                <span class="material-icons">history</span> Historial de Pagos
-              </button>
+              ${btnHistorial}
             </div>
           `;
         } catch (err) {
@@ -198,22 +206,23 @@
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
     body { background: #101012; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
-    .main { max-width: 480px; margin: 0 auto; padding: 1.5rem 1rem 3rem 1rem; }
+    .main { max-width: 500px; margin: 0 auto; padding: 1.5rem 1rem 3rem 1rem; }
     .cabecera {
-      background: #ffb30012; border-radius: 16px; padding: 22px 18px 17px 18px;
-      margin-bottom: 16px; box-shadow: 0 2px 14px #0002;
+      background: linear-gradient(90deg,#ffb30044 0,#aee2fa22 100%);
+      border-radius: 18px; padding: 22px 18px 17px 18px;
+      margin-bottom: 18px; box-shadow: 0 2px 14px #0002;
     }
-    .title { font-size: 2rem; font-weight: bold; color: #fff;}
-    .subtitle { color: #ffe5b7; font-size: 1rem; margin-top: 1px;}
-    .detalles { margin-bottom: 28px; }
+    .title { font-size: 2.1rem; font-weight: bold; color: #fff;}
+    .subtitle { color: #ffe5b7; font-size: 1rem; margin-top: 2px;}
+    .detalles { margin-bottom: 35px; }
     .detail-card {
       background: #191927;
       border-radius: 12px;
-      margin-bottom: 11px;
+      margin-bottom: 12px;
       display: flex; align-items: flex-start;
-      box-shadow: 0 2px 8px #0002;
-      padding: 10px 16px;
-      gap: 12px;
+      box-shadow: 0 2px 8px #0001;
+      padding: 11px 18px;
+      gap: 13px;
     }
     .detail-card .icon {
       width: 36px; height: 36px;
@@ -223,8 +232,8 @@
       flex-shrink: 0;
     }
     .detail-card .material-icons { color: #ffb300; font-size: 22px;}
-    .detail-label { color: #ffe7b5; font-size: .99rem;}
-    .detail-value { color: #fff; font-size: 1.12rem; font-weight: bold;}
+    .detail-label { color: #ffe7b5; font-size: 1rem;}
+    .detail-value { color: #fff; font-size: 1.14rem; font-weight: bold;}
     .loader {
       width: 44px; height: 44px; margin: 55px auto 70px auto; border-radius: 50%;
       border: 4.5px solid #ffb300; border-top: 4.5px solid #eee0; animation: spin 1s linear infinite;
@@ -232,32 +241,54 @@
     }
     @keyframes spin { 100% { transform: rotate(360deg); } }
     .notfound { color: #fff9; font-size: 1.22rem; text-align: center; margin: 70px 0;}
-    .acciones {
+    .acciones-modernas {
       display: flex;
-      gap: 15px;
+      gap: 12px;
       justify-content: stretch;
-      margin-top: 35px;
+      margin-top: 40px;
+      margin-bottom: 8px;
+      background: #191927e0;
+      padding: 21px 14px 13px 14px;
+      border-radius: 15px;
+      box-shadow: 0 2px 14px #0002;
+      flex-wrap: wrap;
     }
-    .acciones .btn-accent, .acciones .btn-green {
+    .btn-action,
+    .btn-history {
       flex: 1 1 0;
-      background: #2196f3;
+      min-width: 145px;
+      background: #228be6;
       border: none;
       color: #fff;
       font-size: 1.08rem;
-      padding: 15px 8px;
-      border-radius: 12px;
+      padding: 13px 10px;
+      border-radius: 11px;
       font-weight: 600;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      gap: 8px;
-      transition: background 0.16s;
+      gap: 9px;
+      box-shadow: 0 2px 12px #0001;
+      transition: background 0.17s, transform 0.10s;
+      margin-bottom: 8px;
     }
-    .acciones .btn-green { background: #23b76d; }
-    .acciones .btn-accent:hover { background: #2962ff;}
-    .acciones .btn-green:hover { background: #19a05a;}
+    .btn-action.green { background: #22b573; }
+    .btn-action.blue { background: #228be6; }
+    .btn-history {
+      background: #8e44ad;
+    }
+    .btn-action:hover,
+    .btn-history:hover {
+      background: #173b63;
+      transform: translateY(-2px) scale(1.04);
+      color: #fff;
+    }
+    .btn-action.green:hover { background: #179154; }
+    .btn-action.blue:hover { background: #12549c; }
+    .btn-history:hover { background: #69269d;}
     @media (max-width: 570px) {
       .main { max-width: 99vw; padding: 1rem .4rem 2rem .4rem;}
       .cabecera { font-size: 1.13rem;}
+      .acciones-modernas { flex-direction: column; gap: 10px; padding: 17px 7px;}
     }
   </style>
 </head>

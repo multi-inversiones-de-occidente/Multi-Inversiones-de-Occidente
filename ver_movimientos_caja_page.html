@@ -56,7 +56,7 @@
     </button>
   </div>
 
-  <!-- Firebase y lógica principal: SIN CAMBIOS -->
+  <!-- Firebase y lógica principal: SOLO SE AGREGA EL FILTRO DE ANULADO EN MOVIMIENTOS MANUALES -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, orderBy, limit, getDoc, doc as docRef } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -133,7 +133,7 @@
 
       let movimientos = [];
 
-      // 1. Movimientos manuales (solo de esa agencia)
+      // 1. Movimientos manuales (solo de esa agencia, **AHORA FILTRANDO ANULADOS**)
       const movSnap = await getDocs(
         query(
           collection(db, "movimientosCaja"),
@@ -144,6 +144,7 @@
       );
       movSnap.forEach(doc => {
         const d = doc.data();
+        if (d.anulado === true) return; // <--- SOLO ESTA LINEA NUEVA
         movimientos.push({
           tipo: d.tipo,
           descripcion: d.descripcion,
@@ -318,5 +319,6 @@
   </script>
 </body>
 </html>
+
 
 

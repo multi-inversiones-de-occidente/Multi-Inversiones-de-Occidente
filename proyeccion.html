@@ -50,12 +50,22 @@
       return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
     }
 
+    // Parsear input de tipo date como fecha local, no UTC
+    function parseDateInput(dateStr) {
+      // dateStr tiene formato "YYYY-MM-DD"
+      const [year, month, day] = dateStr.split('-').map(Number);
+      // mes en JS va de 0 a 11, así que restamos 1
+      return new Date(year, month - 1, day, 12, 0, 0);
+    }
+
+    // Lógica corregida y optimizada para cálculo bancario real
     function calcularProyeccion(credito, fechaProy) {
       const tasaDiaria = parseFloat(credito.tasaDiariaCredito || "0") || 0;
       const saldoActual = parseFloat(credito.saldoActual || "0") || 0;
       const interesActual = parseFloat(credito.interesActual || "0") || 0;
       const amortizacion = credito.amortizacion || [];
 
+      // Tomar SIEMPRE la última actualización real como fecha base
       let fechaBaseStr = credito.fechaUltimoMovimiento || credito.fechaInicio;
       let fechaBase;
       try {
@@ -68,7 +78,6 @@
       let capitalVencido = 0.0;
       let interesesVencidos = 0.0;
       let cuotasAtrasadas = 0;
-      let fechaUltimaVencida = null;
 
       for (const cuotaItem of amortizacion) {
         if (!cuotaItem) continue;
@@ -82,34 +91,17 @@
           capitalVencido += parseFloat(cuotaItem.capital || "0");
           interesesVencidos += parseFloat(cuotaItem.interes || "0");
           cuotasAtrasadas++;
-          if (!fechaUltimaVencida || fechaCuota > fechaUltimaVencida) {
-            fechaUltimaVencida = fechaCuota;
-          }
         }
       }
 
-      let interesCorriente = 0.0;
-      let dias = 0;
-      if (cuotasAtrasadas > 0 && fechaUltimaVencida) {
-        const desde = new Date(fechaUltimaVencida.getTime() + 86400000);
-        if (fechaProyeccion >= desde) {
-          dias = Math.floor((fechaProyeccion - desde) / 86400000);
-          interesCorriente = saldoActual * tasaDiaria * dias;
-        } else {
-          dias = 0;
-          interesCorriente = 0;
-        }
-      } else {
-        dias = Math.floor((fechaProyeccion - fechaBase) / 86400000);
-        interesCorriente = (dias > 0) ? saldoActual * tasaDiaria * dias : 0.0;
-      }
+      // Intereses corridos SOLO desde la última actualización real (fechaBase)
+      let dias = Math.floor((fechaProyeccion - fechaBase) / 86400000);
+      let interesCorriente = (dias > 0) ? saldoActual * tasaDiaria * dias : 0.0;
 
-      let paraPonerseAlDia = 0.0;
-      if (cuotasAtrasadas > 0) {
-        paraPonerseAlDia = cuotasVencidas + interesCorriente;
-      } else {
-        paraPonerseAlDia = interesCorriente;
-      }
+      // "Para ponerse al día" = cuotas vencidas + intereses corridos NO incluidos en cuotas vencidas
+      let paraPonerseAlDia = cuotasVencidas + interesCorriente;
+
+      // Interés acumulado (solo para mostrar) = interesActual + intereses corridos + intereses vencidos
       let interesProyectado = interesActual + interesCorriente + interesesVencidos;
 
       return {
@@ -240,7 +232,7 @@
       }
       document.getElementById("main-proyeccion").innerHTML = html;
 
-      // Modal lógica
+      // Modal lógica con corrección de zona horaria
       document.getElementById("btnElegirFecha").onclick = () => {
         document.getElementById("modalFecha").style.display = "block";
       };
@@ -253,7 +245,7 @@
         document.getElementById("btnConfirmarFecha").onclick = () => {
           const val = document.getElementById("inputFecha").value;
           if (val) {
-            fechaProyeccion = val;
+            fechaProyeccion = parseDateInput(val); // ¡Aquí usamos la función corregida!
             proyeccion = calcularProyeccion(creditoGlobal, fechaProyeccion);
             renderUI();
           }

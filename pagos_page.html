@@ -230,7 +230,7 @@
       render();
     }
 
-    // LOGICA MODIFICADA SOLO DONDE INDICAS:
+    // === LÓGICA DE PAGO ADAPTADA A TU PEDIDO ===
     async function realizarPago(cliente, montoNum) {
       try {
         const user = auth.currentUser;
@@ -275,22 +275,22 @@
           restante = 0;
         }
 
-        // 2. INTERES ACTUAL CORRIDO (hasta HOY)
+        // 2. INTERES CORRIDO (interesActual, solo a la fecha)
         let interesPagadoHoy = Math.min(interesActual, restante);
         restante -= interesPagadoHoy;
         pagoInteres += interesPagadoHoy;
         interesActual -= interesPagadoHoy;
 
-        // REFLEJAR EL INTERES PAGADO HOY EN LA PRIMERA CUOTA PENDIENTE
+        // Aplica ese interesPagadoHoy al montoPagadoInteres de la primera cuota pendiente de capital
         for (let i = 0; i < amortizacion.length; i++) {
           let cuota = amortizacion[i];
-          if (parseFloat(cuota.montoPagado) < parseFloat(cuota.capital)) {
+          if ((parseFloat(cuota.montoPagado) || 0) < parseFloat(cuota.capital)) {
             cuota.montoPagadoInteres = (parseFloat(cuota.montoPagadoInteres) || 0) + interesPagadoHoy;
             break;
           }
         }
 
-        // 3. CAPITAL: Primero a la cuota exigible actual, luego a la siguiente si sobra
+        // 3. CAPITAL: Reparte el resto a capital de las cuotas desde la más próxima
         for (let i = 0; i < amortizacion.length && restante > 0; i++) {
           let cuota = amortizacion[i];
           let capitalPendiente = parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0);
@@ -307,7 +307,6 @@
         // 4. ACTUALIZAR ESTADOS DE CUOTAS
         for (let i = 0; i < amortizacion.length; i++) {
           let cuota = amortizacion[i];
-          // Pagada si capital y algún interes ya fue abonado
           if (
             (parseFloat(cuota.montoPagado) || 0) + tolerancia >= (parseFloat(cuota.capital) || 0)
           ) {

@@ -203,15 +203,25 @@
       if (!isNaN(correlativoNum) && correlativoInput !== "") correlativosBuscar.push(correlativoNum);
 
       let ticket = null;
+      let creditoAnulado = false;
+
       // Busca en pagos
       const pagosQuery = query(collection(db, "pagos"), where("correlativo", "in", correlativosBuscar));
       const pagosSnap = await getDocs(pagosQuery);
       if (!pagosSnap.empty) {
         ticket = { ...pagosSnap.docs[0].data(), tipo: "pago", id: pagosSnap.docs[0].id };
+        // Si es pago de crédito, revisar si el crédito está anulado
+        if (ticket.creditoID) {
+          const creditoDoc = await getDoc(doc(db, "creditos", ticket.creditoID));
+          if (creditoDoc.exists()) {
+            const dataCred = creditoDoc.data();
+            if (dataCred.anulado === true) creditoAnulado = true;
+          }
+        }
       }
 
       // Si no en pagos, busca en movimientosCaja
-      if (!ticket) {
+      if (!ticket && !creditoAnulado) {
         const movCajaQuery = query(collection(db, "movimientosCaja"), where("correlativo", "in", correlativosBuscar));
         const movCajaSnap = await getDocs(movCajaQuery);
         if (!movCajaSnap.empty) {
@@ -220,12 +230,18 @@
       }
 
       // Si no en movimientos_caja (con guión bajo)
-      if (!ticket) {
+      if (!ticket && !creditoAnulado) {
         const movCaja2Query = query(collection(db, "movimientos_caja"), where("correlativo", "in", correlativosBuscar));
         const movCaja2Snap = await getDocs(movCaja2Query);
         if (!movCaja2Snap.empty) {
           ticket = { ...movCaja2Snap.docs[0].data(), tipo: "movimientoCaja" };
         }
+      }
+
+      if (creditoAnulado) {
+        document.getElementById("error-msg").textContent = "El crédito asociado a este ticket fue ANULADO. No se puede mostrar el comprobante.";
+        document.getElementById("error-msg").style.display = "block";
+        return;
       }
 
       if (!ticket) {
@@ -303,13 +319,16 @@
         return;
       }
 
-      // 2. Tomar todos los creditosID encontrados
-      const creditosIDs = snapCred.docs.map(doc => doc.id);
-      if (creditosIDs.length === 0) {
+      // 2. Tomar solo los créditos NO ANULADOS
+      const creditosActivos = snapCred.docs.filter(doc => doc.data().anulado !== true);
+      if (creditosActivos.length === 0) {
         document.getElementById("tickets-dui-container").innerHTML =
           `<div style="color:#ff6363;text-align:center;padding:34px 0;">No se encontraron créditos activos con ese DUI.</div>`;
         return;
       }
+
+      // 2.1 Tomar los creditosID no anulados
+      const creditosIDs = creditosActivos.map(doc => doc.id);
 
       // 3. Buscar pagos de esos creditos
       const pagosRef = collection(db, "pagos");
@@ -369,13 +388,19 @@
       }
       const pago = docSnap.data();
 
-      // Buscar el DUI en el crédito
+      // Buscar el DUI en el crédito y verificar si está anulado
       let dui = "";
+      let anulado = false;
       if (pago.creditoID) {
         const creditoDoc = await getDoc(doc(db, "creditos", pago.creditoID));
         if (creditoDoc.exists()) {
           dui = creditoDoc.data().numeroDui || "";
+          if (creditoDoc.data().anulado === true) anulado = true;
         }
+      }
+      if (anulado) {
+        alert("El crédito asociado a este ticket fue ANULADO. No se puede imprimir el comprobante.");
+        return;
       }
 
       let printHtml = `
@@ -463,4 +488,3 @@
   </script>
 </body>
 </html>
-

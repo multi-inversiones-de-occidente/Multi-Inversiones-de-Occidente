@@ -230,7 +230,7 @@
       render();
     }
 
-    // === LÓGICA DE PAGO ROBUSTA CORREGIDA: Solo intereses exigibles, luego capital, nunca intereses futuros ===
+    // LOGICA MODIFICADA SOLO DONDE INDICAS:
     async function realizarPago(cliente, montoNum) {
       try {
         const user = auth.currentUser;
@@ -251,15 +251,6 @@
         let multasAcumuladas = parseFloat(creditoData.multasAcumuladas || 0);
         let paraPonerseAlDia = parseFloat(creditoData.paraPonerseAlDia || 0);
 
-        // Interés corrido sólo hasta hoy
-        let fechaUltimoCalculo = creditoData.fechaUltimoCalculoIntereses
-          ? new Date(creditoData.fechaUltimoCalculoIntereses)
-          : new Date(creditoData.fechaInicio);
-        let tasaDiaria = parseFloat(creditoData.tasaDiariaCredito || 0.0);
-        let dias = Math.floor((ahora - fechaUltimoCalculo) / (1000 * 60 * 60 * 24));
-        let interesCorrido = dias > 0 ? saldoActual * tasaDiaria * dias : 0;
-        interesActual += interesCorrido;
-
         let amortizacion = Array.isArray(creditoData.amortizacion) ? creditoData.amortizacion : [];
         amortizacion = amortizacion.map((cuota) => ({
           ...cuota,
@@ -273,7 +264,7 @@
         let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
         const tolerancia = 0.10; // Tolerancia de centavos
 
-        // 1. Multas
+        // 1. MULTAS
         if (restante >= multasAcumuladas) {
           restante -= multasAcumuladas;
           pagoMultas = multasAcumuladas;
@@ -284,42 +275,42 @@
           restante = 0;
         }
 
-        // 2. PAGO SOLO DE CUOTAS EXIGIBLES A LA FECHA: primero interés exigible, luego capital exigible
+        // 2. INTERES ACTUAL CORRIDO (hasta HOY)
+        let interesPagadoHoy = Math.min(interesActual, restante);
+        restante -= interesPagadoHoy;
+        pagoInteres += interesPagadoHoy;
+        interesActual -= interesPagadoHoy;
+
+        // REFLEJAR EL INTERES PAGADO HOY EN LA PRIMERA CUOTA PENDIENTE
+        for (let i = 0; i < amortizacion.length; i++) {
+          let cuota = amortizacion[i];
+          if (parseFloat(cuota.montoPagado) < parseFloat(cuota.capital)) {
+            cuota.montoPagadoInteres = (parseFloat(cuota.montoPagadoInteres) || 0) + interesPagadoHoy;
+            break;
+          }
+        }
+
+        // 3. CAPITAL: Primero a la cuota exigible actual, luego a la siguiente si sobra
         for (let i = 0; i < amortizacion.length && restante > 0; i++) {
           let cuota = amortizacion[i];
-          // La cuota es exigible si su fecha <= hoy (ya venció o es el día)
-          if (new Date(cuota.fecha) > ahora) break; // ya no hay más exigibles
-
-          // 2.1 Pagar interés pendiente de la cuota actual (sólo si es exigible)
-          let interesPendiente = parseFloat(cuota.interes || 0) - (parseFloat(cuota.montoPagadoInteres) || 0);
-          if (interesPendiente > 0) {
-            let abonoInteres = Math.min(restante, interesPendiente);
-            cuota.montoPagadoInteres += abonoInteres;
-            pagoInteres += abonoInteres;
-            restante -= abonoInteres;
-            interesPendiente -= abonoInteres;
-            if (restante <= 0) break;
-          }
-
-          // 2.2 Pagar capital pendiente de la cuota actual (solo si el interés ya está cubierto)
           let capitalPendiente = parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0);
-          if (interesPendiente <= tolerancia && capitalPendiente > 0) {
+          if (capitalPendiente > 0) {
             let abonoCapital = Math.min(restante, capitalPendiente);
             cuota.montoPagado += abonoCapital;
             pagoCapital += abonoCapital;
             saldoActual -= abonoCapital;
             if (saldoActual < 0) saldoActual = 0;
             restante -= abonoCapital;
-            if (restante <= 0) break;
           }
+        }
 
-          // 2.3 Actualizar estado de la cuota
+        // 4. ACTUALIZAR ESTADOS DE CUOTAS
+        for (let i = 0; i < amortizacion.length; i++) {
+          let cuota = amortizacion[i];
+          // Pagada si capital y algún interes ya fue abonado
           if (
-            (parseFloat(cuota.montoPagadoInteres) || 0) + tolerancia >= (parseFloat(cuota.interes) || 0) &&
             (parseFloat(cuota.montoPagado) || 0) + tolerancia >= (parseFloat(cuota.capital) || 0)
           ) {
-            cuota.montoPagadoInteres = parseFloat(cuota.interes) || 0;
-            cuota.montoPagado = parseFloat(cuota.capital) || 0;
             cuota.estado = "Pagada";
             cuota.fechaPagoReal = fechaPago;
           } else if (
@@ -329,57 +320,28 @@
             cuota.estado = "Parcial";
             cuota.fechaPagoReal = null;
           } else {
-            if (new Date(cuota.fecha) < ahora) {
-              cuota.estado = "Atrasado";
-            } else {
-              cuota.estado = "Pendiente";
-            }
+            cuota.estado = "Pendiente";
+            cuota.fechaPagoReal = null;
           }
         }
 
-        // 3. SI SOBRA DINERO, se abona SOLO A CAPITAL de las cuotas siguientes, **no a intereses futuros**
-        for (let i = 0; i < amortizacion.length && restante > 0; i++) {
-          let cuota = amortizacion[i];
-          // Sólo cuotas futuras (no exigibles): fecha > ahora, y solo capital
-          if (new Date(cuota.fecha) <= ahora) continue;
-
-          let capitalPendiente = parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0);
-          if (capitalPendiente > 0) {
-            let abonoCapital = Math.min(restante, capitalPendiente);
-            cuota.montoPagado += abonoCapital;
-            pagoCapital += abonoCapital;
-            saldoActual -= abonoCapital;
-            if (saldoActual < 0) saldoActual = 0;
-            restante -= abonoCapital;
-            // NO abona a intereses futuros
-          }
-          if (restante <= 0) break;
-        }
-
-        // SEGUNDO RECORRIDO: Asignar fechaPagoReal si falta
-        for (let cuota of amortizacion) {
-          if (
-            cuota.estado === "Pagada" &&
-            (!cuota.fechaPagoReal || cuota.fechaPagoReal === null)
-          ) {
-            cuota.fechaPagoReal = fechaPago;
-          }
-        }
-
-        // 4. Recalcular indicadores globales
+        // 5. RECALCULAR paraPonerseAlDia
         paraPonerseAlDia = 0;
         let capitalAtrasado = 0;
-        const hoy = new Date();
         for (let i = 0; i < amortizacion.length; i++) {
           let cuota = amortizacion[i];
-          const esVencida = new Date(cuota.fecha) < hoy && cuota.estado !== "Pagada";
-          if (esVencida) {
+          // Si es vencida y no pagada, falta pagar algo
+          const fechaCuota = new Date(cuota.fecha);
+          if (fechaCuota < ahora && cuota.estado !== "Pagada") {
             let faltaCapital = Math.max(0, parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0));
             let faltaInteres = Math.max(0, parseFloat(cuota.interes || 0) - (parseFloat(cuota.montoPagadoInteres) || 0));
             paraPonerseAlDia += faltaCapital + faltaInteres;
             capitalAtrasado += faltaCapital;
           }
         }
+        // Si está todo pagado, paraPonerseAlDia queda 0
+        if (paraPonerseAlDia < 0.01) paraPonerseAlDia = 0;
+
         saldoActual = amortizacion
           .reduce((acc, cuota) => acc + Math.max(0, parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0)), 0);
 
@@ -414,7 +376,7 @@
 
         await window.firebaseUpdateDoc("creditos", cliente.id, {
           saldoActual: (parseFloat(saldoActual) || 0).toFixed(2),
-          interesActual: "0.00", // El interesActual ya está distribuido en cuotas
+          interesActual: interesActual.toFixed(2),
           capitalAtrasado: (parseFloat(capitalAtrasado) || 0).toFixed(2),
           paraPonerseAlDia: (parseFloat(paraPonerseAlDia) || 0).toFixed(2),
           multasAcumuladas: (parseFloat(multasAcumuladas) || 0).toFixed(2),
@@ -424,7 +386,6 @@
           amortizacion: amortizacion
         });
 
-        // *** AQUÍ ES EL ÚNICO CAMBIO ***
         window.location.href = `ticket_page.html?correlativo=${correlativoStr}` +
           `&cliente=${encodeURIComponent(creditoData.nombre)}` +
           `&apellido=${encodeURIComponent(creditoData.apellido || '')}` +
@@ -451,7 +412,6 @@
   </script>
 </body>
 </html>
-
 
 
 

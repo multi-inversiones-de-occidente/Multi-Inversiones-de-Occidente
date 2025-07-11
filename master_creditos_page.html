@@ -70,6 +70,8 @@
     function aplicarFiltro(term) {
       term = (term || "").toLowerCase();
       creditosFiltrados = creditos.filter(c => {
+        // Filtrar también aquí los "Revertido"
+        if (c.estadoCredito === "Revertido") return false;
         return (c.nombre || "").toLowerCase().includes(term)
           || (c.apellido || "").toLowerCase().includes(term)
           || (c.numeroDui || "").toLowerCase().includes(term);
@@ -82,7 +84,10 @@
       mostrarCreditos();
       let q = query(collection(db, "creditos"), where("agenciaAsignada", "==", department));
       let snap = await getDocs(q);
-      creditos = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      // Filtrar aquí también los "Revertido"
+      creditos = snap.docs
+        .map(doc => ({ ...doc.data(), id: doc.id }))
+        .filter(c => c.estadoCredito !== "Revertido");
       creditosFiltrados = [...creditos];
       loading = false;
       mostrarCreditos();
@@ -200,4 +205,5 @@
   </div>
 </body>
 </html>
+
 

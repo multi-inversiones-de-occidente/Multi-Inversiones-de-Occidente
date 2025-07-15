@@ -159,13 +159,14 @@
         for (const docMov of snap.docs) {
           const movData = docMov.data();
           if (movData.cierre === true) continue;
-          if (movData.anulado === true) continue; // <--- FILTRO NUEVO
+          if (movData.anulado === true) continue;
           movimientosDelDia.push({ id: docMov.id, coll, ...movData, origen: "movimiento" });
           if (movData.tipo === "Ingreso") totalIngresos += Number(movData.monto || 0);
           if (movData.tipo === "Egreso") totalEgresos += Number(movData.monto || 0);
         }
       }
-      // 2. PAGOS de clientes (NO anulados, NO cierre:true)
+
+      // 2. PAGOS de clientes (NO anulados, NO cierre:true) por fechaPago
       const pagosSnap = await getDocs(
         query(
           collection(db, "pagos"),
@@ -174,26 +175,60 @@
           where("fechaPago", "<=", fechaFinUTC)
         )
       );
+
+      // 2A. PAGOS RETROACTIVOS hechos HOY (por fechaRegistro)
+      const pagosRetroSnap = await getDocs(
+        query(
+          collection(db, "pagos"),
+          where("sucursal", "==", agenciaActual),
+          where("fechaRegistro", ">=", fechaInicioUTC),
+          where("fechaRegistro", "<=", fechaFinUTC),
+          where("retroactivo", "==", true)
+        )
+      );
+
+      // Junta ambos arrays, evita duplicados por ID
+      const pagosUnidos = [];
+      const pagosIds = new Set();
+
       for (const docPago of pagosSnap.docs) {
         const data = docPago.data();
         if (!("anulado" in data) || !data.anulado) {
           const cierrePago = data.hasOwnProperty("cierre") ? data.cierre : false;
           if (cierrePago === false || cierrePago === null) {
-            movimientosDelDia.push({
-              id: docPago.id,
-              coll: "pagos",
-              tipo: "Ingreso",
-              descripcion: "Pago de cliente",
-              monto: Number(data.montoPagado) || 0,
-              usuario: data.cajeroNombre || "",
-              fecha: data.fechaPago,
-              cierre: cierrePago,
-              origen: "pago"
-            });
-            totalIngresos += Number(data.montoPagado) || 0;
+            pagosUnidos.push({ ...data, id: docPago.id });
+            pagosIds.add(docPago.id);
           }
         }
       }
+      for (const docPago of pagosRetroSnap.docs) {
+        if (pagosIds.has(docPago.id)) continue;
+        const data = docPago.data();
+        if (!("anulado" in data) || !data.anulado) {
+          const cierrePago = data.hasOwnProperty("cierre") ? data.cierre : false;
+          if (cierrePago === false || cierrePago === null) {
+            pagosUnidos.push({ ...data, id: docPago.id });
+            pagosIds.add(docPago.id);
+          }
+        }
+      }
+
+      // Ahora sí: agregar todos los pagosUnidos a movimientosDelDia y a totales
+      for (const data of pagosUnidos) {
+        movimientosDelDia.push({
+          id: data.id,
+          coll: "pagos",
+          tipo: "Ingreso",
+          descripcion: data.retroactivo ? "Pago retroactivo" : "Pago de cliente",
+          monto: Number(data.montoPagado) || 0,
+          usuario: data.cajeroNombre || "",
+          fecha: data.fechaRegistro || data.fechaPago || "",
+          cierre: data.cierre || false,
+          origen: "pago"
+        });
+        totalIngresos += Number(data.montoPagado) || 0;
+      }
+
       movimientosDelDia.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
       if (movimientosDelDia.length === 0) {
         document.getElementById("tabla-movs").innerHTML =

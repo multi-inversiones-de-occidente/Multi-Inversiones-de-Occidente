@@ -393,13 +393,54 @@
       // paraPonerseAlDia = interesActual
       let paraPonerseAlDia = interesActual;
 
+      // ------------ AGREGA AQUI LA LOGICA DE MULTAS Y ESTADO ------------------
+      // Limpiar multas de cuotas ya pagadas tras el abono retroactivo
+      let historialMultas = Array.isArray(creditoSeleccionado.historialMultas) ? creditoSeleccionado.historialMultas : [];
+      let nuevoHistorialMultas = [];
+      let nuevaMultaAcumulada = 0;
+      for (let multa of historialMultas) {
+        let idxCuota = typeof multa.cuotaNumero === "number" ? multa.cuotaNumero - 1 : null;
+        let cuotaMulta = idxCuota !== null ? amortizacion[idxCuota] : null;
+        if (cuotaMulta && cuotaMulta.estado !== "Pagada") {
+          nuevoHistorialMultas.push(multa);
+          nuevaMultaAcumulada += parseFloat(multa.monto || 0);
+        }
+      }
+
+      // Detectar si hay cuotas vencidas e impagas al día de hoy
+      let hayAtrasos = amortizacion.some(c => {
+        let fechaCuota = new Date(c.fecha);
+        let hoyFecha = new Date();
+        return fechaCuota < hoyFecha && c.estado !== "Pagada";
+      });
+      let nuevoEstadoCredito = hayAtrasos ? (creditoSeleccionado.estadoCredito || "Mora Temprana") : "Activo";
+
+      // ----------- LOGICA DEL CORRELATIVO ----------
+      let correlativo = 1;
+      try {
+        const pagosQuery = query(collection(db, "pagos"), where("creditoID", "==", creditoSeleccionado.id));
+        const pagosSnap = await getDocs(pagosQuery);
+        if (!pagosSnap.empty) {
+          let maxCorrel = 0;
+          pagosSnap.forEach(docP => {
+            const c = docP.data().correlativo || 0;
+            if (c > maxCorrel) maxCorrel = c;
+          });
+          correlativo = maxCorrel + 1;
+        }
+      } catch (e) {
+        correlativo = Math.floor(Math.random() * 100000); // fallback aleatorio (nunca debe pasar)
+      }
+
+      // ---------------------------------------------------
+
       // Registrar el pago retroactivo
       await addDoc(collection(db, "pagos"), {
         creditoID: creditoSeleccionado.id,
         montoPagado: monto,
         pagoInteres: pagoInteres.toFixed(2),
         pagoCapital: pagoCapital.toFixed(2),
-        saldoRestante: saldoActual.toFixed(2),    // <-- AGREGADO AQUI
+        saldoRestante: saldoActual.toFixed(2),
         fechaPago: new Date(fechaSeleccionada + "T12:00:00").toISOString(),
         nombres: creditoSeleccionado.nombre,
         sucursal: userAgencia,
@@ -408,6 +449,7 @@
         retroactivo: true,
         anulado: false,
         fechaRegistro: new Date().toISOString(),
+        correlativo // <--- Aquí va el correlativo
       });
 
       // Registrar el movimiento en caja
@@ -419,12 +461,15 @@
         usuarioID: userId,
       });
 
-      // Actualizar el crédito (sin tocar multas)
+      // Actualizar el crédito (ahora SÍ toca multas e historial)
       await updateDoc(doc(db, "creditos", creditoSeleccionado.id), {
         amortizacion: amortizacion,
         saldoActual: saldoActual.toFixed(2),
         interesActual: interesActual.toFixed(2),
-        paraPonerseAlDia: paraPonerseAlDia.toFixed(2)
+        paraPonerseAlDia: paraPonerseAlDia.toFixed(2),
+        historialMultas: nuevoHistorialMultas,
+        multasAcumuladas: nuevaMultaAcumulada.toFixed(2),
+        estadoCredito: nuevoEstadoCredito
       });
 
       // Reinicia ciclo visual:
@@ -443,4 +488,5 @@
   </script>
 </body>
 </html>
+
 

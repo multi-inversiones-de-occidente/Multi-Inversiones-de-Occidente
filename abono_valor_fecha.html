@@ -292,6 +292,17 @@
       document.getElementById("form-abono").style.display = "block";
     });
 
+    // --- NUEVA FUNCIÓN PARA DÍAS NATURALES SIN HORA ---
+    function diasEntreFechasSinHora(f1, f2) {
+      // f1 y f2 pueden ser tipo Date o string 'YYYY-MM-DD'
+      let d1 = new Date(f1);
+      let d2 = new Date(f2);
+      d1.setHours(0, 0, 0, 0);
+      d2.setHours(0, 0, 0, 0);
+      let diff = Math.floor((d2 - d1) / (1000 * 60 * 60 * 24));
+      return diff;
+    }
+
     // ---- Lógica de registro de abono retroactivo y todo lo demás igual ----
     document.getElementById("form-abono").onsubmit = async function(e) {
       e.preventDefault();
@@ -386,13 +397,12 @@
         .filter(c => c.estado !== "Pagada")
         .reduce((acc, c) => acc + Math.max(0, parseFloat(c.capital || 0) - (parseFloat(c.montoPagado) || 0)), 0);
 
-      // Calcula nuevo interesActual (solo intereses desde la fecha del pago retroactivo hasta hoy sobre saldo actual)
-      let hoy = new Date();
-      let diasInteres = Math.floor((hoy - new Date(fechaSeleccionada + "T23:59:59")) / (1000 * 60 * 60 * 24));
+      // --- CAMBIO AQUÍ: INTERESES SOLO DÍAS NATURALES ---
+      let fechaHoy = new Date();
+      let diasInteres = diasEntreFechasSinHora(fechaSeleccionada, fechaHoy);
       diasInteres = diasInteres > 0 ? diasInteres : 0;
       let tasaDiaria = parseFloat(creditoSeleccionado.tasaDiariaCredito || 0);
       let interesActual = saldoActual * tasaDiaria * diasInteres;
-
       // paraPonerseAlDia = interesActual
       let paraPonerseAlDia = interesActual;
 
@@ -489,6 +499,7 @@
   </script>
 </body>
 </html>
+
 
 
 

@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
@@ -31,6 +31,13 @@
     .modal-btn-cancel:hover { background: #bb2c1a; }
     .modal-btn-ok { background: #F8AF40; color: #1a1813; border: none; padding: 9px 18px; border-radius: 7px; cursor: pointer; font-weight: bold; transition: background .17s;}
     .modal-error { color: #d30013; font-size: 0.99rem; margin-bottom: 9px; font-weight: 500;}
+    /* Recibo */
+    .recibo-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #181e21cc; z-index: 9999; display: flex; align-items: center; justify-content: center;}
+    .recibo { background: #fff; color: #232a37; border-radius: 14px; box-shadow: 0 2px 32px #0007; padding: 27px 23px 18px 23px; max-width: 350px; width: 96%; font-size: 1.03rem; }
+    .recibo-titulo { font-weight: bold; font-size: 1.2rem; margin-bottom: 12px; color: #fb923c; }
+    .recibo-row { margin-bottom: 7px; }
+    .recibo-close { background: #e74c3c; color: #fff; border: none; padding: 7px 15px; border-radius: 7px; cursor: pointer; font-weight: bold; float: right; margin-top: 9px;}
+    .recibo-close:hover { background: #bb2c1a; }
     @media (max-width:640px){.container{padding:1.15rem .6rem;}}
   </style>
 </head>
@@ -59,9 +66,10 @@
     </form>
   </div>
   <div id="modal-root"></div>
+  <div id="recibo-root"></div>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, query, where, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -85,7 +93,7 @@
     let fechaSeleccionada = null;
     let historico = null;
 
-    // PIN Gerente modal - CORREGIDO para varios gerentes y bug de resolve
+    // PIN Gerente modal - igual
     function showGerentePinDialog() {
       return new Promise((resolve) => {
         let modalRoot = document.getElementById("modal-root");
@@ -113,26 +121,14 @@
               render();
               return;
             }
-            // Logs para depuración:
-            let gerentesLog = [];
             let pinValido = false;
             snap.docs.forEach(docG => {
               const data = docG.data();
               const gerenteHash = typeof data.internalPassword === 'string' ? data.internalPassword.trim() : '';
-              gerentesLog.push({
-                nombre: data.nombre,
-                email: data.email,
-                hash: gerenteHash
-              });
-              console.log('[PIN-GERENTE] Comparando:', gerenteHash, 'vs', hashHex);
               if (String(gerenteHash).trim() === String(hashHex).trim()) {
                 pinValido = true;
               }
             });
-            console.log('[PIN-GERENTE] Gerentes encontrados para departamento:', userAgencia, '=', snap.docs.length);
-            console.log('[PIN-GERENTE] Detalles gerentes:', gerentesLog);
-            console.log('[PIN-GERENTE] Hash ingresado:', hashHex);
-
             if (pinValido) {
               closeModal();
               resolve(true);
@@ -142,13 +138,10 @@
             }
           } catch (e) {
             errorMsg = "Error técnico: " + e;
-            console.error('[PIN-GERENTE][ERROR]', e);
             render();
           }
         }
-        function closeModal() {
-          modalRoot.innerHTML = "";
-        }
+        function closeModal() { modalRoot.innerHTML = ""; }
         function render() {
           modalRoot.innerHTML = `
             <div class="modal-bg">
@@ -163,10 +156,7 @@
               </div>
             </div>
           `;
-          document.getElementById("cancelar-pin").onclick = () => {
-            closeModal();
-            resolve(false);
-          };
+          document.getElementById("cancelar-pin").onclick = () => { closeModal(); resolve(false); };
           document.getElementById("autorizar-pin").onclick = onOk;
           document.getElementById("gerente-pin-input").onkeydown = e => { if (e.key === "Enter") onOk(); };
           setTimeout(() => document.getElementById("gerente-pin-input").focus(), 30);
@@ -294,13 +284,35 @@
 
     // --- NUEVA FUNCIÓN PARA DÍAS NATURALES SIN HORA ---
     function diasEntreFechasSinHora(f1, f2) {
-      // f1 y f2 pueden ser tipo Date o string 'YYYY-MM-DD'
-      let d1 = new Date(f1);
-      let d2 = new Date(f2);
-      d1.setHours(0, 0, 0, 0);
-      d2.setHours(0, 0, 0, 0);
-      let diff = Math.floor((d2 - d1) / (1000 * 60 * 60 * 24));
-      return diff;
+      let d1 = new Date(f1); let d2 = new Date(f2);
+      d1.setHours(0,0,0,0); d2.setHours(0,0,0,0);
+      return Math.floor((d2-d1)/(1000*60*60*24));
+    }
+
+    // Mostrar recibo modal
+    function mostrarRecibo(datos) {
+      let reciboDiv = document.getElementById("recibo-root");
+      let fechaFmt = new Date(datos.fechaPago).toLocaleDateString('es-SV');
+      let hoyFmt = new Date().toLocaleDateString('es-SV');
+      reciboDiv.innerHTML = `
+        <div class="recibo-bg">
+          <div class="recibo">
+            <div class="recibo-titulo">Recibo de Pago Retroactivo</div>
+            <div class="recibo-row"><b>No. Correlativo:</b> ${datos.correlativo || '-'}</div>
+            <div class="recibo-row"><b>Cliente:</b> ${datos.nombres}</div>
+            <div class="recibo-row"><b>DUI:</b> ${datos.numeroDui || ''}</div>
+            <div class="recibo-row"><b>Monto pagado:</b> $${Number(datos.montoPagado).toFixed(2)}</div>
+            <div class="recibo-row"><b>Pago a valor fecha:</b> ${fechaFmt}</div>
+            <div class="recibo-row"><b>Sucursal:</b> ${datos.sucursal}</div>
+            <div class="recibo-row"><b>Pago capital:</b> $${Number(datos.pagoCapital).toFixed(2)}</div>
+            <div class="recibo-row"><b>Pago interés:</b> $${Number(datos.pagoInteres).toFixed(2)}</div>
+            <div class="recibo-row"><b>Saldo restante:</b> $${Number(datos.saldoRestante).toFixed(2)}</div>
+            <div class="recibo-row"><b>Registrado el:</b> ${hoyFmt}</div>
+            <div class="recibo-row"><b>Motivo:</b> ${datos.motivo || ''}</div>
+            <button class="recibo-close" onclick="document.getElementById('recibo-root').innerHTML=''">Cerrar</button>
+          </div>
+        </div>
+      `;
     }
 
     // ---- Lógica de registro de abono retroactivo y todo lo demás igual ----
@@ -324,7 +336,6 @@
       for (let i = 0; i < amortizacion.length; i++) {
         let cuota = amortizacion[i];
         let fechaCuota = new Date(cuota.fecha);
-        // Inicializar campos
         if (typeof cuota.montoPagadoInteres !== "number") cuota.montoPagadoInteres = 0;
         if (typeof cuota.montoPagado !== "number") cuota.montoPagado = 0;
         if (fechaCuota <= new Date(fechaSeleccionada + "T23:59:59")) {
@@ -336,19 +347,16 @@
           let pendienteInteres = interesCuota - pagadoInteres;
           let pendienteCapital = capitalCuota - pagadoCapital;
 
-          // 1. Paga interés primero
           let abonoInteres = Math.min(pendienteInteres, abonoRestante);
           cuota.montoPagadoInteres = pagadoInteres + abonoInteres;
           pagoInteres += abonoInteres;
           abonoRestante -= abonoInteres;
 
-          // 2. Luego paga capital
           let abonoCapital = Math.min(pendienteCapital, abonoRestante);
           cuota.montoPagado = pagadoCapital + abonoCapital;
           pagoCapital += abonoCapital;
           abonoRestante -= abonoCapital;
 
-          // 3. Estado de cuota
           if (
             Math.abs(cuota.montoPagadoInteres - interesCuota) < 0.01 &&
             Math.abs(cuota.montoPagado - capitalCuota) < 0.01
@@ -397,17 +405,15 @@
         .filter(c => c.estado !== "Pagada")
         .reduce((acc, c) => acc + Math.max(0, parseFloat(c.capital || 0) - (parseFloat(c.montoPagado) || 0)), 0);
 
-      // --- CAMBIO AQUÍ: INTERESES SOLO DÍAS NATURALES ---
+      // --- INTERESES SOLO DÍAS NATURALES ---
       let fechaHoy = new Date();
       let diasInteres = diasEntreFechasSinHora(fechaSeleccionada, fechaHoy);
       diasInteres = diasInteres > 0 ? diasInteres : 0;
       let tasaDiaria = parseFloat(creditoSeleccionado.tasaDiariaCredito || 0);
       let interesActual = saldoActual * tasaDiaria * diasInteres;
-      // paraPonerseAlDia = interesActual
       let paraPonerseAlDia = interesActual;
 
-      // ------------ AGREGA AQUI LA LOGICA DE MULTAS Y ESTADO ------------------
-      // Limpiar multas de cuotas ya pagadas tras el abono retroactivo
+      // LOGICA DE MULTAS Y ESTADO
       let historialMultas = Array.isArray(creditoSeleccionado.historialMultas) ? creditoSeleccionado.historialMultas : [];
       let nuevoHistorialMultas = [];
       let nuevaMultaAcumulada = 0;
@@ -420,6 +426,16 @@
         }
       }
 
+      // Actualizar capitalAtrasado después del pago retroactivo (solo cuotas vencidas y no pagadas)
+      let capitalAtrasadoActual = amortizacion
+        .filter(c => {
+          let fechaCuota = new Date(c.fecha);
+          let hoy = new Date();
+          hoy.setHours(0,0,0,0);
+          return fechaCuota < hoy && c.estado !== "Pagada";
+        })
+        .reduce((acc, c) => acc + Math.max(0, parseFloat(c.capital || 0) - (parseFloat(c.montoPagado) || 0)), 0);
+
       // Detectar si hay cuotas vencidas e impagas al día de hoy
       let hayAtrasos = amortizacion.some(c => {
         let fechaCuota = new Date(c.fecha);
@@ -428,7 +444,7 @@
       });
       let nuevoEstadoCredito = hayAtrasos ? (creditoSeleccionado.estadoCredito || "Mora Temprana") : "Activo";
 
-      // ----------- LOGICA DEL CORRELATIVO ----------
+      // LOGICA DEL CORRELATIVO
       let correlativo = 1;
       try {
         const pagosQuery = query(collection(db, "pagos"), where("creditoID", "==", creditoSeleccionado.id));
@@ -446,7 +462,7 @@
       }
 
       // Registrar el pago retroactivo
-      await addDoc(collection(db, "pagos"), {
+      let pagoObj = {
         creditoID: creditoSeleccionado.id,
         montoPagado: monto,
         pagoInteres: pagoInteres.toFixed(2),
@@ -454,6 +470,7 @@
         saldoRestante: saldoActual.toFixed(2),
         fechaPago: new Date(fechaSeleccionada + "T12:00:00").toISOString(),
         nombres: creditoSeleccionado.nombre,
+        numeroDui: creditoSeleccionado.numeroDui || "",
         sucursal: userAgencia,
         usuarioID: userId,
         motivo: motivo,
@@ -461,7 +478,8 @@
         anulado: false,
         fechaRegistro: new Date().toISOString(),
         correlativo
-      });
+      };
+      await addDoc(collection(db, "pagos"), pagoObj);
 
       // Registrar el movimiento en caja
       await addDoc(collection(db, "movimientos_caja"), {
@@ -472,7 +490,7 @@
         usuarioID: userId,
       });
 
-      // Actualizar el crédito (ahora SÍ toca multas e historial)
+      // Actualizar el crédito (ahora SÍ toca multas e historial Y capital atrasado)
       await updateDoc(doc(db, "creditos", creditoSeleccionado.id), {
         amortizacion: amortizacion,
         saldoActual: saldoActual.toFixed(2),
@@ -480,8 +498,12 @@
         paraPonerseAlDia: paraPonerseAlDia.toFixed(2),
         historialMultas: nuevoHistorialMultas,
         multasAcumuladas: nuevaMultaAcumulada.toFixed(2),
-        estadoCredito: nuevoEstadoCredito
+        estadoCredito: nuevoEstadoCredito,
+        capitalAtrasado: capitalAtrasadoActual.toFixed(2)
       });
+
+      // Mostrar recibo en pantalla
+      mostrarRecibo(pagoObj);
 
       // Reinicia ciclo visual:
       document.getElementById("ok-msg").textContent = "Abono retroactivo registrado correctamente.";

@@ -90,6 +90,8 @@
             const asignData = asignDoc.data();
             const solicitudID = asignData.solicitudID;
             if (!solicitudID) return null;
+            // Filtrar solo las asignaciones aceptadas
+            if (asignData.respuestaCliente !== "Aceptado") return null;
             try {
               const solRef = doc(db, "Archivo Solicitudes", solicitudID);
               const solSnap = await getDoc(solRef);

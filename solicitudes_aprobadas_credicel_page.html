@@ -95,16 +95,17 @@
             const asignData = asignDoc.data();
             const solicitudID = asignData.solicitudID;
             if (!solicitudID) return null;
+            // ---- CAMBIO CLAVE: Filtrar por respuestaCliente en la asignación ----
+            if (asignData.respuestaCliente !== "Aceptado") return null;
             try {
               const solRef = doc(db, "Archivo Solicitudes", solicitudID);
               const solSnap = await getDoc(solRef);
               if (!solSnap.exists()) return null;
               const solData = solSnap.data();
-              // SOLO mostrar Credicel, Aprobado y NO mostrar donde respuestaCliente sea "Rechazado"
+              // SOLO mostrar Credicel y Aprobado
               if (
                 solData.creditLine !== "Credicel" ||
-                solData.estado !== "Aprobado" ||
-                solData.respuestaCliente === "Rechazado"
+                solData.estado !== "Aprobado"
               ) return null;
               return {
                 asignacionID: asignDoc.id,
@@ -255,4 +256,5 @@
   </div>
 </body>
 </html>
+
 

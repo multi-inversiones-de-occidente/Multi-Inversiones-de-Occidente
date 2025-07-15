@@ -36,7 +36,6 @@
         return;
       }
       data.forEach(row => {
-        // La fila entera será un enlace a la página de detalle usando el ID de la asignación
         tbody.innerHTML += `
           <tr class="fila-click" data-id="${row.asignacionID}" style="cursor:pointer;">
             <td><i class="fas fa-check-circle"></i></td>
@@ -102,10 +101,15 @@
               const solSnap = await getDoc(solRef);
               if (!solSnap.exists()) return null;
               const solData = solSnap.data();
-              // SOLO mostrar Credicash y Aprobado
-              if (solData.creditLine !== "Credicash" || solData.estado !== "Aprobado") return null;
+              // SOLO mostrar Credicash, Aprobado y NO mostrar donde respuestaCliente sea "Rechazado"
+              if (
+                solData.creditLine !== "Credicash" ||
+                solData.estado !== "Aprobado" ||
+                solData.respuestaCliente === "Rechazado"
+              ) return null;
+
               return {
-                asignacionID: asignDoc.id, // <---- IMPORTANTE
+                asignacionID: asignDoc.id,
                 nombre: solData.nombre || '',
                 numeroDui: solData.numeroDui || solData.dui || '',
                 montoAprobado: asignData.montoAprobado ?? '',
@@ -212,7 +216,6 @@
       font-size: 1.1rem;
     }
     tr:hover { background: #232c31; }
-    /* Añade un efecto sutil para indicar clic */
     .fila-click:hover { background:#24302d; }
     @media (max-width:700px) {
       .container { padding: 1.3rem 0.5rem; }

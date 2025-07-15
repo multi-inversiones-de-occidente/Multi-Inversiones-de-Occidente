@@ -96,16 +96,17 @@
             const asignData = asignDoc.data();
             const solicitudID = asignData.solicitudID;
             if (!solicitudID) return null;
+            // ---- CAMBIO CLAVE: Filtrar por respuestaCliente en la asignación ----
+            if (asignData.respuestaCliente !== "Aceptado") return null;
             try {
               const solRef = doc(db, "Archivo Solicitudes", solicitudID);
               const solSnap = await getDoc(solRef);
               if (!solSnap.exists()) return null;
               const solData = solSnap.data();
-              // SOLO mostrar Credicash, Aprobado y NO mostrar donde respuestaCliente sea "Rechazado"
+              // SOLO mostrar Credicash y Aprobado
               if (
                 solData.creditLine !== "Credicash" ||
-                solData.estado !== "Aprobado" ||
-                solData.respuestaCliente === "Rechazado"
+                solData.estado !== "Aprobado"
               ) return null;
 
               return {

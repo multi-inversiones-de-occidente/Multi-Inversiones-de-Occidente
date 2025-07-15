@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
@@ -124,7 +124,6 @@
                 email: data.email,
                 hash: gerenteHash
               });
-              // Logs nuevos para depuración:
               console.log('[PIN-GERENTE] Comparando:', gerenteHash, 'vs', hashHex);
               if (String(gerenteHash).trim() === String(hashHex).trim()) {
                 pinValido = true;
@@ -136,7 +135,7 @@
 
             if (pinValido) {
               closeModal();
-              resolve(true);   // <<<< Ahora sí
+              resolve(true);
             } else {
               errorMsg = "PIN incorrecto";
               render();
@@ -176,14 +175,18 @@
       });
     }
 
-    // Al autenticarse, carga los créditos de la agencia del usuario
+    // Al autenticarse, carga los créditos de la agencia del usuario, excluyendo los "Revertido"
     onAuthStateChanged(auth, async user => {
       if (!user) return location.href = "login.html";
       usuarioActual = user.displayName || user.email || "Usuario desconocido";
       userId = user.uid;
       const docUser = await getDoc(doc(db, "users", user.uid));
       userAgencia = docUser.exists() && docUser.data().department ? docUser.data().department : "";
-      const q = query(collection(db, "creditos"), where("agenciaAsignada", "==", userAgencia));
+      const q = query(
+        collection(db, "creditos"),
+        where("agenciaAsignada", "==", userAgencia),
+        where("estadoCredito", "!=", "Revertido")
+      );
       const snap = await getDocs(q);
       creditosAgencia = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     });
@@ -429,10 +432,8 @@
           correlativo = maxCorrel + 1;
         }
       } catch (e) {
-        correlativo = Math.floor(Math.random() * 100000); // fallback aleatorio (nunca debe pasar)
+        correlativo = Math.floor(Math.random() * 100000);
       }
-
-      // ---------------------------------------------------
 
       // Registrar el pago retroactivo
       await addDoc(collection(db, "pagos"), {
@@ -449,7 +450,7 @@
         retroactivo: true,
         anulado: false,
         fechaRegistro: new Date().toISOString(),
-        correlativo // <--- Aquí va el correlativo
+        correlativo
       });
 
       // Registrar el movimiento en caja
@@ -488,5 +489,6 @@
   </script>
 </body>
 </html>
+
 
 

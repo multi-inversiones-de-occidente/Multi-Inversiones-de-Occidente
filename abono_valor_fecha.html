@@ -464,6 +464,7 @@
       // Registrar el pago retroactivo
       let pagoObj = {
         creditoID: creditoSeleccionado.id,
+        clienteID: creditoSeleccionado.clienteID || "",    // <-- ASEGÚRALO AQUÍ
         montoPagado: monto,
         pagoInteres: pagoInteres.toFixed(2),
         pagoCapital: pagoCapital.toFixed(2),

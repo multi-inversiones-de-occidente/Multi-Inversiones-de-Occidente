@@ -488,6 +488,8 @@
         fecha: new Date().toISOString(),
         referencia: 'Abono retroactivo',
         usuarioID: userId,
+        clienteID: creditoSeleccionado.clienteID || "", // <-- NUEVO
+        creditoID: creditoSeleccionado.id              // <-- NUEVO
       });
 
       // Actualizar el crédito (ahora SÍ toca multas e historial Y capital atrasado)

@@ -81,6 +81,7 @@
     const auth = getAuth(app);
 
     let pagosFiltrados = [];
+    let agenciaActual = "";
 
     // Fechas por defecto (21 de junio 2025 hasta hoy)
     function fechaActualISO() {
@@ -95,10 +96,13 @@
       document.getElementById("hasta").value = fechaActualISO();
     });
 
-    // Bloquea acceso a usuarios no autenticados
-    onAuthStateChanged(auth, user => {
-      if (!user) {
-        location.href = "login.html";
+    // Bloquea acceso a usuarios no autenticados y obtiene agencia
+    onAuthStateChanged(auth, async user => {
+      if (!user) return location.href = "login.html";
+      // Obtén agencia del usuario
+      const usersSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
+      if (!usersSnap.empty) {
+        agenciaActual = usersSnap.docs[0].data().department;
       }
     });
 
@@ -120,16 +124,22 @@
         pagosFiltrados = [];
         return;
       }
+      if (!agenciaActual) {
+        tablaDiv.innerHTML = `<div class="nada">No se pudo determinar la agencia del usuario.</div>`;
+        pagosFiltrados = [];
+        return;
+      }
 
       // Rango para incluir TODO el último día
       const desdeISO = new Date(desde + "T00:00:00").toISOString();
       const hastaISO = new Date(hasta + "T23:59:59").toISOString();
 
-      // Consulta los pagos dentro del rango de fechas
+      // Consulta los pagos dentro del rango de fechas Y de la agencia del usuario
       const pagosQ = query(
         collection(db, "pagos"),
         where("fechaPago", ">=", desdeISO),
-        where("fechaPago", "<=", hastaISO)
+        where("fechaPago", "<=", hastaISO),
+        where("sucursal", "==", agenciaActual)
       );
       const pagosSnap = await getDocs(pagosQ);
 
@@ -266,4 +276,5 @@
   </script>
 </body>
 </html>
+
 

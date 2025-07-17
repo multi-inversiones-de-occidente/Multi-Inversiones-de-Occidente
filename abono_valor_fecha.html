@@ -72,6 +72,23 @@
     import { getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, query, where, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
+    // --- PATCH fechas robustas para días sin hora y sin errores de zona horaria ---
+    function parseLocalYMD(ymd) {
+      if (!ymd) return null;
+      const [y, m, d] = ymd.split('-').map(n => parseInt(n, 10));
+      return new Date(y, m - 1, d, 0, 0, 0, 0); // medianoche local
+    }
+    function diffDaysLocal(d1, d2) {
+      const MS_PER_DAY = 86400000;
+      return Math.floor((d2.getTime() - d1.getTime()) / MS_PER_DAY);
+    }
+    function diasEntreFechasSinHora(f1YMD, f2DateObj) {
+      const d1 = parseLocalYMD(f1YMD);
+      const d2 = new Date(f2DateObj);
+      d2.setHours(0,0,0,0);
+      return diffDaysLocal(d1, d2);
+    }
+
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -282,13 +299,6 @@
       document.getElementById("form-abono").style.display = "block";
     });
 
-    // --- NUEVA FUNCIÓN PARA DÍAS NATURALES SIN HORA ---
-    function diasEntreFechasSinHora(f1, f2) {
-      let d1 = new Date(f1); let d2 = new Date(f2);
-      d1.setHours(0,0,0,0); d2.setHours(0,0,0,0);
-      return Math.floor((d2-d1)/(1000*60*60*24));
-    }
-
     // Mostrar recibo modal
     function mostrarRecibo(datos) {
       let reciboDiv = document.getElementById("recibo-root");
@@ -405,13 +415,12 @@
         .filter(c => c.estado !== "Pagada")
         .reduce((acc, c) => acc + Math.max(0, parseFloat(c.capital || 0) - (parseFloat(c.montoPagado) || 0)), 0);
 
-      // --- INTERESES SOLO DÍAS NATURALES ---
-      let fechaHoy = new Date();
-      let diasInteres = diasEntreFechasSinHora(fechaSeleccionada, fechaHoy);
-      diasInteres = diasInteres > 0 ? diasInteres : 0;
-      let tasaDiaria = parseFloat(creditoSeleccionado.tasaDiariaCredito || 0);
-      let interesActual = saldoActual * tasaDiaria * diasInteres;
-      let paraPonerseAlDia = interesActual;
+      // --- INTERESES SOLO DÍAS NATURALES PATCH ---
+      const fechaHoy = new Date();
+      const diasInteres = Math.max(0, diasEntreFechasSinHora(fechaSeleccionada, fechaHoy));
+      const tasaDiaria = parseFloat(creditoSeleccionado.tasaDiariaCredito || 0);
+      const interesActual = saldoActual * tasaDiaria * diasInteres;
+      const paraPonerseAlDia = interesActual;
 
       // LOGICA DE MULTAS Y ESTADO
       let historialMultas = Array.isArray(creditoSeleccionado.historialMultas) ? creditoSeleccionado.historialMultas : [];
@@ -502,7 +511,10 @@
         historialMultas: nuevoHistorialMultas,
         multasAcumuladas: nuevaMultaAcumulada.toFixed(2),
         estadoCredito: nuevoEstadoCredito,
-        capitalAtrasado: capitalAtrasadoActual.toFixed(2)
+        capitalAtrasado: capitalAtrasadoActual.toFixed(2),
+        // --- PATCH: fecha base del cálculo de intereses para cron ---
+        fechaUltimoCalculoIntereses: parseLocalYMD(fechaSeleccionada),
+        ultimaActualizacion: new Date()
       });
 
       // Mostrar recibo en pantalla
@@ -524,7 +536,6 @@
   </script>
 </body>
 </html>
-
 
 
 

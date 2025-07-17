@@ -41,20 +41,30 @@
     // FECHA seleccionada
     let selectedDate = new Date();
 
+    // AGREGADO: Guardar agencia actual del usuario
+    let agenciaActual = "";
+
     // Cargar movimientos
     async function cargarMovimientos() {
       document.getElementById("movimientos-list").innerHTML =
         `<div class="cargando">Cargando movimientos...</div>`;
       document.getElementById("total-caja").textContent = "—";
       try {
+        if (!agenciaActual) {
+          document.getElementById("movimientos-list").innerHTML =
+            `<div class="error">No se pudo determinar la agencia del usuario.</div>`;
+          return;
+        }
+
         const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
         const end = new Date(start.getTime() + 86400000 - 1);
         const startIso = start.toISOString();
         const endIso = end.toISOString();
 
-        // Movimientos de caja
+        // Movimientos de caja (SOLO DE LA AGENCIA DEL USUARIO)
         const qMov = query(
           collection(db, "movimientosCaja"),
+          where("agencia", "==", agenciaActual),
           where("fecha", ">=", startIso),
           where("fecha", "<=", endIso)
         );
@@ -72,9 +82,10 @@
           });
         });
 
-        // Pagos (solo ingresos)
+        // Pagos (solo ingresos, SOLO DE LA AGENCIA DEL USUARIO)
         const qPago = query(
           collection(db, "pagos"),
+          where("sucursal", "==", agenciaActual),
           where("fechaPago", ">=", startIso),
           where("fechaPago", "<=", endIso)
         );
@@ -143,8 +154,13 @@
     };
 
     window.addEventListener("DOMContentLoaded", () => {
-      onAuthStateChanged(auth, user => {
+      onAuthStateChanged(auth, async user => {
         if (!user) return location.href = "login.html";
+        // AGREGADO: Cargar el departamento (agencia) del usuario
+        const userDocSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
+        if (!userDocSnap.empty) {
+          agenciaActual = userDocSnap.docs[0].data().department;
+        }
         // Fecha inicial
         const today = new Date();
         selectedDate = today;

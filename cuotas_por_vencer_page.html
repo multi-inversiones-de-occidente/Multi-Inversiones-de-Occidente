@@ -166,7 +166,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -178,7 +178,7 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // Función para formatear fecha a UTC (sin error de zona horaria)
+    // Formatea la fecha a DD/MM/YYYY
     function formateaFechaUTC(fechaIso) {
       if(!fechaIso) return '';
       let fecha = new Date(fechaIso);
@@ -195,10 +195,20 @@
       return Math.floor((d1 - d2) / (1000*60*60*24));
     }
 
-    // Mostrar usuario logueado (email)
-    onAuthStateChanged(auth, user => {
+    // Guarda agencia actual
+    let agenciaActual = "";
+
+    // Mostrar usuario logueado (email) y guardar agencia
+    onAuthStateChanged(auth, async user => {
       if (!user) return location.href = "login.html";
       document.getElementById("usuario-email").textContent = "Usuario: " + user.email;
+      // Carga el departamento del usuario
+      const usersSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
+      if (!usersSnap.empty) {
+        agenciaActual = usersSnap.docs[0].data().department;
+      }
+      // Inicializa con rango por defecto (hoy)
+      cargarCuotas("hoy");
     });
 
     async function cargarCuotas(rango) {
@@ -206,12 +216,16 @@
       let hoyUTC = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate()));
       let cuotas = [];
       document.getElementById("cuotas-list").innerHTML = `<tr><td colspan="9" class="loading"><i class="fa-solid fa-spinner fa-spin"></i> Cargando...</td></tr>`;
-      const snapshot = await getDocs(collection(db, "creditos"));
+      if (!agenciaActual) {
+        document.getElementById("cuotas-list").innerHTML = `<tr><td colspan="9" class="loading">No se pudo determinar la agencia del usuario.</td></tr>`;
+        return;
+      }
+      // Ahora SÍ, SOLO créditos de la agencia del usuario
+      const snapshot = await getDocs(query(collection(db, "creditos"), where("agenciaAsignada", "==", agenciaActual)));
       snapshot.forEach(doc => {
         let d = doc.data();
         if (!Array.isArray(d.amortizacion)) return;
         (d.amortizacion).forEach(cuota => {
-          // Mostrar todas menos las pagadas:
           if (["Pendiente", "Parcial", "Atrasado"].includes(cuota.estado) && cuota.fecha) {
             let fcuota = new Date(cuota.fecha);
             let fcuotaUTC = new Date(Date.UTC(fcuota.getUTCFullYear(), fcuota.getUTCMonth(), fcuota.getUTCDate()));
@@ -255,11 +269,11 @@
       document.getElementById("cuotas-list").innerHTML = html;
     }
 
-    // Inicializa con rango por defecto (hoy)
+    // Cambia el filtro de rango
     document.getElementById("rango").onchange = function() {
       cargarCuotas(this.value);
     };
-    cargarCuotas("hoy");
   </script>
 </body>
 </html>
+

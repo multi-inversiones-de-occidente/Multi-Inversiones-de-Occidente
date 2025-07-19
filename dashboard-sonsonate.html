@@ -175,7 +175,7 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    let agenciaActual = "Sonsonate"; // por defecto
+    let agenciaActual = "Sonsonate";
     let gerenteNombre = "";
     let gerenteId = "";
 
@@ -195,7 +195,7 @@
       agenciaActual = gerenteData.department || agenciaActual;
       gerenteNombre = `${gerenteData.nombre || ""} ${gerenteData.apellido || ""}`.trim();
       document.getElementById("user-info").innerText = gerenteNombre || user.email;
-      document.getElementById('agencia-select').value = agenciaActual; // Selecciona por defecto
+      document.getElementById('agencia-select').value = agenciaActual;
 
       cargarDashboard();
     });
@@ -249,14 +249,13 @@
     // DASHBOARD PRINCIPAL
     function cargarDashboard() {
       const fechaFiltro = HOY();
+      const fechaFiltroISO = fechaFiltro.toISOString().slice(0,10);
       let warning = "";
 
       // --- Créditos otorgados en la agencia seleccionada ---
       const creditosQuery = query(
         collection(db, 'creditos'),
-        where('agenciaAsignada', '==', agenciaActual),
-        where('fechaInicio', '>=', Timestamp.fromDate(fechaFiltro)),
-        orderBy('fechaInicio', 'asc')
+        where('agenciaAsignada', '==', agenciaActual)
       );
       onSnapshot(creditosQuery, (snapshot) => {
         let totalCreditos = 0, totalDesembolsado = 0, tablaHTML = '', porHora = {};
@@ -265,22 +264,38 @@
 
         snapshot.forEach(doc => {
           const d = doc.data();
-          if (typeof d.fechaInicio === 'string') detectaFechaString = true;
-          totalCreditos++;
-          totalDesembolsado += Number(d.montoAprobado || 0);
-          const fecha = d.fechaInicio?.seconds ? new Date(d.fechaInicio.seconds * 1000) : new Date();
-          const hora = fecha.getHours();
-          porHora[hora] = (porHora[hora] || 0) + 1;
-          tablaHTML += `
-            <tr>
-              <td>${idx++}</td>
-              <td>${d.nombre || ''} ${d.apellido || ''}</td>
-              <td>$${d.montoAprobado || ''}</td>
-              <td>${d.lineaDeCredito || d.creditLine || ''}</td>
-              <td>${d.asignadoA || d.analistaID || ''}</td>
-              <td>${fecha.toLocaleTimeString('es-SV', {hour:'2-digit',minute:'2-digit'})}</td>
-            </tr>
-          `;
+          let isDeHoy = false;
+
+          // Timestamp
+          if (d.fechaInicio && d.fechaInicio.seconds) {
+            const f = new Date(d.fechaInicio.seconds * 1000);
+            if (f.toISOString().slice(0,10) === fechaFiltroISO) isDeHoy = true;
+          }
+          // String
+          else if (typeof d.fechaInicio === 'string') {
+            detectaFechaString = true;
+            if (d.fechaInicio.slice(0,10) === fechaFiltroISO) isDeHoy = true;
+          }
+
+          if (isDeHoy) {
+            totalCreditos++;
+            totalDesembolsado += Number(d.montoAprobado || 0);
+            let fecha = d.fechaInicio?.seconds
+              ? new Date(d.fechaInicio.seconds * 1000)
+              : (typeof d.fechaInicio === 'string' ? new Date(d.fechaInicio) : new Date());
+            const hora = fecha.getHours();
+            porHora[hora] = (porHora[hora] || 0) + 1;
+            tablaHTML += `
+              <tr>
+                <td>${idx++}</td>
+                <td>${d.nombre || ''} ${d.apellido || ''}</td>
+                <td>$${d.montoAprobado || ''}</td>
+                <td>${d.lineaDeCredito || d.creditLine || ''}</td>
+                <td>${d.asignadoA || d.analistaID || ''}</td>
+                <td>${fecha.toLocaleTimeString('es-SV', {hour:'2-digit',minute:'2-digit'})}</td>
+              </tr>
+            `;
+          }
         });
         document.getElementById('total-creditos').innerText = totalCreditos;
         document.getElementById('total-desembolsado').innerText = totalDesembolsado.toLocaleString();
@@ -326,21 +341,29 @@
       // Buscar por campo "fechaSolicitud" (timestamp), no por "fecha" string
       const solicitudesQuery = query(
         collection(db, 'Archivo Solicitudes'),
-        where('departamento', '==', agenciaActual),
-        where('fechaSolicitud', '>=', Timestamp.fromDate(fechaFiltro)),
-        orderBy('fechaSolicitud', 'asc')
+        where('departamento', '==', agenciaActual)
       );
       onSnapshot(solicitudesQuery, (snapshot) => {
         let detectaFechaString = false;
+        let solicitudesHoy = 0;
         snapshot.forEach(doc => {
           const d = doc.data();
-          if (typeof d.fechaSolicitud === 'string') detectaFechaString = true;
+          // Timestamp
+          if (d.fechaSolicitud && d.fechaSolicitud.seconds) {
+            const f = new Date(d.fechaSolicitud.seconds * 1000);
+            if (f.toISOString().slice(0,10) === fechaFiltroISO) solicitudesHoy++;
+          }
+          // String
+          else if (typeof d.fechaSolicitud === 'string') {
+            detectaFechaString = true;
+            if (d.fechaSolicitud.slice(0,10) === fechaFiltroISO) solicitudesHoy++;
+          }
         });
-        document.getElementById('total-solicitudes').innerText = snapshot.size;
+        document.getElementById('total-solicitudes').innerText = solicitudesHoy;
         if (detectaFechaString) {
           warning += "⚠️ En la colección 'Archivo Solicitudes' hay campos 'fechaSolicitud' guardados como texto (string) en vez de timestamp. Corrígelo para que se reflejen los datos correctamente.<br>";
         }
-        if (snapshot.size === 0 && !detectaFechaString) {
+        if (solicitudesHoy === 0 && !detectaFechaString) {
           warning += "No se encontraron solicitudes para este día y agencia. Si esperabas ver datos, verifica que existan registros con el campo 'fechaSolicitud' como timestamp y 'departamento' igual a la agencia seleccionada.";
         }
         if (warning) mostrarAlerta(warning); else document.getElementById('alerta-datos').style.display = "none";
@@ -384,4 +407,5 @@
   </script>
 </body>
 </html>
+
 

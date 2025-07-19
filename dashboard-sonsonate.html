@@ -200,8 +200,16 @@
       document.getElementById('total-solicitudes').innerText = "0";
       document.getElementById('tabla-creditos').innerHTML = "";
       document.getElementById('tabla-usuarios').innerHTML = "";
-      if(window['grafica-creditos']) window['grafica-creditos'].destroy();
-      if(window['grafica-usuarios']) window['grafica-usuarios'].destroy();
+
+      // Fix: Solo destruye si es instancia válida de gráfica Chart.js
+      if (window['grafica-creditos'] && typeof window['grafica-creditos'].destroy === "function") {
+        window['grafica-creditos'].destroy();
+        window['grafica-creditos'] = null;
+      }
+      if (window['grafica-usuarios'] && typeof window['grafica-usuarios'].destroy === "function") {
+        window['grafica-usuarios'].destroy();
+        window['grafica-usuarios'] = null;
+      }
     }
     // -------------------------------------
 
@@ -330,7 +338,6 @@
 
     // Listener filtro fecha
     document.getElementById('filter-date').addEventListener('change', () => {
-      // Limpia gráficas previas y recarga dashboard
       limpiarDashboard();
       cargarDashboard();
     });
@@ -339,4 +346,5 @@
   </script>
 </body>
 </html>
+
 

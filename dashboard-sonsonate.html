@@ -20,18 +20,25 @@
     .card-title { color: #F8AF40; font-size: 1.15rem;}
     .card-value { font-size: 2rem; font-weight: bold; }
     .table th, .table td { vertical-align: middle; }
+    #login-btn, #logout-btn { min-width: 210px; }
   </style>
 </head>
 <body>
   <div class="container-fluid py-4">
     <h1 class="dashboard-title mb-4"><i class="fas fa-chart-bar"></i> Dashboard de Rendimiento Diario - Sonsonate</h1>
     
+    <!-- Login/Logout Google -->
+    <div class="mb-3">
+      <button id="login-btn" class="btn btn-outline-light"><i class="fab fa-google"></i> Iniciar sesión con Google</button>
+      <span id="user-info" class="ms-3"></span>
+      <button id="logout-btn" class="btn btn-outline-danger ms-2 d-none">Cerrar sesión</button>
+    </div>
+    
     <!-- Filtros -->
     <div class="row mb-4 g-3">
       <div class="col-md-3">
         <input type="date" class="form-control" id="filter-date"/>
       </div>
-      <!-- Puedes agregar más filtros aquí -->
     </div>
     
     <!-- Resumen Rápido -->
@@ -142,8 +149,9 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, orderBy, onSnapshot, Timestamp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
-    // TODO: Pon tu config de Firebase aquí:
+    // ----- TU CONFIGURACIÓN DE FIREBASE -----
     const firebaseConfig = {
       apiKey: "TU_API_KEY",
       authDomain: "TU_AUTH_DOMAIN",
@@ -155,6 +163,47 @@
     };
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    // -----
+
+    // ----------- LOGIN GOOGLE -----------
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    const loginBtn = document.getElementById('login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    const userInfo = document.getElementById('user-info');
+
+    loginBtn.addEventListener('click', async () => {
+      try { await signInWithPopup(auth, provider); }
+      catch (e) { alert("Error de autenticación: " + e.message); }
+    });
+    logoutBtn.addEventListener('click', async () => { await signOut(auth); });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        userInfo.innerHTML = `<strong>${user.displayName}</strong>`;
+        loginBtn.classList.add('d-none');
+        logoutBtn.classList.remove('d-none');
+        cargarDashboard(); // Solo carga si está logueado
+      } else {
+        userInfo.innerHTML = '';
+        loginBtn.classList.remove('d-none');
+        logoutBtn.classList.add('d-none');
+        limpiarDashboard();
+      }
+    });
+
+    function limpiarDashboard() {
+      document.getElementById('total-creditos').innerText = "0";
+      document.getElementById('total-desembolsado').innerText = "0";
+      document.getElementById('total-usuarios').innerText = "0";
+      document.getElementById('total-solicitudes').innerText = "0";
+      document.getElementById('tabla-creditos').innerHTML = "";
+      document.getElementById('tabla-usuarios').innerHTML = "";
+      if(window['grafica-creditos']) window['grafica-creditos'].destroy();
+      if(window['grafica-usuarios']) window['grafica-usuarios'].destroy();
+    }
+    // -------------------------------------
 
     // ----------- PARÁMETROS -----------
     const AGENCIA = "Sonsonate";
@@ -167,21 +216,9 @@
     // Iniciar con fecha de hoy
     document.getElementById('filter-date').valueAsDate = new Date();
 
-    // Utils
-    function formatearHora(fecha) {
-      if (!fecha) return '';
-      const f = new Date(fecha.seconds ? fecha.seconds * 1000 : fecha);
-      return f.toLocaleTimeString('es-SV', {hour:'2-digit',minute:'2-digit'});
-    }
-    function formatearFechaISO(fecha) {
-      const f = new Date(fecha.seconds ? fecha.seconds * 1000 : fecha);
-      return f.toISOString().slice(0,10);
-    }
-
     // DASHBOARD PRINCIPAL
-    async function cargarDashboard() {
+    function cargarDashboard() {
       const fechaFiltro = HOY();
-      const fechaISO = fechaFiltro.toISOString().slice(0,10);
 
       // Créditos otorgados hoy en Sonsonate
       const creditosQuery = query(
@@ -292,10 +329,14 @@
     }
 
     // Listener filtro fecha
-    document.getElementById('filter-date').addEventListener('change', cargarDashboard);
+    document.getElementById('filter-date').addEventListener('change', () => {
+      // Limpia gráficas previas y recarga dashboard
+      limpiarDashboard();
+      cargarDashboard();
+    });
 
-    // Iniciar dashboard
-    cargarDashboard();
+    // No se llama cargarDashboard() de inmediato, solo tras login Google (por seguridad)
   </script>
 </body>
 </html>
+

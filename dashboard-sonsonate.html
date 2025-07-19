@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard Sonsonate | Rendimiento Diario</title>
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background: #10141a; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; }
+    .card { border-radius: 1.5rem; }
+    .dashboard-title { color: #F8AF40; letter-spacing: 2px; font-weight: 900;}
+    .table { color: #fff; }
+    .bg-main { background: #232c37 !important; }
+    .icon-card { font-size: 2.6rem; color: #F8AF40; }
+    .card-title { color: #F8AF40; font-size: 1.15rem;}
+    .card-value { font-size: 2rem; font-weight: bold; }
+    .table th, .table td { vertical-align: middle; }
+  </style>
+</head>
+<body>
+  <div class="container-fluid py-4">
+    <h1 class="dashboard-title mb-4"><i class="fas fa-chart-bar"></i> Dashboard de Rendimiento Diario - Sonsonate</h1>
+    
+    <!-- Filtros -->
+    <div class="row mb-4 g-3">
+      <div class="col-md-3">
+        <input type="date" class="form-control" id="filter-date"/>
+      </div>
+      <!-- Puedes agregar más filtros aquí -->
+    </div>
+    
+    <!-- Resumen Rápido -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card bg-main text-center shadow">
+          <div class="card-body">
+            <div class="icon-card mb-1"><i class="fas fa-money-bill-trend-up"></i></div>
+            <div class="card-title">Créditos Otorgados Hoy</div>
+            <div class="card-value" id="total-creditos">0</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card bg-main text-center shadow">
+          <div class="card-body">
+            <div class="icon-card mb-1"><i class="fas fa-dollar-sign"></i></div>
+            <div class="card-title">Desembolsado Hoy ($)</div>
+            <div class="card-value" id="total-desembolsado">0</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card bg-main text-center shadow">
+          <div class="card-body">
+            <div class="icon-card mb-1"><i class="fas fa-users"></i></div>
+            <div class="card-title">Usuarios Registrados Hoy</div>
+            <div class="card-value" id="total-usuarios">0</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card bg-main text-center shadow">
+          <div class="card-body">
+            <div class="icon-card mb-1"><i class="fas fa-file-alt"></i></div>
+            <div class="card-title">Solicitudes Hoy</div>
+            <div class="card-value" id="total-solicitudes">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráficas -->
+    <div class="row g-4 mb-4">
+      <div class="col-md-6">
+        <div class="card bg-main shadow">
+          <div class="card-body">
+            <div class="card-title">Créditos Otorgados por Hora</div>
+            <canvas id="grafica-creditos"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card bg-main shadow">
+          <div class="card-body">
+            <div class="card-title">Nuevos Usuarios por Hora</div>
+            <canvas id="grafica-usuarios"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tablas -->
+    <div class="row g-4">
+      <div class="col-md-6">
+        <div class="card bg-main shadow">
+          <div class="card-body">
+            <div class="card-title">Últimos Créditos Hoy</div>
+            <table class="table table-dark table-hover table-striped align-middle">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Cliente</th>
+                  <th>Monto</th>
+                  <th>Línea</th>
+                  <th>Analista</th>
+                  <th>Hora</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-creditos"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card bg-main shadow">
+          <div class="card-body">
+            <div class="card-title">Últimos Usuarios Registrados Hoy</div>
+            <table class="table table-dark table-hover table-striped align-middle">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Nombre</th>
+                  <th>DUI</th>
+                  <th>Municipio</th>
+                  <th>Hora</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-usuarios"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, orderBy, onSnapshot, Timestamp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+
+    // TODO: Pon tu config de Firebase aquí:
+    const firebaseConfig = {
+      apiKey: "TU_API_KEY",
+      authDomain: "TU_AUTH_DOMAIN",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "TU_MESSAGING_SENDER_ID",
+      appId: "TU_APP_ID",
+      measurementId: "TU_MEASUREMENT_ID"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // ----------- PARÁMETROS -----------
+    const AGENCIA = "Sonsonate";
+    const HOY = () => {
+      const f = new Date(document.getElementById('filter-date').value || Date.now());
+      f.setHours(0,0,0,0); return f;
+    };
+    // -----------------------------------
+
+    // Iniciar con fecha de hoy
+    document.getElementById('filter-date').valueAsDate = new Date();
+
+    // Utils
+    function formatearHora(fecha) {
+      if (!fecha) return '';
+      const f = new Date(fecha.seconds ? fecha.seconds * 1000 : fecha);
+      return f.toLocaleTimeString('es-SV', {hour:'2-digit',minute:'2-digit'});
+    }
+    function formatearFechaISO(fecha) {
+      const f = new Date(fecha.seconds ? fecha.seconds * 1000 : fecha);
+      return f.toISOString().slice(0,10);
+    }
+
+    // DASHBOARD PRINCIPAL
+    async function cargarDashboard() {
+      const fechaFiltro = HOY();
+      const fechaISO = fechaFiltro.toISOString().slice(0,10);
+
+      // Créditos otorgados hoy en Sonsonate
+      const creditosQuery = query(
+        collection(db, 'creditos'),
+        where('agenciaAsignada', '==', AGENCIA),
+        where('fechaInicio', '>=', Timestamp.fromDate(fechaFiltro)),
+        orderBy('fechaInicio', 'asc')
+      );
+      onSnapshot(creditosQuery, (snapshot) => {
+        let totalCreditos = 0, totalDesembolsado = 0, tablaHTML = '', porHora = {};
+        let idx = 1;
+        snapshot.forEach(doc => {
+          totalCreditos++;
+          totalDesembolsado += Number(doc.data().montoAprobado || 0);
+          const d = doc.data();
+          const fecha = d.fechaInicio?.seconds ? new Date(d.fechaInicio.seconds * 1000) : new Date();
+          const hora = fecha.getHours();
+          porHora[hora] = (porHora[hora] || 0) + 1;
+          tablaHTML += `
+            <tr>
+              <td>${idx++}</td>
+              <td>${d.nombre || ''} ${d.apellido || ''}</td>
+              <td>$${d.montoAprobado || ''}</td>
+              <td>${d.lineaDeCredito || d.creditLine || ''}</td>
+              <td>${d.asignadoA || d.analistaID || ''}</td>
+              <td>${fecha.toLocaleTimeString('es-SV', {hour:'2-digit',minute:'2-digit'})}</td>
+            </tr>
+          `;
+        });
+        document.getElementById('total-creditos').innerText = totalCreditos;
+        document.getElementById('total-desembolsado').innerText = totalDesembolsado.toLocaleString();
+        document.getElementById('tabla-creditos').innerHTML = tablaHTML;
+        actualizarGrafica('grafica-creditos', porHora, 'Créditos por Hora', '#F8AF40');
+      });
+
+      // Usuarios registrados hoy (solo Sonsonate)
+      const usuariosQuery = query(
+        collection(db, 'users'),
+        where('department', '==', AGENCIA),
+        where('fecha_registro', '>=', Timestamp.fromDate(fechaFiltro)),
+        orderBy('fecha_registro', 'asc')
+      );
+      onSnapshot(usuariosQuery, (snapshot) => {
+        let totalUsuarios = 0, tablaHTML = '', porHora = {};
+        let idx = 1;
+        snapshot.forEach(doc => {
+          totalUsuarios++;
+          const d = doc.data();
+          const fecha = d.fecha_registro?.seconds ? new Date(d.fecha_registro.seconds * 1000) : new Date();
+          const hora = fecha.getHours();
+          porHora[hora] = (porHora[hora] || 0) + 1;
+          tablaHTML += `
+            <tr>
+              <td>${idx++}</td>
+              <td>${d.nombre || ''}</td>
+              <td>${d.numeroDui || ''}</td>
+              <td>${d.municipio || ''}</td>
+              <td>${fecha.toLocaleTimeString('es-SV', {hour:'2-digit',minute:'2-digit'})}</td>
+            </tr>
+          `;
+        });
+        document.getElementById('total-usuarios').innerText = totalUsuarios;
+        document.getElementById('tabla-usuarios').innerHTML = tablaHTML;
+        actualizarGrafica('grafica-usuarios', porHora, 'Usuarios por Hora', '#4db6ac');
+      });
+
+      // Solicitudes nuevas hoy (Archivo Solicitudes)
+      const solicitudesQuery = query(
+        collection(db, 'Archivo Solicitudes'),
+        where('departamento', '==', AGENCIA),
+        where('fecha', '>=', Timestamp.fromDate(fechaFiltro)),
+        orderBy('fecha', 'asc')
+      );
+      onSnapshot(solicitudesQuery, (snapshot) => {
+        document.getElementById('total-solicitudes').innerText = snapshot.size;
+      });
+    }
+
+    // ---- GRAFICAS
+    function actualizarGrafica(canvasId, datosPorHora, label, color) {
+      const labels = [];
+      const data = [];
+      for (let h = 7; h <= 19; h++) {
+        labels.push(h + ':00');
+        data.push(datosPorHora[h] || 0);
+      }
+      if (!window[canvasId]) {
+        window[canvasId] = new Chart(document.getElementById(canvasId), {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: label,
+              data: data,
+              backgroundColor: color + 'cc'
+            }]
+          },
+          options: {
+            plugins: { legend: { display: false }},
+            scales: { x: { grid: {display: false}}, y: { beginAtZero: true, grid: {display:false}}},
+            animation: false
+          }
+        });
+      } else {
+        window[canvasId].data.datasets[0].data = data;
+        window[canvasId].update();
+      }
+    }
+
+    // Listener filtro fecha
+    document.getElementById('filter-date').addEventListener('change', cargarDashboard);
+
+    // Iniciar dashboard
+    cargarDashboard();
+  </script>
+</body>
+</html>

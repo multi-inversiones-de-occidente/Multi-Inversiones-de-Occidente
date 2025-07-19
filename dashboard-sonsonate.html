@@ -22,12 +22,14 @@
     .table th, .table td { vertical-align: middle; }
     .agencia-select { min-width: 230px; font-size: 1rem;}
     .user-info { font-size:1.05rem; color:#F8AF40; margin-bottom: 1rem; font-weight:600; }
+    .alerta-datos { color: #f8af40; background: #181818; border-left: 4px solid #f8af40; padding: 10px 18px; margin-bottom: 14px; border-radius: 9px;}
   </style>
 </head>
 <body>
   <div class="container-fluid py-4">
     <h1 class="dashboard-title mb-2"><i class="fas fa-chart-bar"></i> Dashboard de Rendimiento Diario</h1>
     <div class="user-info" id="user-info">Cargando usuario...</div>
+    <div class="alerta-datos" id="alerta-datos" style="display:none;"></div>
     
     <!-- Selección de Agencia -->
     <div class="row mb-3 g-3">
@@ -159,7 +161,7 @@
     import { getFirestore, collection, query, where, orderBy, onSnapshot, Timestamp, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
-    // Tu configuración de Firebase
+    // Configuración de Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -218,6 +220,8 @@
       document.getElementById('total-solicitudes').innerText = "0";
       document.getElementById('tabla-creditos').innerHTML = "";
       document.getElementById('tabla-usuarios').innerHTML = "";
+      document.getElementById('alerta-datos').style.display = "none";
+      document.getElementById('alerta-datos').innerText = "";
 
       if (window['grafica-creditos'] && typeof window['grafica-creditos'].destroy === "function") {
         window['grafica-creditos'].destroy();
@@ -235,11 +239,19 @@
       f.setHours(0,0,0,0); return f;
     };
 
+    // Función para mostrar advertencias
+    function mostrarAlerta(texto) {
+      const alerta = document.getElementById('alerta-datos');
+      alerta.innerText = texto;
+      alerta.style.display = "block";
+    }
+
     // DASHBOARD PRINCIPAL
     function cargarDashboard() {
       const fechaFiltro = HOY();
+      let warning = "";
 
-      // Créditos otorgados en la agencia seleccionada
+      // --- Créditos otorgados en la agencia seleccionada ---
       const creditosQuery = query(
         collection(db, 'creditos'),
         where('agenciaAsignada', '==', agenciaActual),
@@ -249,10 +261,14 @@
       onSnapshot(creditosQuery, (snapshot) => {
         let totalCreditos = 0, totalDesembolsado = 0, tablaHTML = '', porHora = {};
         let idx = 1;
+        let detectaFechaString = false;
+
         snapshot.forEach(doc => {
-          totalCreditos++;
-          totalDesembolsado += Number(doc.data().montoAprobado || 0);
           const d = doc.data();
+          // Detectar error: fechaInicio string
+          if (typeof d.fechaInicio === 'string') detectaFechaString = true;
+          totalCreditos++;
+          totalDesembolsado += Number(d.montoAprobado || 0);
           const fecha = d.fechaInicio?.seconds ? new Date(d.fechaInicio.seconds * 1000) : new Date();
           const hora = fecha.getHours();
           porHora[hora] = (porHora[hora] || 0) + 1;
@@ -271,9 +287,14 @@
         document.getElementById('total-desembolsado').innerText = totalDesembolsado.toLocaleString();
         document.getElementById('tabla-creditos').innerHTML = tablaHTML;
         actualizarGrafica('grafica-creditos', porHora, 'Créditos por Hora', '#F8AF40');
+
+        // Mensaje si detecta fechas string
+        if (detectaFechaString) {
+          warning += "⚠️ En la colección 'creditos' hay campos 'fechaInicio' guardados como texto (string) en vez de timestamp. Corrígelo para que se reflejen los datos correctamente.<br>";
+        }
       });
 
-      // Usuarios registrados hoy (solo agencia seleccionada)
+      // --- Usuarios registrados hoy (solo agencia seleccionada) ---
       const usuariosQuery = query(
         collection(db, 'users'),
         where('department', '==', agenciaActual),
@@ -284,8 +305,8 @@
         let totalUsuarios = 0, tablaHTML = '', porHora = {};
         let idx = 1;
         snapshot.forEach(doc => {
-          totalUsuarios++;
           const d = doc.data();
+          totalUsuarios++;
           const fecha = d.fecha_registro?.seconds ? new Date(d.fecha_registro.seconds * 1000) : new Date();
           const hora = fecha.getHours();
           porHora[hora] = (porHora[hora] || 0) + 1;
@@ -304,7 +325,7 @@
         actualizarGrafica('grafica-usuarios', porHora, 'Usuarios por Hora', '#4db6ac');
       });
 
-      // Solicitudes nuevas hoy (Archivo Solicitudes)
+      // --- Solicitudes nuevas hoy (Archivo Solicitudes) ---
       const solicitudesQuery = query(
         collection(db, 'Archivo Solicitudes'),
         where('departamento', '==', agenciaActual),
@@ -312,39 +333,53 @@
         orderBy('fecha', 'asc')
       );
       onSnapshot(solicitudesQuery, (snapshot) => {
+        let detectaFechaString = false;
+        snapshot.forEach(doc => {
+          const d = doc.data();
+          if (typeof d.fecha === 'string') detectaFechaString = true;
+        });
         document.getElementById('total-solicitudes').innerText = snapshot.size;
+        if (detectaFechaString) {
+          warning += "⚠️ En la colección 'Archivo Solicitudes' hay campos 'fecha' guardados como texto (string) en vez de timestamp. Corrígelo para que se reflejen los datos correctamente.<br>";
+        }
+        if (snapshot.size === 0 && !detectaFechaString) {
+          warning += "No se encontraron solicitudes para este día y agencia. Si esperabas ver datos, verifica que existan registros con el campo 'fecha' como timestamp y 'departamento' igual a la agencia seleccionada.";
+        }
+        if (warning) mostrarAlerta(warning); else document.getElementById('alerta-datos').style.display = "none";
       });
     }
 
-    // ---- GRAFICAS
+    // ---- GRAFICAS (fix: siempre destruye antes de crear, nunca se rompe)
     function actualizarGrafica(canvasId, datosPorHora, label, color) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
       const labels = [];
       const data = [];
       for (let h = 7; h <= 19; h++) {
         labels.push(h + ':00');
         data.push(datosPorHora[h] || 0);
       }
-      if (!window[canvasId]) {
-        window[canvasId] = new Chart(document.getElementById(canvasId), {
-          type: 'bar',
-          data: {
-            labels: labels,
-            datasets: [{
-              label: label,
-              data: data,
-              backgroundColor: color + 'cc'
-            }]
-          },
-          options: {
-            plugins: { legend: { display: false }},
-            scales: { x: { grid: {display: false}}, y: { beginAtZero: true, grid: {display:false}}},
-            animation: false
-          }
-        });
-      } else {
-        window[canvasId].data.datasets[0].data = data;
-        window[canvasId].update();
+      // Destruye antes de crear siempre
+      if (window[canvasId] && typeof window[canvasId].destroy === "function") {
+        window[canvasId].destroy();
+        window[canvasId] = null;
       }
+      window[canvasId] = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: label,
+            data: data,
+            backgroundColor: color + 'cc'
+          }]
+        },
+        options: {
+          plugins: { legend: { display: false }},
+          scales: { x: { grid: {display: false}}, y: { beginAtZero: true, grid: {display:false}}},
+          animation: false
+        }
+      });
     }
   </script>
 </body>

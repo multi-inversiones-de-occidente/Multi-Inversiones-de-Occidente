@@ -242,7 +242,7 @@
     // Función para mostrar advertencias
     function mostrarAlerta(texto) {
       const alerta = document.getElementById('alerta-datos');
-      alerta.innerText = texto;
+      alerta.innerHTML = texto;
       alerta.style.display = "block";
     }
 
@@ -329,21 +329,22 @@
       const solicitudesQuery = query(
         collection(db, 'Archivo Solicitudes'),
         where('departamento', '==', agenciaActual),
-        where('fecha', '>=', Timestamp.fromDate(fechaFiltro)),
-        orderBy('fecha', 'asc')
+        where('fechaSolicitud', '>=', Timestamp.fromDate(fechaFiltro)),
+        orderBy('fechaSolicitud', 'asc')
       );
       onSnapshot(solicitudesQuery, (snapshot) => {
         let detectaFechaString = false;
         snapshot.forEach(doc => {
           const d = doc.data();
-          if (typeof d.fecha === 'string') detectaFechaString = true;
+          // Detectar error: fechaSolicitud como string
+          if (typeof d.fechaSolicitud === 'string') detectaFechaString = true;
         });
         document.getElementById('total-solicitudes').innerText = snapshot.size;
         if (detectaFechaString) {
-          warning += "⚠️ En la colección 'Archivo Solicitudes' hay campos 'fecha' guardados como texto (string) en vez de timestamp. Corrígelo para que se reflejen los datos correctamente.<br>";
+          warning += "⚠️ En la colección 'Archivo Solicitudes' hay campos 'fechaSolicitud' guardados como texto (string) en vez de timestamp. Corrígelo para que se reflejen los datos correctamente.<br>";
         }
         if (snapshot.size === 0 && !detectaFechaString) {
-          warning += "No se encontraron solicitudes para este día y agencia. Si esperabas ver datos, verifica que existan registros con el campo 'fecha' como timestamp y 'departamento' igual a la agencia seleccionada.";
+          warning += "No se encontraron solicitudes para este día y agencia. Si esperabas ver datos, verifica que existan registros con el campo 'fechaSolicitud' como timestamp y 'departamento' igual a la agencia seleccionada.";
         }
         if (warning) mostrarAlerta(warning); else document.getElementById('alerta-datos').style.display = "none";
       });
@@ -376,12 +377,4 @@
         },
         options: {
           plugins: { legend: { display: false }},
-          scales: { x: { grid: {display: false}}, y: { beginAtZero: true, grid: {display:false}}},
-          animation: false
-        }
-      });
-    }
-  </script>
-</body>
-</html>
-
+          scales: { x: { grid: {display: false

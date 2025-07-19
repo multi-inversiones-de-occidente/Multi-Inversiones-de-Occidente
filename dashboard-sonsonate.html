@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Dashboard Sonsonate | Rendimiento Diario</title>
+  <title>Dashboard Multi Inversiones | Rendimiento Diario</title>
   <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Chart.js -->
@@ -21,17 +21,31 @@
     .card-value { font-size: 2rem; font-weight: bold; }
     .table th, .table td { vertical-align: middle; }
     #login-btn, #logout-btn { min-width: 210px; }
+    .agencia-select { min-width: 230px; font-size: 1rem;}
   </style>
 </head>
 <body>
   <div class="container-fluid py-4">
-    <h1 class="dashboard-title mb-4"><i class="fas fa-chart-bar"></i> Dashboard de Rendimiento Diario - Sonsonate</h1>
+    <h1 class="dashboard-title mb-4"><i class="fas fa-chart-bar"></i> Dashboard de Rendimiento Diario - Multi Inversiones</h1>
     
     <!-- Login/Logout Google -->
     <div class="mb-3">
       <button id="login-btn" class="btn btn-outline-light"><i class="fab fa-google"></i> Iniciar sesión con Google</button>
       <span id="user-info" class="ms-3"></span>
       <button id="logout-btn" class="btn btn-outline-danger ms-2 d-none">Cerrar sesión</button>
+    </div>
+
+    <!-- Selección de Agencia -->
+    <div class="row mb-3 g-3">
+      <div class="col-md-4">
+        <select class="form-select agencia-select" id="agencia-select">
+          <option value="Sonsonate">Sonsonate</option>
+          <option value="Santa Ana">Santa Ana</option>
+          <option value="Juayúa">Juayúa</option>
+          <option value="Ahuachapán">Ahuachapán</option>
+          <option value="Chalchuapa">Chalchuapa</option>
+        </select>
+      </div>
     </div>
     
     <!-- Filtros -->
@@ -184,7 +198,7 @@
         userInfo.innerHTML = `<strong>${user.displayName}</strong>`;
         loginBtn.classList.add('d-none');
         logoutBtn.classList.remove('d-none');
-        cargarDashboard(); // Solo carga si está logueado
+        cargarDashboard();
       } else {
         userInfo.innerHTML = '';
         loginBtn.classList.remove('d-none');
@@ -201,7 +215,6 @@
       document.getElementById('tabla-creditos').innerHTML = "";
       document.getElementById('tabla-usuarios').innerHTML = "";
 
-      // Fix: Solo destruye si es instancia válida de gráfica Chart.js
       if (window['grafica-creditos'] && typeof window['grafica-creditos'].destroy === "function") {
         window['grafica-creditos'].destroy();
         window['grafica-creditos'] = null;
@@ -214,7 +227,7 @@
     // -------------------------------------
 
     // ----------- PARÁMETROS -----------
-    const AGENCIA = "Sonsonate";
+    let agenciaActual = document.getElementById('agencia-select').value;
     const HOY = () => {
       const f = new Date(document.getElementById('filter-date').value || Date.now());
       f.setHours(0,0,0,0); return f;
@@ -224,14 +237,27 @@
     // Iniciar con fecha de hoy
     document.getElementById('filter-date').valueAsDate = new Date();
 
+    // Listener para cambio de agencia
+    document.getElementById('agencia-select').addEventListener('change', () => {
+      agenciaActual = document.getElementById('agencia-select').value;
+      limpiarDashboard();
+      cargarDashboard();
+    });
+
+    // Listener filtro fecha
+    document.getElementById('filter-date').addEventListener('change', () => {
+      limpiarDashboard();
+      cargarDashboard();
+    });
+
     // DASHBOARD PRINCIPAL
     function cargarDashboard() {
       const fechaFiltro = HOY();
 
-      // Créditos otorgados hoy en Sonsonate
+      // Créditos otorgados en la agencia seleccionada
       const creditosQuery = query(
         collection(db, 'creditos'),
-        where('agenciaAsignada', '==', AGENCIA),
+        where('agenciaAsignada', '==', agenciaActual),
         where('fechaInicio', '>=', Timestamp.fromDate(fechaFiltro)),
         orderBy('fechaInicio', 'asc')
       );
@@ -262,10 +288,10 @@
         actualizarGrafica('grafica-creditos', porHora, 'Créditos por Hora', '#F8AF40');
       });
 
-      // Usuarios registrados hoy (solo Sonsonate)
+      // Usuarios registrados hoy (solo agencia seleccionada)
       const usuariosQuery = query(
         collection(db, 'users'),
-        where('department', '==', AGENCIA),
+        where('department', '==', agenciaActual),
         where('fecha_registro', '>=', Timestamp.fromDate(fechaFiltro)),
         orderBy('fecha_registro', 'asc')
       );
@@ -296,7 +322,7 @@
       // Solicitudes nuevas hoy (Archivo Solicitudes)
       const solicitudesQuery = query(
         collection(db, 'Archivo Solicitudes'),
-        where('departamento', '==', AGENCIA),
+        where('departamento', '==', agenciaActual),
         where('fecha', '>=', Timestamp.fromDate(fechaFiltro)),
         orderBy('fecha', 'asc')
       );
@@ -336,15 +362,7 @@
       }
     }
 
-    // Listener filtro fecha
-    document.getElementById('filter-date').addEventListener('change', () => {
-      limpiarDashboard();
-      cargarDashboard();
-    });
-
     // No se llama cargarDashboard() de inmediato, solo tras login Google (por seguridad)
   </script>
 </body>
 </html>
-
-

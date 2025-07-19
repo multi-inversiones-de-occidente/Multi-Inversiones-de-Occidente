@@ -265,7 +265,6 @@
 
         snapshot.forEach(doc => {
           const d = doc.data();
-          // Detectar error: fechaInicio string
           if (typeof d.fechaInicio === 'string') detectaFechaString = true;
           totalCreditos++;
           totalDesembolsado += Number(d.montoAprobado || 0);
@@ -287,8 +286,6 @@
         document.getElementById('total-desembolsado').innerText = totalDesembolsado.toLocaleString();
         document.getElementById('tabla-creditos').innerHTML = tablaHTML;
         actualizarGrafica('grafica-creditos', porHora, 'Créditos por Hora', '#F8AF40');
-
-        // Mensaje si detecta fechas string
         if (detectaFechaString) {
           warning += "⚠️ En la colección 'creditos' hay campos 'fechaInicio' guardados como texto (string) en vez de timestamp. Corrígelo para que se reflejen los datos correctamente.<br>";
         }
@@ -326,6 +323,7 @@
       });
 
       // --- Solicitudes nuevas hoy (Archivo Solicitudes) ---
+      // Buscar por campo "fechaSolicitud" (timestamp), no por "fecha" string
       const solicitudesQuery = query(
         collection(db, 'Archivo Solicitudes'),
         where('departamento', '==', agenciaActual),
@@ -336,7 +334,6 @@
         let detectaFechaString = false;
         snapshot.forEach(doc => {
           const d = doc.data();
-          // Detectar error: fechaSolicitud como string
           if (typeof d.fechaSolicitud === 'string') detectaFechaString = true;
         });
         document.getElementById('total-solicitudes').innerText = snapshot.size;
@@ -350,7 +347,7 @@
       });
     }
 
-    // ---- GRAFICAS (fix: siempre destruye antes de crear, nunca se rompe)
+    // ---- GRAFICAS (destruye antes de crear)
     function actualizarGrafica(canvasId, datosPorHora, label, color) {
       const canvas = document.getElementById(canvasId);
       if (!canvas) return;
@@ -360,7 +357,6 @@
         labels.push(h + ':00');
         data.push(datosPorHora[h] || 0);
       }
-      // Destruye antes de crear siempre
       if (window[canvasId] && typeof window[canvasId].destroy === "function") {
         window[canvasId].destroy();
         window[canvasId] = null;
@@ -377,4 +373,15 @@
         },
         options: {
           plugins: { legend: { display: false }},
-          scales: { x: { grid: {display: false
+          scales: { 
+            x: { grid: {display: false} }, 
+            y: { beginAtZero: true, grid: {display:false} }
+          },
+          animation: false
+        }
+      });
+    }
+  </script>
+</body>
+</html>
+

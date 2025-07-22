@@ -353,7 +353,7 @@
         // Cálculo del capital atrasado (solo suma faltantes de cuotas vencidas)
         let capitalAtrasado = calcularCapitalAtrasado(nuevaAmortizacion, fechaHoyStr);
 
-        // Buscar último pago vigente (no anulado)
+        // Buscar último pago vigente (no anulado Y NO el pago que estamos anulando)
         const pagosQ = query(
           collection(db, "pagos"),
           where("creditoID", "==", pagoData.creditoID),
@@ -362,8 +362,10 @@
         const pagosSnap = await getDocs(pagosQ);
         let ultimaFechaPago = null;
         pagosSnap.forEach(d => {
-          if (!ultimaFechaPago || new Date(d.data().fechaPago) > new Date(ultimaFechaPago)) {
-            ultimaFechaPago = d.data().fechaPago;
+          if (d.id !== pagoDoc.id) { // <-- EXCLUYE el pago que estamos anulando
+            if (!ultimaFechaPago || new Date(d.data().fechaPago) > new Date(ultimaFechaPago)) {
+              ultimaFechaPago = d.data().fechaPago;
+            }
           }
         });
 

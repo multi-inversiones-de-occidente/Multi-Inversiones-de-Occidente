@@ -339,7 +339,8 @@
           amortizacion: nuevaAmortizacion,
           historialMultas,
           capitalAtrasado: capitalAtrasado.toFixed(2),
-          cuotasAtrasadas: 0
+          cuotasAtrasadas: 0,
+          fechaUltimoCalculoIntereses: new Date(), // Aquí se guarda la fecha/hora de reversión
         });
 
         await updateDoc(doc(db, "pagos", pagoDoc.id), {

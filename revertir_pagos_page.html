@@ -208,7 +208,7 @@
             <b>Detalle del Pago:</b><br>
             <span style="color:#0c8028;"><b>↳ Capital:</b> $${parseFloat(pagoData.pagoCapital || 0).toFixed(2)}</span><br>
             <span style="color:#1873ad;"><b>↳ Interés:</b> $${parseFloat(pagoData.pagoInteres || 0).toFixed(2)}</span><br>
-            <span style="color:#b1440e;"><b>↳ Multas:</b> $${parseFloat(pagoData.pagoMultas || 0).toFixed(2)}</span><br>
+            <span style="color:#b1440e;"><b>↳ Multas:</b> $${parseFloat(pagoData.pagoMulta || 0).toFixed(2)}</span><br>
             <span><b>↳ Saldo restante:</b> $${parseFloat(pagoData.saldoRestante || 0).toFixed(2)}</span><br>
             <span><b>↳ Para ponerse al día antes:</b> $${parseFloat(pagoData.paraPonerseAlDiaAntes || 0).toFixed(2)}</span>
           </div>
@@ -290,11 +290,13 @@
         let montoRestanteInteres = parseFloat(pagoData.pagoInteres || "0");
         for (let i = nuevaAmortizacion.length - 1; i >= 0; i--) {
           let cuota = nuevaAmortizacion[i];
+          // Revertir capital
           if (montoRestanteCapital > 0 && cuota.montoPagado > 0) {
             let descontar = Math.min(montoRestanteCapital, cuota.montoPagado);
             cuota.montoPagado -= descontar;
             montoRestanteCapital -= descontar;
           }
+          // Revertir interés
           if (montoRestanteInteres > 0 && cuota.montoPagadoInteres > 0) {
             let descontarInt = Math.min(montoRestanteInteres, cuota.montoPagadoInteres);
             cuota.montoPagadoInteres -= descontarInt;
@@ -308,11 +310,11 @@
         let tieneAtrasos = false;
 
         // Eliminar multas de la cuota revertida si corresponde
-        if (pagoData.pagoMultas && parseFloat(pagoData.pagoMultas) > 0 && pagoData.numeroCuota !== undefined) {
+        if (pagoData.pagoMulta && parseFloat(pagoData.pagoMulta) > 0 && pagoData.numeroCuota !== undefined) {
           historialMultas = historialMultas.filter(m =>
             !(m.tipo === "por cuota atrasada" && String(m.cuotaNumero) === String(pagoData.numeroCuota))
           );
-          multasAcumuladas -= parseFloat(pagoData.pagoMultas || "0");
+          multasAcumuladas -= parseFloat(pagoData.pagoMulta || "0");
         }
 
         // Revisar y actualizar estado de cada cuota

@@ -371,18 +371,31 @@
 
         // --- Cálculo del interésActual desde última fecha de pago hasta hoy ---
         let interesActual = 0;
+        let fechaBaseInteres = null;
+
         if (ultimaFechaPago) {
-          let dias = Math.max(0, Math.ceil((hoy - new Date(ultimaFechaPago)) / (1000 * 60 * 60 * 24)));
+          fechaBaseInteres = new Date(ultimaFechaPago);
+        } else {
+          // Si no hay pagos vigentes, usar fecha de inicio del crédito
+          fechaBaseInteres = new Date(credito.fechaInicio);
+        }
+
+        if (fechaBaseInteres) {
+          let dias = Math.max(0, Math.ceil((hoy - fechaBaseInteres) / (1000 * 60 * 60 * 24)));
           interesActual = saldoActual * tasaDiaria * dias;
         }
 
+        // Calcula paraPonerseAlDia correctamente
         let paraPonerseAlDia = interesActual + capitalAtrasado + multasAcumuladas;
 
         // Estado de crédito
         let estadoCreditoFinal = tieneAtrasos || multasAcumuladas > 0 ? "Mora Temprana" : "Activo";
 
+        // Ajuste de saldo: suma el capital revertido, bien redondeado a 2 decimales
+        saldoActual = +(saldoActual + parseFloat(pagoData.pagoCapital || 0)).toFixed(2);
+
         await updateDoc(creditoRef, {
-          saldoActual: (saldoActual + parseFloat(pagoData.pagoCapital || 0)).toFixed(2),
+          saldoActual: saldoActual.toFixed(2),
           interesActual: interesActual.toFixed(2),
           multasAcumuladas: multasAcumuladas.toFixed(2),
           paraPonerseAlDia: paraPonerseAlDia.toFixed(2),

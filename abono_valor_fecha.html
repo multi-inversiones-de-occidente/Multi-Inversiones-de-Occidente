@@ -71,7 +71,6 @@
     import { getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
-    // Funciones auxiliares de fecha
     function parseLocalYMD(ymd) {
       if (!ymd) return null;
       const [y, m, d] = ymd.split('-').map(n => parseInt(n, 10));
@@ -88,7 +87,6 @@
       return diffDaysLocal(d1, d2);
     }
 
-    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -109,7 +107,6 @@
     let creditoSeleccionado = null;
     let fechaSeleccionada = null;
 
-    // --- PIN de Gerente Modal ---
     function showGerentePinDialog() {
       return new Promise((resolve) => {
         let modalRoot = document.getElementById("modal-root");
@@ -160,7 +157,6 @@
       });
     }
 
-    // --- Autenticación y carga de créditos ---
     onAuthStateChanged(auth, async user => {
       if (!user) return location.href = "login.html";
       usuarioActual = user.displayName || user.email || "Usuario desconocido";
@@ -176,7 +172,6 @@
       creditosAgencia = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     });
 
-    // --- Filtrado en tiempo real ---
     document.getElementById("busqueda").addEventListener("input", () => {
       const queryTxt = document.getElementById("busqueda").value.toLowerCase();
       const listaDiv = document.getElementById("lista-creditos");
@@ -204,7 +199,6 @@
       document.getElementById("simulacion-block").style.display = "none";
     }
 
-    // --- Recibo modal ---
     function mostrarRecibo(datos) {
       let reciboDiv = document.getElementById("recibo-root");
       let fechaFmt = new Date(datos.fechaPago).toLocaleDateString('es-SV');
@@ -231,7 +225,6 @@
       `;
     }
 
-    // --- Registrar abono a valor fecha ---
     document.getElementById("form-abono").onsubmit = async function(e) {
       e.preventDefault();
       if (!creditoSeleccionado || !fechaSeleccionada) return alert("Selecciona cliente y fecha.");
@@ -243,18 +236,18 @@
       const autorizado = await showGerentePinDialog();
       if (!autorizado) return alert("PIN de gerente incorrecto o cancelado.");
 
-      // Lógica principal de aplicación del abono
+      // ---- Lógica del abono retroactivo robusta ----
       let abonoRestante = monto;
       let pagoInteres = 0;
       let pagoCapital = 0;
       let pagoMulta = 0;
       let saldoActual = parseFloat(creditoSeleccionado.saldoActual || creditoSeleccionado.saldoInicial || creditoSeleccionado.montoCredito || 0);
       let tasaDiaria = parseFloat(creditoSeleccionado.tasaDiariaCredito || 0);
-      let historialMultas = Array.isArray(creditoSeleccionado.historialMultas) ? [...creditoSeleccionado.historialMultas] : [];
+      let historialMultas = Array.isArray(creditoSeleccionado.historialMultas) ? JSON.parse(JSON.stringify(creditoSeleccionado.historialMultas)) : [];
       let amortizacion = Array.isArray(creditoSeleccionado.amortizacion) ? JSON.parse(JSON.stringify(creditoSeleccionado.amortizacion)) : [];
       let fechaAbono = new Date(fechaSeleccionada + "T23:59:59");
 
-      // 1. MULTAS: Pagar multas exigibles primero
+      // 1. MULTAS: Pagar multas exigibles primero (luego se reclasifican)
       let multaVigente = 0, nuevasMultasHistorial = [];
       for (let m of historialMultas) {
         let multaFecha = new Date(m.fecha);
@@ -308,7 +301,6 @@
             cuota.estado = "Pagada";
             cuota.fechaPagoReal = fechaSeleccionada;
           } else if (cuota.montoPagado > 0 || cuota.montoPagadoInteres > 0) {
-            // Si la cuota está vencida y tiene abono parcial, debe quedar como ATRASADA
             cuota.estado = "Atrasada";
             cuota.fechaPagoReal = null;
           }
@@ -329,7 +321,6 @@
             cuotaSig.montoPagado = pagadoCapital + abono;
             pagoCapital += abono;
             abonoRestante -= abono;
-            // Solo aquí la cuota puede ser "Parcial" (si está en el futuro)
             if (
               Math.abs(cuotaSig.montoPagado - capitalCuota) < 0.01
             ) {
@@ -343,7 +334,64 @@
         }
       }
 
-      // --- Actualización de crédito global ---
+      // --------- RECLASIFICACIÓN DE MULTAS (LA CLAVE) ---------
+      // Cada multa queda con estado: Pagada, No Corresponde, No Pagada
+      // Solo sumaremos las "No Pagada"
+      let historialMultasActualizado = [];
+      for (let multa of [...historialMultas, ...nuevasMultasHistorial]) {
+        // Si ya tiene estadoCuota, preserva; sino lo recalcula
+        let estadoCuota = "No Pagada";
+        let fechaMulta = new Date(multa.fecha);
+        let asociadaPagada = false;
+        // 1. ¿Hay alguna cuota asociada a la fecha de la multa, y pagada a valor fecha retroactivo?
+        for (let c of amortizacion) {
+          let fechaCuota = new Date(c.fecha);
+          // Toma margen de +/- 1 día por si acaso
+          if (Math.abs(diffDaysLocal(fechaMulta, fechaCuota)) <= 1) {
+            if (c.estado === "Pagada" && c.fechaPagoReal && c.fechaPagoReal <= multa.fecha) {
+              asociadaPagada = true;
+              break;
+            }
+          }
+        }
+        if (asociadaPagada) {
+          estadoCuota = "Pagada";
+        } else if (fechaAbono < fechaMulta) {
+          estadoCuota = "No Corresponde";
+        }
+        // Si no entró en ninguno de los casos, sigue como No Pagada
+        historialMultasActualizado.push({
+          ...multa,
+          estadoCuota
+        });
+      }
+
+      // ------------- CÁLCULO FINAL DE TOTALES ----------------
+      // Solo sumamos multas NO PAGADAS
+      let multasAcumuladasFinal = historialMultasActualizado.filter(m => m.estadoCuota === "No Pagada").reduce((acc, m) => acc + parseFloat(m.monto || 0), 0);
+
+      // Recuento de cuotas atrasadas después del abono
+      let cuotasAtrasadasFinal = amortizacion.filter(c => {
+        let fechaCuota = new Date(c.fecha);
+        let hoy = new Date();
+        hoy.setHours(0,0,0,0);
+        return fechaCuota < hoy && c.estado !== "Pagada";
+      }).length;
+
+      // Estado del crédito correcto
+      let nuevoEstadoCredito = (cuotasAtrasadasFinal === 0 && multasAcumuladasFinal === 0)
+        ? "Activo"
+        : "Mora Temprana";
+
+      // Capital atrasado: solo cuotas vencidas y no pagadas
+      let capitalAtrasado = amortizacion.filter(c => {
+        let fechaCuota = new Date(c.fecha);
+        let hoy = new Date();
+        hoy.setHours(0,0,0,0);
+        return fechaCuota < hoy && c.estado !== "Pagada";
+      }).reduce((acc, c) => acc + Math.max(0, parseFloat(c.capital || 0) - (parseFloat(c.montoPagado) || 0)), 0);
+
+      // Saldo pendiente
       let saldoPendiente = amortizacion
         .filter(c => c.estado !== "Pagada")
         .reduce((acc, c) => acc + Math.max(0, parseFloat(c.capital || 0) - (parseFloat(c.montoPagado) || 0)), 0);
@@ -353,31 +401,8 @@
       const diasInteres = Math.max(0, diasEntreFechasSinHora(fechaSeleccionada, fechaHoy));
       const interesActual = saldoPendiente * tasaDiaria * diasInteres;
 
-      // Para ponerse al día: suma de capital e intereses y multas de cuotas vencidas después del abono
-      let capitalAtrasado = amortizacion
-        .filter(c => {
-          let fechaCuota = new Date(c.fecha);
-          let hoy = new Date();
-          hoy.setHours(0,0,0,0);
-          return fechaCuota < hoy && c.estado !== "Pagada";
-        })
-        .reduce((acc, c) => acc + Math.max(0, parseFloat(c.capital || 0) - (parseFloat(c.montoPagado) || 0)), 0);
-
-      // --------- NUEVA LÓGICA DE ESTADO DE CRÉDITO ---------
-      let hayCuotasAtrasadas = amortizacion.some(c => {
-        let fechaCuota = new Date(c.fecha);
-        let hoyFecha = new Date();
-        hoyFecha.setHours(0,0,0,0);
-        return fechaCuota < hoyFecha && c.estado !== "Pagada";
-      });
-
-      let multasPendientes = nuevasMultasHistorial.length > 0 && nuevasMultasHistorial.some(m => parseFloat(m.monto) > 0);
-
-      // Por defecto el crédito es "Activo" si no hay cuotas vencidas no pagadas ni multas pendientes.
-      let nuevoEstadoCredito = (!hayCuotasAtrasadas && !multasPendientes)
-        ? "Activo"
-        : "Mora Temprana";
-      // --------- FIN NUEVA LÓGICA ---------
+      // Para ponerse al día: suma de capital atrasado + multas NO PAGADAS + interés actual
+      const paraPonerseAlDiaFinal = (capitalAtrasado + multasAcumuladasFinal + interesActual);
 
       // LOGICA DEL CORRELATIVO
       let correlativo = 1;
@@ -418,7 +443,6 @@
       };
       await addDoc(collection(db, "pagos"), pagoObj);
 
-      // Registrar el movimiento en caja
       await addDoc(collection(db, "movimientos_caja"), {
         tipoMovimiento: 'Ingreso',
         monto: monto,
@@ -429,24 +453,22 @@
         creditoID: creditoSeleccionado.id
       });
 
-      // Actualizar el crédito
       await updateDoc(doc(db, "creditos", creditoSeleccionado.id), {
         amortizacion: amortizacion,
         saldoActual: saldoPendiente.toFixed(2),
         interesActual: interesActual.toFixed(2),
-        paraPonerseAlDia: (capitalAtrasado + (nuevasMultasHistorial.reduce((a, m) => a + parseFloat(m.monto || 0), 0)) + interesActual).toFixed(2),
-        historialMultas: nuevasMultasHistorial,
-        multasAcumuladas: nuevasMultasHistorial.reduce((a, m) => a + parseFloat(m.monto || 0), 0).toFixed(2),
+        paraPonerseAlDia: paraPonerseAlDiaFinal.toFixed(2),
+        historialMultas: historialMultasActualizado,
+        multasAcumuladas: multasAcumuladasFinal.toFixed(2),
         estadoCredito: nuevoEstadoCredito,
+        cuotasAtrasadas: cuotasAtrasadasFinal,
         capitalAtrasado: capitalAtrasado.toFixed(2),
         fechaUltimoCalculoIntereses: fechaHoy,
         ultimaActualizacion: new Date()
       });
 
-      // Mostrar recibo
       mostrarRecibo(pagoObj);
 
-      // Reset visual
       document.getElementById("ok-msg").textContent = "Abono retroactivo registrado correctamente.";
       document.getElementById("ok-msg").style.display = "block";
       setTimeout(() => {
@@ -460,7 +482,6 @@
       }, 2100);
     };
 
-    // Mostrar formulario cuando se selecciona fecha válida
     document.getElementById("fecha-abono").addEventListener("change", function() {
       fechaSeleccionada = document.getElementById("fecha-abono").value;
       document.getElementById("form-abono").style.display = fechaSeleccionada && creditoSeleccionado ? "block" : "none";
@@ -468,6 +489,7 @@
   </script>
 </body>
 </html>
+
 
 
 

@@ -71,6 +71,7 @@
     import { getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
+    // Utilidades de fecha
     function parseLocalYMD(ymd) {
       if (!ymd) return null;
       const [y, m, d] = ymd.split('-').map(n => parseInt(n, 10));
@@ -107,6 +108,23 @@
     let creditoSeleccionado = null;
     let fechaSeleccionada = null;
 
+    // --- Algoritmo blindado: nunca repite correlativo (a nivel global en pagos) ---
+    async function obtenerCorrelativoUnicoPagos(db) {
+      let correlativo = 1;
+      // Trae todos los correlativos ya usados (esto puede tomar segundos pero es la única forma segura en frontend)
+      const pagosSnap = await getDocs(collection(db, "pagos"));
+      let usados = new Set();
+      pagosSnap.forEach(doc => {
+        const c = doc.data().correlativo;
+        if (typeof c === "number" && c > 0) usados.add(c);
+      });
+      // Busca el primer correlativo libre
+      correlativo = 1;
+      while (usados.has(correlativo)) correlativo++;
+      return correlativo;
+    }
+
+    // --- PIN de Gerente Modal ---
     function showGerentePinDialog() {
       return new Promise((resolve) => {
         let modalRoot = document.getElementById("modal-root");
@@ -157,6 +175,7 @@
       });
     }
 
+    // --- Autenticación y carga de créditos ---
     onAuthStateChanged(auth, async user => {
       if (!user) return location.href = "login.html";
       usuarioActual = user.displayName || user.email || "Usuario desconocido";
@@ -172,6 +191,7 @@
       creditosAgencia = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     });
 
+    // --- Filtrado en tiempo real ---
     document.getElementById("busqueda").addEventListener("input", () => {
       const queryTxt = document.getElementById("busqueda").value.toLowerCase();
       const listaDiv = document.getElementById("lista-creditos");
@@ -334,19 +354,14 @@
         }
       }
 
-      // --------- RECLASIFICACIÓN DE MULTAS (LA CLAVE) ---------
-      // Cada multa queda con estado: Pagada, No Corresponde, No Pagada
-      // Solo sumaremos las "No Pagada"
+      // --------- RECLASIFICACIÓN DE MULTAS ---------
       let historialMultasActualizado = [];
       for (let multa of [...historialMultas, ...nuevasMultasHistorial]) {
-        // Si ya tiene estadoCuota, preserva; sino lo recalcula
         let estadoCuota = "No Pagada";
         let fechaMulta = new Date(multa.fecha);
         let asociadaPagada = false;
-        // 1. ¿Hay alguna cuota asociada a la fecha de la multa, y pagada a valor fecha retroactivo?
         for (let c of amortizacion) {
           let fechaCuota = new Date(c.fecha);
-          // Toma margen de +/- 1 día por si acaso
           if (Math.abs(diffDaysLocal(fechaMulta, fechaCuota)) <= 1) {
             if (c.estado === "Pagada" && c.fechaPagoReal && c.fechaPagoReal <= multa.fecha) {
               asociadaPagada = true;
@@ -359,7 +374,6 @@
         } else if (fechaAbono < fechaMulta) {
           estadoCuota = "No Corresponde";
         }
-        // Si no entró en ninguno de los casos, sigue como No Pagada
         historialMultasActualizado.push({
           ...multa,
           estadoCuota
@@ -367,59 +381,32 @@
       }
 
       // ------------- CÁLCULO FINAL DE TOTALES ----------------
-      // Solo sumamos multas NO PAGADAS
       let multasAcumuladasFinal = historialMultasActualizado.filter(m => m.estadoCuota === "No Pagada").reduce((acc, m) => acc + parseFloat(m.monto || 0), 0);
-
-      // Recuento de cuotas atrasadas después del abono
       let cuotasAtrasadasFinal = amortizacion.filter(c => {
         let fechaCuota = new Date(c.fecha);
         let hoy = new Date();
         hoy.setHours(0,0,0,0);
         return fechaCuota < hoy && c.estado !== "Pagada";
       }).length;
-
-      // Estado del crédito correcto
       let nuevoEstadoCredito = (cuotasAtrasadasFinal === 0 && multasAcumuladasFinal === 0)
         ? "Activo"
         : "Mora Temprana";
-
-      // Capital atrasado: solo cuotas vencidas y no pagadas
       let capitalAtrasado = amortizacion.filter(c => {
         let fechaCuota = new Date(c.fecha);
         let hoy = new Date();
         hoy.setHours(0,0,0,0);
         return fechaCuota < hoy && c.estado !== "Pagada";
       }).reduce((acc, c) => acc + Math.max(0, parseFloat(c.capital || 0) - (parseFloat(c.montoPagado) || 0)), 0);
-
-      // Saldo pendiente
       let saldoPendiente = amortizacion
         .filter(c => c.estado !== "Pagada")
         .reduce((acc, c) => acc + Math.max(0, parseFloat(c.capital || 0) - (parseFloat(c.montoPagado) || 0)), 0);
-
-      // Interés actual hasta HOY después del pago retroactivo
       const fechaHoy = new Date();
       const diasInteres = Math.max(0, diasEntreFechasSinHora(fechaSeleccionada, fechaHoy));
       const interesActual = saldoPendiente * tasaDiaria * diasInteres;
-
-      // Para ponerse al día: suma de capital atrasado + multas NO PAGADAS + interés actual
       const paraPonerseAlDiaFinal = (capitalAtrasado + multasAcumuladasFinal + interesActual);
 
-      // LOGICA DEL CORRELATIVO
-      let correlativo = 1;
-      try {
-        const pagosQuery = query(collection(db, "pagos"), where("creditoID", "==", creditoSeleccionado.id));
-        const pagosSnap = await getDocs(pagosQuery);
-        if (!pagosSnap.empty) {
-          let maxCorrel = 0;
-          pagosSnap.forEach(docP => {
-            const c = docP.data().correlativo || 0;
-            if (c > maxCorrel) maxCorrel = c;
-          });
-          correlativo = maxCorrel + 1;
-        }
-      } catch (e) {
-        correlativo = Math.floor(Math.random() * 100000);
-      }
+      // --- BLINDAJE DE CORRELATIVO ---
+      let correlativo = await obtenerCorrelativoUnicoPagos(db);
 
       // Registrar el pago retroactivo
       let pagoObj = {

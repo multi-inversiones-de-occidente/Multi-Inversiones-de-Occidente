@@ -87,7 +87,7 @@
 
     let pagoDoc = null, pagoData = null, movDoc = null, movData = null, userId = null;
 
-    // --- PIN GERENTE MODAL (idéntico para ambos flujos) ---
+    // --- PIN GERENTE MODAL ---
     function showGerentePinDialog() {
       return new Promise((resolve) => {
         let modalRoot = document.getElementById("modal-root");
@@ -97,7 +97,6 @@
         async function onOk() {
           const pinValue = document.getElementById("gerente-pin-input").value.trim();
           if (!pinValue) { errorMsg = "Debes ingresar el PIN del gerente."; render(); return; }
-          // Hash SHA256
           const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pinValue));
           const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
           const q = query(collection(db, "users"), where("rol", "==", "gerente"));
@@ -221,22 +220,20 @@
       document.getElementById("revertir-btn").onclick = revertirPago;
     }
 
-    // --- Función para calcular el capital atrasado ---
+    // --- Capital atrasado (suma lo faltante de cada cuota vencida) ---
     function calcularCapitalAtrasado(amortizacion, fechaHoy) {
       let capitalAtrasado = 0;
       const hoy = new Date(fechaHoy);
       for (const cuota of amortizacion) {
-        if ((cuota.estado === "Pendiente" || cuota.estado === "Parcial") && cuota.fecha) {
-          const fechaCuota = new Date(cuota.fecha);
-          if (fechaCuota <= hoy) {
-            capitalAtrasado += parseFloat(cuota.capital || 0);
-          }
+        if (cuota.fecha && new Date(cuota.fecha) < hoy) {
+          let faltante = Math.max(0, parseFloat(cuota.capital || 0) - parseFloat(cuota.montoPagado || 0));
+          capitalAtrasado += faltante;
         }
       }
       return capitalAtrasado;
     }
 
-    // --- Lógica de reversión de pago ---
+    // --- LOGICA DE REVERSIÓN MEJORADA ---
     async function revertirPago() {
       try {
         if (!pagoData || pagoData.anulado) return;
@@ -257,7 +254,7 @@
           return;
         }
 
-        // 2. Validaciones extra (pagos posteriores)
+        // Validar pagos posteriores
         const posterioresQ = query(
           collection(db, "pagos"),
           where("creditoID", "==", pagoData.creditoID),
@@ -271,7 +268,7 @@
           return;
         }
 
-        // 3. Restaurar el crédito
+        // Restaurar el crédito
         const creditoRef = doc(db, "creditos", pagoData.creditoID);
         const creditoSnap = await getDoc(creditoRef);
         if (!creditoSnap.exists()) {
@@ -282,65 +279,115 @@
         }
         const credito = creditoSnap.data();
 
+        let tasaDiaria = parseFloat(credito.tasaDiariaCredito || "0");
         let saldoActual = parseFloat(credito.saldoActual || "0");
-        let interesActual = parseFloat(credito.interesActual || "0");
         let multasAcumuladas = parseFloat(credito.multasAcumuladas || "0");
         let historialMultas = Array.isArray(credito.historialMultas) ? [...credito.historialMultas] : [];
-
-        saldoActual += parseFloat(pagoData.pagoCapital || "0");
-        interesActual += parseFloat(pagoData.pagoInteres || "0");
-        multasAcumuladas += parseFloat(pagoData.pagoMultas || "0");
-
         let nuevaAmortizacion = Array.isArray(credito.amortizacion) ? [...credito.amortizacion] : [];
-        if (Array.isArray(nuevaAmortizacion) && nuevaAmortizacion.length > 0 && pagoData.pagoCapital) {
-          let montoRestante = parseFloat(pagoData.pagoCapital || "0");
-          for (let i = nuevaAmortizacion.length - 1; i >= 0 && montoRestante > 0; i--) {
-            let cuota = nuevaAmortizacion[i];
-            let pagado = parseFloat(cuota.montoPagado || "0");
-            if (pagado > 0) {
-              if (pagado <= montoRestante) {
-                montoRestante -= pagado;
-                cuota.montoPagado = 0;
-                cuota.montoPagadoInteres = 0;
-                cuota.estado = "Pendiente";
-                cuota.fechaPagoReal = null;
-              } else {
-                cuota.montoPagado = pagado - montoRestante;
-                cuota.estado = "Parcial";
-                cuota.fechaPagoReal = null;
-                montoRestante = 0;
-              }
-            }
+
+        // --- Reversa de pagos en amortización (de atrás hacia adelante) ---
+        let montoRestanteCapital = parseFloat(pagoData.pagoCapital || "0");
+        let montoRestanteInteres = parseFloat(pagoData.pagoInteres || "0");
+        for (let i = nuevaAmortizacion.length - 1; i >= 0; i--) {
+          let cuota = nuevaAmortizacion[i];
+          if (montoRestanteCapital > 0 && cuota.montoPagado > 0) {
+            let descontar = Math.min(montoRestanteCapital, cuota.montoPagado);
+            cuota.montoPagado -= descontar;
+            montoRestanteCapital -= descontar;
+          }
+          if (montoRestanteInteres > 0 && cuota.montoPagadoInteres > 0) {
+            let descontarInt = Math.min(montoRestanteInteres, cuota.montoPagadoInteres);
+            cuota.montoPagadoInteres -= descontarInt;
+            montoRestanteInteres -= descontarInt;
           }
         }
 
-        // Corregir multa indebida si aplica
-        if (pagoData.pagoMultas && parseFloat(pagoData.pagoMultas) > 0 && pagoData.numeroCuota) {
-          const cuotaPagada = nuevaAmortizacion.find(c => String(c.numeroCuota) === String(pagoData.numeroCuota));
-          if (cuotaPagada && cuotaPagada.fecha === pagoData.fechaPago?.substring(0, 10)) {
-            historialMultas = historialMultas.filter(m =>
-              !(m.tipo === "por cuota atrasada" && String(m.cuotaNumero) === String(pagoData.numeroCuota))
+        // --- ESTADOS DE CUOTAS Y MULTAS ---
+        let hoy = new Date();
+        let fechaHoyStr = hoy.toISOString().substring(0, 10);
+        let tieneAtrasos = false;
+
+        // Eliminar multas de la cuota revertida si corresponde
+        if (pagoData.pagoMultas && parseFloat(pagoData.pagoMultas) > 0 && pagoData.numeroCuota !== undefined) {
+          historialMultas = historialMultas.filter(m =>
+            !(m.tipo === "por cuota atrasada" && String(m.cuotaNumero) === String(pagoData.numeroCuota))
+          );
+          multasAcumuladas -= parseFloat(pagoData.pagoMultas || "0");
+        }
+
+        // Revisar y actualizar estado de cada cuota
+        for (let cuota of nuevaAmortizacion) {
+          let fechaCuota = new Date(cuota.fecha);
+          let pagado = parseFloat(cuota.montoPagado || "0");
+          let capitalCuota = parseFloat(cuota.capital || "0");
+
+          // Si la cuota ya venció y no está completamente pagada (aunque tenga parcial):
+          if (fechaCuota < hoy && pagado < capitalCuota) {
+            cuota.estado = "Atrasada";
+            cuota.fechaPagoReal = null;
+            // Si no tiene multa, se agrega
+            let yaTieneMulta = historialMultas.some(m =>
+              m.tipo === "por cuota atrasada" && String(m.cuotaNumero) === String(cuota.numeroCuota)
             );
-            multasAcumuladas -= parseFloat(pagoData.pagoMultas || "0");
+            if (!yaTieneMulta) {
+              historialMultas.push({
+                tipo: "por cuota atrasada",
+                cuotaNumero: cuota.numeroCuota,
+                monto: 3,
+                fecha: fechaHoyStr
+              });
+              multasAcumuladas += 3;
+            }
+            tieneAtrasos = true;
+          } else if (fechaCuota < hoy && pagado >= capitalCuota) {
+            cuota.estado = "Pagada";
+          } else if (fechaCuota >= hoy) {
+            if (pagado === 0) cuota.estado = "Pendiente";
+            else if (pagado < capitalCuota) cuota.estado = "Parcial";
+            else cuota.estado = "Pagada";
           }
         }
 
-        let fechaHoy = (new Date()).toISOString().substring(0, 10);
-        let capitalAtrasado = calcularCapitalAtrasado(nuevaAmortizacion, fechaHoy);
+        // Cálculo del capital atrasado (solo suma faltantes de cuotas vencidas)
+        let capitalAtrasado = calcularCapitalAtrasado(nuevaAmortizacion, fechaHoyStr);
 
-        let paraPonerseAlDia = interesActual + capitalAtrasado;
+        // Buscar último pago vigente (no anulado)
+        const pagosQ = query(
+          collection(db, "pagos"),
+          where("creditoID", "==", pagoData.creditoID),
+          where("anulado", "==", false)
+        );
+        const pagosSnap = await getDocs(pagosQ);
+        let ultimaFechaPago = null;
+        pagosSnap.forEach(d => {
+          if (!ultimaFechaPago || new Date(d.data().fechaPago) > new Date(ultimaFechaPago)) {
+            ultimaFechaPago = d.data().fechaPago;
+          }
+        });
+
+        // --- Cálculo del interésActual desde última fecha de pago hasta hoy ---
+        let interesActual = 0;
+        if (ultimaFechaPago) {
+          let dias = Math.max(0, Math.ceil((hoy - new Date(ultimaFechaPago)) / (1000 * 60 * 60 * 24)));
+          interesActual = saldoActual * tasaDiaria * dias;
+        }
+
+        let paraPonerseAlDia = interesActual + capitalAtrasado + multasAcumuladas;
+
+        // Estado de crédito
+        let estadoCreditoFinal = tieneAtrasos || multasAcumuladas > 0 ? "Mora Temprana" : "Activo";
 
         await updateDoc(creditoRef, {
-          saldoActual: saldoActual.toFixed(2),
+          saldoActual: (saldoActual + parseFloat(pagoData.pagoCapital || 0)).toFixed(2),
           interesActual: interesActual.toFixed(2),
           multasAcumuladas: multasAcumuladas.toFixed(2),
           paraPonerseAlDia: paraPonerseAlDia.toFixed(2),
-          estadoCredito: "Activo",
+          estadoCredito: estadoCreditoFinal,
           amortizacion: nuevaAmortizacion,
           historialMultas,
           capitalAtrasado: capitalAtrasado.toFixed(2),
-          cuotasAtrasadas: 0,
-          fechaUltimoCalculoIntereses: new Date(), // Aquí se guarda la fecha/hora de reversión
+          cuotasAtrasadas: tieneAtrasos ? 1 : 0,
+          fechaUltimoCalculoIntereses: new Date(),
         });
 
         await updateDoc(doc(db, "pagos", pagoDoc.id), {
@@ -392,7 +439,7 @@
         return;
       }
       movDoc = movSnap.docs[0];
-      movData = movDoc.data();
+      movData = movSnap.docs[0].data();
 
       renderMovimientoInfo();
     }
@@ -438,7 +485,6 @@
         btn.disabled = true;
         btn.innerHTML = `<span class="spinner"></span> Revirtiendo...`;
 
-        // 1. Validación gerente
         const autorizado = await showGerentePinDialog();
         if (!autorizado) {
           btn.disabled = false;
@@ -446,7 +492,6 @@
           return;
         }
 
-        // 2. Actualizar movimiento como anulado
         await updateDoc(doc(db, "movimientosCaja", movDoc.id), {
           anulado: true,
           fechaReversion: new Date().toISOString(),
@@ -454,7 +499,6 @@
           motivoReversion: motivo
         });
 
-        // 3. (opcional) Registrar movimiento inverso para control contable
         await addDoc(collection(db, "movimientosCaja"), {
           correlativo: Math.floor(Math.random() * 1000000),
           tipo: movData.tipo === "Ingreso" ? "Egreso" : "Ingreso",

@@ -363,14 +363,21 @@
         })
         .reduce((acc, c) => acc + Math.max(0, parseFloat(c.capital || 0) - (parseFloat(c.montoPagado) || 0)), 0);
 
-      let hayAtrasos = amortizacion.some(c => {
+      // --------- NUEVA LÓGICA DE ESTADO DE CRÉDITO ---------
+      let hayCuotasAtrasadas = amortizacion.some(c => {
         let fechaCuota = new Date(c.fecha);
         let hoyFecha = new Date();
+        hoyFecha.setHours(0,0,0,0);
         return fechaCuota < hoyFecha && c.estado !== "Pagada";
       });
 
-      let nuevoEstadoCredito = (!hayAtrasos && saldoPendiente <= 0.01 && nuevasMultasHistorial.length === 0 && interesActual < 0.01)
-        ? "Activo" : "Mora Temprana";
+      let multasPendientes = nuevasMultasHistorial.length > 0 && nuevasMultasHistorial.some(m => parseFloat(m.monto) > 0);
+
+      // Por defecto el crédito es "Activo" si no hay cuotas vencidas no pagadas ni multas pendientes.
+      let nuevoEstadoCredito = (!hayCuotasAtrasadas && !multasPendientes)
+        ? "Activo"
+        : "Mora Temprana";
+      // --------- FIN NUEVA LÓGICA ---------
 
       // LOGICA DEL CORRELATIVO
       let correlativo = 1;

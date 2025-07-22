@@ -108,18 +108,18 @@
     let creditoSeleccionado = null;
     let fechaSeleccionada = null;
 
-    // --- Algoritmo blindado: nunca repite correlativo (a nivel global en pagos) ---
+    // --- Algoritmo blindado: nunca repite correlativo a nivel global ---
     async function obtenerCorrelativoUnicoPagos(db) {
-      let correlativo = 1;
-      // Trae todos los correlativos ya usados (esto puede tomar segundos pero es la única forma segura en frontend)
+      // Trae todos los correlativos ya usados (pueden ser string o number)
       const pagosSnap = await getDocs(collection(db, "pagos"));
       let usados = new Set();
       pagosSnap.forEach(doc => {
-        const c = doc.data().correlativo;
+        let c = doc.data().correlativo;
+        if (typeof c === "string" && !isNaN(c)) c = Number(c);
         if (typeof c === "number" && c > 0) usados.add(c);
       });
       // Busca el primer correlativo libre
-      correlativo = 1;
+      let correlativo = 1;
       while (usados.has(correlativo)) correlativo++;
       return correlativo;
     }
@@ -408,7 +408,7 @@
       // --- BLINDAJE DE CORRELATIVO ---
       let correlativo = await obtenerCorrelativoUnicoPagos(db);
 
-      // Registrar el pago retroactivo
+      // Registrar el pago retroactivo (correlativo SIEMPRE como número)
       let pagoObj = {
         creditoID: creditoSeleccionado.id,
         clienteID: creditoSeleccionado.clienteID || "",
@@ -426,7 +426,7 @@
         retroactivo: true,
         anulado: false,
         fechaRegistro: new Date().toISOString(),
-        correlativo
+        correlativo: correlativo // SIEMPRE NUMÉRICO
       };
       await addDoc(collection(db, "pagos"), pagoObj);
 

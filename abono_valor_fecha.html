@@ -31,7 +31,6 @@
     .modal-btn-cancel:hover { background: #bb2c1a; }
     .modal-btn-ok { background: #F8AF40; color: #1a1813; border: none; padding: 9px 18px; border-radius: 7px; cursor: pointer; font-weight: bold; transition: background .17s;}
     .modal-error { color: #d30013; font-size: 0.99rem; margin-bottom: 9px; font-weight: 500;}
-    /* Recibo */
     .recibo-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #181e21cc; z-index: 9999; display: flex; align-items: center; justify-content: center;}
     .recibo { background: #fff; color: #232a37; border-radius: 14px; box-shadow: 0 2px 32px #0007; padding: 27px 23px 18px 23px; max-width: 350px; width: 96%; font-size: 1.03rem; }
     .recibo-titulo { font-weight: bold; font-size: 1.2rem; margin-bottom: 12px; color: #fb923c; }
@@ -69,14 +68,14 @@
   <div id="recibo-root"></div>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, query, where, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
-    // --- PATCH fechas robustas para días sin hora y sin errores de zona horaria ---
+    // Funciones de fechas robustas
     function parseLocalYMD(ymd) {
       if (!ymd) return null;
       const [y, m, d] = ymd.split('-').map(n => parseInt(n, 10));
-      return new Date(y, m - 1, d, 0, 0, 0, 0); // medianoche local
+      return new Date(y, m - 1, d, 0, 0, 0, 0);
     }
     function diffDaysLocal(d1, d2) {
       const MS_PER_DAY = 86400000;
@@ -110,7 +109,7 @@
     let fechaSeleccionada = null;
     let historico = null;
 
-    // PIN Gerente modal - igual
+    // Modal para el PIN de gerente
     function showGerentePinDialog() {
       return new Promise((resolve) => {
         let modalRoot = document.getElementById("modal-root");
@@ -123,10 +122,8 @@
               render();
               return;
             }
-            // Hash SHA256
             const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pinValue));
             const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-            // Buscar gerentes de la agencia actual
             const q = query(
               collection(db, "users"),
               where("rol", "==", "gerente"),
@@ -182,7 +179,7 @@
       });
     }
 
-    // Al autenticarse, carga los créditos de la agencia del usuario, excluyendo los "Revertido"
+    // Autenticación y carga de créditos
     onAuthStateChanged(auth, async user => {
       if (!user) return location.href = "login.html";
       usuarioActual = user.displayName || user.email || "Usuario desconocido";
@@ -226,8 +223,8 @@
       document.getElementById("simulacion-block").style.display = "none";
     }
 
-    // SIMULACIÓN corregida
-    document.getElementById("fecha-abono").addEventListener("change", () => {
+    // Simulación (básica) para mostrar el resumen al seleccionar fecha y cliente
+    document.getElementById("fecha-abono").addEventListener("change", async () => {
       fechaSeleccionada = document.getElementById("fecha-abono").value;
       if (!fechaSeleccionada || !creditoSeleccionado) return;
 
@@ -240,24 +237,52 @@
         return;
       }
 
+      // Cargar pagos previos para cálculos precisos
+      const pagosQuery = query(collection(db, "pagos"), where("creditoID", "==", creditoSeleccionado.id), where("anulado", "==", false));
+      const pagosSnap = await getDocs(pagosQuery);
+      let pagosPrevios = [];
+      pagosSnap.forEach(docP => pagosPrevios.push(docP.data()));
+
+      // Lógica de intereses, multas y resumen
       let saldoInicial = parseFloat(creditoSeleccionado.saldoInicial || creditoSeleccionado.montoCredito || 0);
       let tasaDiaria = parseFloat(creditoSeleccionado.tasaDiariaCredito || 0);
+      let amortizacion = Array.isArray(creditoSeleccionado.amortizacion) ? creditoSeleccionado.amortizacion : [];
       let multasAcumuladas = parseFloat(creditoSeleccionado.multasAcumuladas || 0) || 0;
 
-      // Interés acumulado hasta fecha simulada (referencia informativa)
-      let dias = Math.floor((fechaSim - fechaApertura) / (1000 * 60 * 60 * 24));
-      dias = dias > 0 ? dias : 0;
-      let interesAcumulado = saldoInicial * tasaDiaria * dias;
+      // MULTA: Solo exigible si la fecha del abono es después del vencimiento de la cuota
+      let multaVigente = 0;
+      let historialMultas = Array.isArray(creditoSeleccionado.historialMultas) ? creditoSeleccionado.historialMultas : [];
+      if (historialMultas.length) {
+        // Busca multas aún vigentes al día del abono
+        for (let m of historialMultas) {
+          let multaFecha = new Date(m.fecha);
+          if (fechaSim >= multaFecha) {
+            multaVigente += parseFloat(m.monto || 0);
+          }
+        }
+      }
 
-      // Calcular cuotas realmente atrasadas SOLO si su fecha < fecha simulada
-      let cuotasAtrasadas = 0;
-      let capitalAtrasado = 0;
-      let interesesAtrasados = 0;
-      let totalOverdueCuota = 0;
-      let amortizacion = Array.isArray(creditoSeleccionado.amortizacion) ? creditoSeleccionado.amortizacion : [];
+      // INTERESES acumulados desde el último pago (busca el pago más reciente)
+      let fechaUltPago = fechaApertura;
+      if (pagosPrevios.length > 0) {
+        // Busca la fecha del último pago real antes del abono retroactivo
+        let pagosValidos = pagosPrevios.filter(p => new Date(p.fechaPago) < fechaSim);
+        if (pagosValidos.length > 0) {
+          fechaUltPago = new Date(Math.max(...pagosValidos.map(p => new Date(p.fechaPago).getTime())));
+        }
+      }
+      let diasDesdeUltPago = diffDaysLocal(fechaUltPago, fechaSim);
+      diasDesdeUltPago = Math.max(0, diasDesdeUltPago);
 
+      // El saldo después del último pago (teórico)
+      let saldoActualSimulado = parseFloat(creditoSeleccionado.saldoActual || saldoInicial);
+
+      // Recalcula intereses desde el último pago real
+      let interesActual = saldoActualSimulado * tasaDiaria * diasDesdeUltPago;
+
+      // Capital e intereses atrasados
+      let cuotasAtrasadas = 0, capitalAtrasado = 0, interesesAtrasados = 0, totalOverdueCuota = 0;
       let hoySim = new Date(fechaSim.getFullYear(), fechaSim.getMonth(), fechaSim.getDate());
-
       amortizacion.forEach(cuota => {
         let fechaCuota = new Date(cuota.fecha);
         let soloFechaCuota = new Date(fechaCuota.getFullYear(), fechaCuota.getMonth(), fechaCuota.getDate());
@@ -269,13 +294,13 @@
         }
       });
 
-      // Para ponerse al día SOLO capital e intereses atrasados + multas acumuladas a esa fecha
-      let paraPonerseAlDia = capitalAtrasado + interesesAtrasados + multasAcumuladas;
+      // Para ponerse al día SOLO capital e intereses atrasados + multa vigente a esa fecha
+      let paraPonerseAlDia = capitalAtrasado + interesesAtrasados + multaVigente;
 
       historico = {
-        saldoActual: saldoInicial,
-        interesActual: interesAcumulado,
-        multasAcumuladas: multasAcumuladas,
+        saldoActual: saldoActualSimulado,
+        interesActual: interesActual,
+        multasAcumuladas: multaVigente,
         paraPonerseAlDia: paraPonerseAlDia,
         cuotasAtrasadas: cuotasAtrasadas,
         capitalAtrasado: capitalAtrasado,
@@ -286,8 +311,8 @@
 
       let html = `
         <b>Saldo ese día:</b> $${historico.saldoActual.toFixed(2)}<br>
-        <b>Interés Acumulado (referencia):</b> $${historico.interesActual.toFixed(2)}<br>
-        <b>Multas Acumuladas:</b> $${historico.multasAcumuladas.toFixed(2)}<br>
+        <b>Interés desde último pago:</b> $${historico.interesActual.toFixed(2)}<br>
+        <b>Multas exigibles:</b> $${historico.multasAcumuladas.toFixed(2)}<br>
         <b>Para Ponerse al Día:</b> $${historico.paraPonerseAlDia.toFixed(2)}<br>
         <b>Cuotas Atrasadas:</b> ${historico.cuotasAtrasadas}<br>
         <b>Capital Atrasado:</b> $${historico.capitalAtrasado.toFixed(2)}<br>
@@ -299,7 +324,7 @@
       document.getElementById("form-abono").style.display = "block";
     });
 
-    // Mostrar recibo modal
+    // Recibo modal
     function mostrarRecibo(datos) {
       let reciboDiv = document.getElementById("recibo-root");
       let fechaFmt = new Date(datos.fechaPago).toLocaleDateString('es-SV');
@@ -316,6 +341,7 @@
             <div class="recibo-row"><b>Sucursal:</b> ${datos.sucursal}</div>
             <div class="recibo-row"><b>Pago capital:</b> $${Number(datos.pagoCapital).toFixed(2)}</div>
             <div class="recibo-row"><b>Pago interés:</b> $${Number(datos.pagoInteres).toFixed(2)}</div>
+            <div class="recibo-row"><b>Pago multa:</b> $${Number(datos.pagoMulta || 0).toFixed(2)}</div>
             <div class="recibo-row"><b>Saldo restante:</b> $${Number(datos.saldoRestante).toFixed(2)}</div>
             <div class="recibo-row"><b>Registrado el:</b> ${hoyFmt}</div>
             <div class="recibo-row"><b>Motivo:</b> ${datos.motivo || ''}</div>
@@ -325,7 +351,7 @@
       `;
     }
 
-    // ---- Lógica de registro de abono retroactivo y todo lo demás igual ----
+    // Registro del abono a valor fecha
     document.getElementById("form-abono").onsubmit = async function(e) {
       e.preventDefault();
       if (!creditoSeleccionado || !fechaSeleccionada) return alert("Selecciona cliente y fecha.");
@@ -337,12 +363,51 @@
       const autorizado = await showGerentePinDialog();
       if (!autorizado) return alert("PIN de gerente incorrecto o cancelado.");
 
-      // Aplicar el abono solo sobre cuotas vencidas hasta la fecha seleccionada
+      // Cargar pagos previos para cálculo preciso
+      const pagosQuery = query(collection(db, "pagos"), where("creditoID", "==", creditoSeleccionado.id), where("anulado", "==", false));
+      const pagosSnap = await getDocs(pagosQuery);
+      let pagosPrevios = [];
+      pagosSnap.forEach(docP => pagosPrevios.push(docP.data()));
+
+      // Calcular intereses y aplicar abono correctamente
       let abonoRestante = monto;
-      let amortizacion = Array.isArray(creditoSeleccionado.amortizacion) ? creditoSeleccionado.amortizacion : [];
       let pagoInteres = 0;
       let pagoCapital = 0;
+      let pagoMulta = 0;
+      let amortizacion = Array.isArray(creditoSeleccionado.amortizacion) ? creditoSeleccionado.amortizacion : [];
+      let saldoActual = parseFloat(creditoSeleccionado.saldoActual || creditoSeleccionado.saldoInicial || creditoSeleccionado.montoCredito || 0);
+      let tasaDiaria = parseFloat(creditoSeleccionado.tasaDiariaCredito || 0);
+      let historialMultas = Array.isArray(creditoSeleccionado.historialMultas) ? creditoSeleccionado.historialMultas : [];
 
+      // Detectar multas exigibles al día del abono y priorizar pago de multa si aplica
+      let multaVigente = 0, nuevasMultasHistorial = [];
+      for (let m of historialMultas) {
+        let multaFecha = new Date(m.fecha);
+        if (new Date(fechaSeleccionada + "T23:59:59") >= multaFecha) {
+          multaVigente += parseFloat(m.monto || 0);
+          // La multa solo permanece si no fue liquidada (pagada completamente)
+        } else {
+          nuevasMultasHistorial.push(m);
+        }
+      }
+      if (multaVigente > 0) {
+        let pagoAMulta = Math.min(abonoRestante, multaVigente);
+        abonoRestante -= pagoAMulta;
+        pagoMulta += pagoAMulta;
+        if (pagoAMulta === multaVigente) {
+          // Elimina del historial si se pagó
+          // (Ya lo elimina al guardar nuevasMultasHistorial)
+        } else {
+          // Aún queda multa pendiente
+          nuevasMultasHistorial.push({
+            fecha: fechaSeleccionada,
+            monto: (multaVigente - pagoAMulta).toFixed(2),
+            motivo: "Pendiente de liquidar"
+          });
+        }
+      }
+
+      // Recorre las cuotas hasta la fecha seleccionada y abona primero intereses, luego capital
       for (let i = 0; i < amortizacion.length; i++) {
         let cuota = amortizacion[i];
         let fechaCuota = new Date(cuota.fecha);
@@ -380,7 +445,7 @@
         }
       }
 
-      // SOBRANTE: Aplica a la siguiente cuota pendiente (solo a capital)
+      // Aplica sobrante a la siguiente cuota pendiente (solo a capital)
       if (abonoRestante > 0) {
         for (let j = 0; j < amortizacion.length && abonoRestante > 0; j++) {
           let cuotaSig = amortizacion[j];
@@ -410,48 +475,19 @@
         }
       }
 
-      // Calcula nuevo saldo actual (solo lo que falta de capital en todas las cuotas)
-      let saldoActual = amortizacion
+      // Calcula saldo restante después del pago retroactivo
+      let saldoPendiente = amortizacion
         .filter(c => c.estado !== "Pagada")
         .reduce((acc, c) => acc + Math.max(0, parseFloat(c.capital || 0) - (parseFloat(c.montoPagado) || 0)), 0);
 
-      // --- INTERESES SOLO DÍAS NATURALES PATCH ---
+      // Calcular interés actual hasta HOY después del pago
       const fechaHoy = new Date();
       const diasInteres = Math.max(0, diasEntreFechasSinHora(fechaSeleccionada, fechaHoy));
-      const tasaDiaria = parseFloat(creditoSeleccionado.tasaDiariaCredito || 0);
-      const interesActual = saldoActual * tasaDiaria * diasInteres;
+      const interesActual = saldoPendiente * tasaDiaria * diasInteres;
       const paraPonerseAlDia = interesActual;
 
-      // LOGICA DE MULTAS Y ESTADO
-      let historialMultas = Array.isArray(creditoSeleccionado.historialMultas) ? creditoSeleccionado.historialMultas : [];
-      let nuevoHistorialMultas = [];
-      let nuevaMultaAcumulada = 0;
-      for (let multa of historialMultas) {
-        let idxCuota = typeof multa.cuotaNumero === "number" ? multa.cuotaNumero - 1 : null;
-        let cuotaMulta = idxCuota !== null ? amortizacion[idxCuota] : null;
-        if (cuotaMulta && cuotaMulta.estado !== "Pagada") {
-          nuevoHistorialMultas.push(multa);
-          nuevaMultaAcumulada += parseFloat(multa.monto || 0);
-        }
-      }
-
-      // Actualizar capitalAtrasado después del pago retroactivo (solo cuotas vencidas y no pagadas)
-      let capitalAtrasadoActual = amortizacion
-        .filter(c => {
-          let fechaCuota = new Date(c.fecha);
-          let hoy = new Date();
-          hoy.setHours(0,0,0,0);
-          return fechaCuota < hoy && c.estado !== "Pagada";
-        })
-        .reduce((acc, c) => acc + Math.max(0, parseFloat(c.capital || 0) - (parseFloat(c.montoPagado) || 0)), 0);
-
-      // Detectar si hay cuotas vencidas e impagas al día de hoy
-      let hayAtrasos = amortizacion.some(c => {
-        let fechaCuota = new Date(c.fecha);
-        let hoyFecha = new Date();
-        return fechaCuota < hoyFecha && c.estado !== "Pagada";
-      });
-      let nuevoEstadoCredito = hayAtrasos ? (creditoSeleccionado.estadoCredito || "Mora Temprana") : "Activo";
+      // Actualizar campos globales
+      let nuevoHistorialMultas = nuevasMultasHistorial; // Mantiene solo multas aún vigentes
 
       // LOGICA DEL CORRELATIVO
       let correlativo = 1;
@@ -473,11 +509,12 @@
       // Registrar el pago retroactivo
       let pagoObj = {
         creditoID: creditoSeleccionado.id,
-        clienteID: creditoSeleccionado.clienteID || "",    // <-- ASEGÚRALO AQUÍ
+        clienteID: creditoSeleccionado.clienteID || "",
         montoPagado: monto,
         pagoInteres: pagoInteres.toFixed(2),
         pagoCapital: pagoCapital.toFixed(2),
-        saldoRestante: saldoActual.toFixed(2),
+        pagoMulta: pagoMulta.toFixed(2),
+        saldoRestante: saldoPendiente.toFixed(2),
         fechaPago: new Date(fechaSeleccionada + "T12:00:00").toISOString(),
         nombres: creditoSeleccionado.nombre,
         numeroDui: creditoSeleccionado.numeroDui || "",
@@ -498,29 +535,44 @@
         fecha: new Date().toISOString(),
         referencia: 'Abono retroactivo',
         usuarioID: userId,
-        clienteID: creditoSeleccionado.clienteID || "", // <-- NUEVO
-        creditoID: creditoSeleccionado.id              // <-- NUEVO
+        clienteID: creditoSeleccionado.clienteID || "",
+        creditoID: creditoSeleccionado.id
       });
 
-      // Actualizar el crédito (ahora SÍ toca multas e historial Y capital atrasado)
+      // Estado crédito (mora o activo)
+      let hayAtrasos = amortizacion.some(c => {
+        let fechaCuota = new Date(c.fecha);
+        let hoyFecha = new Date();
+        return fechaCuota < hoyFecha && c.estado !== "Pagada";
+      });
+      let nuevoEstadoCredito = hayAtrasos ? (creditoSeleccionado.estadoCredito || "Mora Temprana") : "Activo";
+
+      // Actualiza el crédito (liquida intereses hasta HOY)
       await updateDoc(doc(db, "creditos", creditoSeleccionado.id), {
         amortizacion: amortizacion,
-        saldoActual: saldoActual.toFixed(2),
+        saldoActual: saldoPendiente.toFixed(2),
         interesActual: interesActual.toFixed(2),
         paraPonerseAlDia: paraPonerseAlDia.toFixed(2),
         historialMultas: nuevoHistorialMultas,
-        multasAcumuladas: nuevaMultaAcumulada.toFixed(2),
+        multasAcumuladas: nuevoHistorialMultas.reduce((a, m) => a + parseFloat(m.monto || 0), 0).toFixed(2),
         estadoCredito: nuevoEstadoCredito,
-        capitalAtrasado: capitalAtrasadoActual.toFixed(2),
-        // --- PATCH: fecha base del cálculo de intereses para cron ---
-        fechaUltimoCalculoIntereses: parseLocalYMD(fechaSeleccionada),
+        capitalAtrasado: amortizacion
+          .filter(c => {
+            let fechaCuota = new Date(c.fecha);
+            let hoy = new Date();
+            hoy.setHours(0,0,0,0);
+            return fechaCuota < hoy && c.estado !== "Pagada";
+          })
+          .reduce((acc, c) => acc + Math.max(0, parseFloat(c.capital || 0) - (parseFloat(c.montoPagado) || 0)), 0)
+          .toFixed(2),
+        fechaUltimoCalculoIntereses: fechaHoy, // LIQUIDA HASTA HOY
         ultimaActualizacion: new Date()
       });
 
-      // Mostrar recibo en pantalla
+      // Mostrar recibo
       mostrarRecibo(pagoObj);
 
-      // Reinicia ciclo visual:
+      // Reset visual
       document.getElementById("ok-msg").textContent = "Abono retroactivo registrado correctamente.";
       document.getElementById("ok-msg").style.display = "block";
       setTimeout(() => {
@@ -536,6 +588,7 @@
   </script>
 </body>
 </html>
+
 
 
 

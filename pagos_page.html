@@ -324,14 +324,17 @@
           }
         }
 
-        // 4. ACTUALIZAR ESTADOS DE CUOTAS
+        // 4. ACTUALIZAR ESTADOS DE CUOTAS (¡CORREGIDO!)
         for (let i = 0; i < amortizacion.length; i++) {
           let cuota = amortizacion[i];
           if (
             (parseFloat(cuota.montoPagado) || 0) + tolerancia >= (parseFloat(cuota.capital) || 0)
           ) {
             cuota.estado = "Pagada";
-            cuota.fechaPagoReal = fechaPago;
+            // CORRECCIÓN: Solo asigna fecha si antes no la tenía
+            if (!cuota.fechaPagoReal) {
+              cuota.fechaPagoReal = fechaPago;
+            }
           } else if (
             ((parseFloat(cuota.montoPagadoInteres) || 0) > 0) ||
             ((parseFloat(cuota.montoPagado) || 0) > 0)
@@ -432,6 +435,7 @@
   </script>
 </body>
 </html>
+
 
 
 

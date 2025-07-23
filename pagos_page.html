@@ -230,7 +230,7 @@
       render();
     }
 
-    // === LÓGICA DE PAGO ADAPTADA A TU PEDIDO ===
+    // === LÓGICA DE PAGO ADAPTADA: suma, marca multas pagadas y respeta todo lo tuyo ===
     async function realizarPago(cliente, montoNum) {
       try {
         const user = auth.currentUser;
@@ -260,20 +260,40 @@
           fechaPagoReal: cuota.fechaPagoReal || null
         }));
 
+        let historialMultas = Array.isArray(creditoData.historialMultas) ? JSON.parse(JSON.stringify(creditoData.historialMultas)) : [];
+
         let restante = montoNum;
         let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
         const tolerancia = 0.10; // Tolerancia de centavos
 
-        // 1. MULTAS
-        if (restante >= multasAcumuladas) {
-          restante -= multasAcumuladas;
-          pagoMultas = multasAcumuladas;
-          multasAcumuladas = 0;
-        } else {
-          multasAcumuladas -= restante;
-          pagoMultas = restante;
-          restante = 0;
+        // 1. MULTAS: Suma todas las NO PAGADAS
+        let multasNoPagadas = historialMultas.filter(m => !m.estadoCuota || m.estadoCuota === "No Pagada");
+        let multasPendientes = multasNoPagadas.reduce((acc, m) => acc + (parseFloat(m.monto) || 0), 0);
+
+        // Paga primero las multas NO PAGADAS
+        let pagadoEnMultas = 0;
+        let nuevasMultasHistorial = historialMultas.map(m => ({...m}));
+        if (restante > 0 && multasPendientes > 0) {
+          for (let i = 0; i < nuevasMultasHistorial.length; i++) {
+            let multa = nuevasMultasHistorial[i];
+            if (!multa.estadoCuota || multa.estadoCuota === "No Pagada") {
+              let pagar = Math.min(restante, parseFloat(multa.monto) || 0);
+              if (pagar > 0) {
+                pagadoEnMultas += pagar;
+                restante -= pagar;
+                // Si se pagó toda la multa, márcala como Pagada
+                if (Math.abs(pagar - parseFloat(multa.monto)) < 0.01) {
+                  multa.estadoCuota = "Pagada";
+                }
+                // Si se pagó parcialmente (raro pero posible), se deja "No Pagada"
+                if (restante <= 0) break;
+              }
+            }
+          }
         }
+        pagoMultas = pagadoEnMultas;
+        multasAcumuladas = nuevasMultasHistorial.filter(m => !m.estadoCuota || m.estadoCuota === "No Pagada")
+          .reduce((acc, m) => acc + (parseFloat(m.monto) || 0), 0);
 
         // 2. INTERES CORRIDO (interesActual, solo a la fecha)
         let interesPagadoHoy = Math.min(interesActual, restante);
@@ -382,7 +402,8 @@
           ultimaActualizacion: fechaPago,
           fechaUltimoCalculoIntereses: fechaPago,
           estadoCredito: nuevoEstado,
-          amortizacion: amortizacion
+          amortizacion: amortizacion,
+          historialMultas: nuevasMultasHistorial // ← Aquí se actualiza el historial con "Pagada"
         });
 
         window.location.href = `ticket_page.html?correlativo=${correlativoStr}` +

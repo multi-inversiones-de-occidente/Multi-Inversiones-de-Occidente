@@ -173,20 +173,30 @@
 
     let usuarioListo = false;
     let usuario = null;
+    let agenciaActual = "";
 
-    onAuthStateChanged(auth, user => {
+    // Función para obtener la agencia/sucursal del usuario logeado
+    async function obtenerAgencia(user) {
+      const userSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
+      if (!userSnap.empty) {
+        agenciaActual = userSnap.docs[0].data().department || userSnap.docs[0].data().agencia || "";
+      }
+    }
+
+    onAuthStateChanged(auth, async user => {
       if (!user) {
         window.location.href = "login.html";
       } else {
         usuarioListo = true;
         usuario = user;
+        await obtenerAgencia(user); // Obtenemos agencia al autenticar
       }
     });
 
     // --- BUSCAR POR CORRELATIVO ---
     document.getElementById('formBuscarTicket').onsubmit = async function(e) {
       e.preventDefault();
-      if (!usuarioListo) {
+      if (!usuarioListo || !agenciaActual) {
         document.getElementById("error-msg").textContent = "Espera a que se inicie sesión...";
         document.getElementById("error-msg").style.display = "block";
         return;
@@ -205,8 +215,12 @@
       let ticket = null;
       let creditoAnulado = false;
 
-      // Busca en pagos
-      const pagosQuery = query(collection(db, "pagos"), where("correlativo", "in", correlativosBuscar));
+      // Busca en pagos SOLO de la sucursal del usuario
+      const pagosQuery = query(
+        collection(db, "pagos"),
+        where("correlativo", "in", correlativosBuscar),
+        where("sucursal", "==", agenciaActual)
+      );
       const pagosSnap = await getDocs(pagosQuery);
       if (!pagosSnap.empty) {
         ticket = { ...pagosSnap.docs[0].data(), tipo: "pago", id: pagosSnap.docs[0].id };
@@ -220,18 +234,26 @@
         }
       }
 
-      // Si no en pagos, busca en movimientosCaja
+      // Si no en pagos, busca en movimientosCaja (SOLO de la agencia del usuario)
       if (!ticket && !creditoAnulado) {
-        const movCajaQuery = query(collection(db, "movimientosCaja"), where("correlativo", "in", correlativosBuscar));
+        const movCajaQuery = query(
+          collection(db, "movimientosCaja"),
+          where("correlativo", "in", correlativosBuscar),
+          where("agencia", "==", agenciaActual)
+        );
         const movCajaSnap = await getDocs(movCajaQuery);
         if (!movCajaSnap.empty) {
           ticket = { ...movCajaSnap.docs[0].data(), tipo: "movimientoCaja" };
         }
       }
 
-      // Si no en movimientos_caja (con guión bajo)
+      // Si no en movimientos_caja (SOLO de la agencia del usuario)
       if (!ticket && !creditoAnulado) {
-        const movCaja2Query = query(collection(db, "movimientos_caja"), where("correlativo", "in", correlativosBuscar));
+        const movCaja2Query = query(
+          collection(db, "movimientos_caja"),
+          where("correlativo", "in", correlativosBuscar),
+          where("agencia", "==", agenciaActual)
+        );
         const movCaja2Snap = await getDocs(movCaja2Query);
         if (!movCaja2Snap.empty) {
           ticket = { ...movCaja2Snap.docs[0].data(), tipo: "movimientoCaja" };

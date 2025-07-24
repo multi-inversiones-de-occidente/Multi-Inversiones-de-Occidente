@@ -86,6 +86,15 @@
     const auth = getAuth(app);
 
     let pagoDoc = null, pagoData = null, movDoc = null, movData = null, userId = null;
+    let agenciaActual = "";
+
+    // -- Utilidad: Obtener agencia del usuario logeado
+    async function obtenerAgencia(user) {
+      const userSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
+      if (!userSnap.empty) {
+        agenciaActual = userSnap.docs[0].data().department || userSnap.docs[0].data().agencia || "";
+      }
+    }
 
     // --- PIN GERENTE MODAL ---
     function showGerentePinDialog() {
@@ -160,7 +169,7 @@
       };
     }
 
-    // --- Buscar Pago ---
+    // --- Buscar Pago (AHORA FILTRADO POR SUCURSAL) ---
     async function buscarPago() {
       document.getElementById("pago-card").innerHTML = "";
       const correlativo = document.getElementById("correlativo").value.trim();
@@ -170,8 +179,15 @@
       document.getElementById("buscar-btn").innerHTML = '<span class="spinner"></span> Buscando...';
       pagoDoc = pagoData = null;
 
-      const pagosQ = query(collection(db, "pagos"), where("correlativo", "==", correlativo));
+      if (!agenciaActual) await obtenerAgencia({ uid: userId });
+
+      const pagosQ = query(
+        collection(db, "pagos"),
+        where("correlativo", "==", correlativo),
+        where("sucursal", "==", agenciaActual) // <-- FILTRO DE SEGURIDAD
+      );
       const pagosSnap = await getDocs(pagosQ);
+
       document.getElementById("buscar-btn").disabled = false;
       document.getElementById("buscar-btn").innerHTML = '<i class="fas fa-search"></i> Buscar Pago';
 
@@ -414,12 +430,16 @@
           motivoReversion: motivo,
         });
 
-        await addDoc(collection(db, "movimientos_caja"), {
-          tipoMovimiento: 'Egreso',
+        await addDoc(collection(db, "movimientosCaja"), {
+          correlativo: Math.floor(Math.random() * 1000000),
+          tipo: "Egreso",
+          descripcion: "Reversión de pago " + pagoDoc.id,
+          agencia: agenciaActual,
+          usuario: userId,
           monto: -parseFloat(pagoData.montoPagado || "0"),
           fecha: new Date().toISOString(),
-          referencia: 'Reversión de pago ' + pagoDoc.id,
-          usuarioID: userId,
+          observaciones: motivo,
+          anulado: false
         });
 
         btn.disabled = false;
@@ -436,7 +456,7 @@
       }
     }
 
-    // --- BLOQUE MOVIMIENTOS DE CAJA ---
+    // --- BLOQUE MOVIMIENTOS DE CAJA (AHORA FILTRADO POR AGENCIA) ---
     async function buscarMovimiento() {
       document.getElementById("mov-card").innerHTML = "";
       const correlativo = document.getElementById("correlativo-mov").value.trim();
@@ -446,8 +466,15 @@
       document.getElementById("buscar-btn-mov").innerHTML = '<span class="spinner"></span> Buscando...';
       movDoc = movData = null;
 
-      const movQ = query(collection(db, "movimientosCaja"), where("correlativo", "==", Number(correlativo)));
+      if (!agenciaActual) await obtenerAgencia({ uid: userId });
+
+      const movQ = query(
+        collection(db, "movimientosCaja"),
+        where("correlativo", "==", Number(correlativo)),
+        where("agencia", "==", agenciaActual)
+      );
       const movSnap = await getDocs(movQ);
+
       document.getElementById("buscar-btn-mov").disabled = false;
       document.getElementById("buscar-btn-mov").innerHTML = '<i class="fas fa-search"></i> Buscar Movimiento';
 
@@ -542,10 +569,11 @@
       }
     }
 
-    // --- Firebase Auth para saber userID ---
+    // --- Firebase Auth para saber userID y agencia ---
     onAuthStateChanged(auth, user => {
       if (!user) return location.href = "login.html";
       userId = user.uid;
+      obtenerAgencia(user); // Se obtiene la agencia al inicio
     });
 
     document.getElementById("buscar-btn").onclick = buscarPago;
@@ -556,6 +584,7 @@
   </script>
 </body>
 </html>
+
 
 
 

@@ -55,7 +55,6 @@
     </button>
   </div>
 
-  <!-- Firebase y lógica principal: SOLO SE AGREGA EL FILTRO DE ANULADO EN MOVIMIENTOS MANUALES -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, orderBy, limit, getDoc, doc as docRef } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -74,7 +73,6 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // Utilidades de fechas
     function formatFecha(date) {
       return date.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
@@ -83,7 +81,6 @@
       return d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true });
     }
 
-    // Estado
     let now = new Date();
     let selectedDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
     let agenciaActual = "";
@@ -115,7 +112,6 @@
       listDiv.innerHTML = "Cargando...";
       totalDiv.textContent = "";
 
-      // Obtener agencia del usuario logeado
       if (!agenciaActual) {
         const docUser = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
         if (!docUser.empty) {
@@ -131,8 +127,9 @@
       const endIso = endOfDay.toISOString();
 
       let movimientos = [];
+      const correlativosSumados = new Set();
 
-      // 1. Movimientos manuales (solo de esa agencia, **AHORA FILTRANDO ANULADOS**)
+      // 1. Movimientos manuales (filtrando anulados y reversiones)
       const movSnap = await getDocs(
         query(
           collection(db, "movimientosCaja"),
@@ -143,8 +140,11 @@
       );
       movSnap.forEach(doc => {
         const d = doc.data();
-        // FILTRO ROBUSTO DE ANULADOS
         if ('anulado' in d && d.anulado === true) return;
+        if (d.descripcion && d.descripcion.startsWith('Reversión correlativo')) return;
+        // SOLO SUMA EL PRIMER CORRELATIVO NO ANULADO
+        if (d.correlativo && correlativosSumados.has(d.correlativo)) return;
+        if (d.correlativo) correlativosSumados.add(d.correlativo);
         movimientos.push({
           tipo: d.tipo,
           descripcion: d.descripcion,
@@ -266,7 +266,6 @@
           </div>
         `).join('');
       }
-      // Aquí los totales siempre aparecen, igual que antes
       totalDiv.innerHTML = `
         <div style="font-size:1.12rem;font-weight:400;margin-bottom:4px;">
           <b style="color:#2ef37a;">Saldo Anterior: $${saldoAnterior.toFixed(2)}</b>
@@ -277,7 +276,6 @@
       `;
     }
 
-    // Cambiar fecha
     document.getElementById("fecha-btn").onclick = async function() {
       const val = prompt("Ingrese la fecha en formato DD/MM/AAAA", formatFecha(selectedDate));
       if (!val) return;
@@ -302,7 +300,6 @@
   </script>
   <script>
   document.getElementById("btn-imprimir-corte").onclick = function() {
-    // Toma datos tal como están en pantalla, NO omite nada
     const fecha = document.getElementById("fecha-label").textContent || '';
     const movimientosHtml = document.getElementById("movimientos-list").innerHTML;
     const totalHtml = document.getElementById("total-caja").innerHTML;
@@ -347,6 +344,7 @@
   </script>
 </body>
 </html>
+
 
 
 

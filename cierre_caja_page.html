@@ -147,7 +147,10 @@
 
       const [fechaInicioUTC, fechaFinUTC] = getDiaSVRange(fecha);
 
-      // 1. Movimientos manuales (filtra anulado: true)
+      // --- AGRUPA POR CORRELATIVO ---
+      const correlativosSumados = new Set();
+
+      // 1. Movimientos manuales (filtra anulado y reversiones)
       for (const coll of ["movimientosCaja", "movimientos_caja"]) {
         const q = query(
           collection(db, coll),
@@ -159,8 +162,13 @@
         for (const docMov of snap.docs) {
           const movData = docMov.data();
           if (movData.cierre === true) continue;
-          // FILTRO ROBUSTO DE ANULADOS
           if ('anulado' in movData && movData.anulado === true) continue;
+          if (movData.descripcion && movData.descripcion.startsWith('Reversión correlativo')) continue;
+
+          // SOLO SUMA EL PRIMER CORRELATIVO NO ANULADO
+          if (movData.correlativo && correlativosSumados.has(movData.correlativo)) continue;
+          if (movData.correlativo) correlativosSumados.add(movData.correlativo);
+
           movimientosDelDia.push({ id: docMov.id, coll, ...movData, origen: "movimiento" });
           if (movData.tipo === "Ingreso") totalIngresos += Number(movData.monto || 0);
           if (movData.tipo === "Egreso") totalEgresos += Number(movData.monto || 0);

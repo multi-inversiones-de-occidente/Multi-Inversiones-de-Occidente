@@ -159,7 +159,8 @@
         for (const docMov of snap.docs) {
           const movData = docMov.data();
           if (movData.cierre === true) continue;
-          if (movData.anulado === true) continue;
+          // FILTRO ROBUSTO DE ANULADOS
+          if ('anulado' in movData && movData.anulado === true) continue;
           movimientosDelDia.push({ id: docMov.id, coll, ...movData, origen: "movimiento" });
           if (movData.tipo === "Ingreso") totalIngresos += Number(movData.monto || 0);
           if (movData.tipo === "Egreso") totalEgresos += Number(movData.monto || 0);

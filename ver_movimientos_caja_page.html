@@ -50,7 +50,6 @@
     </div>
     <div id="movimientos-list"></div>
     <div class="total-caja" id="total-caja"></div>
-    <!-- Aquí SOLO SE AGREGA el botón de impresión -->
     <button id="btn-imprimir-corte" class="btn-main">
       <i class="fas fa-print"></i> Imprimir Corte de Caja
     </button>
@@ -144,7 +143,8 @@
       );
       movSnap.forEach(doc => {
         const d = doc.data();
-        if (d.anulado === true) return;
+        // FILTRO ROBUSTO DE ANULADOS
+        if ('anulado' in d && d.anulado === true) return;
         movimientos.push({
           tipo: d.tipo,
           descripcion: d.descripcion,
@@ -300,7 +300,6 @@
       cargarMovimientos(user);
     });
   </script>
-  <!-- SOLO SE AGREGA el script de impresión abajo -->
   <script>
   document.getElementById("btn-imprimir-corte").onclick = function() {
     // Toma datos tal como están en pantalla, NO omite nada

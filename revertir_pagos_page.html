@@ -169,11 +169,11 @@
       };
     }
 
-    // --- Buscar Pago (AHORA FILTRADO POR SUCURSAL) ---
+    // --- Buscar Pago (SOPORTA correlativo como number o string) ---
     async function buscarPago() {
       document.getElementById("pago-card").innerHTML = "";
-      const correlativo = document.getElementById("correlativo").value.trim();
-      if (!correlativo) return;
+      const correlativoRaw = document.getElementById("correlativo").value.trim();
+      if (!correlativoRaw) return;
 
       document.getElementById("buscar-btn").disabled = true;
       document.getElementById("buscar-btn").innerHTML = '<span class="spinner"></span> Buscando...';
@@ -181,12 +181,23 @@
 
       if (!agenciaActual) await obtenerAgencia({ uid: userId });
 
-      const pagosQ = query(
+      // 1. Buscar como número
+      let pagosQ = query(
         collection(db, "pagos"),
-        where("correlativo", "==", correlativo),
-        where("sucursal", "==", agenciaActual) // <-- FILTRO DE SEGURIDAD
+        where("correlativo", "==", Number(correlativoRaw)),
+        where("sucursal", "==", agenciaActual)
       );
-      const pagosSnap = await getDocs(pagosQ);
+      let pagosSnap = await getDocs(pagosQ);
+
+      // 2. Si no encuentra nada, buscar como string
+      if (pagosSnap.empty) {
+        pagosQ = query(
+          collection(db, "pagos"),
+          where("correlativo", "==", correlativoRaw),
+          where("sucursal", "==", agenciaActual)
+        );
+        pagosSnap = await getDocs(pagosQ);
+      }
 
       document.getElementById("buscar-btn").disabled = false;
       document.getElementById("buscar-btn").innerHTML = '<i class="fas fa-search"></i> Buscar Pago';
@@ -456,11 +467,11 @@
       }
     }
 
-    // --- BLOQUE MOVIMIENTOS DE CAJA (AHORA FILTRADO POR AGENCIA) ---
+    // --- BLOQUE MOVIMIENTOS DE CAJA (SOPORTA correlativo como number o string) ---
     async function buscarMovimiento() {
       document.getElementById("mov-card").innerHTML = "";
-      const correlativo = document.getElementById("correlativo-mov").value.trim();
-      if (!correlativo) return;
+      const correlativoRaw = document.getElementById("correlativo-mov").value.trim();
+      if (!correlativoRaw) return;
 
       document.getElementById("buscar-btn-mov").disabled = true;
       document.getElementById("buscar-btn-mov").innerHTML = '<span class="spinner"></span> Buscando...';
@@ -468,12 +479,23 @@
 
       if (!agenciaActual) await obtenerAgencia({ uid: userId });
 
-      const movQ = query(
+      // 1. Buscar como número
+      let movQ = query(
         collection(db, "movimientosCaja"),
-        where("correlativo", "==", Number(correlativo)),
+        where("correlativo", "==", Number(correlativoRaw)),
         where("agencia", "==", agenciaActual)
       );
-      const movSnap = await getDocs(movQ);
+      let movSnap = await getDocs(movQ);
+
+      // 2. Si no encuentra nada, buscar como string
+      if (movSnap.empty) {
+        movQ = query(
+          collection(db, "movimientosCaja"),
+          where("correlativo", "==", correlativoRaw),
+          where("agencia", "==", agenciaActual)
+        );
+        movSnap = await getDocs(movQ);
+      }
 
       document.getElementById("buscar-btn-mov").disabled = false;
       document.getElementById("buscar-btn-mov").innerHTML = '<i class="fas fa-search"></i> Buscar Movimiento';
@@ -584,6 +606,7 @@
   </script>
 </body>
 </html>
+
 
 
 

@@ -110,7 +110,6 @@
 
     // --- Algoritmo blindado: nunca repite correlativo a nivel global ---
     async function obtenerCorrelativoUnicoPagos(db) {
-      // Trae todos los correlativos ya usados (pueden ser string o number)
       const pagosSnap = await getDocs(collection(db, "pagos"));
       let usados = new Set();
       pagosSnap.forEach(doc => {
@@ -118,7 +117,6 @@
         if (typeof c === "string" && !isNaN(c)) c = Number(c);
         if (typeof c === "number" && c > 0) usados.add(c);
       });
-      // Busca el primer correlativo libre
       let correlativo = 1;
       while (usados.has(correlativo)) correlativo++;
       return correlativo;
@@ -267,9 +265,13 @@
       let amortizacion = Array.isArray(creditoSeleccionado.amortizacion) ? JSON.parse(JSON.stringify(creditoSeleccionado.amortizacion)) : [];
       let fechaAbono = new Date(fechaSeleccionada + "T23:59:59");
 
-      // 1. MULTAS: Pagar multas exigibles primero (luego se reclasifican)
+      // 1. MULTAS: Pagar multas exigibles primero (NO tocar multas ya "Pagadas")
       let multaVigente = 0, nuevasMultasHistorial = [];
       for (let m of historialMultas) {
+        if (m.estadoCuota && m.estadoCuota === "Pagada") {
+          nuevasMultasHistorial.push(m); // Ya pagada, no se toca
+          continue;
+        }
         let multaFecha = new Date(m.fecha);
         if (fechaAbono >= multaFecha) {
           multaVigente += parseFloat(m.monto || 0);
@@ -290,21 +292,37 @@
         }
       }
 
-      // 2. Intereses y capital de cuotas vencidas (primero interes, luego capital de esas cuotas)
+      // 2. Intereses y capital de cuotas vencidas (primero interés, luego capital)
       for (let i = 0; i < amortizacion.length; i++) {
         let cuota = amortizacion[i];
         let fechaCuota = new Date(cuota.fecha);
+
         if (fechaCuota <= fechaAbono) {
           if (typeof cuota.montoPagadoInteres !== "number") cuota.montoPagadoInteres = 0;
           if (typeof cuota.montoPagado !== "number") cuota.montoPagado = 0;
           let pagadoInteres = parseFloat(cuota.montoPagadoInteres || 0);
           let interesCuota = parseFloat(cuota.interes || 0);
-          let pendienteInteres = interesCuota - pagadoInteres;
+
+          // LOGICA REFORZADA: Si la cuota está vencida (fechaCuota < HOY), abona TODO el interés de la cuota, no solo el corrido.
+          let hoy = new Date();
+          hoy.setHours(0,0,0,0);
+
+          let pendienteInteres;
+          if (fechaCuota < hoy) {
+            // Cuota vencida: se abona al 100% del interés de la cuota (menos lo ya pagado)
+            pendienteInteres = interesCuota - pagadoInteres;
+          } else {
+            // Cuota futura o al día: se abona solo el interés corrido hasta el valor fecha
+            let diasCorrido = diasEntreFechasSinHora(cuota.fecha, fechaAbono);
+            let interesCorrido = Math.max(0, parseFloat(cuota.capital || 0) * tasaDiaria * diasCorrido);
+            pendienteInteres = interesCorrido - pagadoInteres;
+          }
           let abonoInteres = Math.min(pendienteInteres, abonoRestante);
           cuota.montoPagadoInteres = pagadoInteres + abonoInteres;
           pagoInteres += abonoInteres;
           abonoRestante -= abonoInteres;
 
+          // Capital
           let pagadoCapital = parseFloat(cuota.montoPagado || 0);
           let capitalCuota = parseFloat(cuota.capital || 0);
           let pendienteCapital = capitalCuota - pagadoCapital;
@@ -327,7 +345,7 @@
         }
       }
 
-      // 3. Si sobra, abona a capital de cuotas futuras
+      // 3. Si sobra, abona a capital de cuotas futuras (adelantadas)
       if (abonoRestante > 0) {
         for (let j = 0; j < amortizacion.length && abonoRestante > 0; j++) {
           let cuotaSig = amortizacion[j];
@@ -357,6 +375,10 @@
       // --------- RECLASIFICACIÓN DE MULTAS ---------
       let historialMultasActualizado = [];
       for (let multa of [...historialMultas, ...nuevasMultasHistorial]) {
+        if (multa.estadoCuota === "Pagada") {
+          historialMultasActualizado.push(multa);
+          continue;
+        }
         let estadoCuota = "No Pagada";
         let fechaMulta = new Date(multa.fecha);
         let asociadaPagada = false;

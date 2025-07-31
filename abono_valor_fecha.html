@@ -267,30 +267,27 @@
 
       // 1. MULTAS: Solo actualizar estado de las No Pagadas (no crear nuevas ni duplicar)
       let historialMultasActualizado = historialMultas.map(multa => {
-        if (multa.estadoCuota === "Pagada") return multa; // NO TOCAR las pagadas
-        let fechaMulta = new Date(multa.fecha);
-        let asociadaPagada = false;
-        for (let c of amortizacion) {
-          let fechaCuota = new Date(c.fecha);
-          if (Math.abs(diffDaysLocal(fechaMulta, fechaCuota)) <= 1) {
-            if (c.estado === "Pagada" && c.fechaPagoReal && c.fechaPagoReal <= multa.fecha) {
-              asociadaPagada = true;
-              break;
-            }
-          }
+        if (multa.estadoCuota === "Pagada" || multa.estadoCuota === "No Procede") return multa; // NO TOCAR las pagadas o ya no proceden
+        let multaFecha = new Date(multa.fecha);
+        multaFecha.setHours(0,0,0,0);
+        let fechaAbonoSinHora = new Date(fechaSeleccionada + "T00:00:00");
+        // Pagar multas si fecha abono >= fecha multa
+        if (fechaAbonoSinHora >= multaFecha) {
+          return multa; // Se manejará en el bucle de pago más abajo
+        } else {
+          // Si el abono es antes de la fecha de la multa y sigue No Pagada, entonces NO PROCEDE
+          return { ...multa, estadoCuota: "No Procede" };
         }
-        return {
-          ...multa,
-          estadoCuota: asociadaPagada ? "Pagada" : "No Pagada"
-        };
       });
 
-      // 2. PAGAR multas exigibles primero (no crear ni dividir, solo pagar las existentes "No Pagada")
+      // 2. PAGAR multas exigibles primero (no crear ni dividir, solo pagar las existentes "No Pagada" con fecha <= abono)
       for (let i = 0; i < historialMultasActualizado.length; i++) {
         let m = historialMultasActualizado[i];
         if (m.estadoCuota !== "No Pagada") continue;
         let multaFecha = new Date(m.fecha);
-        if (fechaAbono >= multaFecha && abonoRestante > 0) {
+        multaFecha.setHours(0,0,0,0);
+        let fechaAbonoSinHora = new Date(fechaSeleccionada + "T00:00:00");
+        if (fechaAbonoSinHora >= multaFecha && abonoRestante > 0) {
           let pagoAMulta = Math.min(abonoRestante, parseFloat(m.monto || 0));
           abonoRestante -= pagoAMulta;
           pagoMulta += pagoAMulta;

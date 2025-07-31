@@ -141,7 +141,11 @@
       movSnap.forEach(doc => {
         const d = doc.data();
         if ('anulado' in d && d.anulado === true) return;
-        if (d.descripcion && d.descripcion.startsWith('Reversión correlativo')) return;
+        // NO mostrar reversión de pago ni reversión correlativo
+        if (d.descripcion && (
+          d.descripcion.startsWith('Reversión de pago') ||
+          d.descripcion.startsWith('Reversión correlativo')
+        )) return;
         // SOLO SUMA EL PRIMER CORRELATIVO NO ANULADO
         if (d.correlativo && correlativosSumados.has(d.correlativo)) return;
         if (d.correlativo) correlativosSumados.add(d.correlativo);

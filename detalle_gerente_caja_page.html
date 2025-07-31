@@ -1,13 +1,63 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Ver Movimientos de Caja – Multi Inversiones</title>
-  <!-- Firebase SDK -->
+  <title>Ver Movimientos de Caja – Panel Gerente</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background: #101212; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
+    header { background: #000; padding: 1rem 0; text-align: center; font-size: 1.45rem; letter-spacing: 1px; font-weight: 700; color: #67C8F1;}
+    .container { max-width: 700px; margin: 2.5rem auto 0 auto; background: #181a1c; border-radius: 16px; box-shadow: 0 2px 22px #0008; padding: 2.2rem 1.2rem 1.7rem 1.2rem;}
+    .row-fecha { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;}
+    .fecha-label { font-size: 1.11rem; color: #8ae1fc; font-weight: 600;}
+    .fecha-btn { background: none; border: none; color: #fff; font-size: 1.25rem; cursor: pointer;}
+    .mov-card { background: #23272c; border-radius: 12px; margin-bottom: 12px; padding: 16px 18px; box-shadow: 0 1px 7px #0002;}
+    .mov-ingreso { border-left: 5px solid #13b66b;}
+    .mov-egreso { border-left: 5px solid #e74c3c;}
+    .mov-pago { border-left: 5px solid #67C8F1;}
+    .mov-title { font-weight: bold; font-size: 1.05rem; margin-bottom: 6px;}
+    .mov-sub { font-size: .98rem; color: #8ae1fc;}
+    .total-caja { margin-top: 14px; background: #101212; border-radius: 10px; text-align: center; padding: 18px; font-size: 1.32rem; font-weight: bold; color: #fff;}
+    .empty-msg { text-align:center; color:#ccc; padding: 32px 0;}
+    .btn-main {
+      width: 100%;
+      background: #13b66b;
+      color: #fff;
+      font-size: 1.11rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 9px;
+      padding: 13px 0;
+      cursor: pointer;
+      margin-top: 1.4em;
+      transition: background .17s;
+      margin-bottom: 0.7em;
+    }
+    .btn-main:active,
+    .btn-main:hover { background: #0b854c; }
+    @media (max-width:600px){.container{padding:1.2rem .3rem;}}
+  </style>
+</head>
+<body>
+  <header>Ver Movimientos de Caja – Panel Gerente</header>
+  <div class="container">
+    <div class="row-fecha">
+      <span id="fecha-label" class="fecha-label"></span>
+      <button id="fecha-btn" class="fecha-btn" title="Cambiar Fecha">
+        <i class="fas fa-calendar-day"></i>
+      </button>
+    </div>
+    <div id="movimientos-list"></div>
+    <div class="total-caja" id="total-caja"></div>
+    <button id="btn-imprimir-corte" class="btn-main">
+      <i class="fas fa-print"></i> Imprimir Corte de Caja
+    </button>
+  </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, getDoc, doc as docRef } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, orderBy, limit, getDoc, doc as docRef } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -19,8 +69,8 @@
       appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
       measurementId: "G-H4E31XHG1Y"
     };
-    const app  = initializeApp(firebaseConfig);
-    const db   = getFirestore(app);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
     const auth = getAuth(app);
 
     function formatFecha(date) {
@@ -30,10 +80,8 @@
       const d = new Date(fechaIso);
       return d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true });
     }
-    function formatMoney(n) {
-      return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-    }
 
+    // Fecha actual local
     let now = new Date();
     let selectedDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
     let agenciaActual = "";
@@ -49,21 +97,14 @@
         cierresRef,
         where("agencia", "==", agencia),
         where("fecha", "<", fechaStr),
-        // Este orderBy se puede omitir en v9, pero lo dejamos por claridad
+        orderBy("fecha", "desc"),
+        limit(1)
       );
       const snap = await getDocs(q);
-      let maxFecha = null;
-      let saldo = 0;
-      snap.forEach(doc => {
-        const d = doc.data();
-        if (d.fecha && d.saldo_caja !== undefined) {
-          if (!maxFecha || d.fecha > maxFecha) {
-            maxFecha = d.fecha;
-            saldo = Number(d.saldo_caja || 0);
-          }
-        }
-      });
-      return saldo;
+      if (!snap.empty) {
+        return Number(snap.docs[0].data().saldo_caja || 0);
+      }
+      return 0;
     }
 
     async function cargarMovimientos(user) {
@@ -101,7 +142,10 @@
       movSnap.forEach(doc => {
         const d = doc.data();
         if ('anulado' in d && d.anulado === true) return;
-        if (d.descripcion && d.descripcion.startsWith('Reversión correlativo')) return;
+        if (d.descripcion && (
+          d.descripcion.startsWith('Reversión de pago') ||
+          d.descripcion.startsWith('Reversión correlativo')
+        )) return;
         // SOLO SUMA EL PRIMER CORRELATIVO NO ANULADO
         if (d.correlativo && correlativosSumados.has(d.correlativo)) return;
         if (d.correlativo) correlativosSumados.add(d.correlativo);
@@ -236,84 +280,80 @@
       `;
     }
 
-    document.getElementById("fecha-picker").onclick = function() {
-      this.showPicker && this.showPicker(); // Mejora UX para navegadores modernos
-    };
-    document.getElementById("fecha-picker").onchange = function() {
-      const val = this.value;
+    // Cambia la fecha por prompt DD/MM/AAAA
+    document.getElementById("fecha-btn").onclick = async function() {
+      const val = prompt("Ingrese la fecha en formato DD/MM/AAAA", formatFecha(selectedDate));
       if (!val) return;
-      const [y, m, d] = val.split('-');
-      selectedDate = new Date(y, m - 1, d, 0, 0, 0, 0);
+      const [d, m, y] = val.split('/');
+      const parsed = new Date(`${y}-${m}-${d}T00:00:00`);
+      if (isNaN(parsed.getTime())) {
+        alert("Fecha inválida");
+        return;
+      }
+      selectedDate = parsed;
       renderFecha();
       onAuthStateChanged(auth, user => {
         if (user) cargarMovimientos(user);
       });
     };
 
+    // Inicia con el día actual local
+    window.addEventListener("DOMContentLoaded", () => {
+      let localNow = new Date();
+      selectedDate = new Date(localNow.getFullYear(), localNow.getMonth(), localNow.getDate(), 0, 0, 0, 0);
+      renderFecha();
+    });
+
     onAuthStateChanged(auth, user => {
       if (!user) return location.href = "login.html";
-      // AGREGADO: Cargar el departamento (agencia) del usuario
       renderFecha();
       cargarMovimientos(user);
     });
-
-    // Setea el input date al iniciar (día local actual)
-    window.addEventListener("DOMContentLoaded", () => {
-      // Zona horaria local El Salvador
-      const now = new Date();
-      const offsetMin = now.getTimezoneOffset();
-      const local = new Date(now.getTime() - offsetMin * 60000);
-      selectedDate = new Date(local.getFullYear(), local.getMonth(), local.getDate(), 0, 0, 0, 0);
-      document.getElementById("fecha-picker").value = selectedDate.toISOString().slice(0,10);
-      renderFecha();
-    });
   </script>
+  <script>
+  document.getElementById("btn-imprimir-corte").onclick = function() {
+    const fecha = document.getElementById("fecha-label").textContent || '';
+    const movimientosHtml = document.getElementById("movimientos-list").innerHTML;
+    const totalHtml = document.getElementById("total-caja").innerHTML;
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    body { background: #101212; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
-    header { background: #000; padding: 1rem 0; text-align: center; font-size: 1.45rem; letter-spacing: 1px; font-weight: 700; color: #67C8F1;}
-    .container { max-width: 700px; margin: 2.5rem auto 0 auto; background: #181a1c; border-radius: 16px; box-shadow: 0 2px 22px #0008; padding: 2.2rem 1.2rem 1.7rem 1.2rem;}
-    .fecha-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;}
-    .fecha-label { font-size: 1.11rem; color: #8ae1fc; font-weight: 600;}
-    .fecha-btn { background: none; border: none; color: #fff; font-size: 1.25rem; cursor: pointer;}
-    .mov-card { background: #23272c; border-radius: 12px; margin-bottom: 12px; padding: 16px 18px; box-shadow: 0 1px 7px #0002;}
-    .mov-ingreso { border-left: 5px solid #13b66b;}
-    .mov-egreso { border-left: 5px solid #e74c3c;}
-    .mov-pago { border-left: 5px solid #67C8F1;}
-    .mov-title { font-weight: bold; font-size: 1.05rem; margin-bottom: 6px;}
-    .mov-sub { font-size: .98rem; color: #8ae1fc;}
-    .total-caja { margin-top: 14px; background: #101212; border-radius: 10px; text-align: center; padding: 18px; font-size: 1.32rem; font-weight: bold; color: #fff;}
-    .empty-msg { text-align:center; color:#ccc; padding: 32px 0;}
-    .btn-main {
-      width: 100%;
-      background: #13b66b;
-      color: #fff;
-      font-size: 1.11rem;
-      font-weight: bold;
-      border: none;
-      border-radius: 9px;
-      padding: 13px 0;
-      cursor: pointer;
-      margin-top: 1.4em;
-      transition: background .17s;
-      margin-bottom: 0.7em;
-    }
-    .btn-main:active,
-    .btn-main:hover { background: #0b854c; }
-    @media (max-width:600px){.container{padding:1.2rem .3rem;}}
-  </style>
-</head>
-<body>
-  <header>Ver Movimientos de Caja</header>
-  <div class="container">
-    <div class="fecha-row">
-      <span id="fecha-label" class="fecha-label"></span>
-      <input type="date" id="fecha-picker">
-    </div>
-    <div id="movimientos-list"></div>
-    <div class="total-caja" id="total-caja"></div>
-  </div>
+    const printHtml = `
+      <html>
+      <head>
+        <title>Corte de Caja – Multi Inversiones</title>
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; color: #222; margin: 0; background: #fff; }
+          .header-corte { text-align: center; font-size: 1.55rem; font-weight: bold; margin: 18px 0 4px 0; color: #00527c; }
+          .fecha-corte { text-align: center; margin-bottom: 12px; font-size: 1.06rem; }
+          .mov-card { border: 1px solid #eee; border-radius: 10px; margin-bottom: 8px; padding: 10px 13px; background: #fff;}
+          .mov-title { font-weight: bold; font-size: 1.01rem; margin-bottom: 3px;}
+          .mov-sub { font-size: .97rem; color: #333;}
+          .totales-corte { font-size: 1.13rem; font-weight: bold; margin: 20px 0 18px 0; text-align: center;}
+          .firmas-corte { margin-top:52px; display:flex; justify-content:space-between; }
+          .firma { width:47%; border-top:1.5px solid #222; text-align:center; padding-top:5px; font-size:1rem; }
+          @media print {
+            .mov-card, .header-corte, .totales-corte, .firma, .fecha-corte { background: #fff !important; color: #222 !important;}
+            body { background: #fff !important; color: #222 !important;}
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header-corte">CORTE DE CAJA</div>
+        <div class="fecha-corte">${fecha}</div>
+        <div>${movimientosHtml}</div>
+        <div class="totales-corte">${totalHtml}</div>
+        <div class="firmas-corte">
+          <div class="firma">Firma de Caja</div>
+          <div class="firma">Firma de Gerente</div>
+        </div>
+      </body>
+      </html>
+    `;
+    const w = window.open('', '', 'width=900,height=800');
+    w.document.write(printHtml);
+    w.document.close();
+    setTimeout(() => { w.focus(); }, 300);
+  }
+  </script>
 </body>
 </html>
 

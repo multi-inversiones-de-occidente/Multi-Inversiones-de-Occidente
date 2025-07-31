@@ -4,9 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Ver Movimientos de Caja – Multi Inversiones</title>
+  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, orderBy, limit, getDoc, doc as docRef } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -22,6 +23,7 @@
     const db   = getFirestore(app);
     const auth = getAuth(app);
 
+    // Utilidad para formato
     function formatDateTime(dateStr) {
       const d = new Date(dateStr);
       return d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' });
@@ -35,174 +37,92 @@
 
     let movimientos = [];
     let totalCaja = 0.0;
+
+    // FECHA seleccionada
     let selectedDate = new Date();
+
+    // AGREGADO: Guardar agencia actual del usuario
     let agenciaActual = "";
 
-    // Obtener saldo anterior desde cierres
-    async function obtenerSaldoAnterior(agencia, fecha) {
-      const cierresRef = collection(db, "cierres_caja");
-      const fechaStr = fecha.toISOString().slice(0,10);
-      const q = query(
-        cierresRef,
-        where("agencia", "==", agencia),
-        where("fecha", "<", fechaStr),
-        orderBy("fecha", "desc"),
-        limit(1)
-      );
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        return Number(snap.docs[0].data().saldo_caja || 0);
-      }
-      return 0;
-    }
-
-    // Cargar movimientos con los mismos filtros que en usuario/cajero
+    // Cargar movimientos
     async function cargarMovimientos() {
       document.getElementById("movimientos-list").innerHTML =
         `<div class="cargando">Cargando movimientos...</div>`;
       document.getElementById("total-caja").textContent = "—";
-
       try {
         if (!agenciaActual) {
           document.getElementById("movimientos-list").innerHTML =
             `<div class="error">No se pudo determinar la agencia del usuario.</div>`;
           return;
         }
-        const y = selectedDate.getFullYear(), m = selectedDate.getMonth(), d = selectedDate.getDate();
-        const startOfDay = new Date(y, m, d, 0, 0, 0, 0);
-        const endOfDay = new Date(y, m, d, 23, 59, 59, 999);
-        const startIso = startOfDay.toISOString();
-        const endIso = endOfDay.toISOString();
 
-        let movimientosArr = [];
-        const correlativosSumados = new Set();
+        const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+        const end = new Date(start.getTime() + 86400000 - 1);
+        const startIso = start.toISOString();
+        const endIso = end.toISOString();
 
-        // Movimientos manuales (filtrando anulados y reversiones)
-        const movSnap = await getDocs(
-          query(
-            collection(db, "movimientosCaja"),
-            where("agencia", "==", agenciaActual),
-            where("fecha", ">=", startIso),
-            where("fecha", "<=", endIso)
-          )
+        // Movimientos de caja (SOLO DE LA AGENCIA DEL USUARIO, filtrando anulados y reversiones)
+        const qMov = query(
+          collection(db, "movimientosCaja"),
+          where("agencia", "==", agenciaActual),
+          where("fecha", ">=", startIso),
+          where("fecha", "<=", endIso)
         );
+        const movSnap = await getDocs(qMov);
+        const movList = [];
+        const correlativosSumados = new Set();
         movSnap.forEach(doc => {
           const d = doc.data();
           if ('anulado' in d && d.anulado === true) return;
-          if (d.descripcion && (
-              d.descripcion.startsWith('Reversión de pago') ||
-              d.descripcion.startsWith('Reversión correlativo')
-          )) return;
+          if (d.descripcion && d.descripcion.startsWith('Reversión correlativo')) return;
+          // SOLO SUMA EL PRIMER CORRELATIVO NO ANULADO
           if (d.correlativo && correlativosSumados.has(d.correlativo)) return;
           if (d.correlativo) correlativosSumados.add(d.correlativo);
-          movimientosArr.push({
+          movList.push({
             tipo: d.tipo,
             descripcion: d.descripcion,
-            monto: Number(d.monto),
+            monto: parseFloat(d.monto),
             observaciones: d.observaciones || '',
             usuario: d.usuario || '',
             fecha: d.fecha,
-            clase: d.tipo === "Ingreso" ? "ingreso" : "egreso",
-            cliente: ""
           });
         });
 
-        // Pagos (NO anulados)
-        const pagoSnap = await getDocs(
-          query(
-            collection(db, "pagos"),
-            where("sucursal", "==", agenciaActual),
-            where("fechaPago", ">=", startIso),
-            where("fechaPago", "<=", endIso)
-          )
+        // Pagos (solo ingresos, SOLO DE LA AGENCIA DEL USUARIO y NO ANULADOS)
+        const qPago = query(
+          collection(db, "pagos"),
+          where("sucursal", "==", agenciaActual),
+          where("fechaPago", ">=", startIso),
+          where("fechaPago", "<=", endIso)
         );
-        const clienteIDSet = new Set();
-        const pagosList = [];
+        const pagoSnap = await getDocs(qPago);
+        const pagoList = [];
         pagoSnap.forEach(doc => {
           const d = doc.data();
           if (!("anulado" in d) || !d.anulado) {
-            pagosList.push({...d, id: doc.id});
-            if (d.clienteID) clienteIDSet.add(d.clienteID);
-          }
-        });
-
-        // Buscar nombre y apellido de users (en bloques de 10)
-        let clientesData = {};
-        const ids = Array.from(clienteIDSet).filter(Boolean);
-        for (let i = 0; i < ids.length; i += 10) {
-          const batch = ids.slice(i, i + 10);
-          await Promise.all(batch.map(async cid => {
-            try {
-              const userDoc = await getDoc(docRef(db, "users", cid));
-              if (userDoc.exists()) {
-                const user = userDoc.data();
-                clientesData[cid] = ((user.nombre || "") + " " + (user.apellido || "")).trim();
-              }
-            } catch (e) {}
-          }));
-        }
-
-        pagosList.forEach(data => {
-          let clienteNombre = "Cliente";
-          if (data.clienteID && clientesData[data.clienteID]) {
-            clienteNombre = clientesData[data.clienteID];
-          } else if (data.nombres) {
-            clienteNombre = data.nombres;
-          }
-          movimientosArr.push({
-            tipo: "Ingreso",
-            descripcion: "Pago",
-            monto: Number(data.montoPagado),
-            observaciones: "",
-            usuario: data.cajeroNombre || '',
-            fecha: data.fechaPago,
-            clase: "pago",
-            cliente: clienteNombre
-          });
-        });
-
-        // Abonos retroactivos (NO anulados)
-        const pagosRetroQ = await getDocs(
-          query(
-            collection(db, "pagos"),
-            where("sucursal", "==", agenciaActual),
-            where("retroactivo", "==", true),
-            where("fechaRegistro", ">=", startIso),
-            where("fechaRegistro", "<=", endIso)
-          )
-        );
-        pagosRetroQ.forEach(doc => {
-          const d = doc.data();
-          const yaExiste = movimientosArr.some(mov => mov.fecha === d.fechaRegistro && mov.monto === Number(d.montoPagado));
-          if (!yaExiste && (!("anulado" in d) || !d.anulado)) {
-            let clienteNombre = d.nombres || "Cliente";
-            movimientosArr.push({
+            pagoList.push({
               tipo: "Ingreso",
-              descripcion: "Abono retroactivo",
-              monto: Number(d.montoPagado),
-              observaciones: d.motivo || '',
+              descripcion: "Pago",
+              monto: parseFloat(d.montoPagado),
+              observaciones: "",
               usuario: d.cajeroNombre || '',
-              fecha: d.fechaRegistro,
-              clase: "pago",
-              cliente: clienteNombre
+              fecha: d.fechaPago,
             });
           }
         });
 
-        movimientosArr.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-        movimientos = movimientosArr;
+        movimientos = [...movList, ...pagoList];
+        movimientos.sort((a, b) => (a.fecha > b.fecha ? -1 : 1)); // Más recientes primero
 
-        const saldoAnterior = await obtenerSaldoAnterior(agenciaActual, selectedDate);
-
-        let totalIngresos = 0.0;
-        let totalEgresos = 0.0;
-        movimientos.forEach(mov => {
-          if (mov.tipo === "Ingreso") totalIngresos += mov.monto;
-          else totalEgresos += mov.monto;
+        // Calcular total
+        totalCaja = 0.0;
+        movimientos.forEach(m => {
+          if (m.tipo === "Ingreso") totalCaja += m.monto;
+          else totalCaja -= m.monto;
         });
-        totalCaja = saldoAnterior + totalIngresos - totalEgresos;
 
-        renderMovimientos(saldoAnterior);
+        // Render
+        renderMovimientos();
 
       } catch (e) {
         document.getElementById("movimientos-list").innerHTML =
@@ -211,13 +131,13 @@
     }
 
     // Renderiza los movimientos en la lista
-    function renderMovimientos(saldoAnterior) {
+    function renderMovimientos() {
       const cont = document.getElementById("movimientos-list");
       if (!movimientos.length) {
         cont.innerHTML = `<div class="no-movimientos">No hay movimientos registrados.</div>`;
       } else {
         cont.innerHTML = movimientos.map(mov => `
-          <div class="card-movimiento ${mov.clase}">
+          <div class="card-movimiento ${mov.tipo === 'Ingreso' ? 'ingreso' : 'egreso'}">
             <div class="mov-header">
               <strong>${mov.tipo} - ${mov.descripcion}</strong>
             </div>
@@ -225,18 +145,15 @@
               <div>Monto: <span>${formatMoney(mov.monto)}</span></div>
               ${mov.observaciones ? `<div>Obs: <span>${mov.observaciones}</span></div>` : ''}
               <div>Usuario: <span>${mov.usuario}</span></div>
-              ${mov.cliente ? `<div>Cliente: <span>${mov.cliente}</span></div>` : ""}
               <div>Hora: <span>${formatDateTime(mov.fecha)}</span></div>
             </div>
           </div>
         `).join('');
       }
-      document.getElementById("total-caja").innerHTML = `
-        <span style="color:#2ef37a;">Saldo Anterior: ${formatMoney(saldoAnterior)}</span>
-        <br><span style="color:#fff;">Total de Caja: ${formatMoney(totalCaja)}</span>
-      `;
+      document.getElementById("total-caja").textContent = formatMoney(totalCaja);
     }
 
+    // Cambia la fecha
     window.cambiarFecha = function(input) {
       selectedDate = new Date(input.value + "T00:00:00");
       cargarMovimientos();
@@ -247,15 +164,22 @@
     window.addEventListener("DOMContentLoaded", () => {
       onAuthStateChanged(auth, async user => {
         if (!user) return location.href = "login.html";
+        // AGREGADO: Cargar el departamento (agencia) del usuario
         const userDocSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
         if (!userDocSnap.empty) {
           agenciaActual = userDocSnap.docs[0].data().department;
         }
-        const today = new Date();
-        selectedDate = today;
-        document.getElementById("fecha-picker").value = formatDate(today);
+
+        // CORRECCIÓN: Fija el día local actual de El Salvador (ajustando el desfase de zona horaria)
+        const now = new Date();
+        const offsetMin = now.getTimezoneOffset(); // En minutos respecto a UTC
+        const local = new Date(now.getTime() - offsetMin * 60000);
+        selectedDate = new Date(local.getFullYear(), local.getMonth(), local.getDate(), 0, 0, 0, 0);
+
+        // Setea correctamente el input date y texto
+        document.getElementById("fecha-picker").value = formatDate(selectedDate);
         document.getElementById("fecha-txt").textContent =
-          formatDate(today).split("-").reverse().join("/");
+          formatDate(selectedDate).split("-").reverse().join("/");
         cargarMovimientos();
       });
     });
@@ -363,9 +287,11 @@
       <label>Fecha: <span id="fecha-txt"></span></label>
       <input type="date" id="fecha-picker" onchange="cambiarFecha(this)">
     </div>
-    <div id="movimientos-list" class="movimientos-list"></div>
+    <div id="movimientos-list" class="movimientos-list">
+      <!-- Aquí aparecen los movimientos -->
+    </div>
     <div class="total-caja">
-      <span id="total-caja">—</span>
+      Total de Caja: <span id="total-caja">—</span>
     </div>
   </div>
 </body>

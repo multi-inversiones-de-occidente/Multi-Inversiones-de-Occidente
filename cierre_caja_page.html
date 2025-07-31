@@ -163,7 +163,11 @@
           const movData = docMov.data();
           if (movData.cierre === true) continue;
           if ('anulado' in movData && movData.anulado === true) continue;
-          if (movData.descripcion && movData.descripcion.startsWith('Reversión correlativo')) continue;
+          // NO sumar movimientos de reversión (pago o movimiento)
+          if (movData.descripcion && (
+            movData.descripcion.startsWith('Reversión de pago') ||
+            movData.descripcion.startsWith('Reversión correlativo')
+          )) continue;
 
           // SOLO SUMA EL PRIMER CORRELATIVO NO ANULADO
           if (movData.correlativo && correlativosSumados.has(movData.correlativo)) continue;

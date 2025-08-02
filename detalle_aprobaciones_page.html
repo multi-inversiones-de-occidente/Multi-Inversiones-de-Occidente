@@ -25,7 +25,6 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // Utilidad para extraer parámetros de la URL
     function getParam(name) {
       const params = new URLSearchParams(window.location.search);
       return params.get(name);
@@ -48,13 +47,11 @@
           return;
         }
         try {
-          // 1) Leer la asignación
           const asignRef = doc(db, "asignacion_de_cuota", asignacionID);
           const asignSnap = await getDoc(asignRef);
           if (!asignSnap.exists()) throw new Error("Asignación no encontrada.");
           asignData = asignSnap.data();
 
-          // 2) Leer la solicitud original
           const solicitudID = asignData.solicitudID;
           const solRef = doc(db, "Archivo Solicitudes", solicitudID);
           const solSnap = await getDoc(solRef);
@@ -69,14 +66,12 @@
     }
 
     function recalcularAmortizacion(fechaBaseStr = null) {
-      // Parámetros básicos
       const monto = Number(asignData.montoAprobado);
       const tasaAnual = Number(asignData.tasaAnual);
       const frecuencia = asignData.frecuenciaPago;
       const numCuotas = Number(asignData.numeroCuotas);
       const cuota = Number(asignData.cuota);
 
-      // Frecuencias
       const specs = {
         "Semanal": { periodos: 52, dias: 7 },
         "Catorcenal": { periodos: 26, dias: 14 },
@@ -87,16 +82,14 @@
       const diasPeriodo = specs[frecuencia]?.dias ?? 7;
       const tasa = tasaAnual / perAno / 100;
 
-      // Fecha de base
       let fechaBase;
       if (fechaBaseStr) {
         fechaBase = new Date(fechaBaseStr);
       } else {
-        fechaBase = new Date(); // Hoy
+        fechaBase = new Date();
         fechaBase.setHours(0,0,0,0);
       }
 
-      // Generar tabla
       let saldo = monto;
       let lista = [];
       for (let k = 1; k <= numCuotas; k++) {
@@ -119,7 +112,6 @@
     }
 
     function renderDetalle() {
-      // Render información básica
       let html = `
         <h2>Datos del Cliente</h2>
         <div class="info-row"><span>Nombre:</span> ${solData.nombre || '—'}</div>
@@ -140,7 +132,6 @@
         <div class="info-row"><span>Agencia:</span> ${asignData.agenciaAsignada || '—'}</div>
         <div style="height:18px"></div>
         <div class="btns-acciones">
-          <!-- Ahora SIEMPRE mostramos el botón Papelería Legal, pero validamos con la nueva lógica -->
           <button class="btn-legal" id="btn-papeleria-legal"><i class="fas fa-file-alt"></i> Papelería Legal</button>
           <a class="btn-apertura" href="apertura_credito_page.html?solicitudID=${encodeURIComponent(asignData.solicitudID)}">Apertura de Crédito</a>
         </div>
@@ -161,10 +152,8 @@
 
       document.getElementById('detalle-contenido').innerHTML = html;
 
-      // Evento para botón de nueva tabla
       document.getElementById("btn-nueva-tabla").onclick = function () {
-        recalcularAmortizacion(); // hoy
-        // GUARDAR TABLA EN LOCALSTORAGE CON ID UNICO
+        recalcularAmortizacion();
         if (asignacionID && nuevaAmortizacion.length > 0) {
           localStorage.setItem('amortizacion_temp_' + asignacionID, JSON.stringify(nuevaAmortizacion));
         }
@@ -193,25 +182,24 @@
         document.getElementById("amort-table-div").innerHTML = tabla;
       };
 
-      // === NUEVA LÓGICA PROFESIONAL PARA PAPELES LEGAL ===
+      // --- Lógica anti-avance con modal ---
       setTimeout(() => {
         const btnPapeleria = document.getElementById('btn-papeleria-legal');
         if (btnPapeleria) {
           btnPapeleria.onclick = async () => {
             try {
-              // 1. Lee la asignación actualizada
               const asignRef = doc(db, "asignacion_de_cuota", asignacionID);
               const asignSnap = await getDoc(asignRef);
               if (!asignSnap.exists()) throw new Error("No se encontró la asignación.");
               const asignDataFresh = asignSnap.data();
 
-              // 2. Lógica combinada: campo nuevo o crédito antiguo
+              // 1. Flujo moderno
               if (asignDataFresh.creditoAperturado) {
                 window.location.href = `papeleria_legal.html?id=${asignacionID}`;
                 return;
               }
 
-              // Si es antiguo, busca crédito activo por cliente
+              // 2. Flujo antiguo
               const q = query(
                 collection(db, "creditos"),
                 where("clienteID", "==", asignDataFresh.clienteID),
@@ -222,14 +210,14 @@
               if (!creditosSnap.empty) {
                 window.location.href = `papeleria_legal.html?id=${asignacionID}`;
               } else {
-                alert("⚠️ Debes aperturar (guardar) el crédito antes de acceder a la papelería legal.");
+                document.getElementById('modal-bloqueo').style.display = 'flex';
               }
             } catch (err) {
               alert("Error al validar el estado del crédito: " + err.message);
             }
           };
         }
-      }, 400); // Espera que el DOM esté listo
+      }, 400);
     }
 
     window.addEventListener("DOMContentLoaded", loadDetalleAprobacion);
@@ -272,7 +260,21 @@
       <div style="color:#ccc;text-align:center;padding:38px 0;">Cargando información...</div>
     </div>
   </div>
+
+  <!-- Modal de bloqueo de papelería legal -->
+  <div id="modal-bloqueo" style="display:none;position:fixed;z-index:1000;top:0;left:0;width:100vw;height:100vh;background:rgba(17,18,26,0.88);align-items:center;justify-content:center;">
+    <div style="background:#222a2c;padding:42px 28px;border-radius:18px;max-width:340px;text-align:center;box-shadow:0 8px 32px #000b;">
+      <i class="fas fa-ban" style="font-size:2.4em;color:#f55;margin-bottom:8px;"></i>
+      <h3 style="color:#F8AF40;font-weight:900;">¡Acceso bloqueado!</h3>
+      <p style="margin:16px 0 12px 0;color:#fff;font-size:1.08em;">
+        No puedes generar la papelería legal.<br>
+        <b>Primero debes aperturar el crédito.</b>
+      </p>
+      <button onclick="document.getElementById('modal-bloqueo').style.display='none'" style="background:#f55;border:none;color:#fff;font-weight:700;padding:9px 30px;border-radius:10px;font-size:1.07em;cursor:pointer;">Cerrar</button>
+    </div>
+  </div>
 </body>
 </html>
+
 
 

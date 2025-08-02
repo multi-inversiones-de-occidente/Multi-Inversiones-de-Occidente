@@ -40,7 +40,7 @@
         document.getElementById("usuario-nombre").textContent = user.email;
         const uid = user.uid;
 
-        // Filtro SOLO las solicitudes aprobadas y asignadas a este usuario:
+        // Filtros SOLO las solicitudes aprobadas y asignadas a este usuario:
         suscribirBadge(
           "badge-app-credicash",
           [
@@ -54,6 +54,15 @@
           [
             where("estado","==","Aprobado"),
             where("creditLine","==","Credicel"),
+            where("AsignacionID", "==", uid)
+          ]
+        );
+        // NUEVO: Badge para Refinanciamiento
+        suscribirBadge(
+          "badge-app-refinanciamiento",
+          [
+            where("estado","==","Aprobado"),
+            where("creditLine","==","Refinanciamiento"),
             where("AsignacionID", "==", uid)
           ]
         );
@@ -231,6 +240,12 @@
         Solicitudes Aprobadas Credicel
         <span id="badge-app-credicel" class="badge">0</span>
       </a>
+      <!-- NUEVO BOTÓN DE REFINANCIAMIENTO -->
+      <a href="solicitudes_aprobadas_refinanciamiento.html" class="btn-grande">
+        <i class="fas fa-check-circle"></i>
+        Solicitudes Aprobadas Refinanciamiento
+        <span id="badge-app-refinanciamiento" class="badge">0</span>
+      </a>
       <a href="solicitudes_aprobadas_amuebla2_page.html" class="btn-grande">
         <i class="fas fa-check-circle"></i>
         Solicitudes Aprobadas Amuebla2
@@ -277,6 +292,7 @@
   </div>
 </body>
 </html>
+
 
 
 

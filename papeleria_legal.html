@@ -7,7 +7,7 @@
   <!-- Firebase SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, query, collection, where, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     // Configuración de Firebase
@@ -30,54 +30,93 @@
       return params.get(name);
     }
 
-    async function loadResumenPapeleria() {
+    // Función que valida el acceso antes de mostrar el contenido
+    async function validarAperturaPapeleria() {
       const asignacionID = getParam("id");
       if (!asignacionID) {
         document.getElementById('papeleria-contenido').innerHTML = `<div class="error">ID de asignación no especificado en la URL.</div>`;
-        return;
+        return false;
       }
-      onAuthStateChanged(auth, async user => {
-        if (!user) {
-          window.location.href = "login.html";
-          return;
-        }
-        try {
-          // 1) Leer la asignación para personalizar info (si lo deseas, para más adelante)
-          const asignRef = doc(db, "asignacion_de_cuota", asignacionID);
-          const asignSnap = await getDoc(asignRef);
-          if (!asignSnap.exists()) throw new Error("Asignación no encontrada.");
-          const asignData = asignSnap.data();
+      return new Promise((resolve, reject) => {
+        onAuthStateChanged(auth, async user => {
+          if (!user) {
+            window.location.href = "login.html";
+            resolve(false);
+            return;
+          }
+          try {
+            // 1) Leer la asignación
+            const asignRef = doc(db, "asignacion_de_cuota", asignacionID);
+            const asignSnap = await getDoc(asignRef);
+            if (!asignSnap.exists()) throw new Error("Asignación no encontrada.");
+            const asignData = asignSnap.data();
 
-          // 2) Mostrar los botones para acceder a cada documento
-          let html = `
-            <h2>Papelería Legal</h2>
-            <div class="papeleria-btns">
-              <a href="hoja_apertura.html?id=${asignacionID}" class="btn-papeleria">
-                <i class="fas fa-file-contract"></i>
-                Hoja de Apertura
-              </a>
-              <a href="pagare_sin_protesto.html?id=${asignacionID}" class="btn-papeleria">
-                <i class="fas fa-file-signature"></i>
-                Pagaré sin Protesto
-              </a>
-              <a href="contrato_mutuo.html?id=${asignacionID}" class="btn-papeleria">
-                <i class="fas fa-file-shield"></i>
-                Contrato Mutuo
-              </a>
-              <a href="plan_pagos.html?id=${asignacionID}" class="btn-papeleria">
-                <i class="fas fa-file-invoice-dollar"></i>
-                Plan de Pagos
-              </a>
-            </div>
-            <div style="height:34px"></div>
-            <div style="text-align:center;color:#aaa;">Seleccione el documento legal que desea visualizar e imprimir.</div>
-          `;
-          document.getElementById('papeleria-contenido').innerHTML = html;
-        } catch (err) {
-          document.getElementById('papeleria-contenido').innerHTML = `<div class="error">Error: ${err.message}</div>`;
-        }
+            // 2) Validar el campo de apertura
+            if (asignData.creditoAperturado) {
+              resolve(true);
+              return;
+            }
+            // 3) Si no, busca crédito activo antiguo
+            const q = query(
+              collection(db, "creditos"),
+              where("clienteID", "==", asignData.clienteID),
+              where("estadoCredito", "==", "Activo")
+            );
+            const creditosSnap = await getDocs(q);
+
+            if (!creditosSnap.empty) {
+              resolve(true);
+            } else {
+              resolve(false);
+            }
+          } catch (err) {
+            document.getElementById('papeleria-contenido').innerHTML = `<div class="error">Error: ${err.message}</div>`;
+            resolve(false);
+          }
+        });
       });
     }
+
+    async function loadResumenPapeleria() {
+      // Bloquea primero hasta validar
+      document.getElementById('papeleria-contenido').innerHTML = `<div style="color:#ccc;text-align:center;padding:38px 0;">Verificando acceso...</div>`;
+      const acceso = await validarAperturaPapeleria();
+      if (!acceso) {
+        // BLOQUEA TODO: muestra modal y oculta la papelería
+        document.getElementById('modal-bloqueo').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        document.getElementById('papeleria-contenido').style.display = 'none';
+        return;
+      }
+      // Si la validación pasó, muestra normalmente los botones
+      const asignacionID = getParam("id");
+      let html = `
+        <h2>Papelería Legal</h2>
+        <div class="papeleria-btns">
+          <a href="hoja_apertura.html?id=${asignacionID}" class="btn-papeleria">
+            <i class="fas fa-file-contract"></i>
+            Hoja de Apertura
+          </a>
+          <a href="pagare_sin_protesto.html?id=${asignacionID}" class="btn-papeleria">
+            <i class="fas fa-file-signature"></i>
+            Pagaré sin Protesto
+          </a>
+          <a href="contrato_mutuo.html?id=${asignacionID}" class="btn-papeleria">
+            <i class="fas fa-file-shield"></i>
+            Contrato Mutuo
+          </a>
+          <a href="plan_pagos.html?id=${asignacionID}" class="btn-papeleria">
+            <i class="fas fa-file-invoice-dollar"></i>
+            Plan de Pagos
+          </a>
+        </div>
+        <div style="height:34px"></div>
+        <div style="text-align:center;color:#aaa;">Seleccione el documento legal que desea visualizar e imprimir.</div>
+      `;
+      document.getElementById('papeleria-contenido').innerHTML = html;
+      document.getElementById('papeleria-contenido').style.display = '';
+    }
+
     window.addEventListener("DOMContentLoaded", loadResumenPapeleria);
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -134,6 +173,32 @@
       border-color: #67C8F1;
     }
     .error { color:#f55; font-size:1.13rem; padding:24px 0; text-align:center;}
+    /* MODAL */
+    #modal-bloqueo {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(17,18,26,0.88);
+      align-items: center; justify-content: center;
+    }
+    #modal-bloqueo .modal-box {
+      background: #222a2c;
+      padding: 42px 28px;
+      border-radius: 18px;
+      max-width: 340px;
+      text-align: center;
+      box-shadow: 0 8px 32px #000b;
+    }
+    #modal-bloqueo i { font-size:2.4em;color:#f55;margin-bottom:8px;}
+    #modal-bloqueo h3 { color:#F8AF40;font-weight:900;}
+    #modal-bloqueo p {margin:16px 0 12px 0;color:#fff;font-size:1.08em;}
+    #modal-bloqueo button {
+      background:#f55;border:none;color:#fff;
+      font-weight:700;padding:9px 30px;
+      border-radius:10px;font-size:1.07em;
+      cursor:pointer;
+    }
     @media (max-width:680px) {
       .container { padding: 1.2rem 0.5rem;}
       .btn-papeleria { font-size:1rem; padding: 1em 1em;}
@@ -148,5 +213,20 @@
       <div style="color:#ccc;text-align:center;padding:38px 0;">Cargando información...</div>
     </div>
   </div>
+
+  <!-- MODAL BLOQUEO ACCESO -->
+  <div id="modal-bloqueo">
+    <div class="modal-box">
+      <i class="fas fa-ban"></i>
+      <h3>¡Acceso bloqueado!</h3>
+      <p>
+        No puedes generar la papelería legal.<br>
+        <b>Primero debes aperturar el crédito.</b>
+      </p>
+      <button onclick="window.location.href='detalle_aprobacion.html?id='+new URLSearchParams(window.location.search).get('id')">Regresar</button>
+    </div>
+  </div>
 </body>
 </html>
+
+

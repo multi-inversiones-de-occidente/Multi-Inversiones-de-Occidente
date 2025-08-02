@@ -8,7 +8,7 @@
   <!-- Firebase SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, query, collection, where, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     // Configuración Firebase
@@ -34,7 +34,6 @@
     let asignData = null;
     let solData = null;
     let nuevaAmortizacion = [];
-
     let asignacionID = null;
 
     async function loadDetalleAprobacion() {
@@ -94,7 +93,6 @@
         fechaBase = new Date(fechaBaseStr);
       } else {
         fechaBase = new Date(); // Hoy
-        // LIMPIA hora para evitar desfases por zona horaria
         fechaBase.setHours(0,0,0,0);
       }
 
@@ -106,7 +104,6 @@
         const capital = cuota - interes;
         saldo -= capital;
         if (k === numCuotas) saldo = 0;
-        // El primer pago es EXACTAMENTE después de N días (NO el mismo día)
         const fechaCuota = new Date(fechaBase);
         fechaCuota.setDate(fechaBase.getDate() + (k * diasPeriodo));
         lista.push({
@@ -143,7 +140,8 @@
         <div class="info-row"><span>Agencia:</span> ${asignData.agenciaAsignada || '—'}</div>
         <div style="height:18px"></div>
         <div class="btns-acciones">
-          <a class="btn-legal" href="papeleria_legal.html?id=${getParam("id")}"><i class="fas fa-file-alt"></i> Papelería Legal</a>
+          <!-- Ahora SIEMPRE mostramos el botón Papelería Legal, pero validamos con la nueva lógica -->
+          <button class="btn-legal" id="btn-papeleria-legal"><i class="fas fa-file-alt"></i> Papelería Legal</button>
           <a class="btn-apertura" href="apertura_credito_page.html?solicitudID=${encodeURIComponent(asignData.solicitudID)}">Apertura de Crédito</a>
         </div>
         <div style="margin-top:28px">
@@ -194,6 +192,44 @@
         tabla += `</tbody></table></div>`;
         document.getElementById("amort-table-div").innerHTML = tabla;
       };
+
+      // === NUEVA LÓGICA PROFESIONAL PARA PAPELES LEGAL ===
+      setTimeout(() => {
+        const btnPapeleria = document.getElementById('btn-papeleria-legal');
+        if (btnPapeleria) {
+          btnPapeleria.onclick = async () => {
+            try {
+              // 1. Lee la asignación actualizada
+              const asignRef = doc(db, "asignacion_de_cuota", asignacionID);
+              const asignSnap = await getDoc(asignRef);
+              if (!asignSnap.exists()) throw new Error("No se encontró la asignación.");
+              const asignDataFresh = asignSnap.data();
+
+              // 2. Lógica combinada: campo nuevo o crédito antiguo
+              if (asignDataFresh.creditoAperturado) {
+                window.location.href = `papeleria_legal.html?id=${asignacionID}`;
+                return;
+              }
+
+              // Si es antiguo, busca crédito activo por cliente
+              const q = query(
+                collection(db, "creditos"),
+                where("clienteID", "==", asignDataFresh.clienteID),
+                where("estadoCredito", "==", "Activo")
+              );
+              const creditosSnap = await getDocs(q);
+
+              if (!creditosSnap.empty) {
+                window.location.href = `papeleria_legal.html?id=${asignacionID}`;
+              } else {
+                alert("⚠️ Debes aperturar (guardar) el crédito antes de acceder a la papelería legal.");
+              }
+            } catch (err) {
+              alert("Error al validar el estado del crédito: " + err.message);
+            }
+          };
+        }
+      }, 400); // Espera que el DOM esté listo
     }
 
     window.addEventListener("DOMContentLoaded", loadDetalleAprobacion);
@@ -238,4 +274,5 @@
   </div>
 </body>
 </html>
+
 

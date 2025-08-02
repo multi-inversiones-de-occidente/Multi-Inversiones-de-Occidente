@@ -215,7 +215,7 @@
       }
     }
 
-    // ---- GUARDAR CRÉDITO con la nueva tabla y marca aperturado ----
+    // ---- GUARDAR CRÉDITO con la nueva tabla y marca aperturado y REGRESO AL DETALLE ----
     async function guardarCredito() {
       if (!solicitudData || !asignacionData || amortizacion.length === 0) {
         alert("No hay datos completos para guardar el crédito.");
@@ -276,6 +276,8 @@
         }
 
         alert("Crédito guardado correctamente.");
+        // === REDIRECCIÓN AL DETALLE DE LA ASIGNACIÓN ===
+        window.location.href = "detalle_aprobacion.html?id=" + asignacionData._docId;
       } catch (e) {
         alert("Error guardando crédito: " + (e.message || e));
       }
@@ -365,5 +367,7 @@
   </div>
 </body>
 </html>
+
+
 
 

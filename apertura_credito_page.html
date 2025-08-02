@@ -356,7 +356,8 @@
         }
 
         alert("Crédito guardado correctamente.");
-        window.location.href = "detalle_aprobacion.html?id=" + asignacionData._docId;
+        // CAMBIO CLAVE: Redirigir a la página correcta
+        window.location.href = "detalle_aprobaciones_page.html?id=" + asignacionData._docId;
       } catch (e) {
         alert("Error guardando crédito: " + (e.message || e));
       }
@@ -446,6 +447,7 @@
   </div>
 </body>
 </html>
+
 
 
 

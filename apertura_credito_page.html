@@ -31,7 +31,11 @@
     let amortizacion = [];
     let guardando = false;
     let solicitudID = null;
-    let asignacionAperturada = false; // NUEVO
+    let asignacionAperturada = false;
+    // Refinanciamiento: variables nuevas
+    let esRefinanciamiento = false;
+    let desembolsoNeto = null;
+    let creditoAnteriorInfo = null;
 
     // Utilidad para obtener parámetros GET
     function getQueryParam(key) {
@@ -89,6 +93,27 @@
       return lista;
     }
 
+    // Buscar crédito anterior ACTIVO del cliente para refinanciamiento
+    async function buscarCreditoAnterior(clienteID) {
+      const creditosRef = collection(db, "creditos");
+      const q = query(
+        creditosRef,
+        where("clienteID", "==", clienteID),
+        where("estadoCredito", "==", "Activo")
+      );
+      const creditosSnap = await getDocs(q);
+      if (creditosSnap.empty) return null;
+      // Solo toma el primero (regla: 1 crédito activo)
+      const creditoAnteriorDoc = creditosSnap.docs[0];
+      const d = creditoAnteriorDoc.data();
+      return {
+        id: creditoAnteriorDoc.id,
+        saldoActual: Number(d.saldoActual || 0),
+        interesActual: Number(d.interesActual || 0),
+        montoAprobado: Number(d.montoAprobado || 0)
+      };
+    }
+
     // Mostrar info y controles
     function renderMain() {
       if (!solicitudData) {
@@ -113,6 +138,20 @@
           <div class="info-row">Frecuencia de Pago: ${asignacionData.frecuenciaPago ?? ''}</div>
           <div class="info-row">Número de Cuotas: ${asignacionData.numeroCuotas ?? ''}</div>
           <div class="info-row">Cuota Aprobada: $${asignacionData.cuota ?? ''}</div>
+        `;
+      }
+
+      // --- BLOQUE DE DESEMBOLSO NETO PARA REFINANCIAMIENTO ---
+      if (esRefinanciamiento && creditoAnteriorInfo) {
+        html += `
+        <div style="padding:18px;background:#ffd840;border-radius:12px;color:#2d2d2d;font-size:1.3em;font-weight:bold;margin:22px 0 10px 0;">
+          Efectivo a entregar al cliente: $${desembolsoNeto.toFixed(2)}<br>
+          <span style="font-size:.82em;color:#df9900">
+            (Nuevo aprobado: $${Number(asignacionData.montoAprobado).toFixed(2)}<br>
+            Menos saldo anterior: $${creditoAnteriorInfo.saldoActual.toFixed(2)}<br>
+            Menos intereses pendientes: $${creditoAnteriorInfo.interesActual.toFixed(2)})
+          </span>
+        </div>
         `;
       }
 
@@ -216,13 +255,28 @@
           asignacionData = null;
           asignacionAperturada = false;
         }
+
+        // --- LÓGICA DE REFINANCIAMIENTO ---
+        esRefinanciamiento = (solicitudData.creditLine || "").toLowerCase().includes("refinanciamiento");
+        if (esRefinanciamiento && solicitudData.clienteID) {
+          creditoAnteriorInfo = await buscarCreditoAnterior(solicitudData.clienteID);
+          if (creditoAnteriorInfo) {
+            desembolsoNeto = Number(asignacionData.montoAprobado) - creditoAnteriorInfo.saldoActual - creditoAnteriorInfo.interesActual;
+            if (desembolsoNeto < 0) desembolsoNeto = 0;
+          } else {
+            desembolsoNeto = Number(asignacionData.montoAprobado);
+            creditoAnteriorInfo = {saldoActual: 0, interesActual: 0};
+          }
+        }
+        // --- Fin lógica refinanciamiento ---
+
         renderMain();
       } catch (e) {
         setLoading("Error cargando datos: " + (e.message || e));
       }
     }
 
-    // ---- GUARDAR CRÉDITO con la nueva tabla y marca aperturado y REGRESO AL DETALLE ----
+    // GUARDAR CRÉDITO (con lógica refinanciamiento)
     async function guardarCredito() {
       // SEGURIDAD: Verifica de nuevo antes de guardar
       if (asignacionAperturada) {
@@ -248,6 +302,12 @@
       const clienteID = solicitudData.clienteID || "";
       const fechaInicio = new Date().toISOString();
       const fechaUltimoCalculoIntereses = fechaInicio;
+
+      // --- Para refinanciamiento: prepara update para el crédito anterior ---
+      let creditoAnteriorID = null;
+      if (esRefinanciamiento && creditoAnteriorInfo && creditoAnteriorInfo.id) {
+        creditoAnteriorID = creditoAnteriorInfo.id;
+      }
 
       try {
         await addDoc(collection(db, "creditos"), {
@@ -284,6 +344,14 @@
           await updateDoc(doc(db, "asignacion_de_cuota", asignacionData._docId), {
             creditoAperturado: true,
             fechaApertura: new Date().toISOString()
+          });
+        }
+
+        // === Lógica de refinanciamiento: marca anterior como Pagado ===
+        if (esRefinanciamiento && creditoAnteriorID) {
+          await updateDoc(doc(db, "creditos", creditoAnteriorID), {
+            estadoCredito: "Pagado",
+            ultimaActualizacion: new Date().toISOString()
           });
         }
 
@@ -378,6 +446,8 @@
   </div>
 </body>
 </html>
+
+
 
 
 

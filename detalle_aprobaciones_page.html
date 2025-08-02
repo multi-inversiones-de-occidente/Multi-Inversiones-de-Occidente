@@ -7,7 +7,7 @@
   <!-- Firebase SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, doc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     // Configuración Firebase
@@ -34,6 +34,32 @@
     let nuevaAmortizacion = [];
     let asignacionID = null;
 
+    // --- Refinanciamiento
+    let esRefinanciamiento = false;
+    let creditoAnteriorInfo = null;
+    let desembolsoNeto = null;
+
+    // Buscar crédito anterior ACTIVO del cliente para refinanciamiento
+    async function buscarCreditoAnterior(clienteID) {
+      const creditosRef = collection(db, "creditos");
+      const q = query(
+        creditosRef,
+        where("clienteID", "==", clienteID),
+        where("estadoCredito", "==", "Activo")
+      );
+      const creditosSnap = await getDocs(q);
+      if (creditosSnap.empty) return null;
+      // Solo toma el primero (regla: 1 crédito activo)
+      const creditoAnteriorDoc = creditosSnap.docs[0];
+      const d = creditoAnteriorDoc.data();
+      return {
+        id: creditoAnteriorDoc.id,
+        saldoActual: Number(d.saldoActual || 0),
+        interesActual: Number(d.interesActual || 0),
+        montoAprobado: Number(d.montoAprobado || 0)
+      };
+    }
+
     async function loadDetalleAprobacion() {
       asignacionID = getParam("id");
       if (!asignacionID) {
@@ -56,6 +82,20 @@
           const solSnap = await getDoc(solRef);
           if (!solSnap.exists()) throw new Error("Solicitud original no encontrada.");
           solData = solSnap.data();
+
+          // --- LÓGICA DE REFINANCIAMIENTO ---
+          esRefinanciamiento = (solData.creditLine || "").toLowerCase().includes("refinanciamiento");
+          if (esRefinanciamiento && solData.clienteID) {
+            creditoAnteriorInfo = await buscarCreditoAnterior(solData.clienteID);
+            if (creditoAnteriorInfo) {
+              desembolsoNeto = Number(asignData.montoAprobado) - creditoAnteriorInfo.saldoActual - creditoAnteriorInfo.interesActual;
+              if (desembolsoNeto < 0) desembolsoNeto = 0;
+            } else {
+              desembolsoNeto = Number(asignData.montoAprobado);
+              creditoAnteriorInfo = {saldoActual: 0, interesActual: 0};
+            }
+          }
+          // --- Fin lógica refinanciamiento ---
 
           renderDetalle();
         } catch (err) {
@@ -129,6 +169,23 @@
         <div class="info-row"><span>Cuota Aprobada:</span> $${asignData.cuota || '—'}</div>
         <div class="info-row"><span>Asignado a:</span> ${asignData.asignadoA || '—'}</div>
         <div class="info-row"><span>Agencia:</span> ${asignData.agenciaAsignada || '—'}</div>
+      `;
+
+      // --- BLOQUE DE DESEMBOLSO NETO PARA REFINANCIAMIENTO ---
+      if (esRefinanciamiento && creditoAnteriorInfo) {
+        html += `
+        <div style="padding:18px;background:#ffd840;border-radius:12px;color:#2d2d2d;font-size:1.3em;font-weight:bold;margin:22px 0 10px 0;">
+          Efectivo a entregar al cliente: $${desembolsoNeto.toFixed(2)}<br>
+          <span style="font-size:.82em;color:#df9900">
+            (Nuevo aprobado: $${Number(asignData.montoAprobado).toFixed(2)}<br>
+            Menos saldo anterior: $${creditoAnteriorInfo.saldoActual.toFixed(2)}<br>
+            Menos intereses pendientes: $${creditoAnteriorInfo.interesActual.toFixed(2)})
+          </span>
+        </div>
+        `;
+      }
+
+      html += `
         <div style="height:18px"></div>
         <div class="btns-acciones">
           <button class="btn-legal" id="btn-papeleria-legal"><i class="fas fa-file-alt"></i> Papelería Legal</button>
@@ -288,6 +345,7 @@
   </div>
 </body>
 </html>
+
 
 
 

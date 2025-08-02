@@ -181,7 +181,7 @@
         document.getElementById("amort-table-div").innerHTML = tabla;
       };
 
-      // --- Lógica anti-avance con doble modal ---
+      // --- Lógica anti-avance con único modal ---
       setTimeout(() => {
         const btnPapeleria = document.getElementById('btn-papeleria-legal');
         if (btnPapeleria) {
@@ -192,16 +192,12 @@
               if (!asignSnap.exists()) throw new Error("No se encontró la asignación.");
               const asignDataFresh = asignSnap.data();
 
-              // --- Modal moderno: Si campo existe y es false, debe aperturarse ---
-              if ("creditoAperturado" in asignDataFresh) {
-                if (asignDataFresh.creditoAperturado === true) {
-                  window.location.href = `papeleria_legal.html?id=${asignacionID}`;
-                } else {
-                  document.getElementById('modal-bloqueo').style.display = 'flex';
-                }
+              // SOLO permite avanzar si creditoAperturado === true
+              if (asignDataFresh.creditoAperturado === true) {
+                window.location.href = `papeleria_legal.html?id=${asignacionID}`;
               } else {
-                // --- Modal antiguo: campo no existe (flujo viejo) ---
-                document.getElementById('modal-antiguo').style.display = 'flex';
+                // Para cualquier otro caso: flujo antiguo o campo false
+                document.getElementById('modal-bloqueo').style.display = 'flex';
               }
             } catch (err) {
               alert("Error al validar el estado del crédito: " + err.message);
@@ -238,7 +234,7 @@
     td { color:#fff; }
     .error { color:#f55; font-size:1.13rem; padding:24px 0; text-align:center;}
     /* MODAL */
-    #modal-bloqueo, #modal-antiguo {
+    #modal-bloqueo {
       display: none;
       position: fixed;
       z-index: 1000;
@@ -279,7 +275,7 @@
   </div>
 
   <!-- Modal de bloqueo de papelería legal -->
-  <div id="modal-bloqueo" class="modal">
+  <div id="modal-bloqueo">
     <div class="modal-box">
       <i class="fas fa-ban"></i>
       <h3>¡Acceso bloqueado!</h3>
@@ -290,21 +286,10 @@
       <button onclick="document.getElementById('modal-bloqueo').style.display='none'">Cerrar</button>
     </div>
   </div>
-
-  <!-- Modal de flujo antiguo -->
-  <div id="modal-antiguo" class="modal">
-    <div class="modal-box">
-      <i class="fas fa-exclamation-circle"></i>
-      <h3>Crédito Antiguo – Requiere Apertura Formal</h3>
-      <p>
-        Este crédito fue procesado bajo el flujo antiguo y no puede generar papelería legal.<br>
-        <b>Por favor, realiza la apertura formal del crédito en el sistema antes de continuar.</b>
-      </p>
-      <button onclick="window.location.reload()">Cerrar</button>
-    </div>
-  </div>
 </body>
 </html>
+
+
 
 
 

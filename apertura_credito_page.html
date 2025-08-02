@@ -8,7 +8,7 @@
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, doc, getDoc, addDoc, limit, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, doc, getDoc, addDoc, limit, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     // Configuración Firebase
@@ -71,7 +71,6 @@
         const capital = cuota - interes;
         saldo -= capital;
         if (k === numCuotas) saldo = 0;
-        // Fecha de cuota
         const fechaCuota = new Date(fechaBase);
         fechaCuota.setDate(fechaBase.getDate() + (k * diasPeriodo));
         lista.push({
@@ -150,7 +149,7 @@
             </table>
           </div>
           <div style="margin-top:14px;padding:10px;background:#213d4b;color:#F8AF40;border-radius:10px;font-size:1em;">
-            Esta tabla de amortización está calculada **al día de la apertura del crédito**.<br>
+            Esta tabla de amortización está calculada <b>al día de la apertura del crédito</b>.<br>
             Si la apertura es posterior a la asignación, las fechas y valores reflejan el día exacto de apertura.
           </div>
         `;
@@ -206,6 +205,7 @@
         );
         if (!asignSnap.empty) {
           asignacionData = asignSnap.docs[0].data();
+          asignacionData._docId = asignSnap.docs[0].id; // Guardamos el ID para actualizar después
         } else {
           asignacionData = null;
         }
@@ -215,7 +215,7 @@
       }
     }
 
-    // ---- GUARDAR CRÉDITO con la nueva tabla ----
+    // ---- GUARDAR CRÉDITO con la nueva tabla y marca aperturado ----
     async function guardarCredito() {
       if (!solicitudData || !asignacionData || amortizacion.length === 0) {
         alert("No hay datos completos para guardar el crédito.");
@@ -235,8 +235,6 @@
       const saldoActual = montoAprobado;
       const clienteID = solicitudData.clienteID || "";
       const fechaInicio = new Date().toISOString();
-
-      // Nuevo campo: fecha precisa para control de intereses diarios
       const fechaUltimoCalculoIntereses = fechaInicio;
 
       try {
@@ -268,6 +266,15 @@
           fechaUltimoCalculoIntereses: fechaUltimoCalculoIntereses,
           amortizacion: amortizacion // La tabla nueva generada
         });
+
+        // === NUEVO: Marca la asignación como aperturada ===
+        if (asignacionData._docId) {
+          await updateDoc(doc(db, "asignacion_de_cuota", asignacionData._docId), {
+            creditoAperturado: true,
+            fechaApertura: new Date().toISOString()
+          });
+        }
+
         alert("Crédito guardado correctamente.");
       } catch (e) {
         alert("Error guardando crédito: " + (e.message || e));
@@ -358,4 +365,5 @@
   </div>
 </body>
 </html>
+
 

@@ -83,6 +83,14 @@
           if (!solSnap.exists()) throw new Error("Solicitud original no encontrada.");
           solData = solSnap.data();
 
+          // === NUEVO FILTRO: ignorar solicitudes rechazadas ===
+          if (solData.respuestaCliente === "Rechazado") {
+            document.getElementById('detalle-contenido').innerHTML =
+              `<div class="error">Esta solicitud fue rechazada y no puede mostrarse.</div>`;
+            return;
+          }
+          // === FIN DEL FILTRO ===
+
           // --- LÓGICA DE REFINANCIAMIENTO ---
           esRefinanciamiento = (solData.creditLine || "").toLowerCase().includes("refinanciamiento");
           if (esRefinanciamiento && solData.clienteID) {
@@ -345,10 +353,3 @@
   </div>
 </body>
 </html>
-
-
-
-
-
-
-

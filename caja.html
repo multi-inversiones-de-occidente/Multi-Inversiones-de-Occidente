@@ -4,210 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Panel de Caja – Multi Inversiones</title>
-
-  <!-- Tipografía futurista -->
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
-
-  <!-- Font Awesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-  <!-- Estilos -->
-  <style>
-    :root{
-      --bg: #f6f8fc;
-      --card: #ffffff;
-      --ink: #0b1220;
-      --muted: #4b5563;
-      --border: #1f2937;       /* borde oscuro */
-      --accent-1: #13b66b;     /* verde MI */
-      --accent-2: #0ea5e9;     /* cian */
-      --accent-3: #f59e0b;     /* ámbar */
-      --danger:   #e11d48;
-      --a: 0deg;               /* ángulo animación conic */
-    }
-
-    *{ box-sizing:border-box; }
-
-    body{
-      margin:0;
-      font-family: "Space Grotesk", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      color: var(--ink);
-      background: var(--bg);
-      min-height:100vh;
-      /* patrón ligero futurista */
-      background-image:
-        radial-gradient( circle at 10% 10%, rgba(0,0,0,.03) 0 20%, transparent 21% ),
-        radial-gradient( circle at 90% 20%, rgba(0,0,0,.03) 0 18%, transparent 19% );
-    }
-
-    /* Header */
-    .app-header{
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      background: rgba(255,255,255,0.85);
-      backdrop-filter: saturate(1.2) blur(6px);
-      border-bottom: 2px solid var(--border);
-      display:flex; align-items:center; gap:14px;
-      padding: 10px 18px;
-    }
-    .logo{
-      height: 40px; width:auto;
-      filter: contrast(1.1);
-      user-select:none;
-    }
-    .brand{
-      display:flex; flex-direction:column; line-height:1;
-    }
-    .brand span{
-      font-weight:700; letter-spacing:.3px; font-size: 1.05rem;
-    }
-    .brand small{
-      color: var(--muted); font-weight:600; letter-spacing:.4px;
-    }
-    .user-chip{
-      margin-left:auto;
-      display:flex; align-items:center; gap:10px;
-      padding: 8px 12px;
-      border:2px solid var(--border);
-      border-radius: 999px;
-      background: #fff;
-      font-weight:600;
-      box-shadow: 0 2px 0 #00000020;
-    }
-    .user-chip i{ color: var(--accent-2); }
-
-    .container{
-      max-width: 1100px;
-      margin: 22px auto 40px auto;
-      padding: 0 18px;
-    }
-
-    .hero{
-      background: var(--card);
-      border:2px solid var(--border);
-      border-radius: 18px;
-      padding: 22px 20px;
-      display:flex; align-items:center; gap:16px;
-      box-shadow: 0 10px 0 #00000010;
-    }
-    .hero .title{
-      font-size: 1.35rem; font-weight: 700; letter-spacing:.4px;
-    }
-    .hero .subtitle{
-      color: var(--muted); font-weight:600;
-    }
-
-    .grid-botones{
-      margin-top: 22px;
-      display:grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap:18px;
-    }
-
-    /* Botón futurista blanco con borde oscuro y halo animado */
-    .btn-grande{
-      position:relative;
-      display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center;
-      min-height: 150px;
-      text-decoration:none;
-      color: var(--ink);
-      background: var(--card);
-      border:2px solid var(--border);
-      border-radius: 16px;
-      font-weight: 700;
-      padding: 18px 16px;
-      box-shadow: 0 8px 0 #00000012;
-      overflow:hidden;
-      transition: transform .18s ease, box-shadow .18s ease, translate .18s ease;
-      isolation:isolate;
-    }
-    /* Borde neón animado (conic) */
-    .btn-grande::before{
-      content:"";
-      position:absolute; inset:-2px;
-      border-radius: inherit;
-      padding: 2px;
-      background: conic-gradient(from var(--a),
-        var(--accent-1), var(--accent-2), var(--accent-3), var(--accent-1));
-      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-      -webkit-mask-composite: xor; mask-composite: exclude;
-      opacity: 0; pointer-events:none;
-      transition: opacity .18s ease;
-      z-index: -1;
-      animation: spin 7s linear infinite;
-    }
-    /* Shine */
-    .btn-grande::after{
-      content:"";
-      position:absolute; inset:0;
-      background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,.7) 50%, transparent 100%);
-      transform: translateX(-160%);
-      transition: transform .7s ease;
-      pointer-events:none;
-    }
-
-    .btn-grande i{
-      font-size: 28px;
-      color: var(--accent-1);
-      transition: transform .18s ease, color .18s ease;
-    }
-
-    .btn-grande .label{
-      text-align:center;
-      line-height:1.15;
-    }
-
-    .btn-grande .badge{
-      position:absolute; top:10px; right:12px;
-      min-width: 28px; height:28px; padding: 0 7px;
-      border-radius: 999px;
-      display:flex; align-items:center; justify-content:center;
-      background: #ffffff;
-      border: 2px solid var(--border);
-      color: var(--ink);
-      box-shadow: 0 2px 0 #00000020;
-      font-size:.85rem;
-    }
-
-    .btn-grande:hover{
-      transform: translateY(-3px);
-      box-shadow: 0 12px 0 #00000014;
-    }
-    .btn-grande:hover::before{ opacity: .9; }
-    .btn-grande:hover::after{ transform: translateX(160%); }
-    .btn-grande:hover i{
-      transform: translateY(-2px) scale(1.06) rotate(-2deg);
-      color: var(--accent-2);
-    }
-
-    /* Variantes */
-    .btn-reimprimir i{ color: var(--accent-3); }
-    .btn-reimprimir:hover i{ color: #111; }
-
-    .btn-reporte i{ color: #7c3aed; }
-    .btn-reporte:hover i{ color: #6d28d9; }
-
-    .btn-revertir{
-      border-color: var(--border);
-    }
-    .btn-revertir i{ color: var(--danger); }
-    .btn-revertir:hover i{ color: #b91c1c; }
-
-    /* Accesibilidad foco teclado */
-    .btn-grande:focus-visible{
-      outline: 3px dashed var(--accent-2);
-      outline-offset: 3px;
-    }
-
-    @keyframes spin{ to{ --a: 360deg; } }
-
-    @media (max-width: 640px){
-      .hero{ flex-direction:column; text-align:center; align-items:flex-start; }
-    }
-  </style>
-
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
@@ -227,152 +23,275 @@
     const db   = getFirestore(app);
     const auth = getAuth(app);
 
-    // Suscribe un badge a "Archivo Solicitudes" con filtros dados
+    // Función para suscribir el badge con todos los filtros requeridos
     function suscribirBadge(idBadge, filtros=[]) {
       const q = query(collection(db, "Archivo Solicitudes"), ...filtros);
       onSnapshot(q, snap => {
-        const el = document.getElementById(idBadge);
-        if (el) el.textContent = snap.docs.length;
+        document.getElementById(idBadge).textContent = snap.docs.length;
       }, err => {
         console.error("Error en Archivo Solicitudes", err);
-        const el = document.getElementById(idBadge);
-        if (el) el.textContent = "!";
+        document.getElementById(idBadge).textContent = "!";
       });
     }
 
     window.addEventListener("DOMContentLoaded", () => {
       onAuthStateChanged(auth, user => {
         if (!user) return location.href = "login.html";
-
-        // coloca el email en el chip de usuario (se mantiene el mismo ID)
-        const u = document.getElementById("usuario-nombre");
-        if (u) u.textContent = user.email;
-
+        document.getElementById("usuario-nombre").textContent = user.email;
         const uid = user.uid;
+
         // Filtros SOLO las solicitudes aprobadas y asignadas a este usuario:
-        suscribirBadge("badge-app-credicash", [
-          where("estado","==","Aprobado"),
-          where("creditLine","==","Credicash"),
-          where("AsignacionID", "==", uid)
-        ]);
-        suscribirBadge("badge-app-credicel", [
-          where("estado","==","Aprobado"),
-          where("creditLine","==","Credicel"),
-          where("AsignacionID", "==", uid)
-        ]);
+        suscribirBadge(
+          "badge-app-credicash",
+          [
+            where("estado","==","Aprobado"),
+            where("creditLine","==","Credicash"),
+            where("AsignacionID", "==", uid)
+          ]
+        );
+        suscribirBadge(
+          "badge-app-credicel",
+          [
+            where("estado","==","Aprobado"),
+            where("creditLine","==","Credicel"),
+            where("AsignacionID", "==", uid)
+          ]
+        );
         // NUEVO: Badge para Refinanciamiento
-        suscribirBadge("badge-app-refinanciamiento", [
-          where("estado","==","Aprobado"),
-          where("creditLine","==","Refinanciamiento"),
-          where("AsignacionID", "==", uid)
-        ]);
-        suscribirBadge("badge-app-amuebla2", [
-          where("estado","==","Aprobado"),
-          where("creditLine","==","Amuebla2"),
-          where("AsignacionID", "==", uid)
-        ]);
+        suscribirBadge(
+          "badge-app-refinanciamiento",
+          [
+            where("estado","==","Aprobado"),
+            where("creditLine","==","Refinanciamiento"),
+            where("AsignacionID", "==", uid)
+          ]
+        );
+        suscribirBadge(
+          "badge-app-amuebla2",
+          [
+            where("estado","==","Aprobado"),
+            where("creditLine","==","Amuebla2"),
+            where("AsignacionID", "==", uid)
+          ]
+        );
       });
     });
   </script>
+
+  <!-- Estilos modernos y homogéneos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      margin:0; font-family:Arial,sans-serif;
+      background: radial-gradient(circle,#000,#111);
+      color:#fff;
+      min-height: 100vh;
+    }
+    header {
+      background:#000; padding:1rem; text-align:center;
+      font-size:1.5rem; letter-spacing:1px;
+    }
+    .container {
+      max-width:900px; margin:0 auto; padding:2.5rem 1rem 2rem 1rem;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    h1 { 
+      margin:1rem 0 0.2rem 0; 
+      font-size:2.3rem;
+      font-weight:800;
+      letter-spacing:.5px;
+      text-align:center;
+    }
+    .mensaje-bienvenida {
+      font-size:1.12rem;
+      color:#F8AF40;
+      margin-bottom: 2.4rem;
+      margin-top: 0.4rem;
+      font-weight:600;
+      text-align:center;
+      line-height:1.38;
+      max-width: 600px;
+    }
+    .grid-botones {
+      width:100%;
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
+      gap:1.55rem;
+      margin-bottom:2.2rem;
+    }
+    .btn-grande {
+      background: linear-gradient(90deg, #67C8F1 0%, #13b66b 100%);
+      color: #212121;
+      font-weight: bold;
+      font-size: 1.16rem;
+      border: none;
+      border-radius: 18px;
+      box-shadow: 0 4px 22px #13b66a2b;
+      padding: 2rem 1.2rem 2rem 1.2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: background .19s, color .19s, transform .15s;
+      position: relative;
+      outline: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .7rem;
+      min-width:0;
+      user-select: none;
+      text-decoration: none;
+    }
+    .btn-grande:active,
+    .btn-grande:hover {
+      background: linear-gradient(90deg, #13b66b 70%, #67C8F1 100%);
+      color: #222;
+      transform: scale(1.03);
+      box-shadow: 0 8px 26px #0a644188;
+      text-decoration: none;
+    }
+    .btn-grande i {
+      font-size: 2.2rem;
+      margin-bottom: 9px;
+      color: #212121;
+      opacity: .89;
+      transition: color .15s;
+    }
+    .btn-grande:hover i { color: #0c7451; }
+    .btn-grande .badge {
+      position: absolute; top: 14px; right: 15px;
+      background:#e74c3c; color:#fff;
+      width:28px; height:28px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      font-size:.85rem; font-weight:700;
+      box-shadow:0 1px 8px #0002;
+    }
+    /* Botón de revertir pagos estilo rojo */
+    .btn-revertir {
+      background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%);
+      color: #fff !important;
+    }
+    .btn-revertir:active,
+    .btn-revertir:hover {
+      background: linear-gradient(90deg, #c0392b 70%, #8e0800 100%);
+      color: #fff !important;
+      box-shadow: 0 8px 26px #800a0a88;
+    }
+    .btn-revertir i {
+      color: #fff !important;
+      opacity: 1;
+    }
+    /* Nuevo botón de reimpresión */
+    .btn-reimprimir {
+      background: linear-gradient(90deg, #F8AF40 0%, #FFD600 100%);
+      color: #232323 !important;
+      font-weight: bold;
+    }
+    .btn-reimprimir:active,
+    .btn-reimprimir:hover {
+      background: linear-gradient(90deg, #FFD600 60%, #F8AF40 100%);
+      color: #232323 !important;
+      box-shadow: 0 8px 26px #FFD60055;
+    }
+    .btn-reimprimir i {
+      color: #232323 !important;
+      opacity: 1;
+    }
+    /* Botón de reportes gerenciales (nuevo) */
+    .btn-reporte {
+      background: linear-gradient(90deg, #ee0979 0%, #ff6a00 100%);
+      color: #fff !important;
+    }
+    .btn-reporte:active,
+    .btn-reporte:hover {
+      background: linear-gradient(90deg, #ff6a00 60%, #ee0979 100%);
+      color: #fff !important;
+      box-shadow: 0 8px 26px #ee097955;
+    }
+    .btn-reporte i { color: #fff; opacity: 0.95;}
+    @media (max-width: 600px) {
+      .container { padding:1.2rem 1vw; }
+      h1 { font-size: 1.23rem;}
+      .mensaje-bienvenida { font-size: .99rem; }
+      .grid-botones { gap:1rem; }
+      .btn-grande { padding: 1.3rem 0.6rem 1.3rem 0.6rem; font-size: .97rem;}
+      .btn-grande i { font-size:1.4rem; }
+    }
+  </style>
 </head>
 <body>
 
-  <!-- Header con logo y chip de usuario -->
-  <header class="app-header">
-    <img class="logo" src="assets/logo_mi_bw.png" alt="Multi Inversiones de Occidente">
-    <div class="brand">
-      <span>Multi Inversiones de Occidente</span>
-      <small>Panel de Caja</small>
-    </div>
-    <div class="user-chip" title="Usuario">
-      <i class="fa-solid fa-user-astronaut"></i>
-      <span id="usuario-nombre">Usuario</span>
-    </div>
-  </header>
+  <header>Panel de Caja</header>
 
-  <main class="container">
-    <section class="hero" aria-label="Resumen">
-      <div>
-        <div class="title">Acceso rápido a funciones de Caja</div>
-        <div class="subtitle">Gestiona pagos, movimientos y solicitudes aprobadas con precisión y estilo.</div>
-      </div>
-    </section>
+  <div class="container">
+    <h1 id="usuario-nombre">Bienvenido, usuario</h1>
+    <div class="mensaje-bienvenida">
+      ¡Accede rápidamente a todas las funciones de Caja!<br>
+      <span style="color:#67C8F1;font-weight:700;">Gestiona pagos, movimientos y solicitudes aprobadas de forma eficiente y segura.</span>
+    </div>
 
-    <section class="grid-botones" aria-label="Acciones">
+    <div class="grid-botones">
       <a href="solicitudes_aprobadas_credicash_page.html" class="btn-grande">
-        <i class="fas fa-check-circle" aria-hidden="true"></i>
-        <div class="label">Solicitudes Aprobadas<br>Credicash</div>
+        <i class="fas fa-check-circle"></i>
+        Solicitudes Aprobadas Credicash
         <span id="badge-app-credicash" class="badge">0</span>
       </a>
-
       <a href="solicitudes_aprobadas_credicel_page.html" class="btn-grande">
-        <i class="fas fa-check-circle" aria-hidden="true"></i>
-        <div class="label">Solicitudes Aprobadas<br>Credicel</div>
+        <i class="fas fa-check-circle"></i>
+        Solicitudes Aprobadas Credicel
         <span id="badge-app-credicel" class="badge">0</span>
       </a>
-
       <!-- NUEVO BOTÓN DE REFINANCIAMIENTO -->
       <a href="solicitudes_aprobadas_refinanciamiento.html" class="btn-grande">
-        <i class="fas fa-check-circle" aria-hidden="true"></i>
-        <div class="label">Solicitudes Aprobadas<br>Refinanciamiento</div>
+        <i class="fas fa-check-circle"></i>
+        Solicitudes Aprobadas Refinanciamiento
         <span id="badge-app-refinanciamiento" class="badge">0</span>
       </a>
-
       <a href="solicitudes_aprobadas_amuebla2_page.html" class="btn-grande">
-        <i class="fas fa-check-circle" aria-hidden="true"></i>
-        <div class="label">Solicitudes Aprobadas<br>Amuebla2</div>
+        <i class="fas fa-check-circle"></i>
+        Solicitudes Aprobadas Amuebla2
         <span id="badge-app-amuebla2" class="badge">0</span>
       </a>
-
       <a href="pagos_page.html" class="btn-grande">
-        <i class="fas fa-money-bill-wave" aria-hidden="true"></i>
-        <div class="label">Recepción de Pagos</div>
+        <i class="fas fa-money-bill-wave"></i>
+        Recepción de Pagos
       </a>
-
       <a href="movimientos_caja_page.html" class="btn-grande">
-        <i class="fas fa-exchange-alt" aria-hidden="true"></i>
-        <div class="label">Movimientos de Caja</div>
+        <i class="fas fa-exchange-alt"></i>
+        Movimientos de Caja
       </a>
-
       <a href="ver_movimientos_caja_page.html" class="btn-grande">
-        <i class="fas fa-list-alt" aria-hidden="true"></i>
-        <div class="label">Ver Movimientos de Caja</div>
+        <i class="fas fa-list-alt"></i>
+        Ver Movimientos de Caja
       </a>
-
-      <!-- BOTÓN REIMPRESIÓN -->
+      <!-- NUEVO BOTÓN DE REIMPRESIÓN -->
       <a href="reimpresion_tickets_page.html" class="btn-grande btn-reimprimir">
-        <i class="fas fa-print" aria-hidden="true"></i>
-        <div class="label">Ver/Reimprimir Recibos</div>
+        <i class="fas fa-print"></i>
+        Ver/Reimprimir Recibos
       </a>
-
-      <!-- BOTÓN REVERTIR PAGOS -->
+      <!-- BOTÓN DE REVERTIR PAGOS -->
       <a href="revertir_pagos_page.html" class="btn-grande btn-revertir">
-        <i class="fas fa-undo" aria-hidden="true"></i>
-        <div class="label">Revertir Pagos</div>
+        <i class="fas fa-undo"></i>
+        Revertir Pagos
       </a>
-
-      <!-- Master de Créditos -->
+      <!-- NUEVO: Master de Créditos -->
       <a href="master_creditos_page.html" class="btn-grande">
-        <i class="fas fa-database" aria-hidden="true"></i>
-        <div class="label">Master de Créditos</div>
+        <i class="fas fa-database"></i>
+        Master de Créditos
       </a>
-
-      <!-- Cuotas por Vencer -->
+      <!-- NUEVO: Cuotas por Vencer -->
       <a href="cuotas_por_vencer_page.html" class="btn-grande">
-        <i class="fas fa-hourglass-half" aria-hidden="true"></i>
-        <div class="label">Cuotas por Vencer</div>
+        <i class="fas fa-hourglass-half"></i>
+        Cuotas por Vencer
       </a>
-
-      <!-- Reportes Gerenciales -->
+      <!-- NUEVO BOTÓN DE REPORTES GERENCIALES -->
       <a href="reporte_page.html" class="btn-grande btn-reporte">
-        <i class="fas fa-chart-bar" aria-hidden="true"></i>
-        <div class="label">Reportes Gerenciales</div>
+        <i class="fas fa-chart-bar"></i>
+        Reportes Gerenciales
       </a>
-    </section>
-  </main>
+    </div>
+  </div>
 </body>
 </html>
-
 
 
 

@@ -292,7 +292,7 @@
             <div><strong>Monto Pagado:</strong> $${Number(ticket.montoPagado).toFixed(2)}</div>
             <div><strong>Pago Capital:</strong> $${Number(ticket.pagoCapital || 0).toFixed(2)}</div>
             <div><strong>Pago Interés:</strong> $${Number(ticket.pagoInteres || 0).toFixed(2)}</div>
-            <div><strong>Pago Multas:</strong> $${Number(ticket.pagoMultas || 0).toFixed(2)}</div>
+            <div><strong>Pago Multas:</strong> $${Number(ticket.pagoMultas || ticket.pagoMulta || 0).toFixed(2)}</div>
             <div><strong>Saldo Restante:</strong> $${Number(ticket.saldoRestante || 0).toFixed(2)}</div>
             <div><strong>Fecha:</strong> ${(ticket.fechaPago || ticket.timestamp || '-').toString().slice(0,19).replace('T',' ')}</div>
             <div><strong>Agencia:</strong> ${ticket.sucursal || ticket.agencia || '-'}</div>
@@ -389,7 +389,7 @@
             <div><strong>Monto Pagado:</strong> $${Number(pago.montoPagado).toFixed(2)}</div>
             <div><strong>Pago Capital:</strong> $${Number(pago.pagoCapital || 0).toFixed(2)}</div>
             <div><strong>Pago Interés:</strong> $${Number(pago.pagoInteres || 0).toFixed(2)}</div>
-            <div><strong>Pago Multas:</strong> $${Number(pago.pagoMultas || 0).toFixed(2)}</div>
+            <div><strong>Pago Multas:</strong> $${Number(pago.pagoMultas || pago.pagoMulta || 0).toFixed(2)}</div>
             <div><strong>Saldo Restante:</strong> $${Number(pago.saldoRestante || 0).toFixed(2)}</div>
             <button class="btn-imprimir" onclick="imprimirTicketPorId('${pago.id}')">
               <i class="fas fa-print"></i> Imprimir Ticket
@@ -449,7 +449,7 @@
               <div><strong>Monto Pagado:</strong> $${Number(pago.montoPagado).toFixed(2)}</div>
               <div><strong>Pago Capital:</strong> $${Number(pago.pagoCapital || 0).toFixed(2)}</div>
               <div><strong>Pago Interés:</strong> $${Number(pago.pagoInteres || 0).toFixed(2)}</div>
-              <div><strong>Pago Multas:</strong> $${Number(pago.pagoMultas || 0).toFixed(2)}</div>
+              <div><strong>Pago Multas:</strong> $${Number(pago.pagoMultas || pago.pagoMulta || 0).toFixed(2)}</div>
               <div><strong>Saldo Restante:</strong> $${Number(pago.saldoRestante || 0).toFixed(2)}</div>
             </div>
             <div style="text-align:center;margin-top:28px;">
@@ -510,3 +510,5 @@
   </script>
 </body>
 </html>
+
+

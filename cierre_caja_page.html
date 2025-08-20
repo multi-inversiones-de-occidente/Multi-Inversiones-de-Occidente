@@ -7,7 +7,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import {
-      getFirestore, collection, query, where, getDocs, updateDoc, doc, addDoc, orderBy, limit, getDoc, Timestamp
+      getFirestore, collection, query, where, getDocs, updateDoc, doc, addDoc, orderBy, limit, Timestamp
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
@@ -35,9 +35,7 @@
     let saldoInicial = 0;
 
     // ===== Utilidades =====
-    function toDateString(date) {
-      return date.toISOString().slice(0,10); // YYYY-MM-DD
-    }
+    function toDateString(date) { return date.toISOString().slice(0,10); } // YYYY-MM-DD
     function yyyymmdd(d) {
       const x = new Date(d);
       const y = x.getUTCFullYear();
@@ -46,15 +44,15 @@
       return `${y}-${m}-${dd}`;
     }
     function formatMoney(n) {
-      return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+      return '$' + Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
     }
     function getDiaSVRange(fechaLocal /* "YYYY-MM-DD" */) {
-      // Zona: America/El_Salvador UTC-06:00
+      // Rango del día en SV (UTC-06) convertido a ISO UTC
       const dateStart = new Date(`${fechaLocal}T00:00:00-06:00`);
       const dateEnd   = new Date(`${fechaLocal}T23:59:59.999-06:00`);
       return [dateStart.toISOString(), dateEnd.toISOString()];
     }
-    function getPrevOperacionDate(fechaOperacion /* "YYYY-MM-DD" */) {
+    function getPrevOperacionDate(fechaOperacion) {
       const d = new Date(`${fechaOperacion}T00:00:00-06:00`);
       d.setDate(d.getDate() - 1);
       return yyyymmdd(d);
@@ -62,7 +60,7 @@
     function toDateAny(fechaAny) {
       if (!fechaAny) return null;
       if (typeof fechaAny === "string") return new Date(fechaAny);
-      if (fechaAny?.toDate) return fechaAny.toDate(); // Firestore Timestamp
+      if (fechaAny?.toDate) return fechaAny.toDate();
       return null;
     }
     function isoFromAny(fechaAny) {
@@ -74,12 +72,12 @@
       return iso.replace('T',' ').replace('.000Z','').slice(0,16);
     }
 
-    // ===== SALDO INICIAL CORRECTO / BLINDADO =====
+    // ===== SALDO INICIAL (desde cierre previo, retrocompatible) =====
     async function obtenerSaldoInicial(agencia, fechaOperacion /* "YYYY-MM-DD" */) {
       const cierresRef = collection(db, "cierres_caja");
       const fechaAnterior = getPrevOperacionDate(fechaOperacion);
 
-      // 1) Cierre exacto del día anterior
+      // 1) Exacto del día anterior
       {
         const qExact = query(
           cierresRef,
@@ -94,7 +92,7 @@
         }
       }
 
-      // 2) Últimos 20, tomar el más reciente < fechaOperacion
+      // 2) Últimos 20 cierres, tomar el más reciente < fechaOperacion
       {
         const qLast = query(
           cierresRef,
@@ -118,11 +116,11 @@
           return Number((d.saldo_siguiente ?? d.saldo_caja) || 0);
         }
       }
-
+      // 3) Sin cierres previos
       return 0;
     }
 
-    // ===== Carga gerente y fechas pendientes =====
+    // ===== Cargar gerente y fechas con pendientes (ambas colecciones/fechas) =====
     async function cargarGerenteYFechas() {
       document.getElementById("select-fecha").innerHTML = `<option>Cargando...</option>`;
       document.getElementById("tabla-movs").innerHTML = "";
@@ -142,7 +140,7 @@
         gerenteNombre = `${gerenteData.nombre || ""} ${gerenteData.apellido || ""}`.trim();
         document.getElementById("gerente-nombre").innerText = gerenteNombre || user.email;
 
-        // Detectar fechas con movimientos sin cerrar (ambas colecciones + ambos campos de fecha)
+        // Fechas con movimientos sin cerrar (ambas colecciones y campos de fecha)
         let movDatesSet = new Set();
 
         for (const coll of ["movimientosCaja", "movimientos_caja"]) {
@@ -158,26 +156,22 @@
               movDatesSet.add(m.fecha.slice(0,10));
             }
             if (m.fecha_ts?.toDate) {
-              const f = yyyymmdd(m.fecha_ts.toDate());
-              movDatesSet.add(f);
+              movDatesSet.add(yyyymmdd(m.fecha_ts.toDate()));
             }
           }
         }
 
-        // Fechas ya cerradas
+        // Quitar las que ya estén cerradas
         const cierresQ = query(collection(db, "cierres_caja"), where("agencia", "==", agenciaActual));
         const cierresSnap = await getDocs(cierresQ);
         let fechasCerradas = new Set();
         for (const docC of cierresSnap.docs) {
           let f = docC.data().fecha;
-          if (f && typeof f === "string" && f.length >= 10) {
-            fechasCerradas.add(f.substring(0,10));
-          }
+          if (f && typeof f === "string" && f.length >= 10) fechasCerradas.add(f.substring(0,10));
         }
 
-        // Pendientes = con movimientos y no cerradas
         diasPendientes = Array.from(movDatesSet).filter(f => !fechasCerradas.has(f));
-        diasPendientes.sort(); // asc
+        diasPendientes.sort();
 
         if (diasPendientes.length === 0) {
           const hoy = toDateString(new Date());
@@ -197,7 +191,7 @@
       });
     }
 
-    // ===== Cargar movimientos, consolidar, deduplicar y calcular totales =====
+    // ===== Cargar movimientos + pagos (compatible y deduplicado) =====
     async function cargarMovimientosYTotales(fecha /* "YYYY-MM-DD" */) {
       document.getElementById("tabla-movs").innerHTML =
         `<tr><td colspan="6" style="text-align:center">Cargando movimientos...</td></tr>`;
@@ -206,10 +200,9 @@
       let totalIngresos = 0;
       let totalEgresos = 0;
 
-      // SALDO INICIAL
       saldoInicial = await obtenerSaldoInicial(agenciaActual, fecha);
 
-      // Rango del día
+      // Rango del día (SV) en ISO UTC y como Timestamps
       const [fechaInicioUTC, fechaFinUTC] = getDiaSVRange(fecha);
       const startTs = Timestamp.fromDate(new Date(fechaInicioUTC));
       const endTs   = Timestamp.fromDate(new Date(fechaFinUTC));
@@ -222,6 +215,7 @@
         idsVistos.add(docMov.id);
 
         const m = docMov.data();
+
         if (m.cierre === true) return;
         if ('anulado' in m && m.anulado === true) return;
         if (m.descripcion && (m.descripcion.startsWith('Reversión de pago') || m.descripcion.startsWith('Reversión correlativo'))) return;
@@ -230,9 +224,9 @@
         if (m.correlativo) correlativosSumados.add(m.correlativo);
 
         const iso = m.fecha ? isoFromAny(m.fecha) : isoFromAny(m.fecha_ts);
+
         const tipo  = m.tipo;
         const monto = Number(m.monto || 0);
-
         movimientosDelDia.push({
           id: docMov.id,
           coll,
@@ -249,8 +243,9 @@
         if (tipo === "Egreso")  totalEgresos  += monto;
       }
 
-      // 1) Movimientos manuales (ambas colecciones, ambos campos)
+      // 1) Movimientos de caja – ambas colecciones y ambos campos
       for (const coll of ["movimientosCaja", "movimientos_caja"]) {
+        // por 'fecha' (string ISO)
         const qStr = query(
           collection(db, coll),
           where("agencia", "==", agenciaActual),
@@ -260,6 +255,7 @@
         const snapStr = await getDocs(qStr);
         snapStr.forEach(docMov => pushMovimiento(docMov, coll));
 
+        // por 'fecha_ts' (Timestamp)
         const qTs = query(
           collection(db, coll),
           where("agencia", "==", agenciaActual),
@@ -270,53 +266,56 @@
         snapTs.forEach(docMov => pushMovimiento(docMov, coll));
       }
 
-      // 2) Pagos – DUAL (Timestamp y string) para fechaPago y fechaRegistro
-      // fechaPago
-      const pagosPago_TS = query(
-        collection(db, "pagos"),
-        where("sucursal", "==", agenciaActual),
-        where("fechaPago", ">=", startTs),
-        where("fechaPago", "<=", endTs)
+      // 2) Pagos (ingresos)
+      const pagosSnap = await getDocs(
+        query(
+          collection(db, "pagos"),
+          where("sucursal", "==", agenciaActual),
+          where("fechaPago", ">=", fechaInicioUTC),
+          where("fechaPago", "<=", fechaFinUTC)
+        )
       );
-      const pagosPago_ISO = query(
-        collection(db, "pagos"),
-        where("sucursal", "==", agenciaActual),
-        where("fechaPago", ">=", fechaInicioUTC),
-        where("fechaPago", "<=", fechaFinUTC)
-      );
-      // retroactivos por fechaRegistro
-      const pagosReg_TS = query(
-        collection(db, "pagos"),
-        where("sucursal", "==", agenciaActual),
-        where("retroactivo", "==", true),
-        where("fechaRegistro", ">=", startTs),
-        where("fechaRegistro", "<=", endTs)
-      );
-      const pagosReg_ISO = query(
-        collection(db, "pagos"),
-        where("sucursal", "==", agenciaActual),
-        where("retroactivo", "==", true),
-        where("fechaRegistro", ">=", fechaInicioUTC),
-        where("fechaRegistro", "<=", fechaFinUTC)
+      // 2A) Pagos retroactivos (registrados ese día)
+      const pagosRetroSnap = await getDocs(
+        query(
+          collection(db, "pagos"),
+          where("sucursal", "==", agenciaActual),
+          where("retroactivo", "==", true),
+          where("fechaRegistro", ">=", fechaInicioUTC),
+          where("fechaRegistro", "<=", fechaFinUTC)
+        )
       );
 
-      const pagosResults = await Promise.allSettled([
-        getDocs(pagosPago_TS), getDocs(pagosPago_ISO),
-        getDocs(pagosReg_TS), getDocs(pagosReg_ISO)
-      ]);
-
+      const pagosUnidos = [];
       const pagosIds = new Set();
-      function pushPago(docPago) {
+
+      for (const docPago of pagosSnap.docs) {
         const d = docPago.data();
-        if (d.anulado === true) return;
-        if (pagosIds.has(docPago.id)) return;
-        pagosIds.add(docPago.id);
+        if (!("anulado" in d) || !d.anulado) {
+          const cierrePago = d.hasOwnProperty("cierre") ? d.cierre : false;
+          if (cierrePago === false || cierrePago === null) {
+            pagosUnidos.push({ ...d, id: docPago.id });
+            pagosIds.add(docPago.id);
+          }
+        }
+      }
+      for (const docPago of pagosRetroSnap.docs) {
+        if (pagosIds.has(docPago.id)) continue;
+        const d = docPago.data();
+        if (!("anulado" in d) || !d.anulado) {
+          const cierrePago = d.hasOwnProperty("cierre") ? d.cierre : false;
+          if (cierrePago === false || cierrePago === null) {
+            pagosUnidos.push({ ...d, id: docPago.id });
+            pagosIds.add(docPago.id);
+          }
+        }
+      }
 
+      for (const d of pagosUnidos) {
         const monto = Number(d.montoPagado) || 0;
-        const fechaIso = isoFromAny(d.fechaRegistro) || isoFromAny(d.fechaPago) || "";
-
+        const fechaIso = d.fechaRegistro || d.fechaPago || "";
         movimientosDelDia.push({
-          id: docPago.id,
+          id: d.id,
           coll: "pagos",
           tipo: "Ingreso",
           descripcion: d.retroactivo ? "Pago retroactivo" : "Pago de cliente",
@@ -328,14 +327,11 @@
         });
         totalIngresos += monto;
       }
-      pagosResults.forEach(r => {
-        if (r.status === "fulfilled") r.value.forEach(pushPago);
-      });
 
-      // Ordenar por fecha ascendente
-      movimientosDelDia.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+      // Orden cronológico
+      movimientosDelDia.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
 
-      // Render tabla
+      // Render
       if (movimientosDelDia.length === 0) {
         document.getElementById("tabla-movs").innerHTML =
           `<tr><td colspan="6" style="text-align:center;color:#fff6">No hay movimientos para este día.</td></tr>`;
@@ -397,12 +393,12 @@
 
       await addDoc(collection(db, "cierres_caja"), {
         agencia: agenciaActual,
-        fecha: fechaSeleccionada,            // día de operación (YYYY-MM-DD)
+        fecha: fechaSeleccionada,  // YYYY-MM-DD operativo
         total_ingresos: totalIngresos,
         total_egresos: totalEgresos,
         saldo_inicial: saldoInicial,
         saldo_caja: saldoFinal,
-        saldo_siguiente: saldoFinal,         // para apertura siguiente
+        saldo_siguiente: saldoFinal,
         movimientos: movimientosDelDia.map(m => ({
           tipo: m.tipo,
           descripcion: m.descripcion,
@@ -412,20 +408,18 @@
           id_movimiento: m.id,
           origen: m.origen || ""
         })),
-        fecha_cierre: (new Date()).toISOString(), // timestamp real de cierre
+        fecha_cierre: (new Date()).toISOString(),
         gerente_id: gerenteId,
         gerente_nombre: gerenteNombre
       });
 
-      // Marcar cierre:true en documentos fuente
+      // Marcar cierre:true en fuentes
       for (const m of movimientosDelDia) {
         try {
           if (m.origen === "movimiento") {
-            const docRefMov = doc(db, m.coll, m.id);
-            await updateDoc(docRefMov, { cierre: true });
+            await updateDoc(doc(db, m.coll, m.id), { cierre: true });
           } else if (m.origen === "pago") {
-            const docRefPago = doc(db, "pagos", m.id);
-            await updateDoc(docRefPago, { cierre: true });
+            await updateDoc(doc(db, "pagos", m.id), { cierre: true });
           }
         } catch (e) {
           console.warn("No se pudo marcar cierre en", m.origen, m.id, e);
@@ -440,60 +434,23 @@
     window.addEventListener("DOMContentLoaded", cargarGerenteYFechas);
     window.cerrarCajaDelDia = cerrarCajaDelDia;
   </script>
+
   <style>
-    body {
-      margin: 0; font-family: Arial,sans-serif; background: #11102a;
-      color: #fff; min-height: 100vh;
-    }
-    header {
-      width:100%; background:#221a3a; padding:1.2rem 0 1.1rem 0; text-align:center;
-      font-size:1.44rem; font-weight:700; letter-spacing:.5px; color:#fff;
-      margin-bottom: 1.2rem;
-    }
-    .main-card {
-      margin: 54px auto 0 auto; background: #1a1a26; border-radius: 19px;
-      max-width: 540px; min-width: 0;
-      padding: 2.2rem 2.2rem 2.8rem 2.2rem; box-shadow: 0 8px 38px #0a013377;
-      display:flex; flex-direction:column;
-    }
-    label { margin-bottom: 5px; font-weight: 500;}
-    select, option, input {
-      font-size:1.08rem; background:#191834; color:#fff; border-radius:6px;
-      border:1px solid #4e3b71; padding:.59rem .7rem; margin-bottom:10px;
-    }
-    button {
-      width:100%; background:#a787f4; color:#fff; font-weight:700;
-      border:none; border-radius:8px; padding:1rem 0; margin-top:20px;
-      font-size:1.1rem; cursor:pointer; transition:background .15s;
-    }
-    button:hover { background:#5e38a3; }
-    .scroll-table-wrap {
-      width:100%; overflow-x:auto; margin-top: 1.3rem; border-radius:10px; 
-      background: #181828; box-shadow: 0 3px 13px #0002;
-    }
-    .table-movs {
-      width:100%; min-width: 580px; border-collapse:collapse; font-size:.99rem;
-      background:#181828;
-    }
-    .table-movs th, .table-movs td { 
-      padding:.62em .80em; 
-      white-space: nowrap;
-      text-align: left;
-    }
-    .table-movs th {
-      background:#2c234a; color:#fff; font-weight:700; border:none;
-      text-align:left;
-      font-size: 1.01rem;
-      position: sticky; top: 0; z-index: 2;
-    }
-    .table-movs td { border-bottom: 1px solid #212146; color:#fff; }
-    .table-movs tr:last-child td { border-bottom: none; }
-    #totales { margin-top: 10px; text-align: right;}
-    @media (max-width: 630px) {
-      .main-card { padding: 1rem .3rem 2rem .3rem; max-width: 99vw; }
-      .table-movs { font-size: .95rem; }
-      .scroll-table-wrap { min-width: 0; }
-    }
+    body { margin:0; font-family: Arial,sans-serif; background:#11102a; color:#fff; min-height:100vh;}
+    header { width:100%; background:#221a3a; padding:1.2rem 0 1.1rem; text-align:center; font-size:1.44rem; font-weight:700; letter-spacing:.5px; color:#fff; margin-bottom:1.2rem;}
+    .main-card { margin:54px auto 0; background:#1a1a26; border-radius:19px; max-width:540px; padding:2.2rem 2.2rem 2.8rem; box-shadow:0 8px 38px #0a013377; display:flex; flex-direction:column;}
+    label{margin-bottom:5px; font-weight:500;}
+    select,option,input{font-size:1.08rem; background:#191834; color:#fff; border-radius:6px; border:1px solid #4e3b71; padding:.59rem .7rem; margin-bottom:10px;}
+    button{width:100%; background:#a787f4; color:#fff; font-weight:700; border:none; border-radius:8px; padding:1rem 0; margin-top:20px; font-size:1.1rem; cursor:pointer; transition:background .15s;}
+    button:hover{background:#5e38a3;}
+    .scroll-table-wrap{width:100%; overflow-x:auto; margin-top:1.3rem; border-radius:10px; background:#181828; box-shadow:0 3px 13px #0002;}
+    .table-movs{width:100%; min-width:580px; border-collapse:collapse; font-size:.99rem; background:#181828;}
+    .table-movs th,.table-movs td{padding:.62em .8em; white-space:nowrap; text-align:left;}
+    .table-movs th{background:#2c234a; color:#fff; font-weight:700; position:sticky; top:0; z-index:2;}
+    .table-movs td{border-bottom:1px solid #212146; color:#fff;}
+    .table-movs tr:last-child td{border-bottom:none;}
+    #totales{margin-top:10px; text-align:right;}
+    @media (max-width:630px){ .main-card{padding:1rem .3rem 2rem; max-width:99vw;} .table-movs{font-size:.95rem;} .scroll-table-wrap{min-width:0;} }
   </style>
 </head>
 <body>
@@ -522,6 +479,7 @@
   </div>
 </body>
 </html>
+
 
 
 

@@ -57,7 +57,10 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, orderBy, limit, getDoc, doc as docRef } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import {
+      getFirestore, collection, query, where, getDocs, orderBy, limit, getDoc, doc as docRef,
+      Timestamp
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -76,9 +79,21 @@
     function formatFecha(date) {
       return date.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
-    function formatHora(fechaIso) {
-      const d = new Date(fechaIso);
+    function toDate(obj) {
+      // Acepta string ISO o Timestamp y devuelve Date
+      if (!obj) return null;
+      if (typeof obj === "string") return new Date(obj);
+      if (obj?.toDate) return obj.toDate(); // Firestore Timestamp
+      return null;
+    }
+    function formatHora(fechaAny) {
+      const d = toDate(fechaAny);
+      if (!d || isNaN(d.getTime())) return "--:--";
       return d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true });
+    }
+    function ensureISO(fechaAny) {
+      const d = toDate(fechaAny);
+      return d ? d.toISOString() : "";
     }
 
     let now = new Date();
@@ -92,14 +107,14 @@
     async function obtenerSaldoAnterior(agencia, fecha) {
       const cierresRef = collection(db, "cierres_caja");
       const fechaStr = fecha.toISOString().slice(0,10);
-      const q = query(
+      const qC = query(
         cierresRef,
         where("agencia", "==", agencia),
         where("fecha", "<", fechaStr),
         orderBy("fecha", "desc"),
         limit(1)
       );
-      const snap = await getDocs(q);
+      const snap = await getDocs(qC);
       if (!snap.empty) {
         return Number(snap.docs[0].data().saldo_caja || 0);
       }
@@ -125,43 +140,64 @@
       const endOfDay = new Date(y, m, d, 23, 59, 59, 999);
       const startIso = startOfDay.toISOString();
       const endIso = endOfDay.toISOString();
+      const startTs = Timestamp.fromDate(startOfDay);
+      const endTs = Timestamp.fromDate(endOfDay);
 
       let movimientos = [];
       const correlativosSumados = new Set();
+      const movIdsVistos = new Set();
 
-      // 1. Movimientos manuales (filtrando anulados y reversiones)
-      const movSnap = await getDocs(
-        query(
-          collection(db, "movimientosCaja"),
-          where("agencia", "==", agenciaActual),
-          where("fecha", ">=", startIso),
-          where("fecha", "<=", endIso)
-        )
+      // 1A. Movimientos por 'fecha' (string ISO) — COMPATIBILIDAD
+      const qFechaStr = query(
+        collection(db, "movimientosCaja"),
+        where("agencia", "==", agenciaActual),
+        where("fecha", ">=", startIso),
+        where("fecha", "<=", endIso)
       );
-      movSnap.forEach(doc => {
+      const movSnapStr = await getDocs(qFechaStr);
+
+      // 1B. Movimientos por 'fecha_ts' (Timestamp) — NUEVO
+      const qFechaTs = query(
+        collection(db, "movimientosCaja"),
+        where("agencia", "==", agenciaActual),
+        where("fecha_ts", ">=", startTs),
+        where("fecha_ts", "<=", endTs)
+      );
+      const movSnapTs = await getDocs(qFechaTs);
+
+      // Función común para procesar docs y deduplicar
+      function pushMovimiento(doc) {
+        if (movIdsVistos.has(doc.id)) return; // ya entró por la otra consulta
+        movIdsVistos.add(doc.id);
+
         const d = doc.data();
         if ('anulado' in d && d.anulado === true) return;
-        // NO mostrar reversión de pago ni reversión correlativo
         if (d.descripcion && (
           d.descripcion.startsWith('Reversión de pago') ||
           d.descripcion.startsWith('Reversión correlativo')
         )) return;
-        // SOLO SUMA EL PRIMER CORRELATIVO NO ANULADO
+
+        // Evita duplicar mismo correlativo en el día
         if (d.correlativo && correlativosSumados.has(d.correlativo)) return;
         if (d.correlativo) correlativosSumados.add(d.correlativo);
+
+        const fechaDisplay = d.fecha || d.fecha_ts || null; // puede ser string o Timestamp
         movimientos.push({
           tipo: d.tipo,
           descripcion: d.descripcion,
           monto: Number(d.monto),
           observaciones: d.observaciones || '',
           usuario: d.usuario || '',
-          fecha: d.fecha,
+          fecha: fechaDisplay,
           clase: d.tipo === "Ingreso" ? "mov-ingreso" : "mov-egreso",
           cliente: ""
         });
-      });
+      }
 
-      // 2. Pagos (NO anulados, solo de esa agencia)
+      movSnapStr.forEach(pushMovimiento);
+      movSnapTs.forEach(pushMovimiento);
+
+      // 2. Pagos del día (NO anulados, solo de esa agencia) por fechaPago
       const pagoSnap = await getDocs(
         query(
           collection(db, "pagos"),
@@ -180,7 +216,7 @@
         }
       });
 
-      // Buscar nombre y apellido de users (en bloques de 10)
+      // Datos de clientes (si están en "users")
       let clientesData = {};
       const ids = Array.from(clienteIDSet).filter(Boolean);
       for (let i = 0; i < ids.length; i += 10) {
@@ -189,8 +225,8 @@
           try {
             const userDoc = await getDoc(docRef(db, "users", cid));
             if (userDoc.exists()) {
-              const user = userDoc.data();
-              clientesData[cid] = ((user.nombre || "") + " " + (user.apellido || "")).trim();
+              const u = userDoc.data();
+              clientesData[cid] = ((u.nombre || "") + " " + (u.apellido || "")).trim();
             }
           } catch (e) {}
         }));
@@ -209,13 +245,13 @@
           monto: Number(data.montoPagado),
           observaciones: "",
           usuario: data.cajeroNombre || '',
-          fecha: data.fechaPago,
+          fecha: data.fechaPago, // string ISO
           clase: "mov-pago",
           cliente: clienteNombre
         });
       });
 
-      // 3. Pagos Retroactivos (abonos a valor fecha hechos ese día)
+      // 3. Pagos Retroactivos del día (por fechaRegistro)
       const pagosRetroQ = await getDocs(
         query(
           collection(db, "pagos"),
@@ -227,24 +263,35 @@
       );
       pagosRetroQ.forEach(doc => {
         const d = doc.data();
-        // Solo agrega si NO está ya en la lista (por si un abono se registra igual)
-        const yaExiste = movimientos.some(mov => mov.fecha === d.fechaRegistro && mov.monto === Number(d.montoPagado));
-        if (!yaExiste && (!("anulado" in d) || !d.anulado)) {
-          let clienteNombre = d.nombres || "Cliente";
-          movimientos.push({
-            tipo: "Ingreso",
-            descripcion: "Abono retroactivo",
-            monto: Number(d.montoPagado),
-            observaciones: d.motivo || '',
-            usuario: d.cajeroNombre || '',
-            fecha: d.fechaRegistro,
-            clase: "mov-pago",
-            cliente: clienteNombre
-          });
+        if (!("anulado" in d) || !d.anulado) {
+          const yaExiste = movimientos.some(mov =>
+            ensureISO(mov.fecha) === ensureISO(d.fechaRegistro) &&
+            Number(mov.monto) === Number(d.montoPagado) &&
+            mov.descripcion.includes("retroactivo")
+          );
+          if (!yaExiste) {
+            let clienteNombre = d.nombres || "Cliente";
+            movimientos.push({
+              tipo: "Ingreso",
+              descripcion: "Abono retroactivo",
+              monto: Number(d.montoPagado),
+              observaciones: d.motivo || '',
+              usuario: d.cajeroNombre || '',
+              fecha: d.fechaRegistro, // string ISO
+              clase: "mov-pago",
+              cliente: clienteNombre
+            });
+          }
         }
       });
 
-      movimientos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+      // Ordenar por fecha descendente (funciona con ISO o Timestamp)
+      movimientos.sort((a, b) => {
+        const da = toDate(a.fecha)?.getTime() ?? 0;
+        const dbb = toDate(b.fecha)?.getTime() ?? 0;
+        return dbb - da;
+      });
+
       const saldoAnterior = await obtenerSaldoAnterior(agenciaActual, selectedDate);
 
       let totalIngresos = 0.0;
@@ -302,6 +349,7 @@
       cargarMovimientos(user);
     });
   </script>
+
   <script>
   document.getElementById("btn-imprimir-corte").onclick = function() {
     const fecha = document.getElementById("fecha-label").textContent || '';
@@ -348,6 +396,7 @@
   </script>
 </body>
 </html>
+
 
 
 

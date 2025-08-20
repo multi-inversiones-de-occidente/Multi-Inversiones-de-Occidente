@@ -146,7 +146,6 @@
         let movDatesSet = new Set();
 
         for (const coll of ["movimientosCaja", "movimientos_caja"]) {
-          // Solo por cierre:false (sin rango, para listar fechas)
           const qMovs = query(
             collection(db, coll),
             where("agencia", "==", agenciaActual),
@@ -155,11 +154,9 @@
           const snapMovs = await getDocs(qMovs);
           for (const docMov of snapMovs.docs) {
             const m = docMov.data();
-            // fecha (string)
             if (typeof m.fecha === "string" && m.fecha.length >= 10) {
               movDatesSet.add(m.fecha.slice(0,10));
             }
-            // fecha_ts (Timestamp)
             if (m.fecha_ts?.toDate) {
               const f = yyyymmdd(m.fecha_ts.toDate());
               movDatesSet.add(f);
@@ -182,7 +179,6 @@
         diasPendientes = Array.from(movDatesSet).filter(f => !fechasCerradas.has(f));
         diasPendientes.sort(); // asc
 
-        // Si no hay nada, permitir hoy
         if (diasPendientes.length === 0) {
           const hoy = toDateString(new Date());
           diasPendientes = [hoy];
@@ -213,35 +209,30 @@
       // SALDO INICIAL
       saldoInicial = await obtenerSaldoInicial(agenciaActual, fecha);
 
-      // Rango del día en UTC (derivado de -06:00)
+      // Rango del día
       const [fechaInicioUTC, fechaFinUTC] = getDiaSVRange(fecha);
       const startTs = Timestamp.fromDate(new Date(fechaInicioUTC));
       const endTs   = Timestamp.fromDate(new Date(fechaFinUTC));
 
-      // Evitar duplicado por correlativo e ID
       const correlativosSumados = new Set();
       const idsVistos = new Set();
 
-      // Helper para empujar doc de movimiento (compatible fecha/fecha_ts)
       function pushMovimiento(docMov, coll) {
         if (idsVistos.has(docMov.id)) return;
         idsVistos.add(docMov.id);
 
         const m = docMov.data();
-
-        // Ignorar ya cerrados, anulados o reversiones
         if (m.cierre === true) return;
         if ('anulado' in m && m.anulado === true) return;
         if (m.descripcion && (m.descripcion.startsWith('Reversión de pago') || m.descripcion.startsWith('Reversión correlativo'))) return;
 
-        // Solo primer correlativo no anulado
         if (m.correlativo && correlativosSumados.has(m.correlativo)) return;
         if (m.correlativo) correlativosSumados.add(m.correlativo);
 
         const iso = m.fecha ? isoFromAny(m.fecha) : isoFromAny(m.fecha_ts);
-
         const tipo  = m.tipo;
         const monto = Number(m.monto || 0);
+
         movimientosDelDia.push({
           id: docMov.id,
           coll,
@@ -260,7 +251,6 @@
 
       // 1) Movimientos manuales (ambas colecciones, ambos campos)
       for (const coll of ["movimientosCaja", "movimientos_caja"]) {
-        // Por 'fecha' (string ISO)
         const qStr = query(
           collection(db, coll),
           where("agencia", "==", agenciaActual),
@@ -270,7 +260,6 @@
         const snapStr = await getDocs(qStr);
         snapStr.forEach(docMov => pushMovimiento(docMov, coll));
 
-        // Por 'fecha_ts' (Timestamp)
         const qTs = query(
           collection(db, coll),
           where("agencia", "==", agenciaActual),
@@ -281,59 +270,53 @@
         snapTs.forEach(docMov => pushMovimiento(docMov, coll));
       }
 
-      // 2) Pagos por fechaPago (ingresos)
-      const pagosSnap = await getDocs(
-        query(
-          collection(db, "pagos"),
-          where("sucursal", "==", agenciaActual),
-          where("fechaPago", ">=", fechaInicioUTC),
-          where("fechaPago", "<=", fechaFinUTC)
-        )
+      // 2) Pagos – DUAL (Timestamp y string) para fechaPago y fechaRegistro
+      // fechaPago
+      const pagosPago_TS = query(
+        collection(db, "pagos"),
+        where("sucursal", "==", agenciaActual),
+        where("fechaPago", ">=", startTs),
+        where("fechaPago", "<=", endTs)
+      );
+      const pagosPago_ISO = query(
+        collection(db, "pagos"),
+        where("sucursal", "==", agenciaActual),
+        where("fechaPago", ">=", fechaInicioUTC),
+        where("fechaPago", "<=", fechaFinUTC)
+      );
+      // retroactivos por fechaRegistro
+      const pagosReg_TS = query(
+        collection(db, "pagos"),
+        where("sucursal", "==", agenciaActual),
+        where("retroactivo", "==", true),
+        where("fechaRegistro", ">=", startTs),
+        where("fechaRegistro", "<=", endTs)
+      );
+      const pagosReg_ISO = query(
+        collection(db, "pagos"),
+        where("sucursal", "==", agenciaActual),
+        where("retroactivo", "==", true),
+        where("fechaRegistro", ">=", fechaInicioUTC),
+        where("fechaRegistro", "<=", fechaFinUTC)
       );
 
-      // 2A) Pagos retroactivos (registrados hoy por fechaRegistro)
-      const pagosRetroSnap = await getDocs(
-        query(
-          collection(db, "pagos"),
-          where("sucursal", "==", agenciaActual),
-          where("retroactivo", "==", true),
-          where("fechaRegistro", ">=", fechaInicioUTC),
-          where("fechaRegistro", "<=", fechaFinUTC)
-        )
-      );
+      const pagosResults = await Promise.allSettled([
+        getDocs(pagosPago_TS), getDocs(pagosPago_ISO),
+        getDocs(pagosReg_TS), getDocs(pagosReg_ISO)
+      ]);
 
-      // Unificar pagos (evitar duplicados por id de doc de pagos)
-      const pagosUnidos = [];
       const pagosIds = new Set();
-
-      for (const docPago of pagosSnap.docs) {
+      function pushPago(docPago) {
         const d = docPago.data();
-        if (!("anulado" in d) || !d.anulado) {
-          const cierrePago = d.hasOwnProperty("cierre") ? d.cierre : false;
-          if (cierrePago === false || cierrePago === null) {
-            pagosUnidos.push({ ...d, id: docPago.id });
-            pagosIds.add(docPago.id);
-          }
-        }
-      }
-      for (const docPago of pagosRetroSnap.docs) {
-        if (pagosIds.has(docPago.id)) continue;
-        const d = docPago.data();
-        if (!("anulado" in d) || !d.anulado) {
-          const cierrePago = d.hasOwnProperty("cierre") ? d.cierre : false;
-          if (cierrePago === false || cierrePago === null) {
-            pagosUnidos.push({ ...d, id: docPago.id });
-            pagosIds.add(docPago.id);
-          }
-        }
-      }
+        if (d.anulado === true) return;
+        if (pagosIds.has(docPago.id)) return;
+        pagosIds.add(docPago.id);
 
-      // Agregar pagos a movimientos
-      for (const d of pagosUnidos) {
         const monto = Number(d.montoPagado) || 0;
-        const fechaIso = d.fechaRegistro || d.fechaPago || "";
+        const fechaIso = isoFromAny(d.fechaRegistro) || isoFromAny(d.fechaPago) || "";
+
         movimientosDelDia.push({
-          id: d.id,
+          id: docPago.id,
           coll: "pagos",
           tipo: "Ingreso",
           descripcion: d.retroactivo ? "Pago retroactivo" : "Pago de cliente",
@@ -345,6 +328,9 @@
         });
         totalIngresos += monto;
       }
+      pagosResults.forEach(r => {
+        if (r.status === "fulfilled") r.value.forEach(pushPago);
+      });
 
       // Ordenar por fecha ascendente
       movimientosDelDia.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
@@ -536,6 +522,8 @@
   </div>
 </body>
 </html>
+
+
 
 
 

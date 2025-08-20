@@ -31,36 +31,38 @@
     let fechaSeleccionada = null;
     let saldoInicial = 0;
 
+    // ===== Utilidades =====
     function toDateString(date) {
-      return date.toISOString().slice(0,10);
+      return date.toISOString().slice(0,10); // YYYY-MM-DD
     }
     function formatMoney(n) {
       return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     }
     function getDiaSVRange(fechaLocal) {
+      // Zona: America/El_Salvador (UTC-06)
       const dateStart = new Date(`${fechaLocal}T00:00:00-06:00`);
       const dateEnd = new Date(`${fechaLocal}T23:59:59.999-06:00`);
-      return [
-        dateStart.toISOString(),
-        dateEnd.toISOString()
-      ];
+      return [dateStart.toISOString(), dateEnd.toISOString()];
     }
 
+    // ===== SALDO INICIAL CORRECTO: toma último cierre por 'fecha' (día de operación) y usa saldo_siguiente || saldo_caja =====
     async function obtenerSaldoInicial(agencia) {
       const cierresRef = collection(db, "cierres_caja");
       const q = query(
         cierresRef,
         where("agencia", "==", agencia),
-        orderBy("fecha_cierre", "desc"),
+        orderBy("fecha", "desc"),        // usar día de operación
         limit(1)
       );
       const snap = await getDocs(q);
       if (!snap.empty) {
-        return Number(snap.docs[0].data().saldo_caja || 0);
+        const data = snap.docs[0].data();
+        return Number((data.saldo_siguiente ?? data.saldo_caja) || 0);
       }
       return 0;
     }
 
+    // ===== Carga gerente, determina días pendientes y primer render =====
     async function cargarGerenteYFechas() {
       document.getElementById("select-fecha").innerHTML = `<option>Cargando...</option>`;
       document.getElementById("tabla-movs").innerHTML = "";
@@ -69,6 +71,7 @@
       onAuthStateChanged(auth, async user => {
         if (!user) return location.href = "login.html";
         gerenteId = user.uid;
+
         const snap = await getDocs(query(collection(db, "users"), where("__name__", "==", gerenteId)));
         if (snap.empty) {
           document.getElementById("select-fecha").innerHTML = `<option>No se encontró gerente</option>`;
@@ -79,47 +82,50 @@
         gerenteNombre = `${gerenteData.nombre || ""} ${gerenteData.apellido || ""}`.trim();
         document.getElementById("gerente-nombre").innerText = gerenteNombre || user.email;
 
+        // Detectar fechas con movimientos sin cerrar (ambas colecciones)
         let movDatesSet = new Set();
         for (const coll of ["movimientosCaja", "movimientos_caja"]) {
-          const q = query(
+          const q1 = query(
             collection(db, coll),
             where("agencia", "==", agenciaActual),
             where("cierre", "==", false)
           );
-          const snap = await getDocs(q);
-          for (const docMov of snap.docs) {
+          const snap1 = await getDocs(q1);
+          for (const docMov of snap1.docs) {
             const movData = docMov.data();
             if (!movData.fecha) continue;
             movDatesSet.add(movData.fecha.substring(0,10));
           }
         }
+
+        // Si no encuentra 'cierre:false', considerar movimientos no marcados como cerrados explícitamente
         if (movDatesSet.size === 0) {
           for (const coll of ["movimientosCaja", "movimientos_caja"]) {
-            const q = query(
-              collection(db, coll),
-              where("agencia", "==", agenciaActual)
-            );
-            const snap = await getDocs(q);
-            for (const docMov of snap.docs) {
+            const q2 = query(collection(db, coll), where("agencia", "==", agenciaActual));
+            const snap2 = await getDocs(q2);
+            for (const docMov of snap2.docs) {
               const movData = docMov.data();
               if (!movData.fecha) continue;
-              if (movData.cierre !== true) {
-                movDatesSet.add(movData.fecha.substring(0,10));
-              }
+              if (movData.cierre !== true) movDatesSet.add(movData.fecha.substring(0,10));
             }
           }
         }
+
+        // Fechas ya cerradas
         const cierresQ = query(collection(db, "cierres_caja"), where("agencia", "==", agenciaActual));
         const cierresSnap = await getDocs(cierresQ);
         let fechasCerradas = new Set();
         for (const docC of cierresSnap.docs) {
+          // 'fecha' almacena el día de operación (YYYY-MM-DD)
           let f = docC.data().fecha;
           if (f && f.length >= 10) fechasCerradas.add(f.substring(0,10));
         }
 
+        // Pendientes = con movimientos y no cerradas
         diasPendientes = Array.from(movDatesSet).filter(f => !fechasCerradas.has(f));
-        diasPendientes.sort();
+        diasPendientes.sort(); // asc
 
+        // Si no hay nada pendiente, permitir hoy
         if (diasPendientes.length === 0) {
           const hoy = toDateString(new Date());
           diasPendientes = [hoy];
@@ -130,6 +136,7 @@
 
         fechaSeleccionada = diasPendientes[0];
         await cargarMovimientosYTotales(fechaSeleccionada);
+
         document.getElementById("select-fecha").onchange = async e => {
           fechaSeleccionada = e.target.value;
           await cargarMovimientosYTotales(fechaSeleccionada);
@@ -137,49 +144,62 @@
       });
     }
 
+    // ===== Carga y consolida movimientos, calcula totales y saldo final =====
     async function cargarMovimientosYTotales(fecha) {
       document.getElementById("tabla-movs").innerHTML = `<tr><td colspan="6" style="text-align:center">Cargando movimientos...</td></tr>`;
       movimientosDelDia = [];
       let totalIngresos = 0;
       let totalEgresos = 0;
 
+      // SALDO INICIAL viene del ÚLTIMO CIERRE (saldo_siguiente || saldo_caja)
       saldoInicial = await obtenerSaldoInicial(agenciaActual);
 
       const [fechaInicioUTC, fechaFinUTC] = getDiaSVRange(fecha);
 
-      // --- AGRUPA POR CORRELATIVO ---
+      // Evitar duplicado por correlativo
       const correlativosSumados = new Set();
 
-      // 1. Movimientos manuales (filtra anulado y reversiones)
+      // 1) Movimientos manuales de ambas colecciones (respeta anulaciones, reversiones, cierre:true)
       for (const coll of ["movimientosCaja", "movimientos_caja"]) {
-        const q = query(
+        const qMovs = query(
           collection(db, coll),
           where("agencia", "==", agenciaActual),
           where("fecha", ">=", fechaInicioUTC),
           where("fecha", "<=", fechaFinUTC)
         );
-        const snap = await getDocs(q);
+        const snap = await getDocs(qMovs);
         for (const docMov of snap.docs) {
-          const movData = docMov.data();
-          if (movData.cierre === true) continue;
-          if ('anulado' in movData && movData.anulado === true) continue;
-          // NO sumar movimientos de reversión (pago o movimiento)
-          if (movData.descripcion && (
-            movData.descripcion.startsWith('Reversión de pago') ||
-            movData.descripcion.startsWith('Reversión correlativo')
-          )) continue;
+          const m = docMov.data();
 
-          // SOLO SUMA EL PRIMER CORRELATIVO NO ANULADO
-          if (movData.correlativo && correlativosSumados.has(movData.correlativo)) continue;
-          if (movData.correlativo) correlativosSumados.add(movData.correlativo);
+          // Ignorar ya cerrados, anulados o reversiones
+          if (m.cierre === true) continue;
+          if ('anulado' in m && m.anulado === true) continue;
+          if (m.descripcion && (m.descripcion.startsWith('Reversión de pago') || m.descripcion.startsWith('Reversión correlativo'))) continue;
 
-          movimientosDelDia.push({ id: docMov.id, coll, ...movData, origen: "movimiento" });
-          if (movData.tipo === "Ingreso") totalIngresos += Number(movData.monto || 0);
-          if (movData.tipo === "Egreso") totalEgresos += Number(movData.monto || 0);
+          // Solo primer correlativo
+          if (m.correlativo && correlativosSumados.has(m.correlativo)) continue;
+          if (m.correlativo) correlativosSumados.add(m.correlativo);
+
+          const tipo = m.tipo;
+          const monto = Number(m.monto || 0);
+          movimientosDelDia.push({
+            id: docMov.id,
+            coll,
+            tipo,
+            descripcion: m.descripcion || "",
+            monto,
+            usuario: m.usuario || "",
+            fecha: m.fecha || "",
+            cierre: false,
+            origen: "movimiento"
+          });
+
+          if (tipo === "Ingreso") totalIngresos += monto;
+          if (tipo === "Egreso")  totalEgresos  += monto;
         }
       }
 
-      // 2. PAGOS de clientes (NO anulados, NO cierre:true) por fechaPago
+      // 2) PAGOS por fechaPago (ingresos)
       const pagosSnap = await getDocs(
         query(
           collection(db, "pagos"),
@@ -189,60 +209,64 @@
         )
       );
 
-      // 2A. PAGOS RETROACTIVOS hechos HOY (por fechaRegistro)
+      // 2A) PAGOS RETROACTIVOS hechos HOY (por fechaRegistro)
       const pagosRetroSnap = await getDocs(
         query(
           collection(db, "pagos"),
           where("sucursal", "==", agenciaActual),
+          where("retroactivo", "==", true),
           where("fechaRegistro", ">=", fechaInicioUTC),
-          where("fechaRegistro", "<=", fechaFinUTC),
-          where("retroactivo", "==", true)
+          where("fechaRegistro", "<=", fechaFinUTC)
         )
       );
 
-      // Junta ambos arrays, evita duplicados por ID
+      // Unificar pagos (evitar duplicados por id)
       const pagosUnidos = [];
       const pagosIds = new Set();
 
       for (const docPago of pagosSnap.docs) {
-        const data = docPago.data();
-        if (!("anulado" in data) || !data.anulado) {
-          const cierrePago = data.hasOwnProperty("cierre") ? data.cierre : false;
+        const d = docPago.data();
+        if (!("anulado" in d) || !d.anulado) {
+          const cierrePago = d.hasOwnProperty("cierre") ? d.cierre : false;
           if (cierrePago === false || cierrePago === null) {
-            pagosUnidos.push({ ...data, id: docPago.id });
+            pagosUnidos.push({ ...d, id: docPago.id });
             pagosIds.add(docPago.id);
           }
         }
       }
       for (const docPago of pagosRetroSnap.docs) {
         if (pagosIds.has(docPago.id)) continue;
-        const data = docPago.data();
-        if (!("anulado" in data) || !data.anulado) {
-          const cierrePago = data.hasOwnProperty("cierre") ? data.cierre : false;
+        const d = docPago.data();
+        if (!("anulado" in d) || !d.anulado) {
+          const cierrePago = d.hasOwnProperty("cierre") ? d.cierre : false;
           if (cierrePago === false || cierrePago === null) {
-            pagosUnidos.push({ ...data, id: docPago.id });
+            pagosUnidos.push({ ...d, id: docPago.id });
             pagosIds.add(docPago.id);
           }
         }
       }
 
-      // Ahora sí: agregar todos los pagosUnidos a movimientosDelDia y a totales
-      for (const data of pagosUnidos) {
+      // Agregar pagos a los movimientos y totales
+      for (const d of pagosUnidos) {
+        const monto = Number(d.montoPagado) || 0;
         movimientosDelDia.push({
-          id: data.id,
+          id: d.id,
           coll: "pagos",
           tipo: "Ingreso",
-          descripcion: data.retroactivo ? "Pago retroactivo" : "Pago de cliente",
-          monto: Number(data.montoPagado) || 0,
-          usuario: data.cajeroNombre || "",
-          fecha: data.fechaRegistro || data.fechaPago || "",
-          cierre: data.cierre || false,
+          descripcion: d.retroactivo ? "Pago retroactivo" : "Pago de cliente",
+          monto,
+          usuario: d.cajeroNombre || "",
+          fecha: d.fechaRegistro || d.fechaPago || "",
+          cierre: d.cierre || false,
           origen: "pago"
         });
-        totalIngresos += Number(data.montoPagado) || 0;
+        totalIngresos += monto;
       }
 
+      // Ordenar por fecha ascendente para lectura
       movimientosDelDia.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+
+      // Render tabla
       if (movimientosDelDia.length === 0) {
         document.getElementById("tabla-movs").innerHTML =
           `<tr><td colspan="6" style="text-align:center;color:#fff6">No hay movimientos para este día.</td></tr>`;
@@ -270,6 +294,7 @@
         </div>`;
     }
 
+    // ===== PIN hashing =====
     async function sha256(str) {
       const encoder = new TextEncoder();
       const data = encoder.encode(str);
@@ -277,6 +302,7 @@
       return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
+    // ===== Cerrar caja (graba saldo_siguiente, marca cierre en movimientos/pagos) =====
     async function cerrarCajaDelDia() {
       if (!fechaSeleccionada) return alert("Selecciona un día válido");
       if (movimientosDelDia.length === 0) return alert("No hay movimientos para este día.");
@@ -295,18 +321,20 @@
       let totalIngresos = 0, totalEgresos = 0;
       movimientosDelDia.forEach(m => {
         if (m.tipo === "Ingreso") totalIngresos += Number(m.monto || 0);
-        if (m.tipo === "Egreso") totalEgresos += Number(m.monto || 0);
+        if (m.tipo === "Egreso")  totalEgresos  += Number(m.monto || 0);
       });
 
       const saldoFinal = saldoInicial + totalIngresos - totalEgresos;
 
+      // Registrar cierre con campo saldo_siguiente = saldoFinal
       await addDoc(collection(db, "cierres_caja"), {
         agencia: agenciaActual,
-        fecha: fechaSeleccionada,
+        fecha: fechaSeleccionada,            // día de operación (YYYY-MM-DD)
         total_ingresos: totalIngresos,
         total_egresos: totalEgresos,
         saldo_inicial: saldoInicial,
         saldo_caja: saldoFinal,
+        saldo_siguiente: saldoFinal,         // 👈 clave para apertura siguiente
         movimientos: movimientosDelDia.map(m => ({
           tipo: m.tipo,
           descripcion: m.descripcion,
@@ -316,22 +344,24 @@
           id_movimiento: m.id,
           origen: m.origen || ""
         })),
-        fecha_cierre: (new Date()).toISOString(),
+        fecha_cierre: (new Date()).toISOString(), // timestamp real de cierre
         gerente_id: gerenteId,
         gerente_nombre: gerenteNombre
       });
 
+      // Marcar cierre:true en documentos fuente
       for (const m of movimientosDelDia) {
-        if (m.origen === "movimiento") {
-          try {
+        try {
+          if (m.origen === "movimiento") {
             const docRefMov = doc(db, m.coll, m.id);
             await updateDoc(docRefMov, { cierre: true });
-          } catch (e) {}
-        } else if (m.origen === "pago") {
-          try {
+          } else if (m.origen === "pago") {
             const docRefPago = doc(db, "pagos", m.id);
             await updateDoc(docRefPago, { cierre: true });
-          } catch (e) {}
+          }
+        } catch (e) {
+          // Evitar romper el cierre si falla marcar uno; se puede loguear si tienes sistema de logs
+          console.warn("No se pudo marcar cierre en", m.origen, m.id, e);
         }
       }
 
@@ -424,6 +454,8 @@
   </div>
 </body>
 </html>
+
+
 
 
 

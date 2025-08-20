@@ -16,42 +16,26 @@
     .label { color: #67C8F1; font-weight: 600; margin-bottom: 5px; display: block;}
     .btn-main { width: 100%; background: #13b66b; color: #fff; border: none; border-radius: 9px; font-size: 1.13rem; font-weight: 600; padding: 13px 0; cursor: pointer; margin-top: 1.35em; margin-bottom: 0.6em; transition: background .17s;}
     .btn-main:active, .btn-main:hover { background: #0b854c;}
+    .btn-main[disabled]{ opacity:.7; cursor:not-allowed; }
     .error { color: #e74c3c; font-size: 1.01rem; margin-bottom: 10px;}
     .ok-msg { color: #13b66b; text-align: center; font-weight: bold; margin-bottom: 18px; font-size: 1.13rem;}
     .usuario-label { color: #F8AF40; margin-bottom: 0.8em; font-weight: 600;}
     .fecha-row { color: #b5c9d8; font-size: 1.08rem; margin-bottom: 25px;}
     .especial-abono {
-      background: #1a2533;
-      color: #ffcc66;
-      border-radius: 14px;
-      padding: 22px 15px 26px 15px;
-      margin: 33px 0 26px 0;
-      border: 1.7px solid #2b3750;
-      text-align: center;
-      box-shadow: 0 2px 10px #0005;
+      background: #1a2533; color: #ffcc66; border-radius: 14px; padding: 22px 15px 26px 15px;
+      margin: 33px 0 26px 0; border: 1.7px solid #2b3750; text-align: center; box-shadow: 0 2px 10px #0005;
     }
     .especial-abono .fa-history { color: #ffe37a; font-size: 2.2rem; margin-bottom: 9px;}
     .especial-titulo { color: #ffe37a; font-weight: bold; font-size: 1.17rem; margin: 10px 0 8px 0;}
     .especial-desc { color: #ffde8a; font-size: 1.05rem; font-style: italic; margin-bottom: 18px;}
     .especial-btn {
-      background: #e67300;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 1.09rem;
-      font-weight: 700;
-      padding: 13px 20px;
-      margin-top: 12px;
-      cursor: pointer;
-      box-shadow: 0 1px 7px #0006;
-      transition: background .16s;
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
+      background: #e67300; color: #fff; border: none; border-radius: 8px; font-size: 1.09rem; font-weight: 700;
+      padding: 13px 20px; margin-top: 12px; cursor: pointer; box-shadow: 0 1px 7px #0006; transition: background .16s;
+      display: inline-flex; align-items: center; gap: 7px;
     }
     .especial-btn:active, .especial-btn:hover { background: #be5a00;}
     /* Comprobante */
-    .comprobante-bg { background: #fff; color: #181818; max-width: 420px; margin: 30px auto 0 auto; border-radius: 12px; box-shadow: 0 2px 22px #0006; padding: 26px 24px 20px 24px;}
+    .comprobante-bg { background: #fff; color: #181818; max-width: 420px; margin: 30px auto 0 auto; border-radius: 12px; box-shadow: 0 2px 22px #0006; padding: 26px 24px 20px 24px; display:none;}
     .comprobante-header { text-align: center; font-size: 1.16rem; font-weight: bold; color: #13b66b; margin-bottom: 12px;}
     .comprobante-list { margin: 0 0 20px 0; }
     .comprobante-list .row { margin-bottom: 6px;}
@@ -59,22 +43,15 @@
     .comprobante-btns { text-align: center;}
     .btn-imprimir { background: #253045; color: #fff; font-size:1.13rem; padding:9px 34px; border-radius:9px; border:none; cursor:pointer; font-weight:600; margin-top:10px;}
     .btn-imprimir:hover { background: #67C8F1; color:#222;}
-    @media (max-width:600px){.container{padding:1.3rem .7rem;}}
+    @media (max-width:600px){ .container{padding:1.3rem .7rem;} }
     @media print {
       body * { visibility: hidden !important; }
       #comprobante-bg, #comprobante-bg * { visibility: visible !important; }
       #comprobante-bg {
-        position: absolute !important;
-        left: 0; right: 0;
-        top: 0;
-        margin: auto !important;
-        box-shadow: none !important;
-        background: #fff !important;
-        color: #181818 !important;
+        position: absolute !important; left: 0; right: 0; top: 0; margin: auto !important;
+        box-shadow: none !important; background: #fff !important; color: #181818 !important;
       }
-      .btn-imprimir {
-        display: none !important;
-      }
+      .btn-imprimir { display: none !important; }
     }
   </style>
 </head>
@@ -83,6 +60,7 @@
   <div class="container">
     <div class="titulo">Registrar Movimiento</div>
     <div id="usuario" class="usuario-label"></div>
+
     <form id="form-mov-caja" autocomplete="off">
       <label class="label" for="movimiento">Tipo de Movimiento</label>
       <select id="movimiento" class="select-main" required>
@@ -105,14 +83,12 @@
       </select>
       <div id="movimiento-error" class="error" style="display:none;"></div>
 
-      <!-- Campo Nombre (solo para algunos movimientos) -->
       <div id="div-nombre" style="display:none;">
         <label class="label" for="nombre">Nombre</label>
         <input id="nombre" class="input-main" type="text" maxlength="60" placeholder="Nombre de persona, cliente, etc"/>
         <div id="nombre-error" class="error" style="display:none;"></div>
       </div>
 
-      <!-- Aquí van los campos normales -->
       <div id="form-normal">
         <label class="label" for="monto">Monto</label>
         <input id="monto" class="input-main" type="number" min="0.01" step="0.01" placeholder="0.00" required/>
@@ -122,11 +98,10 @@
         <textarea id="observaciones" class="input-observ" placeholder="Escribe aquí las observaciones..."></textarea>
 
         <div class="fecha-row" id="fecha-row"></div>
-        <button type="submit" class="btn-main">Registrar Movimiento</button>
+        <button type="submit" class="btn-main" id="btn-submit">Registrar Movimiento</button>
         <div id="ok-msg" class="ok-msg" style="display:none;"></div>
       </div>
 
-      <!-- Especial para Abono a fechas anteriores -->
       <div id="form-especial" style="display:none;">
         <div class="especial-abono">
           <i class="fas fa-history"></i>
@@ -143,8 +118,7 @@
     </form>
   </div>
 
-  <!-- Comprobante (oculto por defecto) -->
-  <div id="comprobante-bg" class="comprobante-bg" style="display:none;">
+  <div id="comprobante-bg" class="comprobante-bg">
     <div class="comprobante-header">Comprobante de Movimiento de Caja</div>
     <div class="comprobante-list">
       <div class="row"><span class="label">Correlativo:</span> <span id="c-correlativo"></span></div>
@@ -161,10 +135,12 @@
     </div>
   </div>
 
-  <!-- Firebase & lógica -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDoc, doc, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import {
+      getFirestore, collection, addDoc, getDoc, doc as docRef, query, where, getDocs,
+      runTransaction, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -183,7 +159,7 @@
     let usuarioActual = "Usuario desconocido";
     let userId = null;
     let userAgencia = "Desconocida";
-    let fechaMovimientoActual = "";
+    let submitting = false;
 
     function getFechaLocalStr() {
       const d = new Date();
@@ -199,32 +175,15 @@
       userId = user.uid;
       document.getElementById("usuario").textContent = "Gestión realizada por: " + usuarioActual;
 
-      // Obtener agencia (department)
       try {
-        const docUser = await getDoc(doc(db, "users", user.uid));
+        const docUser = await getDoc(docRef(db, "users", user.uid));
         if (docUser.exists() && docUser.data().department) {
           userAgencia = docUser.data().department;
         }
       } catch (e) {}
     });
 
-    // === OBTENER NUEVO CORRELATIVO ===
-    async function obtenerNuevoCorrelativo(agencia) {
-      const q = query(
-        collection(db, "movimientosCaja"),
-        where("agencia", "==", agencia),
-        orderBy("correlativo", "desc"),
-        limit(1)
-      );
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        const mayor = snap.docs[0].data().correlativo || 0;
-        return mayor + 1;
-      } else {
-        return 1;
-      }
-    }
-
+    // Mostrar/ocultar bloques según movimiento
     document.getElementById("movimiento").addEventListener("change", function() {
       const mov = this.value;
       if (mov === "Abono a fechas anteriores") {
@@ -234,87 +193,54 @@
       } else {
         document.getElementById("form-normal").style.display = "block";
         document.getElementById("form-especial").style.display = "none";
-        if (tiposConNombre.includes(mov)) {
-          document.getElementById("div-nombre").style.display = "block";
-        } else {
-          document.getElementById("div-nombre").style.display = "none";
-        }
+        document.getElementById("div-nombre").style.display = tiposConNombre.includes(mov) ? "block" : "none";
       }
     });
 
-    document.getElementById("form-mov-caja").onsubmit = async function(e) {
-      e.preventDefault();
-      if (document.getElementById("movimiento").value === "Abono a fechas anteriores") {
-        return;
+    // ---------- Blindajes ----------
+    // A) Evitar submit con Enter repetido
+    document.getElementById("form-mov-caja").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const tag = (e.target.tagName || "").toLowerCase();
+        // Permitir Enter en textarea; bloquear en otros para evitar doble submit
+        if (tag !== "textarea") e.preventDefault();
       }
-      document.getElementById("movimiento-error").style.display = "none";
-      document.getElementById("monto-error").style.display = "none";
-      document.getElementById("nombre-error").style.display = "none";
-      document.getElementById("ok-msg").style.display = "none";
+    });
 
-      const movimientoSel = document.getElementById("movimiento").value;
-      const montoSel = document.getElementById("monto").value;
-      const nombreSel = document.getElementById("nombre").value.trim();
-      const observaciones = document.getElementById("observaciones").value.trim();
+    // B) Correlativo atómico con transacción (por agencia)
+    async function obtenerNuevoCorrelativoAtomico(agencia) {
+      const counterDoc = docRef(db, "correlativos", agencia);
+      return await runTransaction(db, async (tx) => {
+        const snap = await tx.get(counterDoc);
+        if (!snap.exists()) {
+          tx.set(counterDoc, { ultimo: 1 });
+          return 1;
+        } else {
+          const current = Number(snap.data().ultimo || 0);
+          const siguiente = current + 1;
+          tx.update(counterDoc, { ultimo: siguiente });
+          return siguiente;
+        }
+      });
+    }
 
-      if (!movimientoSel) {
-        document.getElementById("movimiento-error").textContent = "Selecciona un movimiento";
-        document.getElementById("movimiento-error").style.display = "block";
-        return;
-      }
-      if (!montoSel || isNaN(montoSel) || parseFloat(montoSel) <= 0) {
-        document.getElementById("monto-error").textContent = "Ingresa un monto válido";
-        document.getElementById("monto-error").style.display = "block";
-        return;
-      }
-      if (tiposConNombre.includes(movimientoSel) && !nombreSel) {
-        document.getElementById("nombre-error").textContent = "Ingresa el nombre requerido";
-        document.getElementById("nombre-error").style.display = "block";
-        return;
-      }
-      const optionSel = document.querySelector(`#movimiento option[value="${movimientoSel}"]`);
-      const tipoReal = optionSel ? optionSel.getAttribute("data-tipo") : "Ingreso";
-      fechaMovimientoActual = getFechaLocalStr();
-
-      try {
-        let correlativo = await obtenerNuevoCorrelativo(userAgencia);
-
-        await addDoc(collection(db, "movimientosCaja"), {
-          descripcion: movimientoSel,
-          tipo: tipoReal,
-          monto: parseFloat(montoSel),
-          observaciones: observaciones,
-          fecha: new Date().toISOString(),
-          usuario: usuarioActual,
-          agencia: userAgencia,
-          nombre: tiposConNombre.includes(movimientoSel) ? nombreSel : "",
-          correlativo: correlativo
-        });
-
-        mostrarComprobante({
-          correlativo: correlativo,
-          tipo: movimientoSel,
-          nombre: tiposConNombre.includes(movimientoSel) ? nombreSel : "",
-          monto: montoSel,
-          fecha: fechaMovimientoActual,
-          usuario: usuarioActual,
-          agencia: userAgencia,
-          obs: observaciones,
-        });
-
-        document.getElementById("ok-msg").textContent = "Movimiento registrado exitosamente";
-        document.getElementById("ok-msg").style.display = "block";
-        document.getElementById("form-mov-caja").reset();
-        document.getElementById("fecha-row").textContent = "Fecha: " + getFechaLocalStr();
-        document.getElementById("div-nombre").style.display = "none";
-
-        setTimeout(() => {
-          document.getElementById("ok-msg").style.display = "none";
-        }, 2500);
-      } catch (err) {
-        alert("Hubo un error registrando el movimiento: " + (err.message || err));
-      }
-    };
+    // C) Idempotencia determinística (hash de payload)
+    async function sha256Hex(text) {
+      const enc = new TextEncoder();
+      const digest = await crypto.subtle.digest('SHA-256', enc.encode(text));
+      return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+    function roundToMinutes(date = new Date(), windowMinutes = 3) {
+      // Ventana de 3 minutos: mismo movimiento en ventana corta = misma llave
+      const ms = date.getTime();
+      const bucket = Math.floor(ms / (windowMinutes * 60 * 1000));
+      return bucket.toString();
+    }
+    async function buildIdempotencyKey({ agencia, tipo, tipoReal, monto, observaciones, usuario }) {
+      const bucket = roundToMinutes(new Date(), 3);
+      const base = [agencia, tipo, tipoReal, Number(monto).toFixed(2), (observaciones||"").trim(), (usuario||"").trim(), bucket].join("|");
+      return await sha256Hex(base);
+    }
 
     function mostrarComprobante(data) {
       document.getElementById("c-correlativo").textContent = data.correlativo || "-";
@@ -331,10 +257,130 @@
       document.getElementById("c-usuario").textContent = data.usuario;
       document.getElementById("c-agencia").textContent = data.agencia;
       document.getElementById("c-obs").textContent = data.obs || "—";
-      document.getElementById("comprobante-bg").style.display = "block";
-      window.scrollTo({top: 0, behavior: "smooth"});
+      const cbg = document.getElementById("comprobante-bg");
+      cbg.style.display = "block";
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
+
+    document.getElementById("form-mov-caja").onsubmit = async function(e) {
+      e.preventDefault();
+      const sel = document.getElementById("movimiento").value;
+      if (sel === "Abono a fechas anteriores") {
+        // Redirección ya está en el botón de la sección especial
+        return;
+      }
+
+      if (submitting) return; // guard anti doble clic
+      submitting = true;
+      const btn = document.getElementById("btn-submit");
+      const oldTxt = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Registrando...";
+
+      // Oculta errores previos
+      document.getElementById("movimiento-error").style.display = "none";
+      document.getElementById("monto-error").style.display = "none";
+      document.getElementById("nombre-error").style.display = "none";
+      document.getElementById("ok-msg").style.display = "none";
+
+      try {
+        const movimientoSel = sel;
+        const montoSel = document.getElementById("monto").value;
+        const nombreSel = (document.getElementById("nombre").value || "").trim();
+        const observaciones = (document.getElementById("observaciones").value || "").trim();
+
+        // Validaciones
+        if (!movimientoSel) {
+          document.getElementById("movimiento-error").textContent = "Selecciona un movimiento";
+          document.getElementById("movimiento-error").style.display = "block";
+          return;
+        }
+        if (!montoSel || isNaN(montoSel) || parseFloat(montoSel) <= 0) {
+          document.getElementById("monto-error").textContent = "Ingresa un monto válido";
+          document.getElementById("monto-error").style.display = "block";
+          return;
+        }
+        if (tiposConNombre.includes(movimientoSel) && !nombreSel) {
+          document.getElementById("nombre-error").textContent = "Ingresa el nombre requerido";
+          document.getElementById("nombre-error").style.display = "block";
+          return;
+        }
+
+        const optionSel = document.querySelector(`#movimiento option[value="${movimientoSel}"]`);
+        const tipoReal = optionSel ? optionSel.getAttribute("data-tipo") : "Ingreso";
+
+        // Idempotencia: misma operación dentro de ventana corta => misma llave
+        const idempotencyKey = await buildIdempotencyKey({
+          agencia: userAgencia, tipo: movimientoSel, tipoReal,
+          monto: parseFloat(montoSel), observaciones, usuario: usuarioActual
+        });
+
+        // Chequeo rápido de existencia por idempotencyKey
+        const qDup = query(collection(db, "movimientosCaja"), where("idempotencyKey", "==", idempotencyKey));
+        const dupSnap = await getDocs(qDup);
+        if (!dupSnap.empty) {
+          // Ya existe; mostramos comprobante con datos básicos:
+          document.getElementById("ok-msg").textContent = "Movimiento ya registrado (evitado duplicado).";
+          document.getElementById("ok-msg").style.display = "block";
+          // Si querés, podrías leer el doc y rellenar correlativo para el comprobante.
+          return;
+        }
+
+        // Correlativo atómico por agencia
+        const correlativo = await obtenerNuevoCorrelativoAtomico(userAgencia);
+
+        // Escribir documento
+        const payload = {
+          descripcion: movimientoSel,
+          tipo: tipoReal,
+          monto: parseFloat(montoSel),
+          observaciones: observaciones,
+          fecha: serverTimestamp(),       // hora del servidor
+          usuario: usuarioActual,
+          agencia: userAgencia,
+          nombre: tiposConNombre.includes(movimientoSel) ? nombreSel : "",
+          correlativo: correlativo,
+          cierre: false,
+          anulado: false,
+          idempotencyKey,
+          createdAt: serverTimestamp()
+        };
+
+        await addDoc(collection(db, "movimientosCaja"), payload);
+
+        // Mostrar comprobante
+        mostrarComprobante({
+          correlativo,
+          tipo: movimientoSel,
+          nombre: tiposConNombre.includes(movimientoSel) ? nombreSel : "",
+          monto: parseFloat(montoSel),
+          fecha: getFechaLocalStr(),
+          usuario: usuarioActual,
+          agencia: userAgencia,
+          obs: observaciones
+        });
+
+        // Reset UI
+        document.getElementById("ok-msg").textContent = "Movimiento registrado exitosamente";
+        document.getElementById("ok-msg").style.display = "block";
+        document.getElementById("form-mov-caja").reset();
+        document.getElementById("fecha-row").textContent = "Fecha: " + getFechaLocalStr();
+        document.getElementById("div-nombre").style.display = "none";
+
+        setTimeout(() => {
+          document.getElementById("ok-msg").style.display = "none";
+        }, 2500);
+
+      } catch (err) {
+        alert("Hubo un error registrando el movimiento: " + (err.message || err));
+      } finally {
+        submitting = false;
+        btn.disabled = false;
+        btn.textContent = oldTxt;
+      }
+    };
   </script>
 </body>
 </html>
+
 

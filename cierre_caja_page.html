@@ -57,19 +57,25 @@
       d.setDate(d.getDate() - 1);
       return yyyymmdd(d);
     }
-    function toDateAny(fechaAny) {
-      if (!fechaAny) return null;
-      if (typeof fechaAny === "string") return new Date(fechaAny);
-      if (fechaAny?.toDate) return fechaAny.toDate();
+    function toDateAny(x) {
+      if (!x) return null;
+      if (x instanceof Date) return x;
+      if (x?.toDate) return x.toDate();        // Firestore Timestamp
+      if (typeof x === "string") return new Date(x);
       return null;
     }
-    function isoFromAny(fechaAny) {
-      const d = toDateAny(fechaAny);
+    function isoFromAny(x) {
+      const d = toDateAny(x);
       return d ? d.toISOString() : "";
     }
     function formatFechaHoraCompact(iso) {
       if (!iso) return "";
       return iso.replace('T',' ').replace('.000Z','').slice(0,16);
+    }
+    function normTipo(t) {
+      const v = (t || "").toString().toLowerCase();
+      if (v === "egreso") return "Egreso";
+      return "Ingreso";
     }
 
     // ===== SALDO INICIAL (desde cierre previo, retrocompatible) =====
@@ -116,7 +122,6 @@
           return Number((d.saldo_siguiente ?? d.saldo_caja) || 0);
         }
       }
-      // 3) Sin cierres previos
       return 0;
     }
 
@@ -140,7 +145,7 @@
         gerenteNombre = `${gerenteData.nombre || ""} ${gerenteData.apellido || ""}`.trim();
         document.getElementById("gerente-nombre").innerText = gerenteNombre || user.email;
 
-        // Fechas con movimientos sin cerrar (ambas colecciones y campos de fecha)
+        // Fechas con movimientos sin cerrar (ambas colecciones; fecha_ts/createdAt/fecha texto)
         let movDatesSet = new Set();
 
         for (const coll of ["movimientosCaja", "movimientos_caja"]) {
@@ -152,16 +157,18 @@
           const snapMovs = await getDocs(qMovs);
           for (const docMov of snapMovs.docs) {
             const m = docMov.data();
+            if (m.fecha_ts?.toDate) movDatesSet.add(yyyymmdd(m.fecha_ts.toDate()));
+            if (m.createdAt?.toDate) movDatesSet.add(yyyymmdd(m.createdAt.toDate()));
             if (typeof m.fecha === "string" && m.fecha.length >= 10) {
-              movDatesSet.add(m.fecha.slice(0,10));
-            }
-            if (m.fecha_ts?.toDate) {
-              movDatesSet.add(yyyymmdd(m.fecha_ts.toDate()));
+              // Si guardaste "20 de agosto de 2025, ..." no es ISO; no sirve para rango,
+              // pero al menos usamos los primeros 10 si algún día guardas ISO.
+              const s = m.fecha.slice(0,10);
+              if (/\d{4}-\d{2}-\d{2}/.test(s)) movDatesSet.add(s);
             }
           }
         }
 
-        // Quitar las que ya estén cerradas
+        // Quitar las ya cerradas
         const cierresQ = query(collection(db, "cierres_caja"), where("agencia", "==", agenciaActual));
         const cierresSnap = await getDocs(cierresQ);
         let fechasCerradas = new Set();
@@ -223,9 +230,13 @@
         if (m.correlativo && correlativosSumados.has(m.correlativo)) return;
         if (m.correlativo) correlativosSumados.add(m.correlativo);
 
-        const iso = m.fecha ? isoFromAny(m.fecha) : isoFromAny(m.fecha_ts);
+        // Fecha a mostrar (preferencia: fecha_ts -> createdAt -> fecha)
+        let iso = "";
+        if (m.fecha_ts) iso = isoFromAny(m.fecha_ts);
+        else if (m.createdAt) iso = isoFromAny(m.createdAt);
+        else iso = isoFromAny(m.fecha);
 
-        const tipo  = m.tipo;
+        const tipo  = normTipo(m.tipo);
         const monto = Number(m.monto || 0);
         movimientosDelDia.push({
           id: docMov.id,
@@ -243,19 +254,9 @@
         if (tipo === "Egreso")  totalEgresos  += monto;
       }
 
-      // 1) Movimientos de caja – ambas colecciones y ambos campos
+      // 1) Movimientos de caja – ambas colecciones y tres campos de fecha
       for (const coll of ["movimientosCaja", "movimientos_caja"]) {
-        // por 'fecha' (string ISO)
-        const qStr = query(
-          collection(db, coll),
-          where("agencia", "==", agenciaActual),
-          where("fecha", ">=", fechaInicioUTC),
-          where("fecha", "<=", fechaFinUTC)
-        );
-        const snapStr = await getDocs(qStr);
-        snapStr.forEach(docMov => pushMovimiento(docMov, coll));
-
-        // por 'fecha_ts' (Timestamp)
+        // a) por 'fecha_ts' (Timestamp)
         const qTs = query(
           collection(db, coll),
           where("agencia", "==", agenciaActual),
@@ -264,9 +265,29 @@
         );
         const snapTs = await getDocs(qTs);
         snapTs.forEach(docMov => pushMovimiento(docMov, coll));
+
+        // b) por 'createdAt' (Timestamp)
+        const qCreated = query(
+          collection(db, coll),
+          where("agencia", "==", agenciaActual),
+          where("createdAt", ">=", startTs),
+          where("createdAt", "<=", endTs)
+        );
+        const snapCreated = await getDocs(qCreated);
+        snapCreated.forEach(docMov => pushMovimiento(docMov, coll));
+
+        // c) por 'fecha' (string ISO, si alguna vez la guardas así)
+        const qStr = query(
+          collection(db, coll),
+          where("agencia", "==", agenciaActual),
+          where("fecha", ">=", fechaInicioUTC),
+          where("fecha", "<=", fechaFinUTC)
+        );
+        const snapStr = await getDocs(qStr);
+        snapStr.forEach(docMov => pushMovimiento(docMov, coll));
       }
 
-      // 2) Pagos (ingresos)
+      // 2) Pagos (ingresos) – como ya lo tenías
       const pagosSnap = await getDocs(
         query(
           collection(db, "pagos"),
@@ -275,7 +296,6 @@
           where("fechaPago", "<=", fechaFinUTC)
         )
       );
-      // 2A) Pagos retroactivos (registrados ese día)
       const pagosRetroSnap = await getDocs(
         query(
           collection(db, "pagos"),
@@ -479,6 +499,7 @@
   </div>
 </body>
 </html>
+
 
 
 

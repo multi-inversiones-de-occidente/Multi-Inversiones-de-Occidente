@@ -22,20 +22,10 @@
     .empty-msg { text-align:center; color:#ccc; padding: 32px 0;}
     .btn-main {
       width: 100%;
-      background: #13b66b;
-      color: #fff;
-      font-size: 1.11rem;
-      font-weight: bold;
-      border: none;
-      border-radius: 9px;
-      padding: 13px 0;
-      cursor: pointer;
-      margin-top: 1.4em;
-      transition: background .17s;
-      margin-bottom: 0.7em;
+      background: #13b66b; color: #fff; font-size: 1.11rem; font-weight: bold;
+      border: none; border-radius: 9px; padding: 13px 0; cursor: pointer; margin-top: 1.4em; transition: background .17s; margin-bottom: 0.7em;
     }
-    .btn-main:active,
-    .btn-main:hover { background: #0b854c; }
+    .btn-main:active, .btn-main:hover { background: #0b854c; }
     @media (max-width:600px){.container{padding:1.2rem .3rem;}}
   </style>
 </head>
@@ -58,8 +48,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import {
-      getFirestore, collection, query, where, getDocs, orderBy, limit, getDoc, doc as docRef,
-      Timestamp
+      getFirestore, collection, query, where, getDocs, orderBy, limit, getDoc, doc as docRef, Timestamp
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
@@ -76,24 +65,21 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
+    // ===== Helpers de fecha =====
     function formatFecha(date) {
       return date.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
-    function toDate(obj) {
-      // Acepta string ISO o Timestamp y devuelve Date
-      if (!obj) return null;
-      if (typeof obj === "string") return new Date(obj);
-      if (obj?.toDate) return obj.toDate(); // Firestore Timestamp
-      return null;
+    function toDateAny(x) {
+      // Convierte Timestamp/Date/string ISO a Date
+      if (!x) return null;
+      if (x instanceof Date) return x;
+      if (x?.toDate) return x.toDate(); // Firestore Timestamp
+      return new Date(x);
     }
-    function formatHora(fechaAny) {
-      const d = toDate(fechaAny);
-      if (!d || isNaN(d.getTime())) return "--:--";
+    function formatHoraAny(x) {
+      const d = toDateAny(x);
+      if (!d || isNaN(d.getTime())) return "-";
       return d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true });
-    }
-    function ensureISO(fechaAny) {
-      const d = toDate(fechaAny);
-      return d ? d.toISOString() : "";
     }
 
     let now = new Date();
@@ -104,19 +90,21 @@
       document.getElementById("fecha-label").textContent = "Fecha: " + formatFecha(selectedDate);
     }
 
+    // Saldo anterior (igual que lo tenías)
     async function obtenerSaldoAnterior(agencia, fecha) {
       const cierresRef = collection(db, "cierres_caja");
       const fechaStr = fecha.toISOString().slice(0,10);
-      const qC = query(
+      const q = query(
         cierresRef,
         where("agencia", "==", agencia),
         where("fecha", "<", fechaStr),
         orderBy("fecha", "desc"),
         limit(1)
       );
-      const snap = await getDocs(qC);
+      const snap = await getDocs(q);
       if (!snap.empty) {
-        return Number(snap.docs[0].data().saldo_caja || 0);
+        const d = snap.docs[0].data();
+        return Number((d.saldo_siguiente ?? d.saldo_caja) || 0);
       }
       return 0;
     }
@@ -127,183 +115,147 @@
       listDiv.innerHTML = "Cargando...";
       totalDiv.textContent = "";
 
+      // Detectar agencia
       if (!agenciaActual) {
         const docUser = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
-        if (!docUser.empty) {
-          agenciaActual = docUser.docs[0].data().department || "";
-        }
+        if (!docUser.empty) agenciaActual = docUser.docs[0].data().department || "";
+      }
+      if (!agenciaActual) {
+        listDiv.innerHTML = `<div class="empty-msg">Tu usuario no tiene agencia asignada.</div>`;
+        return;
       }
 
-      // Rango del día
+      // Rango del día (Date, ISO y Timestamp para consultas duales)
       const y = selectedDate.getFullYear(), m = selectedDate.getMonth(), d = selectedDate.getDate();
       const startOfDay = new Date(y, m, d, 0, 0, 0, 0);
-      const endOfDay = new Date(y, m, d, 23, 59, 59, 999);
+      const endOfDay   = new Date(y, m, d, 23, 59, 59, 999);
       const startIso = startOfDay.toISOString();
-      const endIso = endOfDay.toISOString();
-      const startTs = Timestamp.fromDate(startOfDay);
-      const endTs = Timestamp.fromDate(endOfDay);
+      const endIso   = endOfDay.toISOString();
+      const startTS  = Timestamp.fromDate(startOfDay);
+      const endTS    = Timestamp.fromDate(endOfDay);
 
       let movimientos = [];
       const correlativosSumados = new Set();
-      const movIdsVistos = new Set();
 
-      // 1A. Movimientos por 'fecha' (string ISO) — COMPATIBILIDAD
-      const qFechaStr = query(
-        collection(db, "movimientosCaja"),
-        where("agencia", "==", agenciaActual),
-        where("fecha", ">=", startIso),
-        where("fecha", "<=", endIso)
-      );
-      const movSnapStr = await getDocs(qFechaStr);
+      // ===== 1) MOVIMIENTOS MANUALES – dual (Timestamp o string ISO) en ambas colecciones =====
+      for (const collName of ["movimientosCaja", "movimientos_caja"]) {
+        // a) Fecha tipo Timestamp
+        const qTS = query(
+          collection(db, collName),
+          where("agencia", "==", agenciaActual),
+          where("fecha", ">=", startTS),
+          where("fecha", "<=", endTS)
+        );
+        // b) Fecha tipo string ISO
+        const qISO = query(
+          collection(db, collName),
+          where("agencia", "==", agenciaActual),
+          where("fecha", ">=", startIso),
+          where("fecha", "<=", endIso)
+        );
 
-      // 1B. Movimientos por 'fecha_ts' (Timestamp) — NUEVO
-      const qFechaTs = query(
-        collection(db, "movimientosCaja"),
-        where("agencia", "==", agenciaActual),
-        where("fecha_ts", ">=", startTs),
-        where("fecha_ts", "<=", endTs)
-      );
-      const movSnapTs = await getDocs(qFechaTs);
+        // Ejecutar ambas y unir resultados
+        const [snapTS, snapISO] = await Promise.allSettled([getDocs(qTS), getDocs(qISO)]);
+        const packs = [];
+        if (snapTS.status === "fulfilled") packs.push(snapTS.value);
+        if (snapISO.status === "fulfilled") packs.push(snapISO.value);
 
-      // Función común para procesar docs y deduplicar
-      function pushMovimiento(doc) {
-        if (movIdsVistos.has(doc.id)) return; // ya entró por la otra consulta
-        movIdsVistos.add(doc.id);
+        for (const pack of packs) {
+          pack.forEach(doc => {
+            const d = doc.data();
+            if (d.cierre === true) return;
+            if ('anulado' in d && d.anulado === true) return;
+            if (d.descripcion && (d.descripcion.startsWith('Reversión de pago') || d.descripcion.startsWith('Reversión correlativo'))) return;
 
-        const d = doc.data();
-        if ('anulado' in d && d.anulado === true) return;
-        if (d.descripcion && (
-          d.descripcion.startsWith('Reversión de pago') ||
-          d.descripcion.startsWith('Reversión correlativo')
-        )) return;
+            if (d.correlativo && correlativosSumados.has(d.correlativo)) return;
+            if (d.correlativo) correlativosSumados.add(d.correlativo);
 
-        // Evita duplicar mismo correlativo en el día
-        if (d.correlativo && correlativosSumados.has(d.correlativo)) return;
-        if (d.correlativo) correlativosSumados.add(d.correlativo);
-
-        const fechaDisplay = d.fecha || d.fecha_ts || null; // puede ser string o Timestamp
-        movimientos.push({
-          tipo: d.tipo,
-          descripcion: d.descripcion,
-          monto: Number(d.monto),
-          observaciones: d.observaciones || '',
-          usuario: d.usuario || '',
-          fecha: fechaDisplay,
-          clase: d.tipo === "Ingreso" ? "mov-ingreso" : "mov-egreso",
-          cliente: ""
-        });
+            movimientos.push({
+              tipo: d.tipo,
+              descripcion: d.descripcion || '',
+              monto: Number(d.monto || 0),
+              observaciones: d.observaciones || '',
+              usuario: d.usuario || '',
+              fecha: d.fecha || d.createdAt || null,
+              clase: d.tipo === "Ingreso" ? "mov-ingreso" : "mov-egreso",
+              cliente: ""
+            });
+          });
+        }
       }
 
-      movSnapStr.forEach(pushMovimiento);
-      movSnapTs.forEach(pushMovimiento);
-
-      // 2. Pagos del día (NO anulados, solo de esa agencia) por fechaPago
-      const pagoSnap = await getDocs(
-        query(
-          collection(db, "pagos"),
-          where("sucursal", "==", agenciaActual),
-          where("fechaPago", ">=", startIso),
-          where("fechaPago", "<=", endIso)
-        )
+      // ===== 2) PAGOS – dual (fechaPago y fechaRegistro pueden ser Timestamp o string) =====
+      // a) Pagos normales por fechaPago
+      const pagosQ_TS = query(
+        collection(db, "pagos"),
+        where("sucursal", "==", agenciaActual),
+        where("fechaPago", ">=", startTS),
+        where("fechaPago", "<=", endTS)
       );
-      const clienteIDSet = new Set();
+      const pagosQ_ISO = query(
+        collection(db, "pagos"),
+        where("sucursal", "==", agenciaActual),
+        where("fechaPago", ">=", startIso),
+        where("fechaPago", "<=", endIso)
+      );
+
+      // b) Pagos retroactivos registrados hoy (fechaRegistro)
+      const pagosR_TS = query(
+        collection(db, "pagos"),
+        where("sucursal", "==", agenciaActual),
+        where("retroactivo", "==", true),
+        where("fechaRegistro", ">=", startTS),
+        where("fechaRegistro", "<=", endTS)
+      );
+      const pagosR_ISO = query(
+        collection(db, "pagos"),
+        where("sucursal", "==", agenciaActual),
+        where("retroactivo", "==", true),
+        where("fechaRegistro", ">=", startIso),
+        where("fechaRegistro", "<=", endIso)
+      );
+
+      const results = await Promise.allSettled([getDocs(pagosQ_TS), getDocs(pagosQ_ISO), getDocs(pagosR_TS), getDocs(pagosR_ISO)]);
       const pagosList = [];
-      pagoSnap.forEach(doc => {
+      const pagosIds = new Set();
+
+      function pushPago(doc) {
         const d = doc.data();
-        if (!("anulado" in d) || !d.anulado) {
-          pagosList.push({...d, id: doc.id});
-          if (d.clienteID) clienteIDSet.add(d.clienteID);
-        }
-      });
+        if (("anulado" in d) && d.anulado) return;
+        const id = doc.id;
+        if (pagosIds.has(id)) return;
+        pagosIds.add(id);
 
-      // Datos de clientes (si están en "users")
-      let clientesData = {};
-      const ids = Array.from(clienteIDSet).filter(Boolean);
-      for (let i = 0; i < ids.length; i += 10) {
-        const batch = ids.slice(i, i + 10);
-        await Promise.all(batch.map(async cid => {
-          try {
-            const userDoc = await getDoc(docRef(db, "users", cid));
-            if (userDoc.exists()) {
-              const u = userDoc.data();
-              clientesData[cid] = ((u.nombre || "") + " " + (u.apellido || "")).trim();
-            }
-          } catch (e) {}
-        }));
-      }
-
-      pagosList.forEach(data => {
-        let clienteNombre = "Cliente";
-        if (data.clienteID && clientesData[data.clienteID]) {
-          clienteNombre = clientesData[data.clienteID];
-        } else if (data.nombres) {
-          clienteNombre = data.nombres;
-        }
         movimientos.push({
           tipo: "Ingreso",
-          descripcion: "Pago",
-          monto: Number(data.montoPagado),
-          observaciones: "",
-          usuario: data.cajeroNombre || '',
-          fecha: data.fechaPago, // string ISO
+          descripcion: d.retroactivo ? "Abono retroactivo" : "Pago",
+          monto: Number(d.montoPagado) || 0,
+          observaciones: d.motivo || '',
+          usuario: d.cajeroNombre || '',
+          fecha: d.fechaRegistro || d.fechaPago || null,
           clase: "mov-pago",
-          cliente: clienteNombre
+          cliente: d.nombres || "Cliente"
         });
+      }
+
+      results.forEach(r => {
+        if (r.status === "fulfilled") r.value.forEach(pushPago);
       });
 
-      // 3. Pagos Retroactivos del día (por fechaRegistro)
-      const pagosRetroQ = await getDocs(
-        query(
-          collection(db, "pagos"),
-          where("sucursal", "==", agenciaActual),
-          where("retroactivo", "==", true),
-          where("fechaRegistro", ">=", startIso),
-          where("fechaRegistro", "<=", endIso)
-        )
-      );
-      pagosRetroQ.forEach(doc => {
-        const d = doc.data();
-        if (!("anulado" in d) || !d.anulado) {
-          const yaExiste = movimientos.some(mov =>
-            ensureISO(mov.fecha) === ensureISO(d.fechaRegistro) &&
-            Number(mov.monto) === Number(d.montoPagado) &&
-            mov.descripcion.includes("retroactivo")
-          );
-          if (!yaExiste) {
-            let clienteNombre = d.nombres || "Cliente";
-            movimientos.push({
-              tipo: "Ingreso",
-              descripcion: "Abono retroactivo",
-              monto: Number(d.montoPagado),
-              observaciones: d.motivo || '',
-              usuario: d.cajeroNombre || '',
-              fecha: d.fechaRegistro, // string ISO
-              clase: "mov-pago",
-              cliente: clienteNombre
-            });
-          }
-        }
-      });
-
-      // Ordenar por fecha descendente (funciona con ISO o Timestamp)
+      // ===== Ordenar y totales =====
       movimientos.sort((a, b) => {
-        const da = toDate(a.fecha)?.getTime() ?? 0;
-        const dbb = toDate(b.fecha)?.getTime() ?? 0;
-        return dbb - da;
+        const da = toDateAny(a.fecha)?.getTime() || 0;
+        const dbb = toDateAny(b.fecha)?.getTime() || 0;
+        return dbb - da; // desc
       });
 
       const saldoAnterior = await obtenerSaldoAnterior(agenciaActual, selectedDate);
-
-      let totalIngresos = 0.0;
-      let totalEgresos = 0.0;
-      movimientos.forEach(mov => {
-        if (mov.tipo === "Ingreso") totalIngresos += mov.monto;
-        else totalEgresos += mov.monto;
-      });
-
+      let totalIngresos = 0, totalEgresos = 0;
+      movimientos.forEach(mov => (mov.tipo === "Ingreso" ? (totalIngresos += mov.monto) : (totalEgresos += mov.monto)));
       const total = saldoAnterior + totalIngresos - totalEgresos;
 
-      if (movimientos.length === 0) {
+      // ===== Render =====
+      if (!movimientos.length) {
         listDiv.innerHTML = `<div class="empty-msg">No hay movimientos registrados.</div>`;
       } else {
         listDiv.innerHTML = movimientos.map(mov => `
@@ -313,20 +265,20 @@
             ${mov.observaciones ? `<div class="mov-sub">Obs: ${mov.observaciones}</div>` : ""}
             <div class="mov-sub">Usuario: ${mov.usuario}</div>
             ${mov.cliente ? `<div class="mov-sub">Cliente: ${mov.cliente}</div>` : ""}
-            <div class="mov-sub">Hora: ${formatHora(mov.fecha)}</div>
+            <div class="mov-sub">Hora: ${formatHoraAny(mov.fecha)}</div>
           </div>
         `).join('');
       }
+
       totalDiv.innerHTML = `
         <div style="font-size:1.12rem;font-weight:400;margin-bottom:4px;">
           <b style="color:#2ef37a;">Saldo Anterior: $${saldoAnterior.toFixed(2)}</b>
         </div>
-        <div>
-          <b style="color:#fff;">Total de Caja: $${total.toFixed(2)}</b>
-        </div>
+        <div><b style="color:#fff;">Total de Caja: $${total.toFixed(2)}</b></div>
       `;
     }
 
+    // Cambiar fecha por prompt (igual que tenías)
     document.getElementById("fecha-btn").onclick = async function() {
       const val = prompt("Ingrese la fecha en formato DD/MM/AAAA", formatFecha(selectedDate));
       if (!val) return;
@@ -338,9 +290,7 @@
       }
       selectedDate = parsed;
       renderFecha();
-      onAuthStateChanged(auth, user => {
-        if (user) cargarMovimientos(user);
-      });
+      onAuthStateChanged(auth, user => { if (user) cargarMovimientos(user); });
     };
 
     onAuthStateChanged(auth, user => {
@@ -351,51 +301,48 @@
   </script>
 
   <script>
-  document.getElementById("btn-imprimir-corte").onclick = function() {
-    const fecha = document.getElementById("fecha-label").textContent || '';
-    const movimientosHtml = document.getElementById("movimientos-list").innerHTML;
-    const totalHtml = document.getElementById("total-caja").innerHTML;
+    document.getElementById("btn-imprimir-corte").onclick = function() {
+      const fecha = document.getElementById("fecha-label").textContent || '';
+      const movimientosHtml = document.getElementById("movimientos-list").innerHTML;
+      const totalHtml = document.getElementById("total-caja").innerHTML;
 
-    const printHtml = `
-      <html>
-      <head>
-        <title>Corte de Caja – Multi Inversiones</title>
-        <style>
-          body { font-family: 'Segoe UI', Arial, sans-serif; color: #222; margin: 0; background: #fff; }
-          .header-corte { text-align: center; font-size: 1.55rem; font-weight: bold; margin: 18px 0 4px 0; color: #00527c; }
-          .fecha-corte { text-align: center; margin-bottom: 12px; font-size: 1.06rem; }
-          .mov-card { border: 1px solid #eee; border-radius: 10px; margin-bottom: 8px; padding: 10px 13px; background: #fff;}
-          .mov-title { font-weight: bold; font-size: 1.01rem; margin-bottom: 3px;}
-          .mov-sub { font-size: .97rem; color: #333;}
-          .totales-corte { font-size: 1.13rem; font-weight: bold; margin: 20px 0 18px 0; text-align: center;}
-          .firmas-corte { margin-top:52px; display:flex; justify-content:space-between; }
-          .firma { width:47%; border-top:1.5px solid #222; text-align:center; padding-top:5px; font-size:1rem; }
-          @media print {
-            .mov-card, .header-corte, .totales-corte, .firma, .fecha-corte { background: #fff !important; color: #222 !important;}
-            body { background: #fff !important; color: #222 !important;}
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header-corte">CORTE DE CAJA</div>
-        <div class="fecha-corte">${fecha}</div>
-        <div>${movimientosHtml}</div>
-        <div class="totales-corte">${totalHtml}</div>
-        <div class="firmas-corte">
-          <div class="firma">Firma de Caja</div>
-          <div class="firma">Firma de Gerente</div>
-        </div>
-      </body>
-      </html>
-    `;
-    const w = window.open('', '', 'width=900,height=800');
-    w.document.write(printHtml);
-    w.document.close();
-    setTimeout(() => { w.focus(); }, 300);
-  }
+      const printHtml = `
+        <html>
+        <head>
+          <title>Corte de Caja – Multi Inversiones</title>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #222; margin: 0; background: #fff; }
+            .header-corte { text-align: center; font-size: 1.55rem; font-weight: bold; margin: 18px 0 4px 0; color: #00527c; }
+            .fecha-corte { text-align: center; margin-bottom: 12px; font-size: 1.06rem; }
+            .mov-card { border: 1px solid #eee; border-radius: 10px; margin-bottom: 8px; padding: 10px 13px; background: #fff;}
+            .mov-title { font-weight: bold; font-size: 1.01rem; margin-bottom: 3px;}
+            .mov-sub { font-size: .97rem; color: #333;}
+            .totales-corte { font-size: 1.13rem; font-weight: bold; margin: 20px 0 18px 0; text-align: center;}
+            .firmas-corte { margin-top:52px; display:flex; justify-content:space-between; }
+            .firma { width:47%; border-top:1.5px solid #222; text-align:center; padding-top:5px; font-size:1rem; }
+          </style>
+        </head>
+        <body>
+          <div class="header-corte">CORTE DE CAJA</div>
+          <div class="fecha-corte">${fecha}</div>
+          <div>${movimientosHtml}</div>
+          <div class="totales-corte">${totalHtml}</div>
+          <div class="firmas-corte">
+            <div class="firma">Firma de Caja</div>
+            <div class="firma">Firma de Gerente</div>
+          </div>
+        </body>
+        </html>
+      `;
+      const w = window.open('', '', 'width=900,height=800');
+      w.document.write(printHtml);
+      w.document.close();
+      setTimeout(() => { w.focus(); }, 300);
+    }
   </script>
 </body>
 </html>
+
 
 
 

@@ -4,47 +4,305 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Panel de Gerente – Multi Inversiones</title>
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app  = initializeApp(firebaseConfig);
+    const db   = getFirestore(app);
+    const auth = getAuth(app);
+
+    // Función para los badges de solicitudes
+    function suscribirBadge(idBadge, filtros=[]) {
+      const q = query(collection(db, "Archivo Solicitudes"), ...filtros);
+      onSnapshot(q, snap => {
+        document.getElementById(idBadge).textContent = snap.docs.length;
+      }, err => {
+        document.getElementById(idBadge).textContent = "!";
+      });
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      onAuthStateChanged(auth, user => {
+        if (!user) return location.href = "login.html";
+        document.getElementById("usuario-nombre").textContent = user.email;
+        const uid = user.uid;
+
+        // Badges de solicitudes aprobadas por línea y usuario logueado
+        suscribirBadge(
+          "badge-app-credicash",
+          [
+            where("estado","==","Aprobado"),
+            where("creditLine","==","Credicash"),
+            where("AsignacionID", "==", uid)
+          ]
+        );
+        suscribirBadge(
+          "badge-app-credicel",
+          [
+            where("estado","==","Aprobado"),
+            where("creditLine","==","Credicel"),
+            where("AsignacionID", "==", uid)
+          ]
+        );
+        suscribirBadge(
+          "badge-app-amuebla2",
+          [
+            where("estado","==","Aprobado"),
+            where("creditLine","==","Amuebla2"),
+            where("AsignacionID", "==", uid)
+          ]
+        );
+      });
+    });
+  </script>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body {
-      margin:0;
-      font-family:Arial,sans-serif;
+      margin:0; font-family:Arial,sans-serif;
       background: radial-gradient(circle,#000,#111);
-      color:#fff;
-      min-height: 100vh;
+      color:#fff; min-height: 100vh;
+    }
+    header {
+      background:#000; padding:1rem; text-align:center;
+      font-size:1.5rem; letter-spacing:1px; font-weight:700;
+    }
+    .container {
+      max-width:900px; margin:0 auto; padding:2.5rem 1rem 2rem 1rem;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    h1 { 
+      margin:1rem 0 0.2rem 0; 
+      font-size:2.3rem;
+      font-weight:800;
+      letter-spacing:.5px;
+      text-align:center;
+    }
+    .mensaje-bienvenida {
+      font-size:1.12rem;
+      color:#F8AF40;
+      margin-bottom: 2.4rem;
+      margin-top: 0.4rem;
+      font-weight:600;
+      text-align:center;
+      line-height:1.38;
+      max-width: 600px;
+    }
+    .grid-botones {
+      width:100%;
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
+      gap:1.55rem;
+      margin-bottom:2.2rem;
+    }
+    .btn-grande {
+      background: linear-gradient(90deg, #67C8F1 0%, #13b66b 100%);
+      color: #212121;
+      font-weight: bold;
+      font-size: 1.16rem;
+      border: none;
+      border-radius: 18px;
+      box-shadow: 0 4px 22px #13b66a2b;
+      padding: 2rem 1.2rem 2rem 1.2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: background .19s, color .19s, transform .15s;
+      position: relative;
+      outline: none;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      text-align: center;
+      gap: .7rem;
+      min-width:0;
+      user-select: none;
+      text-decoration: none;
     }
-    header {
-      position: absolute;
-      top: 0;
-      width: 100%;
-      background:#000;
-      padding:1rem;
-      text-align:center;
-      font-size:1.5rem;
-      letter-spacing:1px;
-      font-weight:700;
+    .btn-grande:active,
+    .btn-grande:hover {
+      background: linear-gradient(90deg, #13b66b 70%, #67C8F1 100%);
+      color: #222;
+      transform: scale(1.03);
+      box-shadow: 0 8px 26px #0a644188;
+      text-decoration: none;
     }
-    .mensaje {
-      font-size:1.4rem;
-      font-weight:700;
-      color:#F8AF40;
-      max-width: 600px;
-      line-height:1.6;
+    .btn-grande i {
+      font-size: 2.2rem;
+      margin-bottom: 9px;
+      color: #212121;
+      opacity: .89;
+      transition: color .15s;
+    }
+    .btn-grande:hover i { color: #0c7451; }
+    .btn-grande .badge {
+      position: absolute; top: 14px; right: 15px;
+      background:#e74c3c; color:#fff;
+      width:28px; height:28px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      font-size:.85rem; font-weight:700;
+      box-shadow:0 1px 8px #0002;
+    }
+    .btn-revertir {
+      background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%);
+      color: #fff !important;
+    }
+    .btn-revertir:active,
+    .btn-revertir:hover {
+      background: linear-gradient(90deg, #c0392b 70%, #8e0800 100%);
+      color: #fff !important;
+      box-shadow: 0 8px 26px #800a0a88;
+    }
+    .btn-revertir i { color: #fff !important; opacity: 1;}
+    .btn-caja { background: linear-gradient(90deg, #67C8F1 0%, #13b66b 100%);}
+    .btn-mora-usuario { background: linear-gradient(90deg, #7a42f1 0%, #5933d7 100%);}
+    .btn-mora-agencia { background: linear-gradient(90deg, #304ffe 0%, #5c6bc0 100%);}
+    .btn-pin { background: linear-gradient(90deg, #f8af40 0%, #ffa726 100%);}
+    .btn-caja i { color: #134e3b; }
+    .btn-mora-usuario i { color: #fff;}
+    .btn-mora-agencia i { color: #fff;}
+    .btn-pin, .btn-pin i { color: #222; }
+    .btn-pin i { color: #fff59d;}
+    .btn-cierre-caja {
+      background: linear-gradient(90deg, #e7ff72 0%, #13b66b 100%);
+      color: #212121;
+    }
+    .btn-cierre-caja:active,
+    .btn-cierre-caja:hover {
+      background: linear-gradient(90deg, #13b66b 60%, #e7ff72 100%);
+      color: #222;
+    }
+    .btn-cierre-caja i { color: #847900; }
+    .btn-master-creditos {
+      background: linear-gradient(90deg, #607D8B 0%, #37474F 100%);
+      color: #fff !important;
+    }
+    .btn-master-creditos:active,
+    .btn-master-creditos:hover {
+      background: linear-gradient(90deg, #37474F 70%, #607D8B 100%);
+      color: #fff !important;
+    }
+    .btn-master-creditos i { color: #fff; opacity: 0.93;}
+    .btn-cuotas-vencer {
+      background: linear-gradient(90deg, #F8AF40 0%, #67C8F1 100%);
+      color: #24272b !important;
+    }
+    .btn-cuotas-vencer:active,
+    .btn-cuotas-vencer:hover {
+      background: linear-gradient(90deg, #67C8F1 70%, #F8AF40 100%);
+      color: #111 !important;
+    }
+    .btn-cuotas-vencer i { color: #222; opacity: 0.98;}
+    .btn-reporte {
+      background: linear-gradient(90deg, #ee0979 0%, #ff6a00 100%);
+      color: #fff !important;
+    }
+    .btn-reporte:active,
+    .btn-reporte:hover {
+      background: linear-gradient(90deg, #ff6a00 60%, #ee0979 100%);
+      color: #fff !important;
+      box-shadow: 0 8px 26px #ee097955;
+    }
+    .btn-reporte i { color: #fff; opacity: 0.95;}
+    @media (max-width: 600px) {
+      .container { padding:1.2rem 1vw; }
+      h1 { font-size: 1.23rem;}
+      .mensaje-bienvenida { font-size: .99rem; }
+      .grid-botones { gap:1rem; }
+      .btn-grande { padding: 1.3rem 0.6rem 1.3rem 0.6rem; font-size: .97rem;}
+      .btn-grande i { font-size:1.4rem; }
     }
   </style>
 </head>
 <body>
   <header>Panel de Gerente</header>
 
-  <div class="mensaje">
-    ⚠️ Las funciones no están disponibles.<br>
-    Revise su cuenta de <strong>Google Cloud</strong> para seguir utilizando las Funciones.
+  <div class="container">
+    <h1 id="usuario-nombre">Bienvenido, usuario</h1>
+    <div class="mensaje-bienvenida">
+      Acceso rápido a las funciones del gerente.<br>
+      <span style="color:#67C8F1;font-weight:700;">Visualiza tus solicitudes aprobadas y administra las funciones claves de Multi Inversiones.</span>
+    </div>
+
+    <!-- BLOQUE NUEVO: Solicitudes aprobadas con badges -->
+    <div class="grid-botones" style="margin-bottom: 1.8rem;">
+      <a href="solicitudes_aprobadas_credicash_page.html" class="btn-grande">
+        <i class="fas fa-check-circle"></i>
+        Solicitudes Aprobadas Credicash
+        <span id="badge-app-credicash" class="badge">0</span>
+      </a>
+      <a href="solicitudes_aprobadas_credicel_page.html" class="btn-grande">
+        <i class="fas fa-check-circle"></i>
+        Solicitudes Aprobadas Credicel
+        <span id="badge-app-credicel" class="badge">0</span>
+      </a>
+      <a href="solicitudes_aprobadas_amuebla2_page.html" class="btn-grande">
+        <i class="fas fa-check-circle"></i>
+        Solicitudes Aprobadas Amuebla2
+        <span id="badge-app-amuebla2" class="badge">0</span>
+      </a>
+    </div>
+
+    <!-- BOTONES DE ACCIÓN DEL GERENTE -->
+    <div class="grid-botones">
+      <a href="detalle_gerente_caja_page.html" class="btn-grande btn-caja">
+        <i class="fas fa-wallet"></i>
+        Ver Movimientos de Caja
+      </a>
+      <a href="tasa_mora_usuario_page.html" class="btn-grande btn-mora-usuario">
+        <i class="fas fa-user-check"></i>
+        Tasa de Mora por Usuario
+      </a>
+      <a href="tasa_mora_agencia_page.html" class="btn-grande btn-mora-agencia">
+        <i class="fas fa-city"></i>
+        Tasa de Mora por Agencia
+      </a>
+      <a href="revertir_credito_page.html" class="btn-grande btn-revertir">
+        <i class="fas fa-undo"></i>
+        Revertir Créditos
+      </a>
+      <a href="gerente_password_page.html" class="btn-grande btn-pin">
+        <i class="fas fa-key"></i>
+        Administrar PIN Interno
+      </a>
+      <a href="cierre_caja_page.html" class="btn-grande btn-cierre-caja">
+        <i class="fas fa-lock"></i>
+        Cierre de Caja (Arqueo Diario)
+      </a>
+      <a href="master_creditos_page.html" class="btn-grande btn-master-creditos">
+        <i class="fas fa-database"></i>
+        Master de Créditos
+      </a>
+      <a href="cuotas_por_vencer_page.html" class="btn-grande btn-cuotas-vencer">
+        <i class="fa-solid fa-hourglass-half"></i>
+        Cuotas por Vencer
+      </a>
+      <a href="recuperacion.html" class="btn-grande btn-reporte">
+        <i class="fas fa-coins"></i>
+        Recuperación
+      </a>
+      <a href="reporte_page.html" class="btn-grande btn-reporte">
+        <i class="fas fa-chart-bar"></i>
+        Reportes Gerenciales
+      </a>
+      <!-- === NUEVO BOTÓN DASHBOARD DE RENDIMIENTO === -->
+      <a href="dashboard-sonsonate.html" class="btn-grande btn-reporte">
+        <i class="fas fa-chart-line"></i>
+        Dashboard de Rendimiento
+      </a>
+    </div>
   </div>
 </body>
 </html>
+
 

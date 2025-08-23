@@ -64,6 +64,15 @@
             where("AsignacionID", "==", uid)
           ]
         );
+        // Badge de solicitudes de refinanciamiento
+        suscribirBadge(
+          "badge-app-refinanciamiento",
+          [
+            where("estado","==","Aprobado"),
+            where("tipo","==","Refinanciamiento"),
+            where("AsignacionID", "==", uid)
+          ]
+        );
       });
     });
   </script>
@@ -251,6 +260,12 @@
         Solicitudes Aprobadas Amuebla2
         <span id="badge-app-amuebla2" class="badge">0</span>
       </a>
+      <!-- NUEVO BOTÓN REFINANCIAMIENTO -->
+      <a href="solicitudes_aprobadas_refinanciamiento.html" class="btn-grande">
+        <i class="fas fa-sync-alt"></i>
+        Solicitudes Aprobadas Refinanciamiento
+        <span id="badge-app-refinanciamiento" class="badge">0</span>
+      </a>
     </div>
 
     <!-- BOTONES DE ACCIÓN DEL GERENTE -->
@@ -304,5 +319,7 @@
   </div>
 </body>
 </html>
+
+
 
 

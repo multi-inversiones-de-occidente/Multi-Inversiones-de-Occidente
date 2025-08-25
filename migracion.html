@@ -311,8 +311,16 @@
     import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-storage.js";
 
-    // ===== Configuración Firebase (SIN LOGIN) =====
-    const firebaseConfig = { apiKey: "PASTE_YOUR_API_KEY", authDomain: "YOUR_PROJECT.firebaseapp.com", projectId: "YOUR_PROJECT", storageBucket: "YOUR_PROJECT.appspot.com", messagingSenderId: "", appId: "" };
+    // ===== Configuración Firebase (REAL) =====
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const storage = getStorage(app);
@@ -324,16 +332,22 @@
     const $ = s => document.querySelector(s);
     const fmt = n => Number(n||0).toFixed(2);
     const alert = (title, text, icon='info')=>Swal.fire({title, text, icon, confirmButtonColor:'#f8af40'});
+
     function setStep(idx){
       document.querySelectorAll('.chip').forEach((c,i)=>{
         c.classList.toggle('active', i===idx);
         if(i<idx) c.classList.add('done'); else if(i>idx) c.classList.remove('done');
       });
-      for(let i=0;i<=5;i++){ document.querySelector('#step'+i)?.classList.add('hidden'); }
-      document.querySelector('#step'+idx).classList.remove('hidden');
+      for(let i=0;i<=5;i++){ document.getElementById('step'+i)?.classList.add('hidden'); }
+      document.getElementById('step'+idx).classList.remove('hidden');
       window.scrollTo({top:0,behavior:'smooth'});
     }
-    function maskTel(v){ v=(v||'').replace(/[^0-9]/g,'').slice(0,8); if(v.length>4) v=v.slice(0,4)+'-'+v.slice(4); return v; }
+
+    function maskTel(v){
+      v=(v||'').replace(/[^0-9]/g,'').slice(0,8);
+      if(v.length>4) v=v.slice(0,4)+'-'+v.slice(4);
+      return v;
+    }
 
     // ===== Paso 0: Cliente
     ['u_tel','s_telJefe','f1_tel','f2_tel','f3_tel','p1_tel','p2_tel','p3_tel','s_numeroConyugue'].forEach(id=>{
@@ -342,69 +356,66 @@
     });
 
     async function buscarCliente(){
-      const dui=$('#u_dui').value?.trim();
-      const tel=$('#u_tel').value?.trim();
+      const dui=document.getElementById('u_dui').value?.trim();
+      const tel=document.getElementById('u_tel').value?.trim();
       if(!dui && !tel){return alert('Falta dato','Ingresa DUI o teléfono para buscar','warning');}
-
       let q = dui
         ? query(collection(db,'users'), where('numeroDui','==',dui))
         : query(collection(db,'users'), where('telefono','==',tel));
-
       const snap = await getDocs(q);
-      if(snap.empty){ alert('No encontrado','Puedes crear un nuevo usuario con estos datos','info'); return; }
-
+      if(snap.empty){
+        alert('No encontrado','Puedes crear un nuevo usuario con estos datos','info');
+        return;
+      }
       const d = snap.docs[0];
-      state.clienteID = d.id;
-      state.cliente = d.data();
+      state.clienteID = d.id; state.cliente = d.data();
 
-      $('#u_nombre').value   = state.cliente.nombre||'';
-      $('#u_apellido').value = state.cliente.apellido||'';
-      $('#u_email').value    = state.cliente.email||'';
-      $('#u_tel').value      = state.cliente.telefono||'';
-      $('#u_genero').value   = state.cliente.genero||'';
-      $('#u_depto').value    = state.cliente.department||'';
-      $('#u_muni').value     = state.cliente.municipio||'';
-      $('#u_dir').value      = state.cliente.direccion||'';
-      $('#u_nac').value      = (state.cliente.dateOfBirth||'').slice(0,10);
-      $('#u_stars').value    = state.cliente.estrellas||'5';
+      document.getElementById('u_nombre').value  = state.cliente.nombre||'';
+      document.getElementById('u_apellido').value= state.cliente.apellido||'';
+      document.getElementById('u_email').value   = state.cliente.email||'';
+      document.getElementById('u_tel').value     = state.cliente.telefono||'';
+      document.getElementById('u_genero').value  = state.cliente.genero||'';
+      document.getElementById('u_depto').value   = state.cliente.department||'';
+      document.getElementById('u_muni').value    = state.cliente.municipio||'';
+      document.getElementById('u_dir').value     = state.cliente.direccion||'';
+      document.getElementById('u_nac').value     = (state.cliente.dateOfBirth||'').slice(0,10);
+      document.getElementById('u_stars').value   = state.cliente.estrellas||'5';
 
-      $('#clienteIDTag').textContent  = `clienteID: ${state.clienteID}`;
-      $('#clienteIDTag2').textContent = `clienteID: ${state.clienteID}`;
+      document.getElementById('clienteIDTag').textContent = `clienteID: ${state.clienteID}`;
+      document.getElementById('clienteIDTag2').textContent= `clienteID: ${state.clienteID}`;
       setStep(1);
     }
 
     async function guardarCliente(){
       const datos = {
-        nombre: $('#u_nombre').value.trim(),
-        apellido: $('#u_apellido').value.trim(),
-        email: $('#u_email').value.trim(),
-        telefono: $('#u_tel').value.trim(),
-        numeroDui: $('#u_dui').value.trim(),
-        genero: $('#u_genero').value,
-        department: $('#u_depto').value.trim(),
-        municipio: $('#u_muni').value.trim(),
-        direccion: $('#u_dir').value.trim(),
-        dateOfBirth: $('#u_nac').value? new Date($('#u_nac').value).toISOString(): '',
+        nombre: document.getElementById('u_nombre').value.trim(),
+        apellido: document.getElementById('u_apellido').value.trim(),
+        email: document.getElementById('u_email').value.trim(),
+        telefono: document.getElementById('u_tel').value.trim(),
+        numeroDui: document.getElementById('u_dui').value.trim(),
+        genero: document.getElementById('u_genero').value,
+        department: document.getElementById('u_depto').value.trim(),
+        municipio: document.getElementById('u_muni').value.trim(),
+        direccion: document.getElementById('u_dir').value.trim(),
+        dateOfBirth: document.getElementById('u_nac').value ? new Date(document.getElementById('u_nac').value).toISOString(): '',
         rol:'user',
-        estrellas: Number($('#u_stars').value||5),
+        estrellas: Number(document.getElementById('u_stars').value||5),
         fecha_registro: serverTimestamp()
       };
       if(!datos.nombre||!datos.apellido||!datos.telefono||!datos.numeroDui){
         return alert('Campos obligatorios','Nombre, apellido, teléfono y DUI son obligatorios','warning');
       }
-
       let id = state.clienteID;
       if(id){
         await setDoc(doc(db,'users',id), {...state.cliente,...datos}, {merge:true});
       }else{
-        const ref = doc(collection(db,'users'));
-        id = ref.id;
-        await setDoc(ref, datos);
+        const refNew = doc(collection(db,'users'));
+        id = refNew.id;
+        await setDoc(refNew, datos);
       }
-      state.clienteID = id;
-      state.cliente = datos;
-      $('#clienteIDTag').textContent  = `clienteID: ${id}`;
-      $('#clienteIDTag2').textContent = `clienteID: ${id}`;
+      state.clienteID = id; state.cliente = datos;
+      document.getElementById('clienteIDTag').textContent  = `clienteID: ${id}`;
+      document.getElementById('clienteIDTag2').textContent = `clienteID: ${id}`;
       setStep(1);
     }
     document.getElementById('btnBuscarCliente').addEventListener('click', buscarCliente);
@@ -412,7 +423,8 @@
 
     // Totales auto
     const ingresosIds=['i_sueldo','i_comisiones','i_ventas','i_ayuda','i_remesas','i_pensiones'];
-    const gastosIds=['g_aliment','g_fam','g_compras','g_creditos','g_alq','g_serv'];
+    const gastosIds  =['g_aliment','g_fam','g_compras','g_creditos','g_alq','g_serv'];
+
     ingresosIds.forEach(id=> document.getElementById(id).addEventListener('input',()=>{
       const total = ingresosIds.reduce((s,id)=> s + Number(document.getElementById(id).value||0), 0);
       document.getElementById('i_total').value = fmt(total);
@@ -432,73 +444,72 @@
 
     async function guardarSolicitud(){
       if(!state.clienteID) return alert('Falta cliente','Completa el Paso 0','warning');
-
       const datos = {
         clienteID: state.clienteID,
-        fechaSolicitud: $('#s_fechaSolicitud').value? new Date($('#s_fechaSolicitud').value).toISOString(): new Date().toISOString(),
-        lineaDeCredito: $('#s_creditLine').value,
-        departamento: $('#u_depto').value||'',
-        municipio: $('#u_muni').value||'',
-        direccion: $('#u_dir').value||'',
-        estado: $('#s_estado').value,
-        estadoCivil: $('#s_estadoCivil')?.value||'',
-        profesion: $('#s_profesion').value.trim(),
-        lugarTrabajo: $('#s_lugarTrabajo').value.trim(),
-        direccionTrabajo: $('#s_direccionTrabajo').value.trim(),
-        tiempoServicio: $('#s_tiempoServicio').value.trim(),
-        jefeInmediato: $('#s_jefe').value.trim(),
-        telefonoJefe: $('#s_telJefe').value.trim(),
-        pagoSueldo: $('#s_pagoSueldo').value,
-        tipoVivienda: $('#s_tipoVivienda').value,
-        ingresosTotales: Number($('#i_total').value||0),
-        egresosTotales: Number($('#g_total').value||0),
-        solvenciaEconomica: Number($('#i_total').value||0) - Number($('#g_total').value||0),
+        fechaSolicitud: document.getElementById('s_fechaSolicitud').value
+          ? new Date(document.getElementById('s_fechaSolicitud').value).toISOString()
+          : new Date().toISOString(),
+        lineaDeCredito: document.getElementById('s_creditLine').value,
+        departamento: document.getElementById('u_depto').value||'',
+        municipio:    document.getElementById('u_muni').value||'',
+        direccion:    document.getElementById('u_dir').value||'',
+        estado: document.getElementById('s_estado').value,
+        estadoCivil: document.getElementById('s_estadoCivil')?.value||'',
+        profesion: document.getElementById('s_profesion').value.trim(),
+        lugarTrabajo: document.getElementById('s_lugarTrabajo').value.trim(),
+        direccionTrabajo: document.getElementById('s_direccionTrabajo').value.trim(),
+        tiempoServicio: document.getElementById('s_tiempoServicio').value.trim(),
+        jefeInmediato: document.getElementById('s_jefe').value.trim(),
+        telefonoJefe: document.getElementById('s_telJefe').value.trim(),
+        pagoSueldo: document.getElementById('s_pagoSueldo').value,
+        tipoVivienda: document.getElementById('s_tipoVivienda').value,
+        ingresosTotales: Number(document.getElementById('i_total').value||0),
+        egresosTotales: Number(document.getElementById('g_total').value||0),
+        solvenciaEconomica: Number(document.getElementById('i_total').value||0) - Number(document.getElementById('g_total').value||0),
         ingresos: {
-          sueldo: Number($('#i_sueldo').value||0),
-          comisiones: Number($('#i_comisiones').value||0),
-          ventasNetas: Number($('#i_ventas').value||0),
-          ayudaFamiliar: Number($('#i_ayuda').value||0),
-          remesas: Number($('#i_remesas').value||0),
-          pensiones: Number($('#i_pensiones').value||0)
+          sueldo: Number(document.getElementById('i_sueldo').value||0),
+          comisiones: Number(document.getElementById('i_comisiones').value||0),
+          ventasNetas: Number(document.getElementById('i_ventas').value||0),
+          ayudaFamiliar: Number(document.getElementById('i_ayuda').value||0),
+          remesas: Number(document.getElementById('i_remesas').value||0),
+          pensiones: Number(document.getElementById('i_pensiones').value||0)
         },
         gastos: {
-          alimenticios: Number($('#g_aliment').value||0),
-          familiares: Number($('#g_fam').value||0),
-          comprasNetas: Number($('#g_compras').value||0),
-          pagoCreditos: Number($('#g_creditos').value||0),
-          alquiler: Number($('#g_alq').value||0),
-          serviciosBasicos: Number($('#g_serv').value||0)
+          alimenticios: Number(document.getElementById('g_aliment').value||0),
+          familiares: Number(document.getElementById('g_fam').value||0),
+          comprasNetas: Number(document.getElementById('g_compras').value||0),
+          pagoCreditos: Number(document.getElementById('g_creditos').value||0),
+          alquiler: Number(document.getElementById('g_alq').value||0),
+          serviciosBasicos: Number(document.getElementById('g_serv').value||0)
         },
-        montoSolicitar: Number($('#s_montoSolicitar').value||0),
-        plazoSolicitado: Number($('#s_plazoSolicitado').value||0),
-        frecuenciaSolicitada: $('#s_frecuenciaSolicitada').value,
-        observaciones: $('#s_observaciones').value.trim(),
+        montoSolicitar: Number(document.getElementById('s_montoSolicitar').value||0),
+        plazoSolicitado: Number(document.getElementById('s_plazoSolicitado').value||0),
+        frecuenciaSolicitada: document.getElementById('s_frecuenciaSolicitada').value,
+        observaciones: document.getElementById('s_observaciones').value.trim(),
         familiares:[
-          {nombre:$('#f1_nombre').value, parentesco:$('#f1_parentesco').value, telefono:$('#f1_tel').value, direccion:$('#f1_dir').value},
-          {nombre:$('#f2_nombre').value, parentesco:$('#f2_parentesco').value, telefono:$('#f2_tel').value, direccion:$('#f2_dir').value},
-          {nombre:$('#f3_nombre').value, parentesco:$('#f3_parentesco').value, telefono:$('#f3_tel').value, direccion:$('#f3_dir').value}
+          {nombre:document.getElementById('f1_nombre').value, parentesco:document.getElementById('f1_parentesco').value, telefono:document.getElementById('f1_tel').value, direccion:document.getElementById('f1_dir').value},
+          {nombre:document.getElementById('f2_nombre').value, parentesco:document.getElementById('f2_parentesco').value, telefono:document.getElementById('f2_tel').value, direccion:document.getElementById('f2_dir').value},
+          {nombre:document.getElementById('f3_nombre').value, parentesco:document.getElementById('f3_parentesco').value, telefono:document.getElementById('f3_tel').value, direccion:document.getElementById('f3_dir').value}
         ],
         personales:[
-          {nombre:$('#p1_nombre').value, parentesco:$('#p1_parentesco').value, telefono:$('#p1_tel').value, direccion:$('#p1_dir').value},
-          {nombre:$('#p2_nombre').value, parentesco:$('#p2_parentesco').value, telefono:$('#p2_tel').value, direccion:$('#p2_dir').value},
-          {nombre:$('#p3_nombre').value, parentesco:$('#p3_parentesco').value, telefono:$('#p3_tel').value, direccion:$('#p3_dir').value}
+          {nombre:document.getElementById('p1_nombre').value, parentesco:document.getElementById('p1_parentesco').value, telefono:document.getElementById('p1_tel').value, direccion:document.getElementById('p1_dir').value},
+          {nombre:document.getElementById('p2_nombre').value, parentesco:document.getElementById('p2_parentesco').value, telefono:document.getElementById('p2_tel').value, direccion:document.getElementById('p2_dir').value},
+          {nombre:document.getElementById('p3_nombre').value, parentesco:document.getElementById('p3_parentesco').value, telefono:document.getElementById('p3_tel').value, direccion:document.getElementById('p3_dir').value}
         ],
-        nombreConyugue: $('#s_nombreConyugue').value||null,
-        numeroConyugue: $('#s_numeroConyugue').value||null,
-        hijos: Number($('#s_hijos').value||0),
+        nombreConyugue: document.getElementById('s_nombreConyugue').value||null,
+        numeroConyugue: document.getElementById('s_numeroConyugue').value||null,
+        hijos: Number(document.getElementById('s_hijos').value||0),
         evidencias: {},
         migratedAt: serverTimestamp()
       };
-
       if(!datos.profesion||!datos.lugarTrabajo){
         return alert('Faltan datos','Profesión y Lugar de trabajo son obligatorios','warning');
       }
 
-      const fFront = $('#e_dui_front').files[0];
-      const fBack  = $('#e_dui_back').files[0];
-      const fComp  = $('#e_comprobante').files;
+      const fFront = document.getElementById('e_dui_front').files[0];
+      const fBack  = document.getElementById('e_dui_back').files[0];
+      const fComp  = document.getElementById('e_comprobante').files;
       const base = `SolicitudesCredito/${state.clienteID}/`;
-
       datos.evidencias.dui_front = await uploadIfAny(fFront, base+`dui_front_${Date.now()}`);
       datos.evidencias.dui_back  = await uploadIfAny(fBack,  base+`dui_back_${Date.now()}`);
       if(fComp?.length){
@@ -511,8 +522,7 @@
 
       let refId = state.solicitudID || doc(collection(db,'Archivo Solicitudes')).id;
       await setDoc(doc(db,'Archivo Solicitudes', refId), datos, {merge:true});
-      state.solicitudID = refId;
-      state.solicitud = datos;
+      state.solicitudID = refId; state.solicitud = datos;
       document.getElementById('solicitudIDTag').textContent = `solicitudID: ${refId}`;
       setStep(2);
     }
@@ -520,31 +530,31 @@
 
     // Paso 2: Crédito
     document.getElementById('btnCalcularTasa').addEventListener('click', ()=>{
-      const a = Number($('#c_tasaAnual').value||0)/100;
+      const a = Number(document.getElementById('c_tasaAnual').value||0)/100;
       const diaria = a/365;
-      $('#c_tasaDiaria').value = diaria.toFixed(9);
+      document.getElementById('c_tasaDiaria').value = diaria.toFixed(9);
     });
 
     async function crearCredito(){
       if(!state.clienteID) return alert('Falta cliente','Completa el Paso 0','warning');
       const datos = {
         clienteID: state.clienteID,
-        agenciaAsignada: $('#c_agencia').value.trim(),
-        asignadoA: $('#c_asesor').value.trim(),
-        lineaDeCredito: $('#c_linea').value,
-        estadoCredito: $('#c_estado').value,
-        montoAprobado: Number($('#c_monto').value||0),
-        saldoInicial: Number($('#c_saldoIni').value||0),
-        saldoActual: Number($('#c_saldoAct').value||0),
-        cuotaAprobada: Number($('#c_cuota').value||0),
-        numeroCuotas: Number($('#c_numCuotas').value||0),
-        frecuenciaPago: $('#c_freq').value,
-        tasaAnualCredito: Number($('#c_tasaAnual').value||0),
-        tasaDiariaCredito: Number($('#c_tasaDiaria').value||0),
-        fechaInicio: $('#c_fechaInicio').value? new Date($('#c_fechaInicio').value).toISOString(): '',
-        interesActual: Number($('#c_interesActual').value||0),
-        multasAcumuladas: Number($('#c_multas').value||0),
-        paraPonerseAlDia: Number($('#c_ppaldia').value||0),
+        agenciaAsignada: document.getElementById('c_agencia').value.trim(),
+        asignadoA: document.getElementById('c_asesor').value.trim(),
+        lineaDeCredito: document.getElementById('c_linea').value,
+        estadoCredito: document.getElementById('c_estado').value,
+        montoAprobado: Number(document.getElementById('c_monto').value||0),
+        saldoInicial: Number(document.getElementById('c_saldoIni').value||0),
+        saldoActual: Number(document.getElementById('c_saldoAct').value||0),
+        cuotaAprobada: Number(document.getElementById('c_cuota').value||0),
+        numeroCuotas: Number(document.getElementById('c_numCuotas').value||0),
+        frecuenciaPago: document.getElementById('c_freq').value,
+        tasaAnualCredito: Number(document.getElementById('c_tasaAnual').value||0),
+        tasaDiariaCredito: Number(document.getElementById('c_tasaDiaria').value||0),
+        fechaInicio: document.getElementById('c_fechaInicio').value ? new Date(document.getElementById('c_fechaInicio').value).toISOString(): '',
+        interesActual: Number(document.getElementById('c_interesActual').value||0),
+        multasAcumuladas: Number(document.getElementById('c_multas').value||0),
+        paraPonerseAlDia: Number(document.getElementById('c_ppaldia').value||0),
         fechaUltimoCalculoIntereses: serverTimestamp(),
         capitalAtrasado: 0,
         cuotasAtrasadas: 0,
@@ -555,42 +565,40 @@
       }
       let id = state.creditoID || doc(collection(db,'creditos')).id;
       await setDoc(doc(db,'creditos', id), datos, {merge:true});
-      state.creditoID = id;
-      state.credito = datos;
+      state.creditoID = id; state.credito = datos;
       document.getElementById('creditoIDTag').textContent = `creditoID: ${id}`;
 
-      // Prefill amort
-      $('#a_start').value = ($('#c_fechaInicio').value)||'';
-      $('#a_freq').value  = $('#c_freq').value;
-      $('#a_n').value     = $('#c_numCuotas').value;
-      $('#a_cuota').value = $('#c_cuota').value;
-      $('#a_monto').value = $('#c_monto').value;
-      $('#a_tasa').value  = $('#c_tasaAnual').value;
-
+      document.getElementById('a_start').value = (document.getElementById('c_fechaInicio').value)||'';
+      document.getElementById('a_freq').value  = document.getElementById('c_freq').value;
+      document.getElementById('a_n').value     = document.getElementById('c_numCuotas').value;
+      document.getElementById('a_cuota').value = document.getElementById('c_cuota').value;
+      document.getElementById('a_monto').value = document.getElementById('c_monto').value;
+      document.getElementById('a_tasa').value  = document.getElementById('c_tasaAnual').value;
       setStep(3);
     }
     document.getElementById('btnCrearCredito').addEventListener('click', crearCredito);
 
     // Paso 3: Amortización
-    function addDays(date, days){ const d=new Date(date); d.setDate(d.getDate()+days); return d}
+    function addDays(date, days){ const d=new Date(date); d.setDate(d.getDate()+days); return d }
     function nextDate(d, freq){
-      if(freq==='Semanal')    return addDays(d,7);
+      if(freq==='Semanal') return addDays(d,7);
       if(freq==='Catorcenal') return addDays(d,14);
-      if(freq==='Quincenal')  return addDays(d,15);
+      if(freq==='Quincenal') return addDays(d,15);
       if(freq==='Mensual'){ const x=new Date(d); x.setMonth(x.getMonth()+1); return x }
       return addDays(d,14);
     }
+
     function generarAmort(){
-      const start=$('#a_start').value;
+      const start=document.getElementById('a_start').value;
       if(!start) return alert('Falta fecha','Elige fecha de inicio','warning');
-      const n=Number($('#a_n').value||0),
-            cuota=Number($('#a_cuota').value||0),
-            monto=Number($('#a_monto').value||0);
+      const n=Number(document.getElementById('a_n').value||0),
+            cuota=Number(document.getElementById('a_cuota').value||0),
+            monto=Number(document.getElementById('a_monto').value||0);
       if(!n||!cuota||!monto) return alert('Faltan datos','N° cuotas, cuota y monto son obligatorios','warning');
 
       let saldo=monto;
-      const freq=$('#a_freq').value;
-      const tasa=Number($('#a_tasa').value||0)/100;
+      const freq=document.getElementById('a_freq').value;
+      const tasa=Number(document.getElementById('a_tasa').value||0)/100;
       let date=new Date(start);
       const rows=[];
       for(let i=1;i<=n;i++){
@@ -614,10 +622,11 @@
       }
       renderAmort(rows);
     }
+
     function renderAmort(rows){
       const tb=document.querySelector('#amortTable tbody');
       tb.innerHTML='';
-      let sumCap=0; let lastSaldo=0;
+      let sumCap=0, lastSaldo=0;
       rows.forEach(r=>{
         sumCap+=Number(r.capital); lastSaldo=r.saldo;
         const tr=document.createElement('tr');
@@ -625,28 +634,26 @@
         tb.appendChild(tr);
       });
       state.amortizacion = rows;
-      const ok = Math.abs(sumCap - Number($('#a_monto').value||0))<=0.02 && Math.abs(lastSaldo-0)<=0.02;
-      document.getElementById('chkAmort').textContent = ok? `OK · capital=${fmt(sumCap)} saldo final=${fmt(lastSaldo)}`: `Revisar · capital=${fmt(sumCap)} saldo final=${fmt(lastSaldo)}`;
-      document.getElementById('chkAmort').style.background = ok? '#0f2c16':'#2a1414';
+      const ok = Math.abs(sumCap - Number(document.getElementById('a_monto').value||0))<=0.02 && Math.abs(lastSaldo-0)<=0.02;
+      const badge = document.getElementById('chkAmort');
+      badge.textContent = ok? `OK · capital=${fmt(sumCap)} saldo final=${fmt(lastSaldo)}`: `Revisar · capital=${fmt(sumCap)} saldo final=${fmt(lastSaldo)}`;
+      badge.style.background = ok? '#0f2c16':'#2a1414';
     }
 
-    // FIX: parser robusto de CSV (sin regex inválida)
     function parseCSV(text){
-      const lines = text.replace(/\r/g,'').trim().split('\n').filter(Boolean);
-      if (!lines.length) return [];
+      const lines = text.trim().split(/\r?\n/);
       const hdr = lines.shift().split(',').map(s=>s.trim().toLowerCase());
       const idx = k => hdr.indexOf(k);
-      const out = [];
-      let i = 1;
-      for (const line of lines){
-        const c = line.split(',');
+      const out=[]; let i=1;
+      for(const line of lines){
+        const c=line.split(',');
         out.push({
-          numeroCuota: i++,
-          fecha:   (c[idx('fecha')] || '').trim(),
-          cuota:   Number((c[idx('cuota')]   || '0').replace(/[^\d.-]/g,'')),
-          capital: Number((c[idx('capital')] || '0').replace(/[^\d.-]/g,'')),
-          interes: Number((c[idx('interes')] || '0').replace(/[^\d.-]/g,'')),
-          saldo:   Number((c[idx('saldo')]   || '0').replace(/[^\d.-]/g,'')),
+          numeroCuota:i++,
+          fecha:(c[idx('fecha')]||'').trim(),
+          cuota:Number(c[idx('cuota')]||0),
+          capital:Number(c[idx('capital')]||0),
+          interes:Number(c[idx('interes')]||0),
+          saldo:Number(c[idx('saldo')]||0),
           estado:'Pendiente',
           montoPagado:0,
           montoPagadoInteres:0,
@@ -675,25 +682,24 @@
 
     // Paso 4: Pagos
     function parsePagosCSV(text){
-      const lines = text.replace(/\r/g,'').trim().split('\n').filter(Boolean);
-      if (!lines.length) return [];
-      const hdr = lines.shift().split(',').map(s=>s.trim().toLowerCase());
-      const g = k => hdr.indexOf(k);
-      const out = [];
-      let i=1;
-      for (const line of lines){
+      const lines = text.trim().split(/\r?\n/);
+      const hdr=lines.shift().split(',').map(s=>s.trim().toLowerCase());
+      const g = k=> hdr.indexOf(k);
+      const out=[]; let i=1;
+      for(const line of lines){
         const c=line.split(',');
         out.push({
           idx:i++,
-          fechaPago:   (c[g('fechapago')] || c[g('fecha')] || '').trim(),
-          montoPagado: Number((c[g('montopagado')] || c[g('monto')] || '0').replace(/[^\d.-]/g,'')),
-          pagoCapital: Number((c[g('pagocapital')]  || '0').replace(/[^\d.-]/g,'')),
-          pagoInteres: Number((c[g('pagointeres')]  || '0').replace(/[^\d.-]/g,'')),
-          pagoMulta:   Number((c[g('pagomulta')]    || '0').replace(/[^\d.-]/g,''))
+          fechaPago:(c[g('fechapago')]||c[g('fecha')]||'').trim(),
+          montoPagado:Number(c[g('montopagado')]||c[g('monto')]||0),
+          pagoCapital:Number(c[g('pagocapital')]||0),
+          pagoInteres:Number(c[g('pagointeres')]||0),
+          pagoMulta:Number(c[g('pagomulta')]||0)
         });
       }
       return out;
     }
+
     function renderPagos(rows){
       const tb=document.querySelector('#pagosTable tbody');
       tb.innerHTML='';
@@ -704,6 +710,7 @@
       });
       state.pagos = rows;
     }
+
     document.getElementById('btnCargarPagos').addEventListener('click', async ()=>{
       const f=document.getElementById('p_csv').files[0];
       if(!f) return alert('Sin archivo','Selecciona un CSV','warning');
@@ -714,13 +721,13 @@
     async function guardarPagos(){
       if(!state.creditoID) return alert('Falta crédito','Crea el crédito en Paso 2','warning');
       if(!state.pagos.length){ setStep(5); return; }
-      const suc=$('#p_sucursal').value.trim();
-      const usuario=$('#p_usuario').value.trim();
+      const suc=document.getElementById('p_sucursal').value.trim();
+      const usuario=document.getElementById('p_usuario').value.trim();
       const batch = writeBatch(db);
       for(const p of state.pagos){
-        const ref = doc(collection(db,'pagos'));
-        batch.set(ref, {
-          pagoID: ref.id,
+        const refNew = doc(collection(db,'pagos'));
+        batch.set(refNew, {
+          pagoID: refNew.id,
           creditoID: state.creditoID,
           clienteID: state.clienteID,
           sucursal: suc||'Migracion',
@@ -764,6 +771,7 @@
       sec('Amortización (n='+state.amortizacion.length+')', state.amortizacion.slice(0,5).concat([{info:`… ${Math.max(0,state.amortizacion.length-5)} filas más`} ]));
       sec('Pagos (n='+state.pagos.length+')', state.pagos);
     }
+
     document.getElementById('btnIntegrar').addEventListener('click', ()=>{
       pintarResumen();
       alert('Integración lista','Documentos guardados en Firestore/Storage.','success');
@@ -772,4 +780,6 @@
   </script>
 </body>
 </html>
+
+
 

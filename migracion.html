@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Panel de Integración – Multi Inversiones (SIN LOGIN)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    :root{ --bg:#0f1216;--card:#161a20;--muted:#9aa4b2;--text:#e9eef5;--brand:#f8af40;--ok:#22c55e;--err:#ef4444; --radius:16px }
+    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+    body{margin:0;background:linear-gradient(180deg,#0d0f13,#11151b);color:var(--text)}
+    header{position:sticky;top:0;background:rgba(15,18,22,.8);backdrop-filter:saturate(140%) blur(6px);border-bottom:1px solid #22262d;z-index:10}
+    header .wrap{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:14px 20px}
+    .logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.3px}
+    .logo .dot{width:12px;height:12px;border-radius:999px;background:var(--brand)}
+    .container{max-width:1160px;margin:22px auto;padding:0 16px 80px}
+    .card{background:var(--card);border:1px solid #232833;border-radius:var(--radius);padding:18px}
+    h2{margin:0 0 8px 0;font-size:20px}
+    h3{margin:14px 0 8px 0;font-size:16px;color:#c9d2df}
+    .muted{color:var(--muted);font-size:13px}
+    .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+    .field{display:flex;flex-direction:column;gap:6px}
+    label{font-size:12px;color:#b7c2d1}
+    input,select,textarea{background:#0f1318;color:var(--text);border:1px solid #273041;border-radius:12px;padding:10px 12px;font-size:14px;outline:none}
+    input:focus,select:focus,textarea:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.2)}
+    textarea{min-height:88px;resize:vertical}
+    .col-12{grid-column:span 12}.col-8{grid-column:span 8}.col-6{grid-column:span 6}.col-4{grid-column:span 4}.col-3{grid-column:span 3}.col-2{grid-column:span 2}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    button{background:#1d2939;color:#e9eef5;border:1px solid #2a3444;border-radius:12px;padding:10px 14px;font-weight:600;cursor:pointer}
+    button.primary{background:var(--brand);border-color:#c6892b;color:#1a1206}
+    button.success{background:var(--ok);border-color:#17a34a;color:#07140b}
+    .stepper{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+    .chip{padding:6px 10px;border-radius:999px;border:1px solid #2b3241;background:#121721;font-size:12px}
+    .chip.active{background:#1e293b;border-color:#334155}
+    .chip.done{background:#0f2c16;border-color:#144d2a;color:#b7ffd0}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{font-size:13px;padding:8px;border-bottom:1px solid #263144}
+    th{color:#c9d2df;text-align:left}
+    .tag{display:inline-flex;align-items:center;gap:6px;background:#141a22;border:1px solid #263144;color:#b9c3d0;border-radius:999px;padding:4px 8px;font-size:12px}
+    .code{font-family:ui-monospace,Consolas,Menlo,monospace;color:#b8e3ff}
+    .hidden{display:none}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="logo"><span class="dot"></span> Panel de Integración (sin login)</div>
+      <div class="muted">Solo uso interno</div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <div class="stepper" id="steps">
+        <div class="chip active" data-step="0">Paso 0 · Cliente</div>
+        <div class="chip" data-step="1">Paso 1 · Solicitud</div>
+        <div class="chip" data-step="2">Paso 2 · Crédito</div>
+        <div class="chip" data-step="3">Paso 3 · Amortización</div>
+        <div class="chip" data-step="4">Paso 4 · Pagos Históricos</div>
+        <div class="chip" data-step="5">Paso 5 · Confirmación</div>
+      </div>
+      <div class="muted">Flujo guiado para migrar créditos al nuevo sistema. Valida y guarda en Firestore/Storage. Todos los campos clave son obligatorios.</div>
+    </div>
+
+    <!-- PASO 0: CLIENTE -->
+    <section class="card" id="step0">
+      <h2>Paso 0 — Cliente</h2>
+      <div class="muted">Busca por <b>DUI</b> o <b>Teléfono</b>. Si no existe, lo creas aquí. Al continuar se fija el <span class="tag">clienteID</span>.</div>
+      <div class="row" style="margin-top:10px">
+        <div class="field col-3"><label>DUI</label><input id="u_dui" placeholder="########-#" maxlength="10"></div>
+        <div class="field col-3"><label>Teléfono</label><input id="u_tel" placeholder="####-####" maxlength="9"></div>
+        <div class="field col-3"><label>Nombre</label><input id="u_nombre" placeholder="Nombres"></div>
+        <div class="field col-3"><label>Apellido</label><input id="u_apellido" placeholder="Apellidos"></div>
+        <div class="field col-4"><label>Departamento</label><input id="u_depto" placeholder="Sonsonate, Santa Ana…"></div>
+        <div class="field col-4"><label>Municipio</label><input id="u_muni" placeholder="Juayúa, Ahuachapán Centro…"></div>
+        <div class="field col-4"><label>Dirección</label><input id="u_dir" placeholder="Colonia / Cantón / Punto de Ref."></div>
+        <div class="field col-3"><label>Género</label>
+          <select id="u_genero">
+            <option value="">Selecciona…</option>
+            <option>Femenino</option>
+            <option>Masculino</option>
+            <option>Otro / Prefiero no decir</option>
+          </select>
+        </div>
+        <div class="field col-3"><label>Fecha de nacimiento</label><input id="u_nac" type="date"></div>
+        <div class="field col-3"><label>Email (opcional)</label><input id="u_email" type="email" placeholder="correo@dominio.com"></div>
+        <div class="field col-3"><label>Estrellas</label>
+          <select id="u_stars">
+            <option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btnBuscarCliente">Buscar</button>
+        <button id="btnGuardarCliente" class="primary">Crear/Actualizar Cliente</button>
+        <span class="tag" id="clienteIDTag">clienteID: —</span>
+      </div>
+    </section>
+
+    <!-- PASO 1: ARCHIVO DE SOLICITUDES (COMPLETO, SIN OMITIR CAMPOS) -->
+    <section class="card hidden" id="step1">
+      <h2>Paso 1 — Archivo de Solicitudes (COMPLETO)</h2>
+      <div class="muted">Se vincula a <span class="tag" id="clienteIDTag2">clienteID: —</span>. Incluye todos los datos que manejan actualmente.</div>
+
+      <h3>Datos Generales de Solicitud</h3>
+      <div class="row">
+        <div class="field col-3"><label>Analista ID</label><input id="s_analistaID" placeholder="uid del analista"></div>
+        <div class="field col-3"><label>Crédito (línea)</label><select id="s_creditLine"><option>Credicash</option><option>Credicel</option><option>Amuebla2</option></select></div>
+        <div class="field col-3"><label>Estado de solicitud</label><select id="s_estado"><option>Aprobado</option><option>Rechazado</option><option>Pendiente</option></select></div>
+        <div class="field col-3"><label>Fecha de solicitud</label><input id="s_fechaSolicitud" type="date"></div>
+      </div>
+
+      <h3>Datos Laborales</h3>
+      <div class="row">
+        <div class="field col-3"><label>Profesión / Ocupación</label><input id="s_profesion"></div>
+        <div class="field col-3"><label>Lugar de trabajo</label><input id="s_lugarTrabajo"></div>
+        <div class="field col-3"><label>Dirección de trabajo</label><input id="s_direccionTrabajo"></div>
+        <div class="field col-3"><label>Tiempo de servicio</label><input id="s_tiempoServicio" placeholder="2 años"></div>
+        <div class="field col-3"><label>Jefe inmediato</label><input id="s_jefe"></div>
+        <div class="field col-3"><label>Tel. Jefe</label><input id="s_telJefe" placeholder="####-####" maxlength="9"></div>
+        <div class="field col-3"><label>Pago de sueldo</label><select id="s_pagoSueldo"><option>Semanal</option><option>Quincenal</option><option>Catorcenal</option><option>Mensual</option></select></div>
+        <div class="field col-3"><label>Tipo de vivienda</label><select id="s_tipoVivienda"><option>Familiar</option><option>Propia</option><option>Alquilada</option><option>Otra</option></select></div>
+      </div>
+
+      <h3>Ingresos Mensuales</h3>
+      <div class="row">
+        <div class="field col-2"><label>Sueldo</label><input id="i_sueldo" type="number" step="0.01"></div>
+        <div class="field col-2"><label>Comisiones</label><input id="i_comisiones" type="number" step="0.01" value="0"></div>
+        <div class="field col-2"><label>Ventas netas</label><input id="i_ventas" type="number" step="0.01" value="0"></div>
+        <div class="field col-2"><label>Ayuda familiar</label><input id="i_ayuda" type="number" step="0.01" value="0"></div>
+        <div class="field col-2"><label>Remesas</label><input id="i_remesas" type="number" step="0.01" value="0"></div>
+        <div class="field col-2"><label>Pensiones</label><input id="i_pensiones" type="number" step="0.01" value="0"></div>
+        <div class="field col-2"><label>Total (auto)</label><input id="i_total" readonly></div>
+      </div>
+
+      <h3>Gastos Mensuales</h3>
+      <div class="row">
+        <div class="field col-2"><label>Alimenticios</label><input id="g_aliment" type="number" step="0.01"></div>
+        <div class="field col-2"><label>Familiares</label><input id="g_fam" type="number" step="0.01" value="0"></div>
+        <div class="field col-2"><label>Compras netas</label><input id="g_compras" type="number" step="0.01" value="0"></div>
+        <div class="field col-2"><label>Pago créditos</label><input id="g_creditos" type="number" step="0.01" value="0"></div>
+        <div class="field col-2"><label>Alquiler</label><input id="g_alq" type="number" step="0.01" value="0"></div>
+        <div class="field col-2"><label>Servicios básicos</label><input id="g_serv" type="number" step="0.01"></div>
+        <div class="field col-2"><label>Total (auto)</label><input id="g_total" readonly></div>
+      </div>
+
+      <h3>Solicitud de Monto</h3>
+      <div class="row">
+        <div class="field col-3"><label>Monto a solicitar ($)</label><input id="s_montoSolicitar" type="number" step="0.01"></div>
+        <div class="field col-3"><label>Plazo solicitado (#)</label><input id="s_plazoSolicitado" type="number"></div>
+        <div class="field col-3"><label>Frecuencia solicitada</label><select id="s_frecuenciaSolicitada"><option>Semanal</option><option>Catorcenal</option><option>Quincenal</option><option>Mensual</option></select></div>
+        <div class="field col-3"><label>Observaciones</label><input id="s_observaciones"></div>
+      </div>
+
+      <h3>Referencias – Familiares (3)</h3>
+      <div class="row">
+        <div class="field col-3"><label>F1 Nombre</label><input id="f1_nombre"></div>
+        <div class="field col-2"><label>Parentesco</label><input id="f1_parentesco"></div>
+        <div class="field col-2"><label>Teléfono</label><input id="f1_tel" placeholder="####-####" maxlength="9"></div>
+        <div class="field col-5"><label>Dirección</label><input id="f1_dir"></div>
+
+        <div class="field col-3"><label>F2 Nombre</label><input id="f2_nombre"></div>
+        <div class="field col-2"><label>Parentesco</label><input id="f2_parentesco"></div>
+        <div class="field col-2"><label>Teléfono</label><input id="f2_tel" placeholder="####-####" maxlength="9"></div>
+        <div class="field col-5"><label>Dirección</label><input id="f2_dir"></div>
+
+        <div class="field col-3"><label>F3 Nombre</label><input id="f3_nombre"></div>
+        <div class="field col-2"><label>Parentesco</label><input id="f3_parentesco"></div>
+        <div class="field col-2"><label>Teléfono</label><input id="f3_tel" placeholder="####-####" maxlength="9"></div>
+        <div class="field col-5"><label>Dirección</label><input id="f3_dir"></div>
+      </div>
+
+      <h3>Referencias – Personales (3)</h3>
+      <div class="row">
+        <div class="field col-3"><label>P1 Nombre</label><input id="p1_nombre"></div>
+        <div class="field col-2"><label>Parentesco</label><input id="p1_parentesco" placeholder="Amigo/Vecino…"></div>
+        <div class="field col-2"><label>Teléfono</label><input id="p1_tel" placeholder="####-####" maxlength="9"></div>
+        <div class="field col-5"><label>Dirección</label><input id="p1_dir"></div>
+
+        <div class="field col-3"><label>P2 Nombre</label><input id="p2_nombre"></div>
+        <div class="field col-2"><label>Parentesco</label><input id="p2_parentesco"></div>
+        <div class="field col-2"><label>Teléfono</label><input id="p2_tel" placeholder="####-####" maxlength="9"></div>
+        <div class="field col-5"><label>Dirección</label><input id="p2_dir"></div>
+
+        <div class="field col-3"><label>P3 Nombre</label><input id="p3_nombre"></div>
+        <div class="field col-2"><label>Parentesco</label><input id="p3_parentesco"></div>
+        <div class="field col-2"><label>Teléfono</label><input id="p3_tel" placeholder="####-####" maxlength="9"></div>
+        <div class="field col-5"><label>Dirección</label><input id="p3_dir"></div>
+      </div>
+
+      <h3>Datos Familiares / Conyugue</h3>
+      <div class="row">
+        <div class="field col-4"><label>Nombre de cónyuge</label><input id="s_nombreConyugue"></div>
+        <div class="field col-4"><label>Teléfono de cónyuge</label><input id="s_numeroConyugue" placeholder="####-####" maxlength="9"></div>
+        <div class="field col-4"><label>Hijos (número)</label><input id="s_hijos" type="number" min="0"></div>
+      </div>
+
+      <h3>Evidencias</h3>
+      <div class="row">
+        <div class="field col-4"><label>DUI anverso (jpg/png/pdf)</label><input id="e_dui_front" type="file" accept="image/*,application/pdf"></div>
+        <div class="field col-4"><label>DUI reverso (jpg/png/pdf)</label><input id="e_dui_back" type="file" accept="image/*,application/pdf"></div>
+        <div class="field col-4"><label>Comprobantes ingreso (múltiples)</label><input id="e_comprobante" type="file" multiple accept="image/*,application/pdf"></div>
+      </div>
+
+      <div class="actions">
+        <button id="btnGuardarSolicitud" class="primary">Guardar Solicitud</button>
+        <span class="tag" id="solicitudIDTag">solicitudID: —</span>
+      </div>
+    </section>
+
+    <!-- PASO 2: CRÉDITO -->
+    <section class="card hidden" id="step2">
+      <h2>Paso 2 — Crédito</h2>
+      <div class="muted">Define los datos del crédito. Se creará el documento en <span class="tag">creditos</span>.</div>
+      <div class="row" style="margin-top:10px">
+        <div class="field col-3"><label>Agencia asignada</label><input id="c_agencia" placeholder="Ahuachapán / Sonsonate…"></div>
+        <div class="field col-3"><label>Asesor</label><input id="c_asesor" placeholder="Nombre del ejecutivo"></div>
+        <div class="field col-3"><label>Línea de crédito</label>
+          <select id="c_linea"><option>Credicash</option><option>Credicel</option><option>Amuebla2</option></select>
+        </div>
+        <div class="field col-3"><label>Estado crédito</label>
+          <select id="c_estado"><option>Activo</option><option>Pagado</option><option>En Mora</option></select>
+        </div>
+        <div class="field col-3"><label>Monto aprobado ($)</label><input id="c_monto" type="number" step="0.01"></div>
+        <div class="field col-3"><label>Saldo inicial ($)</label><input id="c_saldoIni" type="number" step="0.01"></div>
+        <div class="field col-3"><label>Saldo actual ($)</label><input id="c_saldoAct" type="number" step="0.01" value="0"></div>
+        <div class="field col-3"><label>Cuota aprobada ($)</label><input id="c_cuota" type="number" step="0.01"></div>
+        <div class="field col-3"><label># de cuotas</label><input id="c_numCuotas" type="number" min="1"></div>
+        <div class="field col-3"><label>Frecuencia</label>
+          <select id="c_freq"><option>Semanal</option><option>Catorcenal</option><option>Quincenal</option><option>Mensual</option></select>
+        </div>
+        <div class="field col-3"><label>Tasa anual (%)</label><input id="c_tasaAnual" type="number" step="0.01" value="180"></div>
+        <div class="field col-3"><label>Tasa diaria (auto)</label><input id="c_tasaDiaria" readonly></div>
+        <div class="field col-3"><label>Fecha inicio</label><input id="c_fechaInicio" type="date"></div>
+        <div class="field col-3"><label>Interés actual ($)</label><input id="c_interesActual" type="number" step="0.01" value="0"></div>
+        <div class="field col-3"><label>Multas acumuladas ($)</label><input id="c_multas" type="number" step="0.01" value="0"></div>
+        <div class="field col-3"><label>Para ponerse al día ($)</label><input id="c_ppaldia" type="number" step="0.01" value="0"></div>
+      </div>
+      <div class="actions">
+        <button id="btnCalcularTasa">Calcular tasa diaria</button>
+        <button id="btnCrearCredito" class="primary">Crear Crédito</button>
+        <span class="tag" id="creditoIDTag">creditoID: —</span>
+      </div>
+    </section>
+
+    <!-- PASO 3: AMORTIZACIÓN -->
+    <section class="card hidden" id="step3">
+      <h2>Paso 3 — Amortización</h2>
+      <div class="muted">Genera automáticamente o carga un CSV con <span class="code">fecha,cuota,capital,interes,saldo</span>. Se valida contra el monto.</div>
+      <div class="row">
+        <div class="field col-3"><label>Generar desde fecha</label><input id="a_start" type="date"></div>
+        <div class="field col-3"><label>Periodicidad</label><select id="a_freq"><option>Semanal</option><option>Catorcenal</option><option>Quincenal</option><option>Mensual</option></select></div>
+        <div class="field col-2"><label>N° de cuotas</label><input id="a_n" type="number" min="1"></div>
+        <div class="field col-2"><label>Cuota ($)</label><input id="a_cuota" type="number" step="0.01"></div>
+        <div class="field col-2"><label>Monto aprobado ($)</label><input id="a_monto" type="number" step="0.01"></div>
+        <div class="field col-2"><label>Tasa anual (%)</label><input id="a_tasa" type="number" step="0.01"></div>
+        <div class="field col-4"><label>CSV (opcional)</label><input id="a_csv" type="file" accept=".csv"></div>
+      </div>
+      <div class="actions">
+        <button id="btnGenerarAmort">Generar tabla</button>
+        <button id="btnCargarCSV">Cargar CSV</button>
+        <button id="btnGuardarAmort" class="primary">Guardar en crédito</button>
+      </div>
+      <div class="muted">Chequeo: <span id="chkAmort" class="tag">Pendiente</span></div>
+      <div style="max-height:320px;overflow:auto;border:1px solid #273041;border-radius:12px;margin-top:10px">
+        <table id="amortTable">
+          <thead><tr><th>#</th><th>Fecha</th><th>Cuota</th><th>Capital</th><th>Interés</th><th>Saldo</th><th>Estado</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PASO 4: PAGOS HISTÓRICOS -->
+    <section class="card hidden" id="step4">
+      <h2>Paso 4 — Pagos Históricos (retroactivos)</h2>
+      <div class="muted">CSV: <span class="code">fechaPago,montoPagado</span> o con desglose <span class="code">pagoCapital,pagoInteres,pagoMulta</span>. Se registran en <b>pagos</b>.</div>
+      <div class="row">
+        <div class="field col-4"><label>CSV de pagos</label><input id="p_csv" type="file" accept=".csv"></div>
+        <div class="field col-4"><label>Sucursal</label><input id="p_sucursal" placeholder="Ahuachapán / Sonsonate…"></div>
+        <div class="field col-4"><label>UsuarioID (quien registra)</label><input id="p_usuario" placeholder="opcional"></div>
+      </div>
+      <div class="actions">
+        <button id="btnCargarPagos">Cargar CSV</button>
+        <button id="btnGuardarPagos" class="primary">Guardar pagos</button>
+      </div>
+      <div style="max-height:280px;overflow:auto;border:1px solid #273041;border-radius:12px;margin-top:10px">
+        <table id="pagosTable">
+          <thead><tr><th>#</th><th>Fecha Pago</th><th>Monto</th><th>Capital</th><th>Interés</th><th>Multa</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PASO 5: CONFIRMACIÓN -->
+    <section class="card hidden" id="step5">
+      <h2>Paso 5 — Confirmación</h2>
+      <div class="muted">Revisa y confirma. Verás un resumen final de todo lo guardado.</div>
+      <div id="resumen" class="row"></div>
+      <div class="actions">
+        <button id="btnIntegrar" class="success">Finalizar</button>
+        <button id="btnReiniciar">Reiniciar</button>
+      </div>
+    </section>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-storage.js";
+
+    // ===== Configuración Firebase (SIN LOGIN) =====
+    const firebaseConfig = { apiKey: "PASTE_YOUR_API_KEY", authDomain: "YOUR_PROJECT.firebaseapp.com", projectId: "YOUR_PROJECT", storageBucket: "YOUR_PROJECT.appspot.com", messagingSenderId: "", appId: "" };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    // ===== Estado global
+    const state = { clienteID:null, cliente:{}, solicitudID:null, solicitud:{}, creditoID:null, credito:{}, amortizacion:[], pagos:[] };
+
+    // ===== Utils
+    const $ = s => document.querySelector(s);
+    const fmt = n => Number(n||0).toFixed(2);
+    const alert = (title, text, icon='info')=>Swal.fire({title, text, icon, confirmButtonColor:'#f8af40'});
+    function setStep(idx){ document.querySelectorAll('.chip').forEach((c,i)=>{ c.classList.toggle('active', i===idx); if(i<idx) c.classList.add('done'); else if(i>idx) c.classList.remove('done');}); for(let i=0;i<=5;i++){ $('#step'+i)?.classList.add('hidden'); } $('#step'+idx).classList.remove('hidden'); window.scrollTo({top:0,behavior:'smooth'});}    
+    function maskTel(v){ v=(v||'').replace(/[^0-9]/g,'').slice(0,8); if(v.length>4) v=v.slice(0,4)+'-'+v.slice(4); return v; }
+
+    // ===== Paso 0: Cliente
+    ['u_tel','s_telJefe','f1_tel','f2_tel','f3_tel','p1_tel','p2_tel','p3_tel','s_numeroConyugue'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('input', e=> e.target.value = maskTel(e.target.value)); });
+
+    async function buscarCliente(){
+      const dui=$('#u_dui').value?.trim(); const tel=$('#u_tel').value?.trim(); if(!dui && !tel){return alert('Falta dato','Ingresa DUI o teléfono para buscar','warning');}
+      let q = dui? query(collection(db,'users'), where('numeroDui','==',dui)) : query(collection(db,'users'), where('telefono','==',tel));
+      const snap = await getDocs(q);
+      if(snap.empty){ alert('No encontrado','Puedes crear un nuevo usuario con estos datos','info'); return; }
+      const d = snap.docs[0]; state.clienteID = d.id; state.cliente = d.data();
+      $('#u_nombre').value = state.cliente.nombre||''; $('#u_apellido').value = state.cliente.apellido||''; $('#u_email').value = state.cliente.email||''; $('#u_tel').value = state.cliente.telefono||''; $('#u_genero').value = state.cliente.genero||''; $('#u_depto').value = state.cliente.department||''; $('#u_muni').value = state.cliente.municipio||''; $('#u_dir').value = state.cliente.direccion||''; $('#u_nac').value = (state.cliente.dateOfBirth||'').slice(0,10); $('#u_stars').value = state.cliente.estrellas||'5';
+      $('#clienteIDTag').textContent = `clienteID: ${state.clienteID}`; $('#clienteIDTag2').textContent = `clienteID: ${state.clienteID}`; setStep(1);
+    }
+
+    async function guardarCliente(){
+      const datos = {
+        nombre: $('#u_nombre').value.trim(), apellido: $('#u_apellido').value.trim(), email: $('#u_email').value.trim(), telefono: $('#u_tel').value.trim(), numeroDui: $('#u_dui').value.trim(), genero: $('#u_genero').value, department: $('#u_depto').value.trim(), municipio: $('#u_muni').value.trim(), direccion: $('#u_dir').value.trim(), dateOfBirth: $('#u_nac').value? new Date($('#u_nac').value).toISOString(): '', rol:'user', estrellas: Number($('#u_stars').value||5), fecha_registro: serverTimestamp()
+      };
+      if(!datos.nombre||!datos.apellido||!datos.telefono||!datos.numeroDui){ return alert('Campos obligatorios','Nombre, apellido, teléfono y DUI son obligatorios','warning'); }
+      let id = state.clienteID; if(id){ await setDoc(doc(db,'users',id), {...state.cliente,...datos}, {merge:true}); } else { const ref = doc(collection(db,'users')); id = ref.id; await setDoc(ref, datos); }
+      state.clienteID = id; state.cliente = datos; $('#clienteIDTag').textContent = `clienteID: ${id}`; $('#clienteIDTag2').textContent = `clienteID: ${id}`; setStep(1);
+    }
+    $('#btnBuscarCliente').addEventListener('click', buscarCliente); $('#btnGuardarCliente').addEventListener('click', guardarCliente);
+
+    // Totales auto
+    const ingresosIds=['i_sueldo','i_comisiones','i_ventas','i_ayuda','i_remesas','i_pensiones']; const gastosIds=['g_aliment','g_fam','g_compras','g_creditos','g_alq','g_serv'];
+    ingresosIds.forEach(id=> $('#'+id).addEventListener('input',()=>{ const total = ingresosIds.reduce((s,id)=> s + Number($('#'+id).value||0), 0); $('#i_total').value = fmt(total); }));
+    gastosIds.forEach(id=> $('#'+id).addEventListener('input',()=>{ const total = gastosIds.reduce((s,id)=> s + Number($('#'+id).value||0), 0); $('#g_total').value = fmt(total); }));
+
+    // Subidas a Storage
+    import { v4 as uuidv4 } from 'https://jspm.dev/uuid';
+    async function uploadIfAny(file, path){ if(!file) return ''; const r = ref(storage, path); await uploadBytes(r, file); return await getDownloadURL(r); }
+
+    async function guardarSolicitud(){
+      if(!state.clienteID) return alert('Falta cliente','Completa el Paso 0','warning');
+      const datos = {
+        clienteID: state.clienteID,
+        fechaSolicitud: $('#s_fechaSolicitud').value? new Date($('#s_fechaSolicitud').value).toISOString(): new Date().toISOString(),
+        lineaDeCredito: $('#s_creditLine').value,
+        departamento: $('#u_depto').value||'', municipio: $('#u_muni').value||'', direccion: $('#u_dir').value||'',
+        estado: $('#s_estado').value,
+        estadoCivil: $('#s_estadoCivil')?.value||'',
+        profesion: $('#s_profesion').value.trim(), lugarTrabajo: $('#s_lugarTrabajo').value.trim(), direccionTrabajo: $('#s_direccionTrabajo').value.trim(), tiempoServicio: $('#s_tiempoServicio').value.trim(), jefeInmediato: $('#s_jefe').value.trim(), telefonoJefe: $('#s_telJefe').value.trim(), pagoSueldo: $('#s_pagoSueldo').value, tipoVivienda: $('#s_tipoVivienda').value,
+        ingresosTotales: Number($('#i_total').value||0), egresosTotales: Number($('#g_total').value||0), solvenciaEconomica: Number($('#i_total').value||0) - Number($('#g_total').value||0),
+        ingresos: { sueldo: Number($('#i_sueldo').value||0), comisiones: Number($('#i_comisiones').value||0), ventasNetas: Number($('#i_ventas').value||0), ayudaFamiliar: Number($('#i_ayuda').value||0), remesas: Number($('#i_remesas').value||0), pensiones: Number($('#i_pensiones').value||0) },
+        gastos: { alimenticios: Number($('#g_aliment').value||0), familiares: Number($('#g_fam').value||0), comprasNetas: Number($('#g_compras').value||0), pagoCreditos: Number($('#g_creditos').value||0), alquiler: Number($('#g_alq').value||0), serviciosBasicos: Number($('#g_serv').value||0) },
+        montoSolicitar: Number($('#s_montoSolicitar').value||0), plazoSolicitado: Number($('#s_plazoSolicitado').value||0), frecuenciaSolicitada: $('#s_frecuenciaSolicitada').value,
+        observaciones: $('#s_observaciones').value.trim(),
+        familiares:[ {nombre:$('#f1_nombre').value, parentesco:$('#f1_parentesco').value, telefono:$('#f1_tel').value, direccion:$('#f1_dir').value}, {nombre:$('#f2_nombre').value, parentesco:$('#f2_parentesco').value, telefono:$('#f2_tel').value, direccion:$('#f2_dir').value}, {nombre:$('#f3_nombre').value, parentesco:$('#f3_parentesco').value, telefono:$('#f3_tel').value, direccion:$('#f3_dir').value} ],
+        personales:[ {nombre:$('#p1_nombre').value, parentesco:$('#p1_parentesco').value, telefono:$('#p1_tel').value, direccion:$('#p1_dir').value}, {nombre:$('#p2_nombre').value, parentesco:$('#p2_parentesco').value, telefono:$('#p2_tel').value, direccion:$('#p2_dir').value}, {nombre:$('#p3_nombre').value, parentesco:$('#p3_parentesco').value, telefono:$('#p3_tel').value, direccion:$('#p3_dir').value} ],
+        nombreConyugue: $('#s_nombreConyugue').value||null, numeroConyugue: $('#s_numeroConyugue').value||null, hijos: Number($('#s_hijos').value||0),
+        evidencias: {}, migratedAt: serverTimestamp()
+      };
+      if(!datos.profesion||!datos.lugarTrabajo){ return alert('Faltan datos','Profesión y Lugar de trabajo son obligatorios','warning'); }
+      const fFront = $('#e_dui_front').files[0]; const fBack  = $('#e_dui_back').files[0]; const fComp  = $('#e_comprobante').files;
+      const base = `SolicitudesCredito/${state.clienteID}/`;
+      datos.evidencias.dui_front = await uploadIfAny(fFront, base+`dui_front_${Date.now()}`);
+      datos.evidencias.dui_back  = await uploadIfAny(fBack,  base+`dui_back_${Date.now()}`);
+      if(fComp?.length){ datos.evidencias.comprobantes=[]; for(let i=0;i<fComp.length;i++){ const url = await uploadIfAny(fComp[i], base+`comprobante_${i}_${Date.now()}`); datos.evidencias.comprobantes.push(url);} }
+      let refId = state.solicitudID || doc(collection(db,'Archivo Solicitudes')).id; await setDoc(doc(db,'Archivo Solicitudes', refId), datos, {merge:true}); state.solicitudID = refId; state.solicitud = datos; $('#solicitudIDTag').textContent = `solicitudID: ${refId}`; setStep(2);
+    }
+    $('#btnGuardarSolicitud').addEventListener('click', guardarSolicitud);
+
+    // Paso 2: Crédito
+    $('#btnCalcularTasa').addEventListener('click', ()=>{ const a = Number($('#c_tasaAnual').value||0)/100; const diaria = a/365; $('#c_tasaDiaria').value = diaria.toFixed(9); });
+    async function crearCredito(){
+      if(!state.clienteID) return alert('Falta cliente','Completa el Paso 0','warning');
+      const datos = { clienteID: state.clienteID, agenciaAsignada: $('#c_agencia').value.trim(), asignadoA: $('#c_asesor').value.trim(), lineaDeCredito: $('#c_linea').value, estadoCredito: $('#c_estado').value, montoAprobado: Number($('#c_monto').value||0), saldoInicial: Number($('#c_saldoIni').value||0), saldoActual: Number($('#c_saldoAct').value||0), cuotaAprobada: Number($('#c_cuota').value||0), numeroCuotas: Number($('#c_numCuotas').value||0), frecuenciaPago: $('#c_freq').value, tasaAnualCredito: Number($('#c_tasaAnual').value||0), tasaDiariaCredito: Number($('#c_tasaDiaria').value||0), fechaInicio: $('#c_fechaInicio').value? new Date($('#c_fechaInicio').value).toISOString(): '', interesActual: Number($('#c_interesActual').value||0), multasAcumuladas: Number($('#c_multas').value||0), paraPonerseAlDia: Number($('#c_ppaldia').value||0), fechaUltimoCalculoIntereses: serverTimestamp(), capitalAtrasado: 0, cuotasAtrasadas: 0, amortizacion: [] };
+      if(!datos.montoAprobado||!datos.numeroCuotas||!datos.cuotaAprobada){ return alert('Faltan datos','Monto, #cuotas y cuota aprobada son obligatorios','warning'); }
+      let id = state.creditoID || doc(collection(db,'creditos')).id; await setDoc(doc(db,'creditos', id), datos, {merge:true}); state.creditoID = id; state.credito = datos; $('#creditoIDTag').textContent = `creditoID: ${id}`;
+      $('#a_start').value = ($('#c_fechaInicio').value)||''; $('#a_freq').value = $('#c_freq').value; $('#a_n').value = $('#c_numCuotas').value; $('#a_cuota').value = $('#c_cuota').value; $('#a_monto').value = $('#c_monto').value; $('#a_tasa').value = $('#c_tasaAnual').value; setStep(3);
+    }
+    $('#btnCrearCredito').addEventListener('click', crearCredito);
+
+    // Paso 3: Amortización
+    function addDays(date, days){ const d=new Date(date); d.setDate(d.getDate()+days); return d}
+    function nextDate(d, freq){ if(freq==='Semanal') return addDays(d,7); if(freq==='Catorcenal') return addDays(d,14); if(freq==='Quincenal') return addDays(d,15); if(freq==='Mensual'){ const x=new Date(d); x.setMonth(x.getMonth()+1); return x } return addDays(d,14); }
+    function generarAmort(){ const start=$('#a_start').value; if(!start) return alert('Falta fecha','Elige fecha de inicio','warning'); const n=Number($('#a_n').value||0), cuota=Number($('#a_cuota').value||0), monto=Number($('#a_monto').value||0); if(!n||!cuota||!monto) return alert('Faltan datos','N° cuotas, cuota y monto son obligatorios','warning'); let saldo=monto; const freq=$('#a_freq').value; const tasa=Number($('#a_tasa').value||0)/100; let date=new Date(start); const rows=[]; for(let i=1;i<=n;i++){ const interes = Math.max(0, +(saldo * (tasa/ (freq==='Mensual'?12: (freq==='Semanal'?52:26)))).toFixed(2)); let capital = +(cuota - interes).toFixed(2); if(capital>saldo) { capital = saldo; } saldo = +(saldo - capital).toFixed(2); rows.push({ numeroCuota:i, fecha:new Date(date).toISOString().slice(0,10), cuota:+cuota.toFixed(2), capital:+capital.toFixed(2), interes:+interes.toFixed(2), saldo:+saldo.toFixed(2), estado:'Pendiente', montoPagado:0, montoPagadoInteres:0, fechaPagoReal:null }); date = nextDate(date, freq); } renderAmort(rows); }
+    function renderAmort(rows){ const tb=$('#amortTable tbody'); tb.innerHTML=''; let sumCap=0; let lastSaldo=0; rows.forEach(r=>{ sumCap+=Number(r.capital); lastSaldo=r.saldo; const tr=document.createElement('tr'); tr.innerHTML=`<td>${r.numeroCuota}</td><td>${r.fecha}</td><td>${fmt(r.cuota)}</td><td>${fmt(r.capital)}</td><td>${fmt(r.interes)}</td><td>${fmt(r.saldo)}</td><td>${r.estado}</td>`; tb.appendChild(tr); }); state.amortizacion = rows; const ok = Math.abs(sumCap - Number($('#a_monto').value||0))<=0.02 && Math.abs(lastSaldo-0)<=0.02; $('#chkAmort').textContent = ok? `OK · capital=${fmt(sumCap)} saldo final=${fmt(lastSaldo)}`: `Revisar · capital=${fmt(sumCap)} saldo final=${fmt(lastSaldo)}`; $('#chkAmort').style.background = ok? '#0f2c16':'#2a1414'; }
+    function parseCSV(text){ const lines=text.trim().split(/
+?
+/); const hdr=lines.shift().split(',').map(s=>s.trim().toLowerCase()); const idx = (k)=> hdr.indexOf(k); const out=[]; let i=1; for(const line of lines){ const c=line.split(','); out.push({ numeroCuota:i++, fecha:(c[idx('fecha')]||'').trim(), cuota:Number(c[idx('cuota')]||0), capital:Number(c[idx('capital')]||0), interes:Number(c[idx('interes')]||0), saldo:Number(c[idx('saldo')]||0), estado:'Pendiente',montoPagado:0,montoPagadoInteres:0,fechaPagoReal:null }) } return out; }
+    $('#btnGenerarAmort').addEventListener('click', generarAmort); $('#btnCargarCSV').addEventListener('click', async ()=>{ const f=$('#a_csv').files[0]; if(!f) return alert('Sin archivo','Selecciona un CSV','warning'); const text = await f.text(); const rows = parseCSV(text); renderAmort(rows); });
+    async function guardarAmort(){ if(!state.creditoID) return alert('Falta crédito','Crea el crédito en Paso 2','warning'); if(!state.amortizacion.length) return alert('Sin tabla','Genera o carga una tabla','warning'); await updateDoc(doc(db,'creditos',state.creditoID), { amortizacion: state.amortizacion }); setStep(4); }
+    $('#btnGuardarAmort').addEventListener('click', guardarAmort);
+
+    // Paso 4: Pagos
+    function parsePagosCSV(text){ const lines=text.trim().split(/
+?
+/); const hdr=lines.shift().split(',').map(s=>s.trim().toLowerCase()); const g = k=> hdr.indexOf(k); const out=[]; let i=1; for(const line of lines){ const c=line.split(','); out.push({ idx:i++, fechaPago:(c[g('fechapago')]||c[g('fecha')]||'').trim(), montoPagado:Number(c[g('montopagado')]||c[g('monto')]||0), pagoCapital:Number(c[g('pagocapital')]||0), pagoInteres:Number(c[g('pagointeres')]||0), pagoMulta:Number(c[g('pagomulta')]||0) }) } return out; }
+    function renderPagos(rows){ const tb=$('#pagosTable tbody'); tb.innerHTML=''; rows.forEach((r,i)=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${r.fechaPago}</td><td>${fmt(r.montoPagado)}</td><td>${fmt(r.pagoCapital)}</td><td>${fmt(r.pagoInteres)}</td><td>${fmt(r.pagoMulta)}</td>`; tb.appendChild(tr); }); state.pagos = rows; }
+    $('#btnCargarPagos').addEventListener('click', async ()=>{ const f=$('#p_csv').files[0]; if(!f) return alert('Sin archivo','Selecciona un CSV','warning'); const text = await f.text(); renderPagos(parsePagosCSV(text)); });
+    async function guardarPagos(){ if(!state.creditoID) return alert('Falta crédito','Crea el crédito en Paso 2','warning'); if(!state.pagos.length){ setStep(5); return; } const suc=$('#p_sucursal').value.trim(); const usuario=$('#p_usuario').value.trim(); const batch = writeBatch(db); for(const p of state.pagos){ const ref = doc(collection(db,'pagos')); batch.set(ref, { pagoID: ref.id, creditoID: state.creditoID, clienteID: state.clienteID, sucursal: suc||'Migracion', correlativo: 0, fechaPago: p.fechaPago, fechaRegistro: new Date().toISOString(), montoPagado: Number(p.montoPagado||0), pagoCapital: Number(p.pagoCapital||0), pagoInteres: Number(p.pagoInteres||0), pagoMulta: Number(p.pagoMulta||0), retroactivo: true, cierre: false, anulado: false, motivo: 'Migración (abono histórico)', usuarioID: usuario||'', saldoRestante: '' }); } await batch.commit(); setStep(5); }
+    $('#btnGuardarPagos').addEventListener('click', guardarPagos);
+
+    // Paso 5: Confirmación
+    function pintarResumen(){ const r=$('#resumen'); r.innerHTML=''; const sec=(title, obj)=>{ const pre = document.createElement('pre'); pre.className='code'; pre.textContent=JSON.stringify(obj, null, 2); const box=document.createElement('div'); box.className='col-12'; box.innerHTML=`<h3>${title}</h3>`; box.appendChild(pre); r.appendChild(box); } ; sec('Usuario', {id:state.clienteID, ...state.cliente}); sec('Solicitud', {id:state.solicitudID, ...state.solicitud}); sec('Crédito', {id:state.creditoID, ...state.credito}); sec('Amortización (n='+state.amortizacion.length+')', state.amortizacion.slice(0,5).concat([{info:`… ${Math.max(0,state.amortizacion.length-5)} filas más`} ])); sec('Pagos (n='+state.pagos.length+')', state.pagos); }
+    $('#btnIntegrar').addEventListener('click', ()=>{ pintarResumen(); alert('Integración lista','Documentos guardados en Firestore/Storage.','success'); });
+    $('#btnReiniciar').addEventListener('click', ()=> location.reload());
+  </script>
+</body>
+</html>

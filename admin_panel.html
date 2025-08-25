@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel – Multi Inversiones</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{ --bg:#0f1216;--card:#151a22;--muted:#9aa4b2;--text:#e9eef5;--brand:#f8af40;--ok:#22c55e;--err:#ef4444;--line:#223044 }
+    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+    body{margin:0;background:radial-gradient(90% 60% at 50% 0%,#131923 0%,#0d1117 60%,#0b0e12 100%);color:var(--text)}
+    header{position:sticky;top:0;z-index:10;background:rgba(15,18,22,.8);backdrop-filter:saturate(140%) blur(8px);border-bottom:1px solid #222733}
+    .wrap{max-width:1100px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:14px;justify-content:space-between}
+    .logo{display:flex;align-items:center;gap:10px;font-weight:800}
+    .logo .dot{width:12px;height:12px;border-radius:999px;background:var(--brand)}
+    .top-right{display:flex;gap:8px;align-items:center}
+    .tag{background:#111823;border:1px solid #263144;color:#bec8d6;border-radius:999px;padding:6px 10px;font-size:12px}
+    .btn{background:#1f2837;border:1px solid #2e3a4f;color:#e9eef5;border-radius:10px;padding:8px 12px;font-weight:600;cursor:pointer}
+    .btn.signout{background:#2a1b1b;border-color:#472a2a}
+    .container{max-width:1100px;margin:20px auto;padding:0 16px 40px}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+    .card{grid-column:span 12;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+    .kpis{grid-column:span 12;display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+    .kpi{grid-column:span 3;background:#111722;border:1px solid var(--line);border-radius:14px;padding:14px}
+    .kpi h3{margin:4px 0 6px;font-size:14px;color:#c9d2df}
+    .kpi .num{font-size:22px;font-weight:800}
+    .apps{grid-column:span 12;display:grid;grid-template-columns:repeat(12,1fr);gap:14px;margin-top:10px}
+    .app{grid-column:span 4;background:#10151d;border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px}
+    .app h4{margin:0;font-size:16px}
+    .app p{margin:0;color:var(--muted);font-size:13px}
+    .app .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .app a{display:inline-block;text-decoration:none;color:#0ea5e9;border:1px solid #1c2c3f;background:#0b1320;padding:8px 10px;border-radius:10px;font-weight:600}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="logo"><span class="dot"></span> Admin Panel</div>
+      <div class="top-right">
+        <span id="who" class="tag">—</span>
+        <button id="btnSignOut" class="btn signout">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="grid">
+      <div class="card">
+        <h2 style="margin:0 0 8px 0">Resumen rápido</h2>
+        <div class="kpis">
+          <div class="kpi"><h3>Usuarios</h3><div class="num" id="kpiUsers">—</div></div>
+          <div class="kpi"><h3>Créditos</h3><div class="num" id="kpiCreds">—</div></div>
+          <div class="kpi"><h3>Activos</h3><div class="num" id="kpiActivos">—</div></div>
+          <div class="kpi"><h3>En Mora</h3><div class="num" id="kpiMora">—</div></div>
+        </div>
+      </div>
+
+      <div class="apps">
+        <div class="app">
+          <h4>Integración de Créditos</h4>
+          <p>Panel interno para cargar usuario, solicitud, crédito, amortización y pagos históricos.</p>
+          <div class="row">
+            <a href="./migracion.html">Abrir migración</a>
+          </div>
+        </div>
+
+        <div class="app">
+          <h4>Créditos (listado)</h4>
+          <p>Consulta, filtros y detalle de créditos con cronograma y pagos.</p>
+          <div class="row">
+            <a href="./creditos.html">Abrir listado</a>
+          </div>
+        </div>
+
+        <div class="app">
+          <h4>Registro de Clientes</h4>
+          <p>Enlace público para que el cliente se registre y se vincule por DUI.</p>
+          <div class="row">
+            <a href="../registro/index.html" target="_blank">Abrir página pública</a>
+          </div>
+        </div>
+
+        <div class="app">
+          <h4>Reportes</h4>
+          <p>Resumen de cartera por agencia/estado y mora (placeholder).</p>
+          <div class="row">
+            <a href="./reportes.html">Abrir reportes</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+
+    // ==== Firebase config (el mismo que en login) ====
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const $ = s => document.querySelector(s);
+
+    // Guardia de rol: solo admins
+    onAuthStateChanged(auth, async (user) => {
+      if(!user){
+        window.location.href = '../login.html';
+        return;
+      }
+      const snap = await getDoc(doc(db,'users', user.uid));
+      if(!snap.exists()){
+        window.location.href = '../login.html';
+        return;
+      }
+      const data = snap.data();
+      $('#who').textContent = `${data.nombre||'Usuario'} • rol: ${data.rol||'—'}`;
+      if((data.rol||'').toLowerCase() !== 'admin'){
+        window.location.href = '../usuario.html';
+        return;
+      }
+
+      // KPIs simples
+      try{
+        const usersSnap = await getDocs(collection(db,'users'));
+        $('#kpiUsers').textContent = usersSnap.size;
+      }catch{ $('#kpiUsers').textContent = '—'; }
+      try{
+        const credSnap = await getDocs(collection(db,'creditos'));
+        $('#kpiCreds').textContent = credSnap.size;
+        let activos=0, mora=0;
+        credSnap.forEach(d=>{
+          const e = (d.data().estadoCredito||'').toLowerCase();
+          if(e==='activo') activos++; else if(e.includes('mora')) mora++;
+        });
+        $('#kpiActivos').textContent = activos;
+        $('#kpiMora').textContent = mora;
+      }catch{ $('#kpiCreds').textContent = '—'; }
+    });
+
+    // Cerrar sesión
+    $('#btnSignOut').addEventListener('click', async ()=>{
+      await signOut(auth);
+      window.location.href = '../login.html';
+    });
+  </script>
+</body>
+</html>

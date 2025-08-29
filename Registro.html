@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Registro de Cliente – Vinculación por DUI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Vincular cuenta por DUI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -15,171 +15,287 @@
     header{padding:18px 20px;border-bottom:1px solid #232833}
     .logo{display:flex;align-items:center;gap:10px;font-weight:800}
     .logo .dot{width:12px;height:12px;border-radius:999px;background:var(--brand)}
-    .wrap{max-width:720px;margin:30px auto;padding:0 16px}
+    .wrap{max-width:760px;margin:32px auto;padding:0 16px}
     .card{background:#141923;border:1px solid #2a3342;border-radius:16px;padding:16px}
     h1{font-size:22px;margin:0 0 10px 0}
+    h2{font-size:16px;margin:14px 0 8px 0;color:#d9e3f0}
     .muted{color:#9aa4b2;font-size:13px}
-    .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;margin-top:12px}
+    .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
     .field{display:flex;flex-direction:column;gap:6px}
     label{font-size:12px;color:#c9d2df}
-    input,select{background:#0f141a;color:#e9eef5;border:1px solid #2a3444;border-radius:12px;padding:10px 12px;font-size:14px;outline:none}
-    input:focus,select:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.2)}
+    input{background:#0f141a;color:#e9eef5;border:1px solid #2a3444;border-radius:12px;padding:10px 12px;font-size:14px;outline:none}
+    input:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.2)}
     .col-12{grid-column:span 12}.col-8{grid-column:span 8}.col-6{grid-column:span 6}.col-4{grid-column:span 4}.col-3{grid-column:span 3}
-    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
     button{background:#1f2837;color:#e9eef5;border:1px solid #2e3a4f;border-radius:12px;padding:10px 14px;font-weight:600;cursor:pointer}
     button.primary{background:var(--brand);border-color:#c6892b;color:#15110a}
     button.success{background:var(--ok);border-color:#148f3a;color:#08140c}
     .tag{display:inline-flex;align-items:center;gap:6px;background:#141a22;border:1px solid #263144;color:#b9c3d0;border-radius:999px;padding:4px 8px;font-size:12px}
-    .card.success{border-color:#1f4630;background:#122017}
-    #listCreditos td, #listCreditos th{font-size:13px;padding:8px;border-bottom:1px solid #263144}
-    table{width:100%;border-collapse:collapse;margin-top:8px}
+    .hidden{display:none}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{font-size:13px;padding:8px;border-bottom:1px solid #263144}
+    th{color:#c9d2df;text-align:left}
+    .ok{color:#b7ffd0}
+    .warn{color:#ffd7a6}
   </style>
 </head>
 <body>
   <header>
-    <div class="logo"><span class="dot"></span> Registro de Cliente – Vinculación por DUI</div>
+    <div class="logo"><span class="dot"></span> Vincular cuenta por DUI</div>
   </header>
 
   <div class="wrap">
     <div class="card">
-      <h1>Verifica tu teléfono y vincula tu(s) crédito(s) con tu DUI</h1>
-      <p class="muted">Este proceso es para clientes. Necesitarás tu <b>DUI</b> y tu <b>teléfono</b> para confirmar identidad.</p>
+      <h1>Vincula tus créditos con tu usuario</h1>
+      <p class="muted">Ingresa tu <b>DUI</b> y tu <b>nombre</b>. El sistema buscará tus créditos y solicitudes que se migraron, y luego te pedirá tu <b>correo</b> y <b>contraseña</b> para crear/iniciar sesión y vincular todo a tu cuenta.</p>
 
+      <h2>1) Buscar por DUI</h2>
       <div class="row">
-        <div class="field col-6"><label>Teléfono (WhatsApp)</label><input id="r_phone" placeholder="####-####" maxlength="9"></div>
-        <div class="field col-6"><label>DUI</label><input id="r_dui" placeholder="########-#" maxlength="10"></div>
+        <div class="field col-6">
+          <label>DUI</label>
+          <input id="dui" placeholder="########-#" maxlength="10">
+        </div>
+        <div class="field col-6">
+          <label>Nombre</label>
+          <input id="nombre" placeholder="Tu nombre completo">
+        </div>
       </div>
-      <div id="recaptcha-container" style="margin-top:10px"></div>
       <div class="actions">
-        <button id="btnSendCode" class="primary">1) Enviar código SMS</button>
-        <div class="tag" id="smsStatus">SMS: —</div>
+        <button id="btnBuscar" class="primary">Buscar créditos/solicitudes</button>
+        <span id="statusBusca" class="tag">—</span>
       </div>
 
-      <div class="row" style="margin-top:10px">
-        <div class="field col-6"><label>Código recibido</label><input id="r_code" placeholder="123456" maxlength="6"></div>
-        <div class="field col-6"><label>Nombre (opcional)</label><input id="r_nombre" placeholder="Tu nombre"></div>
+      <div id="resultadoBusqueda" class="hidden" style="margin-top:6px">
+        <div class="muted" id="resumenEncontrados">—</div>
+        <table id="tablaResumen" class="hidden">
+          <thead><tr><th>Tipo</th><th>ID</th><th>Detalle</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <hr style="border:none;border-top:1px solid #2a3342;margin:16px 0">
+
+      <h2>2) Crear/Iniciar sesión</h2>
+      <div class="row">
+        <div class="field col-8">
+          <label>Correo electrónico (usuario)</label>
+          <input id="email" type="email" placeholder="correo@dominio.com">
+        </div>
+        <div class="field col-4">
+          <label>Contraseña</label>
+          <input id="pass" type="password" placeholder="********">
+        </div>
       </div>
       <div class="actions">
-        <button id="btnVerifyCode" class="success">2) Verificar y vincular por DUI</button>
+        <button id="btnVincular" class="success">Crear / Iniciar sesión y vincular</button>
+        <button id="btnSalir">Cerrar sesión</button>
+        <span id="statusVinculo" class="tag">—</span>
       </div>
     </div>
 
-    <div id="resultBox" class="card hidden">
-      <h1>¡Listo! Tu cuenta quedó vinculada</h1>
-      <p class="muted">Resumen de la vinculación:</p>
-      <div id="resume" class="tag">—</div>
-      <table id="listCreditos" class="hidden">
+    <div id="panelFinal" class="card hidden" style="margin-top:16px">
+      <h2>Vinculación completada</h2>
+      <div class="muted">Créditos actualmente asignados a tu cuenta:</div>
+      <table id="tablaCreditos" class="hidden">
         <thead><tr><th>Crédito</th><th>Agencia</th><th>Línea</th><th>Estado</th><th>Saldo</th></tr></thead>
         <tbody></tbody>
       </table>
+      <div id="notaSinCreditos" class="muted hidden">No se encontraron créditos vinculados.</div>
     </div>
   </div>
 
   <script type="module">
+    /* ===== Firebase SDK ===== */
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { 
+      getAuth, onAuthStateChanged, signOut,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword 
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+    import { 
+      getFirestore, collection, query, where, getDocs, doc, setDoc, writeBatch 
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
 
-    // ==== Config Firebase ====
-    const firebaseConfig = { apiKey: "PASTE_YOUR_API_KEY", authDomain: "YOUR_PROJECT.firebaseapp.com", projectId: "YOUR_PROJECT", storageBucket: "YOUR_PROJECT.appspot.com", messagingSenderId: "", appId: "" };
+    /* ===== Configuración de tu proyecto ===== */
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // ==== Helpers ====
+    /* ===== Utilidades ===== */
     const $ = s => document.querySelector(s);
-    const fmt = n => `$${Number(n||0).toFixed(2)}`;
-    function maskTel(v){ v=(v||'').replace(/[^0-9]/g,'').slice(0,8); if(v.length>4) v=v.slice(0,4)+'-'+v.slice(4); return v; }
+    const alert = (t,m,i='info')=>Swal.fire({title:t,text:m,icon:i,confirmButtonColor:'#f8af40'});
     function maskDui(v){ v=(v||'').replace(/[^0-9]/g,'').slice(0,9); if(v.length>8) v=v.slice(0,8)+'-'+v.slice(8); return v; }
-    $('#r_phone').addEventListener('input', e=> e.target.value = maskTel(e.target.value));
-    $('#r_dui').addEventListener('input',   e=> e.target.value = maskDui(e.target.value));
+    $('#dui').addEventListener('input', e=> e.target.value = maskDui(e.target.value));
 
-    // ==== Recaptcha + SMS ====
-    let appVerifier; let confirmationResult;
-    function initRecaptcha(){
-      appVerifier = new RecaptchaVerifier('recaptcha-container', { size: 'invisible' }, auth);
-    }
-    initRecaptcha();
+    let encontrados = { oldUserIds: [], creditos: [], solicitudes: [] };
 
-    async function sendCode(){
-      const tel = $('#r_phone').value.trim(); const dui = $('#r_dui').value.trim();
-      if(!tel || !dui) return Swal.fire({icon:'warning', title:'Faltan datos', text:'Escribe tu teléfono y DUI.'});
-      const e164 = '+503' + tel.replace('-','');
-      try{ confirmationResult = await signInWithPhoneNumber(auth, e164, appVerifier); $('#smsStatus').textContent = 'SMS: enviado'; }
-      catch(err){ console.error(err); Swal.fire({icon:'error', title:'No se pudo enviar SMS', text: err.message}); initRecaptcha(); }
-    }
-    $('#btnSendCode').addEventListener('click', sendCode);
+    /* ===== 1) Buscar por DUI ===== */
+    async function buscarPorDui(){
+      const dui = $('#dui').value.trim();
+      const nombre = $('#nombre').value.trim();
+      if(!dui || !nombre){ return alert('Faltan datos','Ingresa DUI y nombre.','warning'); }
 
-    async function verifyAndLink(){
-      const code = $('#r_code').value.trim(); const dui = $('#r_dui').value.trim(); const nombre = $('#r_nombre').value.trim();
-      if(!confirmationResult) return Swal.fire({icon:'info', title:'Primero envía el SMS', text:'Pulsa el botón "Enviar código SMS".'});
-      if(!code || !dui) return Swal.fire({icon:'warning', title:'Faltan datos', text:'Escribe el código y tu DUI.'});
+      $('#statusBusca').textContent = 'Buscando…';
 
-      try{ await confirmationResult.confirm(code); } catch(err){ return Swal.fire({icon:'error', title:'Código inválido', text:'Revisa e inténtalo de nuevo.'}); }
+      // Buscar users con ese DUI (pueden existir duplicados por migraciones)
+      const qUsers = query(collection(db,'users'), where('numeroDui','==', dui));
+      const sUsers = await getDocs(qUsers);
 
-      const uid = auth.currentUser.uid;
-      const tel = $('#r_phone').value.trim();
+      encontrados = { oldUserIds: [], creditos: [], solicitudes: [] };
+      const resumenBody = $('#tablaResumen tbody');
+      resumenBody.innerHTML='';
 
-      // 1) Buscar si existe un users con ese DUI
-      const qUser = query(collection(db,'users'), where('numeroDui','==', dui));
-      const snap = await getDocs(qUser);
-
-      let usersDocId = uid; // por defecto crearemos/actualizaremos users/{uid}
-      let baseUserData = { numeroDui: dui, telefono: tel, nombre: nombre || '', rol:'user' };
-
-      if(!snap.empty){
-        const old = snap.docs[0];
-        const oldId = old.id; const oldData = old.data();
-        // 2) Fusionar en users/{uid} (mantener DUI como clave principal)
-        const merged = { ...oldData, ...baseUserData };
-        await setDoc(doc(db,'users', uid), merged, { merge:true });
-        // Marcar el antiguo como migrado (opcional)
-        if(oldId !== uid){ await setDoc(doc(db,'users', oldId), { mergedInto: uid }, { merge:true }); }
-        usersDocId = uid;
-
-        // 3) Re-vincular créditos y solicitudes que apunten al antiguo clienteID
-        const qCreds = query(collection(db,'creditos'), where('clienteID','==', oldId));
-        const sCreds = await getDocs(qCreds);
-        const qSols = query(collection(db,'Archivo Solicitudes'), where('clienteID','==', oldId));
-        const sSols = await getDocs(qSols);
-        const batch = writeBatch(db);
-        sCreds.forEach(d=> batch.update(doc(db,'creditos', d.id), { clienteID: uid }));
-        sSols.forEach(d=> batch.update(doc(db,'Archivo Solicitudes', d.id), { clienteID: uid }));
-        await batch.commit();
-      } else {
-        // No había user con ese DUI, creamos users/{uid}
-        await setDoc(doc(db,'users', uid), baseUserData, { merge:true });
+      if(sUsers.empty){
+        $('#statusBusca').textContent = 'No existe usuario con ese DUI (se creará).';
+        $('#resultadoBusqueda').classList.remove('hidden');
+        $('#tablaResumen').classList.add('hidden');
+        $('#resumenEncontrados').innerHTML = '<span class="warn">No se halló usuario previo. Se podrá crear la cuenta, pero puede que no se vinculen créditos si no estaban asociados a ese DUI.</span>';
+        return;
       }
 
-      // 4) Traer créditos ya vinculados por clienteID = uid (o recién vinculados)
-      const qMyCreds = query(collection(db,'creditos'), where('clienteID','==', usersDocId));
-      const myCreds = await getDocs(qMyCreds);
+      // Recolectar TODOS los oldIds y listar sus créditos/solicitudes
+      sUsers.forEach(u=> encontrados.oldUserIds.push(u.id));
 
-      // Si no encontró por clienteID (porque algunos pueden no tenerlo), intentemos por coincidencia de DUI en la solicitud
-      if(myCreds.empty){
-        const qS = query(collection(db,'Archivo Solicitudes'), where('clienteID','==', usersDocId));
+      // Traer créditos/solicitudes por cada oldId
+      for(const oldId of encontrados.oldUserIds){
+        // Créditos
+        const qC = query(collection(db,'creditos'), where('clienteID','==', oldId));
+        const sC = await getDocs(qC);
+        sC.forEach(d=>{
+          encontrados.creditos.push({id:d.id, ...d.data()});
+          const tr=document.createElement('tr');
+          tr.innerHTML=`<td>Crédito</td><td>${d.id}</td><td>${(d.data().lineaDeCredito||'')+' · '+(d.data().estadoCredito||'')}</td>`;
+          resumenBody.appendChild(tr);
+        });
+
+        // Solicitudes
+        const qS = query(collection(db,'Archivo Solicitudes'), where('clienteID','==', oldId));
         const sS = await getDocs(qS);
-        // (Opcional) aquí podrías ampliar lógica: si hay solicitudes con ese DUI (si se guardó), buscar sus créditos por relación de negocio.
+        sS.forEach(d=>{
+          encontrados.solicitudes.push({id:d.id, ...d.data()});
+          const tr=document.createElement('tr');
+          tr.innerHTML=`<td>Solicitud</td><td>${d.id}</td><td>${(d.data().lineaDeCredito||'')+' · '+(d.data().estado||'')}</td>`;
+          resumenBody.appendChild(tr);
+        });
       }
 
-      // 5) Mostrar resultado
-      $('#resultBox').classList.remove('hidden');
-      const tbody = document.querySelector('#listCreditos tbody');
-      tbody.innerHTML='';
+      $('#resultadoBusqueda').classList.remove('hidden');
+      $('#tablaResumen').classList.toggle('hidden', (encontrados.creditos.length+encontrados.solicitudes.length)===0);
+
+      $('#resumenEncontrados').innerHTML = `
+        <span class="ok">Usuarios encontrados con ese DUI:</span> ${encontrados.oldUserIds.length}.
+        Créditos: <b>${encontrados.creditos.length}</b>. Solicitudes: <b>${encontrados.solicitudes.length}</b>.
+      `;
+      $('#statusBusca').textContent = 'Búsqueda lista';
+    }
+    $('#btnBuscar').addEventListener('click', buscarPorDui);
+
+    /* ===== 2) Crear / Iniciar sesión y VINCULAR ===== */
+    async function ensureAuth(email, pass){
+      try {
+        const res = await signInWithEmailAndPassword(auth, email, pass);
+        return res.user.uid;
+      } catch (e) {
+        if(e.code === 'auth/user-not-found'){
+          const res = await createUserWithEmailAndPassword(auth, email, pass);
+          return res.user.uid;
+        }
+        throw e;
+      }
+    }
+
+    async function vincular(){
+      const dui = $('#dui').value.trim();
+      const nombre = $('#nombre').value.trim();
+      const email = $('#email').value.trim();
+      const pass = $('#pass').value;
+
+      if(!dui || !nombre) return alert('Faltan datos','Primero completa DUI y nombre.','warning');
+      if(!email || !pass) return alert('Faltan credenciales','Ingresa correo y contraseña.','warning');
+
+      $('#statusVinculo').textContent = 'Autenticando…';
+      let uid;
+      try {
+        uid = await ensureAuth(email, pass);
+      } catch(e){
+        console.error(e);
+        $('#statusVinculo').textContent = 'Error autenticando';
+        return alert('No se pudo iniciar/crear la cuenta', e.message || 'Error', 'error');
+      }
+
+      $('#statusVinculo').textContent = 'Vinculando documentos…';
+
+      // Guardar/actualizar users/{uid} con datos básicos
+      const partes = nombre.trim().split(' ');
+      const nombreOnly = partes.shift() || nombre;
+      const apellido = partes.join(' ') || '';
+      await setDoc(doc(db,'users', uid), {
+        email, nombre: nombreOnly, apellido,
+        numeroDui: dui, rol:'user'
+      }, { merge:true });
+
+      // Si hay oldUserIds, reasignar TODO a este uid
+      if(encontrados.oldUserIds.length){
+        const batch = writeBatch(db);
+        for(const oldId of encontrados.oldUserIds){
+          // Créditos -> clienteID: uid
+          const qC = query(collection(db,'creditos'), where('clienteID','==', oldId));
+          const sC = await getDocs(qC);
+          sC.forEach(d=> batch.update(doc(db,'creditos', d.id), { clienteID: uid }));
+
+          // Solicitudes -> clienteID: uid
+          const qS = query(collection(db,'Archivo Solicitudes'), where('clienteID','==', oldId));
+          const sS = await getDocs(qS);
+          sS.forEach(d=> batch.update(doc(db,'Archivo Solicitudes', d.id), { clienteID: uid }));
+
+          // Marcar user antiguo
+          if(oldId !== uid){
+            batch.set(doc(db,'users', oldId), { mergedInto: uid }, { merge:true });
+          }
+        }
+        await batch.commit();
+      }
+
+      $('#statusVinculo').textContent = 'Vinculación completa';
+      Swal.fire({icon:'success', title:'¡Listo!', text:'Tus documentos quedaron vinculados a tu cuenta.'});
+
+      // Mostrar créditos actuales del usuario
+      const qMy = query(collection(db,'creditos'), where('clienteID','==', uid));
+      const sMy = await getDocs(qMy);
+      const tb = $('#tablaCreditos tbody');
+      tb.innerHTML = '';
       let count = 0;
-      myCreds.forEach(d=>{
+      sMy.forEach(d=>{
         const c = d.data(); count++;
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${d.id}</td><td>${c.agenciaAsignada||''}</td><td>${c.lineaDeCredito||''}</td><td>${c.estadoCredito||''}</td><td>${(c.saldoActual!=null? ('$'+Number(c.saldoActual).toFixed(2)):'')}</td>`;
-        tbody.appendChild(tr);
+        tr.innerHTML = `<td>${d.id}</td><td>${c.agenciaAsignada||''}</td><td>${c.lineaDeCredito||''}</td><td>${c.estadoCredito||''}</td><td>${c.saldoActual!=null? ('$'+Number(c.saldoActual).toFixed(2)) : ''}</td>`;
+        tb.appendChild(tr);
       });
-      if(count>0){ $('#listCreditos').classList.remove('hidden'); }
-      document.querySelector('#resume').textContent = `DUI ${dui} vinculado al usuario ${usersDocId}. Créditos vinculados: ${count}`;
-
-      Swal.fire({icon:'success', title:'¡Vinculación completada!', text:`Se vinculó tu cuenta por DUI ${dui}.`});
+      $('#panelFinal').classList.remove('hidden');
+      $('#tablaCreditos').classList.toggle('hidden', count===0);
+      $('#notaSinCreditos').classList.toggle('hidden', count>0);
     }
+    $('#btnVincular').addEventListener('click', vincular);
 
-    $('#btnVerifyCode').addEventListener('click', verifyAndLink);
+    /* ===== Salir (opcional) ===== */
+    $('#btnSalir').addEventListener('click', async ()=>{
+      try{ await signOut(auth); }catch(e){/* ignore */} finally{ location.reload(); }
+    });
+
+    // Mostrar si ya hay sesión (por si vuelven)
+    onAuthStateChanged(auth, (u)=>{
+      if(u){ $('#statusVinculo').textContent = 'Sesión activa'; } 
+      else { $('#statusVinculo').textContent = '—'; }
+    });
   </script>
 </body>
 </html>
+

@@ -34,6 +34,9 @@
     let fechaSeleccionada = null;
     let saldoInicial = 0;
 
+    // <<< agregado: guardaremos aquí el saldo del ÚLTIMO cierre de la agencia
+    let saldoUltimoCierreAgencia = null;
+
     // ===== Utilidades =====
     function toDateString(date) { return date.toISOString().slice(0,10); } // YYYY-MM-DD
     function yyyymmdd(d) {
@@ -125,35 +128,6 @@
       return 0;
     }
 
-    // ===== NUEVO: obtener el saldo del último cierre (independiente de la fecha seleccionada) =====
-    async function obtenerSaldoUltimoCierre(agencia) {
-      // Primero por 'fecha' (operativa) descendente
-      let q1 = query(
-        collection(db, "cierres_caja"),
-        where("agencia", "==", agencia),
-        orderBy("fecha", "desc"),
-        limit(1)
-      );
-      let snap = await getDocs(q1);
-      if (!snap.empty) {
-        const d = snap.docs[0].data();
-        return Number((d.saldo_siguiente ?? d.saldo_caja) || 0);
-      }
-      // Fallback por 'fecha_cierre' (timestamp ISO) descendente
-      let q2 = query(
-        collection(db, "cierres_caja"),
-        where("agencia", "==", agencia),
-        orderBy("fecha_cierre", "desc"),
-        limit(1)
-      );
-      snap = await getDocs(q2);
-      if (!snap.empty) {
-        const d = snap.docs[0].data();
-        return Number((d.saldo_siguiente ?? d.saldo_caja) || 0);
-      }
-      return null;
-    }
-
     // ===== Cargar gerente y fechas con pendientes (ambas colecciones/fechas) =====
     async function cargarGerenteYFechas() {
       document.getElementById("select-fecha").innerHTML = `<option>Cargando...</option>`;
@@ -199,10 +173,25 @@
         const cierresQ = query(collection(db, "cierres_caja"), where("agencia", "==", agenciaActual));
         const cierresSnap = await getDocs(cierresQ);
         let fechasCerradas = new Set();
+
+        // <<< agregado: detectar el último cierre y guardar su saldo_siguiente
+        let mejorClave = null; // usaremos fecha_cierre si está, si no la fecha operativa
+        saldoUltimoCierreAgencia = null;
         for (const docC of cierresSnap.docs) {
-          let f = docC.data().fecha;
+          const d = docC.data();
+          // Fechas para control de “pendientes”
+          let f = d.fecha;
           if (f && typeof f === "string" && f.length >= 10) fechasCerradas.add(f.substring(0,10));
+          // Determinar cuál es el más reciente
+          const clave = (typeof d.fecha_cierre === "string" && d.fecha_cierre)
+            ? d.fecha_cierre
+            : (typeof d.fecha === "string" ? d.fecha : "");
+          if (clave && (!mejorClave || clave > mejorClave)) {
+            mejorClave = clave;
+            saldoUltimoCierreAgencia = Number((d.saldo_siguiente ?? d.saldo_caja) || 0);
+          }
         }
+        // >>> fin agregado
 
         diasPendientes = Array.from(movDatesSet).filter(f => !fechasCerradas.has(f));
         diasPendientes.sort();
@@ -378,7 +367,7 @@
       // Orden cronológico
       movimientosDelDia.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
 
-      // Render tabla
+      // Render
       if (movimientosDelDia.length === 0) {
         document.getElementById("tabla-movs").innerHTML =
           `<tr><td colspan="6" style="text-align:center;color:#fff6">No hay movimientos para este día.</td></tr>`;
@@ -395,14 +384,13 @@
           ).join('');
       }
 
-      // Saldo proyectado (no se toca)
-      const saldoFinalProyectado = saldoInicial + totalIngresos - totalEgresos;
+      const saldoFinal = saldoInicial + totalIngresos - totalEgresos;
 
-      // === Mostrar SIEMPRE el saldo del ÚLTIMO cierre de la agencia si existe ===
-      const saldoUltimoCierre = await obtenerSaldoUltimoCierre(agenciaActual);
-      const saldoParaMostrar = (saldoUltimoCierre !== null && !isNaN(Number(saldoUltimoCierre)))
-        ? Number(saldoUltimoCierre)
-        : saldoFinalProyectado;
+      // <<< agregado: si tenemos saldo del último cierre, lo mostramos; si no, el proyectado
+      const saldoParaMostrar = (saldoUltimoCierreAgencia !== null)
+        ? Number(saldoUltimoCierreAgencia)
+        : saldoFinal;
+      // >>> fin agregado
 
       document.getElementById("totales").innerHTML =
         `<div style="margin-top:18px;text-align:right">
@@ -533,6 +521,7 @@
   </div>
 </body>
 </html>
+
 
 
 

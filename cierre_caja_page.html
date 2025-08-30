@@ -46,6 +46,8 @@
     function formatMoney(n) {
       return '$' + Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
     }
+    function round2(n){ return Math.round((Number(n)||0) * 100) / 100; } // <= agregado
+
     function getDiaSVRange(fechaLocal /* "YYYY-MM-DD" */) {
       // Rango del día en SV (UTC-06) convertido a ISO UTC
       const dateStart = new Date(`${fechaLocal}T00:00:00-06:00`);
@@ -160,8 +162,6 @@
             if (m.fecha_ts?.toDate) movDatesSet.add(yyyymmdd(m.fecha_ts.toDate()));
             if (m.createdAt?.toDate) movDatesSet.add(yyyymmdd(m.createdAt.toDate()));
             if (typeof m.fecha === "string" && m.fecha.length >= 10) {
-              // Si guardaste "20 de agosto de 2025, ..." no es ISO; no sirve para rango,
-              // pero al menos usamos los primeros 10 si algún día guardas ISO.
               const s = m.fecha.slice(0,10);
               if (/\d{4}-\d{2}-\d{2}/.test(s)) movDatesSet.add(s);
             }
@@ -368,14 +368,14 @@
           ).join('');
       }
 
-      const saldoFinal = saldoInicial + totalIngresos - totalEgresos;
+      const saldoFinal = round2(saldoInicial + totalIngresos - totalEgresos); // <= usa round2
 
       document.getElementById("totales").innerHTML =
         `<div style="margin-top:18px;text-align:right">
-          <b style="color:#55e2c1">Saldo Inicial: ${formatMoney(saldoInicial)}</b><br>
-          <b style="color:#2EF37A">Total Ingresos: ${formatMoney(totalIngresos)}</b><br>
-          <b style="color:#F8AF40">Total Egresos: ${formatMoney(totalEgresos)}</b><br>
-          <b style="color:#FFD600">Saldo de Caja (al cierre): ${formatMoney(saldoFinal)}</b>
+          <b style="color:#55e2c1">Saldo Inicial: ${formatMoney(round2(saldoInicial))}</b><br>
+          <b style="color:#2EF37A">Total Ingresos: ${formatMoney(round2(totalIngresos))}</b><br>
+          <b style="color:#F8AF40">Total Egresos: ${formatMoney(round2(totalEgresos))}</b><br>
+          <b style="color:#FFD600">Saldo Siguiente (al cierre): ${formatMoney(saldoFinal)}</b>
         </div>`;
     }
 
@@ -409,14 +409,16 @@
         if (m.tipo === "Egreso")  totalEgresos  += Number(m.monto || 0);
       });
 
-      const saldoFinal = saldoInicial + totalIngresos - totalEgresos;
+      totalIngresos = round2(totalIngresos);   // <= consistente y sin colas
+      totalEgresos  = round2(totalEgresos);
+      const saldoFinal = round2(saldoInicial + totalIngresos - totalEgresos);
 
       await addDoc(collection(db, "cierres_caja"), {
         agencia: agenciaActual,
         fecha: fechaSeleccionada,  // YYYY-MM-DD operativo
         total_ingresos: totalIngresos,
         total_egresos: totalEgresos,
-        saldo_inicial: saldoInicial,
+        saldo_inicial: round2(saldoInicial),
         saldo_caja: saldoFinal,
         saldo_siguiente: saldoFinal,
         movimientos: movimientosDelDia.map(m => ({
@@ -499,17 +501,4 @@
   </div>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
 

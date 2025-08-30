@@ -182,13 +182,16 @@
     <div id="ref-familiares"></div>
     <div id="ref-personales"></div>
     <div id="doc-links"></div>
-    <div id="info-simple"></div>
+    <div id="info-simple" class="info-simple"></div>
     <div id="no-data" class="no-data" style="display:none"></div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import {
+      getFirestore, collection, query, where, getDocs,
+      orderBy, limit, doc, getDoc
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -209,54 +212,113 @@
       return url.searchParams.get("clienteID") || "";
     }
 
-    // Renderiza referencias
-    function referenciaCard(tipo, n, data) {
-      if (!data[`${tipo}${n}-nombre`]) return "";
+    // ============ Helpers para soportar migrado + legacy ============
+
+    // Normaliza referencias: arrays (migrado) o claves sueltas (legacy)
+    function extractReferencias(data) {
+      const isValid = (r) => r && r.nombre && String(r.nombre).trim() !== "";
+      let familiares = [], personales = [];
+
+      if (Array.isArray(data.familiares)) {
+        familiares = data.familiares.filter(isValid);
+      }
+      if (Array.isArray(data.personales)) {
+        personales = data.personales.filter(isValid);
+      }
+
+      // Legacy (si aún no hay arrays válidos)
+      if (!familiares.length) {
+        for (let n = 1; n <= 3; n++) {
+          const r = {
+            nombre: data[`Familiar${n}-nombre`] || "",
+            parentesco: data[`Familiar${n}-parentesco`] || "",
+            telefono: data[`Familiar${n}-telefono`] || "",
+            direccion: data[`Familiar${n}-direccion`] || ""
+          };
+          if (isValid(r)) familiares.push(r);
+        }
+      }
+      if (!personales.length) {
+        for (let n = 1; n <= 3; n++) {
+          const r = {
+            nombre: data[`Personal${n}-nombre`] || "",
+            parentesco: data[`Personal${n}-parentesco`] || "",
+            telefono: data[`Personal${n}-telefono`] || "",
+            direccion: data[`Personal${n}-direccion`] || ""
+          };
+          if (isValid(r)) personales.push(r);
+        }
+      }
+      return { familiares, personales };
+    }
+
+    function referenciaCardFromObj(r) {
+      if (!r || !r.nombre) return "";
       return `
         <div class="ref-card">
-          <div><span class="ref-label">Nombre:</span><span class="ref-dato">${data[`${tipo}${n}-nombre`]}</span></div>
-          <div><span class="ref-label">Parentesco:</span><span class="ref-dato">${data[`${tipo}${n}-parentesco`]}</span></div>
-          <div><span class="ref-label">Teléfono:</span><span class="ref-dato">${data[`${tipo}${n}-telefono`]}</span></div>
-          <div><span class="ref-label">Dirección:</span><span class="ref-dato">${data[`${tipo}${n}-direccion`]}</span></div>
+          <div><span class="ref-label">Nombre:</span><span class="ref-dato">${r.nombre}</span></div>
+          <div><span class="ref-label">Parentesco:</span><span class="ref-dato">${r.parentesco || "-"}</span></div>
+          <div><span class="ref-label">Teléfono:</span><span class="ref-dato">${r.telefono || "-"}</span></div>
+          <div><span class="ref-label">Dirección:</span><span class="ref-dato">${r.direccion || "-"}</span></div>
         </div>
       `;
     }
 
-    // Renderiza los links de imágenes y documentos
+    // Evidencias: unifica migrado (evidencias.*) y legacy (raíz)
+    function pickEvidencias(data) {
+      const ev = data.evidencias || {};
+      const out = {
+        dui_front: ev.dui_front || data.dui_front || "",
+        dui_back:  ev.dui_back  || data.dui_back  || "",
+        recibo:    data.recibo   || "",
+        comprobantes: Array.isArray(ev.comprobantes) ? ev.comprobantes.filter(Boolean)
+                    : (Array.isArray(data.comprobantes) ? data.comprobantes.filter(Boolean) : [])
+      };
+      if (!out.dui_front) delete out.dui_front;
+      if (!out.dui_back)  delete out.dui_back;
+      if (!out.recibo)    delete out.recibo;
+      return out;
+    }
+
     function renderDocs(data) {
-      let docs = [];
-      if (data.dui_front) docs.push({ url: data.dui_front, label: "Foto DUI (Frente)" });
-      if (data.dui_back) docs.push({ url: data.dui_back, label: "Foto DUI (Reverso)" });
-      if (data.recibo) docs.push({ url: data.recibo, label: "Recibo de Servicio" });
+      const ev = pickEvidencias(data);
+      const docs = [];
+      if (ev.dui_front) docs.push({ url: ev.dui_front, label: "Foto DUI (Frente)" });
+      if (ev.dui_back)  docs.push({ url: ev.dui_back,  label: "Foto DUI (Reverso)" });
+      if (ev.recibo)    docs.push({ url: ev.recibo,    label: "Recibo de Servicio" });
+      (ev.comprobantes || []).forEach((u, i) => docs.push({ url: u, label: `Comprobante ${i + 1}` }));
       return docs.map(d =>
         `<a class="doc-link-btn" href="${d.url}" target="_blank"><i class="fas fa-image"></i> ${d.label}</a>`
       ).join('');
     }
 
     function renderDocsImg(data) {
-      let imgs = [];
-      if (data.dui_front) imgs.push(`<a href="${data.dui_front}" target="_blank"><img src="${data.dui_front}" class="img-doc" alt="DUI Frente"></a>`);
-      if (data.dui_back) imgs.push(`<a href="${data.dui_back}" target="_blank"><img src="${data.dui_back}" class="img-doc" alt="DUI Reverso"></a>`);
-      if (data.recibo) imgs.push(`<a href="${data.recibo}" target="_blank"><img src="${data.recibo}" class="img-doc" alt="Recibo"></a>`);
+      const ev = pickEvidencias(data);
+      const imgs = [];
+      if (ev.dui_front) imgs.push(`<a href="${ev.dui_front}" target="_blank"><img src="${ev.dui_front}" class="img-doc" alt="DUI Frente"></a>`);
+      if (ev.dui_back)  imgs.push(`<a href="${ev.dui_back}"  target="_blank"><img src="${ev.dui_back}"  class="img-doc" alt="DUI Reverso"></a>`);
+      if (ev.recibo)    imgs.push(`<a href="${ev.recibo}"    target="_blank"><img src="${ev.recibo}"    class="img-doc" alt="Recibo"></a>`);
+      (ev.comprobantes || []).forEach(u => imgs.push(`<a href="${u}" target="_blank"><img src="${u}" class="img-doc" alt="Comprobante"></a>`));
       return imgs.join('');
     }
 
-    // Renderiza datos simples del cliente
-    function renderInfoSimple(data) {
+    // Info simple: mezcla users + solicitud
+    function renderInfoSimple(user, solicitud) {
       return `
         <div>
-          <b>Nombre:</b> ${data.nombre || "-"} ${data.apellido || "-"}<br>
-          <b>DUI:</b> ${data.numeroDui || "-"}<br>
-          <b>Teléfono:</b> ${data.telefono || "-"}<br>
-          <b>Dirección:</b> ${data.direccion || "-"}<br>
-          <b>Profesión:</b> ${data.profesion || "-"}<br>
-          <b>Estado civil:</b> ${data.estadoCivil || "-"}<br>
-          <b>Tipo de vivienda:</b> ${data.tipoVivienda || "-"}<br>
-          <b>Departamento:</b> ${data.departamento || "-"}, <b>Municipio:</b> ${data.municipio || "-"}
+          <b>Nombre:</b> ${(user.nombre || "-")} ${(user.apellido || "-")}<br>
+          <b>DUI:</b> ${user.numeroDui || "-"}<br>
+          <b>Teléfono:</b> ${user.telefono || "-"}<br>
+          <b>Dirección:</b> ${user.direccion || "-"}<br>
+          <b>Profesión:</b> ${solicitud.profesion || "-"}<br>
+          <b>Estado civil:</b> ${solicitud.estadoCivil || "-"}<br>
+          <b>Tipo de vivienda:</b> ${solicitud.tipoVivienda || "-"}<br>
+          <b>Departamento:</b> ${solicitud.departamento || "-"}, <b>Municipio:</b> ${solicitud.municipio || "-"}
         </div>
       `;
     }
 
+    // ================== Auth + arranque ==================
     let usuarioAutenticado = null;
     onAuthStateChanged(auth, user => {
       if (!user) {
@@ -278,6 +340,7 @@
       if (e.key === "Enter" && usuarioAutenticado) buscarReferencias();
     };
 
+    // ================== Búsqueda principal ==================
     async function buscarReferencias() {
       const clienteID = document.getElementById('clienteID-input').value.trim();
       document.getElementById('datos-cliente').innerHTML = "";
@@ -292,55 +355,80 @@
         document.getElementById('no-data').style.display = '';
         return;
       }
+
       try {
-        const refQ = query(
-          collection(db, "Archivo Solicitudes"),
-          where("clienteID", "==", clienteID)
-        );
-        const refSnap = await getDocs(refQ);
-        if (refSnap.empty) {
+        // 1) Última solicitud del cliente (migradas o legacy)
+        const base = collection(db, "Archivo Solicitudes");
+        const queries = [
+          query(base, where("clienteID", "==", clienteID), orderBy("migratedAt", "desc"), limit(1)),
+          query(base, where("clienteID", "==", clienteID), orderBy("fechaSolicitud", "desc"), limit(1)),
+          query(base, where("clienteID", "==", clienteID), limit(1))
+        ];
+
+        let refSnap = null;
+        for (const q of queries) {
+          try {
+            const s = await getDocs(q);
+            if (!s.empty) { refSnap = s; break; }
+          } catch (_) { /* si falta índice/campo, intentar siguiente */ }
+        }
+        if (!refSnap) {
           document.getElementById('no-data').textContent = "No se encontraron referencias para este cliente.";
           document.getElementById('no-data').style.display = '';
           return;
         }
-        // Solo tomamos el primero (última solicitud del cliente)
         const data = refSnap.docs[0].data();
 
-        // Datos principales
-        document.getElementById('info-simple').innerHTML = renderInfoSimple(data);
+        // 2) Datos base del cliente en users/{clienteID}
+        let userData = {};
+        try {
+          const uSnap = await getDoc(doc(db, "users", clienteID));
+          if (uSnap.exists()) userData = uSnap.data();
+        } catch {}
 
-        // Familiares
-        let famHtml = '';
-        for (let n = 1; n <= 3; n++) famHtml += referenciaCard("Familiar", n, data);
-        if (famHtml)
+        // 3) Info simple (mezcla users + solicitud)
+        document.getElementById('info-simple').innerHTML = renderInfoSimple(userData, data);
+
+        // 4) Referencias (arrays migradas o legacy)
+        const { familiares, personales } = extractReferencias(data);
+
+        if (familiares.length) {
+          const famHtml = familiares.map(referenciaCardFromObj).join("");
           document.getElementById('ref-familiares').innerHTML =
-            `<div class="bloque-ref"><h3><i class="fas fa-users"></i> Referencias Familiares</h3>
-             <div class="referencia-lista">${famHtml}</div></div>`;
+            `<div class="bloque-ref">
+              <h3><i class="fas fa-users"></i> Referencias Familiares</h3>
+              <div class="referencia-lista">${famHtml}</div>
+            </div>`;
+        }
 
-        // Personales
-        let perHtml = '';
-        for (let n = 1; n <= 3; n++) perHtml += referenciaCard("Personal", n, data);
-        if (perHtml)
+        if (personales.length) {
+          const perHtml = personales.map(referenciaCardFromObj).join("");
           document.getElementById('ref-personales').innerHTML =
-            `<div class="bloque-ref"><h3><i class="fas fa-user"></i> Referencias Personales</h3>
-             <div class="referencia-lista">${perHtml}</div></div>`;
+            `<div class="bloque-ref">
+              <h3><i class="fas fa-user"></i> Referencias Personales</h3>
+              <div class="referencia-lista">${perHtml}</div>
+            </div>`;
+        }
 
-        // Documentos y links
-        let docsBtn = renderDocs(data);
-        let docsImg = renderDocsImg(data);
+        // 5) Adjuntos (migrado + legacy)
+        const docsBtn = renderDocs(data);
+        const docsImg = renderDocsImg(data);
         if (docsBtn || docsImg) {
           document.getElementById('doc-links').innerHTML =
             `<div class="bloque-ref">
               <h3><i class="fas fa-id-card"></i> Documentos Adjuntos</h3>
               <div class="doc-links">${docsBtn}</div>
               <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">${docsImg}</div>
-             </div>`;
+            </div>`;
         }
+
       } catch (err) {
-        document.getElementById('no-data').textContent = "Error de permisos: debes iniciar sesión para ver las referencias.";
+        document.getElementById('no-data').textContent =
+          "Error de permisos o conexión: debes iniciar sesión para ver las referencias.";
         document.getElementById('no-data').style.display = '';
       }
     }
   </script>
 </body>
 </html>
+

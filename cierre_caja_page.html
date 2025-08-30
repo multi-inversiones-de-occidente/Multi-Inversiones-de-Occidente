@@ -46,8 +46,6 @@
     function formatMoney(n) {
       return '$' + Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
     }
-    function round2(n){ return Math.round((Number(n)||0) * 100) / 100; } // <= agregado
-
     function getDiaSVRange(fechaLocal /* "YYYY-MM-DD" */) {
       // Rango del día en SV (UTC-06) convertido a ISO UTC
       const dateStart = new Date(`${fechaLocal}T00:00:00-06:00`);
@@ -125,6 +123,22 @@
         }
       }
       return 0;
+    }
+
+    // ===== NUEVO: leer saldo de un cierre existente para la misma fecha (si ya fue cerrado) =====
+    async function obtenerSaldoCierreSiExiste(agencia, fechaOperacion /* "YYYY-MM-DD" */) {
+      const q = query(
+        collection(db, "cierres_caja"),
+        where("agencia", "==", agencia),
+        where("fecha", "==", fechaOperacion),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const d = snap.docs[0].data();
+        return (d.saldo_siguiente ?? d.saldo_caja ?? null);
+      }
+      return null;
     }
 
     // ===== Cargar gerente y fechas con pendientes (ambas colecciones/fechas) =====
@@ -351,7 +365,7 @@
       // Orden cronológico
       movimientosDelDia.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
 
-      // Render
+      // Render tabla
       if (movimientosDelDia.length === 0) {
         document.getElementById("tabla-movs").innerHTML =
           `<tr><td colspan="6" style="text-align:center;color:#fff6">No hay movimientos para este día.</td></tr>`;
@@ -368,14 +382,21 @@
           ).join('');
       }
 
-      const saldoFinal = round2(saldoInicial + totalIngresos - totalEgresos); // <= usa round2
+      // Saldo proyectado
+      const saldoFinalProyectado = saldoInicial + totalIngresos - totalEgresos;
+
+      // === NUEVO: si ya existe un cierre para esa fecha, mostrar ese saldo; de lo contrario, el proyectado ===
+      const saldoCierreExistente = await obtenerSaldoCierreSiExiste(agenciaActual, fecha);
+      const saldoParaMostrar = (saldoCierreExistente !== null && !isNaN(Number(saldoCierreExistente)))
+        ? Number(saldoCierreExistente)
+        : saldoFinalProyectado;
 
       document.getElementById("totales").innerHTML =
         `<div style="margin-top:18px;text-align:right">
-          <b style="color:#55e2c1">Saldo Inicial: ${formatMoney(round2(saldoInicial))}</b><br>
-          <b style="color:#2EF37A">Total Ingresos: ${formatMoney(round2(totalIngresos))}</b><br>
-          <b style="color:#F8AF40">Total Egresos: ${formatMoney(round2(totalEgresos))}</b><br>
-          <b style="color:#FFD600">Saldo Siguiente (al cierre): ${formatMoney(saldoFinal)}</b>
+          <b style="color:#55e2c1">Saldo Inicial: ${formatMoney(saldoInicial)}</b><br>
+          <b style="color:#2EF37A">Total Ingresos: ${formatMoney(totalIngresos)}</b><br>
+          <b style="color:#F8AF40">Total Egresos: ${formatMoney(totalEgresos)}</b><br>
+          <b style="color:#FFD600">Saldo de Caja (al cierre): ${formatMoney(saldoParaMostrar)}</b>
         </div>`;
     }
 
@@ -409,16 +430,14 @@
         if (m.tipo === "Egreso")  totalEgresos  += Number(m.monto || 0);
       });
 
-      totalIngresos = round2(totalIngresos);   // <= consistente y sin colas
-      totalEgresos  = round2(totalEgresos);
-      const saldoFinal = round2(saldoInicial + totalIngresos - totalEgresos);
+      const saldoFinal = saldoInicial + totalIngresos - totalEgresos;
 
       await addDoc(collection(db, "cierres_caja"), {
         agencia: agenciaActual,
         fecha: fechaSeleccionada,  // YYYY-MM-DD operativo
         total_ingresos: totalIngresos,
         total_egresos: totalEgresos,
-        saldo_inicial: round2(saldoInicial),
+        saldo_inicial: saldoInicial,
         saldo_caja: saldoFinal,
         saldo_siguiente: saldoFinal,
         movimientos: movimientosDelDia.map(m => ({
@@ -501,6 +520,7 @@
   </div>
 </body>
 </html>
+
 
 
 

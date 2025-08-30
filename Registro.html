@@ -1,121 +1,112 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Vincular cuenta por DUI</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <title>Vincular cuenta por DUI — Registro</title>
+  <link rel="icon" href="assets/logo_multinversiones.png" type="image/png"/>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
-    :root{ --bg:#0f1216;--card:#161a20;--muted:#9aa4b2;--text:#e9eef5;--brand:#f8af40;--ok:#22c55e;--err:#ef4444; --radius:16px }
+    :root{--bg:#0f1216;--card:#1a1f2a;--muted:#9aa4b2;--text:#e9eef5;--brand:#f8af40;--ok:#22c55e;--err:#ef4444;--radius:14px}
     *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
-    body{margin:0;background:radial-gradient(90% 60% at 50% 0%,#131923 0%,#0d1117 60%,#0b0e12 100%);color:var(--text)}
-    header{padding:18px 20px;border-bottom:1px solid #232833}
-    .logo{display:flex;align-items:center;gap:10px;font-weight:800}
-    .logo .dot{width:12px;height:12px;border-radius:999px;background:var(--brand)}
-    .wrap{max-width:760px;margin:32px auto;padding:0 16px}
-    .card{background:#141923;border:1px solid #2a3342;border-radius:16px;padding:16px}
-    h1{font-size:22px;margin:0 0 10px 0}
-    h2{font-size:16px;margin:14px 0 8px 0;color:#d9e3f0}
-    .muted{color:#9aa4b2;font-size:13px}
-    .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+    body{margin:0;background:#0d1117;color:var(--text);min-height:100vh}
+    header{padding:16px 20px;border-bottom:1px solid #232833;display:flex;align-items:center;gap:10px}
+    header .dot{width:12px;height:12px;border-radius:999px;background:var(--brand)}
+    header .title{font-weight:800}
+    .wrap{max-width:980px;margin:26px auto;padding:0 16px 40px}
+    .card{background:var(--card);border:1px solid #2a3342;border-radius:var(--radius);padding:18px}
+    h1{margin:0 0 8px;font-size:22px}
+    h2{margin:8px 0 6px;font-size:16px;color:#d9e2f0}
+    .muted{color:var(--muted);font-size:13px}
+    .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;margin-top:10px}
     .field{display:flex;flex-direction:column;gap:6px}
     label{font-size:12px;color:#c9d2df}
-    input{background:#0f141a;color:#e9eef5;border:1px solid #2a3444;border-radius:12px;padding:10px 12px;font-size:14px;outline:none}
+    input{background:#0f141a;color:#e9eef5;border:1px solid #2a3444;border-radius:12px;padding:10px 12px;font-size:14px;outline:none;width:100%}
     input:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.2)}
     .col-12{grid-column:span 12}.col-8{grid-column:span 8}.col-6{grid-column:span 6}.col-4{grid-column:span 4}.col-3{grid-column:span 3}
-    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
-    button{background:#1f2837;color:#e9eef5;border:1px solid #2e3a4f;border-radius:12px;padding:10px 14px;font-weight:600;cursor:pointer}
-    button.primary{background:var(--brand);border-color:#c6892b;color:#15110a}
-    button.success{background:var(--ok);border-color:#148f3a;color:#08140c}
-    .tag{display:inline-flex;align-items:center;gap:6px;background:#141a22;border:1px solid #263144;color:#b9c3d0;border-radius:999px;padding:4px 8px;font-size:12px}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    button{background:#253248;color:#e9eef5;border:1px solid #2e3a4f;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}
+    button.primary{background:var(--brand);border-color:#c6892b;color:#1a1308}
+    button.success{background:var(--ok);border-color:#15803d;color:#07140b}
+    button.ghost{background:#10151c}
+    .tag{display:inline-flex;align-items:center;gap:6px;background:#121a23;border:1px solid #263144;color:#b9c3d0;border-radius:999px;padding:4px 8px;font-size:12px}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{font-size:13px;padding:8px;border-bottom:1px solid #263144;vertical-align:top}
+    th{text-align:left;color:#cfe0ff}
     .hidden{display:none}
-    table{width:100%;border-collapse:collapse;margin-top:10px}
-    th,td{font-size:13px;padding:8px;border-bottom:1px solid #263144}
-    th{color:#c9d2df;text-align:left}
-    .ok{color:#b7ffd0}
-    .warn{color:#ffd7a6}
+    .pill{padding:2px 8px;border-radius:999px;border:1px solid #344255;background:#0e141b;font-size:11px}
   </style>
 </head>
 <body>
-  <header>
-    <div class="logo"><span class="dot"></span> Vincular cuenta por DUI</div>
-  </header>
+  <header><span class="dot"></span><div class="title">Vincular cuenta por DUI — Registro</div></header>
 
   <div class="wrap">
+    <!-- PASO 1 -->
     <div class="card">
-      <h1>Vincula tus créditos con tu usuario</h1>
-      <p class="muted">Ingresa tu <b>DUI</b> y tu <b>nombre</b>. El sistema buscará tus créditos y solicitudes que se migraron, y luego te pedirá tu <b>correo</b> y <b>contraseña</b> para crear/iniciar sesión y vincular todo a tu cuenta.</p>
-
-      <h2>1) Buscar por DUI</h2>
+      <h1>1) Buscar por DUI</h1>
+      <p class="muted">Ingresa tu <b>DUI</b> y <b>nombre</b>. Buscamos el <i>usuario migrado</i> y sus créditos/solicitudes/pagos para vincularlos a tu nueva cuenta con correo y contraseña.</p>
       <div class="row">
-        <div class="field col-6">
-          <label>DUI</label>
-          <input id="dui" placeholder="########-#" maxlength="10">
-        </div>
-        <div class="field col-6">
-          <label>Nombre</label>
-          <input id="nombre" placeholder="Tu nombre completo">
-        </div>
+        <div class="field col-6"><label>DUI</label><input id="b_dui" placeholder="########-#" maxlength="10"></div>
+        <div class="field col-6"><label>Nombre y apellido</label><input id="b_nombre" placeholder="Ej: Juan Pérez"></div>
       </div>
       <div class="actions">
-        <button id="btnBuscar" class="primary">Buscar créditos/solicitudes</button>
-        <span id="statusBusca" class="tag">—</span>
+        <button id="btnBuscar" class="primary">Buscar</button>
+        <span id="statusBusca" class="tag">Estado: —</span>
       </div>
 
-      <div id="resultadoBusqueda" class="hidden" style="margin-top:6px">
-        <div class="muted" id="resumenEncontrados">—</div>
-        <table id="tablaResumen" class="hidden">
-          <thead><tr><th>Tipo</th><th>ID</th><th>Detalle</th></tr></thead>
+      <div id="boxResultados" class="hidden" style="margin-top:10px">
+        <h2>Resultados</h2>
+        <div class="muted">
+          <div>Usuario migrado: <span id="resUser" class="pill">—</span></div>
+          <div>Créditos: <span id="resCreds" class="pill">0</span> · Solicitudes: <span id="resSols" class="pill">0</span> · Pagos: <span id="resPagos" class="pill">0</span></div>
+        </div>
+        <table id="tblCreditos" class="hidden">
+          <thead><tr><th>Crédito</th><th>Agencia</th><th>Línea</th><th>Estado</th><th>Saldo</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
+    </div>
 
-      <hr style="border:none;border-top:1px solid #2a3342;margin:16px 0">
-
-      <h2>2) Crear/Iniciar sesión</h2>
+    <!-- PASO 2 -->
+    <div class="card" style="margin-top:16px">
+      <h1>2) Crear cuenta con correo y contraseña</h1>
+      <p class="muted">La mayoría de clientes creará cuenta nueva. Si el correo ya existe, te avisaremos y podrás iniciar sesión o restablecerla.</p>
       <div class="row">
-        <div class="field col-8">
-          <label>Correo electrónico (usuario)</label>
-          <input id="email" type="email" placeholder="correo@dominio.com">
-        </div>
-        <div class="field col-4">
-          <label>Contraseña</label>
-          <input id="pass" type="password" placeholder="********">
-        </div>
+        <div class="field col-6"><label>Correo</label><input id="r_email" type="email" placeholder="nombre@dominio.com"></div>
+        <div class="field col-3"><label>Contraseña</label><input id="r_pass1" type="password" placeholder="mín. 6"></div>
+        <div class="field col-3"><label>Confirmar</label><input id="r_pass2" type="password" placeholder="repite"></div>
       </div>
       <div class="actions">
-        <button id="btnVincular" class="success">Crear / Iniciar sesión y vincular</button>
-        <button id="btnSalir">Cerrar sesión</button>
-        <span id="statusVinculo" class="tag">—</span>
+        <button id="btnCrear" class="success">Crear cuenta y vincular</button>
+        <button id="btnLogin" class="ghost">Ya tengo cuenta (iniciar sesión & vincular)</button>
+        <button id="btnReset" class="ghost">Restablecer contraseña</button>
+        <span id="statusLink" class="tag">Vinculación: —</span>
       </div>
     </div>
 
-    <div id="panelFinal" class="card hidden" style="margin-top:16px">
-      <h2>Vinculación completada</h2>
-      <div class="muted">Créditos actualmente asignados a tu cuenta:</div>
-      <table id="tablaCreditos" class="hidden">
-        <thead><tr><th>Crédito</th><th>Agencia</th><th>Línea</th><th>Estado</th><th>Saldo</th></tr></thead>
-        <tbody></tbody>
-      </table>
-      <div id="notaSinCreditos" class="muted hidden">No se encontraron créditos vinculados.</div>
+    <!-- RESUMEN -->
+    <div id="boxResult" class="card hidden" style="margin-top:16px">
+      <h1>¡Listo! Cuenta vinculada</h1>
+      <p class="muted">Resumen:</p>
+      <div id="resumeFinal" class="tag">—</div>
     </div>
   </div>
 
   <script type="module">
-    /* ===== Firebase SDK ===== */
+    // Firebase
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { 
-      getAuth, onAuthStateChanged, signOut,
-      signInWithEmailAndPassword, createUserWithEmailAndPassword 
+    import {
+      getAuth,
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
+      sendPasswordResetEmail
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
-    import { 
-      getFirestore, collection, query, where, getDocs, doc, setDoc, writeBatch 
+    import {
+      getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, writeBatch, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
 
-    /* ===== Configuración de tu proyecto ===== */
+    // Config real del proyecto
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -129,173 +120,224 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    /* ===== Utilidades ===== */
+    // Helpers
     const $ = s => document.querySelector(s);
-    const alert = (t,m,i='info')=>Swal.fire({title:t,text:m,icon:i,confirmButtonColor:'#f8af40'});
+    const fmt = n => `$${Number(n||0).toFixed(2)}`;
+    const isEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e||'');
     function maskDui(v){ v=(v||'').replace(/[^0-9]/g,'').slice(0,9); if(v.length>8) v=v.slice(0,8)+'-'+v.slice(8); return v; }
-    $('#dui').addEventListener('input', e=> e.target.value = maskDui(e.target.value));
+    $('#b_dui').addEventListener('input', e=> e.target.value = maskDui(e.target.value));
 
-    let encontrados = { oldUserIds: [], creditos: [], solicitudes: [] };
+    // Estado
+    let foundUserId = null;      // users/{id} (migrado)
+    let foundUserData = null;
+    let cacheCreditos = [];
+    let cacheSolicitudes = [];
+    let cachePagos = [];
 
-    /* ===== 1) Buscar por DUI ===== */
-    async function buscarPorDui(){
-      const dui = $('#dui').value.trim();
-      const nombre = $('#nombre').value.trim();
-      if(!dui || !nombre){ return alert('Faltan datos','Ingresa DUI y nombre.','warning'); }
+    // Paso 1: Buscar
+    async function buscar(){
+      const dui = $('#b_dui').value.trim();
+      const nombre = $('#b_nombre').value.trim();
+      $('#statusBusca').textContent = 'Estado: buscando…';
+      $('#boxResultados').classList.add('hidden');
+      $('#tblCreditos').classList.add('hidden');
+      cacheCreditos=[]; cacheSolicitudes=[]; cachePagos=[];
+      foundUserId = null; foundUserData=null;
 
-      $('#statusBusca').textContent = 'Buscando…';
-
-      // Buscar users con ese DUI (pueden existir duplicados por migraciones)
-      const qUsers = query(collection(db,'users'), where('numeroDui','==', dui));
-      const sUsers = await getDocs(qUsers);
-
-      encontrados = { oldUserIds: [], creditos: [], solicitudes: [] };
-      const resumenBody = $('#tablaResumen tbody');
-      resumenBody.innerHTML='';
-
-      if(sUsers.empty){
-        $('#statusBusca').textContent = 'No existe usuario con ese DUI (se creará).';
-        $('#resultadoBusqueda').classList.remove('hidden');
-        $('#tablaResumen').classList.add('hidden');
-        $('#resumenEncontrados').innerHTML = '<span class="warn">No se halló usuario previo. Se podrá crear la cuenta, pero puede que no se vinculen créditos si no estaban asociados a ese DUI.</span>';
+      if(!/^\d{8}-\d$/.test(dui)){
+        Swal.fire({icon:'warning', title:'DUI inválido', text:'Formato 00000000-0'}); 
+        $('#statusBusca').textContent='Estado: DUI inválido';
         return;
       }
 
-      // Recolectar TODOS los oldIds y listar sus créditos/solicitudes
-      sUsers.forEach(u=> encontrados.oldUserIds.push(u.id));
-
-      // Traer créditos/solicitudes por cada oldId
-      for(const oldId of encontrados.oldUserIds){
-        // Créditos
-        const qC = query(collection(db,'creditos'), where('clienteID','==', oldId));
-        const sC = await getDocs(qC);
-        sC.forEach(d=>{
-          encontrados.creditos.push({id:d.id, ...d.data()});
-          const tr=document.createElement('tr');
-          tr.innerHTML=`<td>Crédito</td><td>${d.id}</td><td>${(d.data().lineaDeCredito||'')+' · '+(d.data().estadoCredito||'')}</td>`;
-          resumenBody.appendChild(tr);
-        });
-
-        // Solicitudes
-        const qS = query(collection(db,'Archivo Solicitudes'), where('clienteID','==', oldId));
-        const sS = await getDocs(qS);
-        sS.forEach(d=>{
-          encontrados.solicitudes.push({id:d.id, ...d.data()});
-          const tr=document.createElement('tr');
-          tr.innerHTML=`<td>Solicitud</td><td>${d.id}</td><td>${(d.data().lineaDeCredito||'')+' · '+(d.data().estado||'')}</td>`;
-          resumenBody.appendChild(tr);
-        });
+      const sU = await getDocs(query(collection(db,'users'), where('numeroDui','==', dui)));
+      if(sU.empty){
+        $('#statusBusca').textContent='Estado: sin usuario migrado (se creará con tu correo)';
+        $('#boxResultados').classList.remove('hidden');
+        $('#resUser').textContent='—';
+        $('#resCreds').textContent='0'; $('#resSols').textContent='0'; $('#resPagos').textContent='0';
+        return;
       }
+      const d = sU.docs[0];
+      foundUserId = d.id; foundUserData = d.data();
 
-      $('#resultadoBusqueda').classList.remove('hidden');
-      $('#tablaResumen').classList.toggle('hidden', (encontrados.creditos.length+encontrados.solicitudes.length)===0);
+      const [sC,sS,sP] = await Promise.all([
+        getDocs(query(collection(db,'creditos'), where('clienteID','==', foundUserId))),
+        getDocs(query(collection(db,'Archivo Solicitudes'), where('clienteID','==', foundUserId))),
+        getDocs(query(collection(db,'pagos'), where('clienteID','==', foundUserId)))
+      ]);
+      cacheCreditos = sC.docs.map(x=>({id:x.id,...x.data()}));
+      cacheSolicitudes = sS.docs.map(x=>({id:x.id,...x.data()}));
+      cachePagos = sP.docs.map(x=>({id:x.id,...x.data()}));
 
-      $('#resumenEncontrados').innerHTML = `
-        <span class="ok">Usuarios encontrados con ese DUI:</span> ${encontrados.oldUserIds.length}.
-        Créditos: <b>${encontrados.creditos.length}</b>. Solicitudes: <b>${encontrados.solicitudes.length}</b>.
-      `;
-      $('#statusBusca').textContent = 'Búsqueda lista';
-    }
-    $('#btnBuscar').addEventListener('click', buscarPorDui);
+      $('#boxResultados').classList.remove('hidden');
+      const fullName = nombre || `${foundUserData?.nombre||''} ${foundUserData?.apellido||''}`.trim();
+      $('#resUser').textContent = `${foundUserId} · ${fullName || '(sin nombre)'}`;
+      $('#resCreds').textContent = String(cacheCreditos.length);
+      $('#resSols').textContent = String(cacheSolicitudes.length);
+      $('#resPagos').textContent = String(cachePagos.length);
 
-    /* ===== 2) Crear / Iniciar sesión y VINCULAR ===== */
-    async function ensureAuth(email, pass){
-      try {
-        const res = await signInWithEmailAndPassword(auth, email, pass);
-        return res.user.uid;
-      } catch (e) {
-        if(e.code === 'auth/user-not-found'){
-          const res = await createUserWithEmailAndPassword(auth, email, pass);
-          return res.user.uid;
-        }
-        throw e;
-      }
-    }
-
-    async function vincular(){
-      const dui = $('#dui').value.trim();
-      const nombre = $('#nombre').value.trim();
-      const email = $('#email').value.trim();
-      const pass = $('#pass').value;
-
-      if(!dui || !nombre) return alert('Faltan datos','Primero completa DUI y nombre.','warning');
-      if(!email || !pass) return alert('Faltan credenciales','Ingresa correo y contraseña.','warning');
-
-      $('#statusVinculo').textContent = 'Autenticando…';
-      let uid;
-      try {
-        uid = await ensureAuth(email, pass);
-      } catch(e){
-        console.error(e);
-        $('#statusVinculo').textContent = 'Error autenticando';
-        return alert('No se pudo iniciar/crear la cuenta', e.message || 'Error', 'error');
-      }
-
-      $('#statusVinculo').textContent = 'Vinculando documentos…';
-
-      // Guardar/actualizar users/{uid} con datos básicos
-      const partes = nombre.trim().split(' ');
-      const nombreOnly = partes.shift() || nombre;
-      const apellido = partes.join(' ') || '';
-      await setDoc(doc(db,'users', uid), {
-        email, nombre: nombreOnly, apellido,
-        numeroDui: dui, rol:'user'
-      }, { merge:true });
-
-      // Si hay oldUserIds, reasignar TODO a este uid
-      if(encontrados.oldUserIds.length){
-        const batch = writeBatch(db);
-        for(const oldId of encontrados.oldUserIds){
-          // Créditos -> clienteID: uid
-          const qC = query(collection(db,'creditos'), where('clienteID','==', oldId));
-          const sC = await getDocs(qC);
-          sC.forEach(d=> batch.update(doc(db,'creditos', d.id), { clienteID: uid }));
-
-          // Solicitudes -> clienteID: uid
-          const qS = query(collection(db,'Archivo Solicitudes'), where('clienteID','==', oldId));
-          const sS = await getDocs(qS);
-          sS.forEach(d=> batch.update(doc(db,'Archivo Solicitudes', d.id), { clienteID: uid }));
-
-          // Marcar user antiguo
-          if(oldId !== uid){
-            batch.set(doc(db,'users', oldId), { mergedInto: uid }, { merge:true });
-          }
-        }
-        await batch.commit();
-      }
-
-      $('#statusVinculo').textContent = 'Vinculación completa';
-      Swal.fire({icon:'success', title:'¡Listo!', text:'Tus documentos quedaron vinculados a tu cuenta.'});
-
-      // Mostrar créditos actuales del usuario
-      const qMy = query(collection(db,'creditos'), where('clienteID','==', uid));
-      const sMy = await getDocs(qMy);
-      const tb = $('#tablaCreditos tbody');
-      tb.innerHTML = '';
-      let count = 0;
-      sMy.forEach(d=>{
-        const c = d.data(); count++;
+      const tb = $('#tblCreditos tbody'); tb.innerHTML='';
+      cacheCreditos.forEach(c=>{
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${d.id}</td><td>${c.agenciaAsignada||''}</td><td>${c.lineaDeCredito||''}</td><td>${c.estadoCredito||''}</td><td>${c.saldoActual!=null? ('$'+Number(c.saldoActual).toFixed(2)) : ''}</td>`;
+        tr.innerHTML = `<td>${c.id}</td><td>${c.agenciaAsignada||''}</td><td>${c.lineaDeCredito||''}</td><td>${c.estadoCredito||''}</td><td>${c.saldoActual!=null?fmt(c.saldoActual):''}</td>`;
         tb.appendChild(tr);
       });
-      $('#panelFinal').classList.remove('hidden');
-      $('#tablaCreditos').classList.toggle('hidden', count===0);
-      $('#notaSinCreditos').classList.toggle('hidden', count>0);
+      if(cacheCreditos.length) $('#tblCreditos').classList.remove('hidden');
+      $('#statusBusca').textContent='Estado: listo';
     }
-    $('#btnVincular').addEventListener('click', vincular);
+    $('#btnBuscar').addEventListener('click', buscar);
 
-    /* ===== Salir (opcional) ===== */
-    $('#btnSalir').addEventListener('click', async ()=>{
-      try{ await signOut(auth); }catch(e){/* ignore */} finally{ location.reload(); }
-    });
+    // Crear/Guardar users/{uid} con merge de datos migrados
+    async function upsertUserDoc(uid, dui, nombreInput){
+      // intentar descomponer nombre/apellido
+      let nombre = '', apellido='';
+      if(nombreInput?.trim()){
+        const parts = nombreInput.trim().split(/\s+/);
+        if(parts.length>1){ apellido = parts.pop(); nombre = parts.join(' '); }
+        else { nombre = nombreInput.trim(); }
+      }
+      const base = {
+        numeroDui: dui,
+        nombre: nombre || foundUserData?.nombre || '',
+        apellido: apellido || foundUserData?.apellido || '',
+        email: $('#r_email').value.trim().toLowerCase(),
+        telefono: foundUserData?.telefono || '',
+        department: foundUserData?.department || '',
+        municipio: foundUserData?.municipio || '',
+        direccion: foundUserData?.direccion || '',
+        dateOfBirth: foundUserData?.dateOfBirth || '',
+        genero: foundUserData?.genero || '',
+        estrellas: foundUserData?.estrellas ?? 5,
+        rol: 'user',
+        updatedAt: serverTimestamp()
+      };
+      await setDoc(doc(db,'users',uid), base, {merge:true});
+    }
 
-    // Mostrar si ya hay sesión (por si vuelven)
-    onAuthStateChanged(auth, (u)=>{
-      if(u){ $('#statusVinculo').textContent = 'Sesión activa'; } 
-      else { $('#statusVinculo').textContent = '—'; }
-    });
+    // Vincular referencias a nuevo uid
+    async function relinkTo(uid){
+      if(!foundUserId || foundUserId===uid) return; // nada que mover
+      const batch = writeBatch(db);
+      batch.set(doc(db,'users',foundUserId), { mergedInto: uid, mergedAt: serverTimestamp() }, { merge:true });
+      for(const c of cacheCreditos){ batch.set(doc(db,'creditos',c.id), { clienteID: uid }, { merge:true }); }
+      for(const s of cacheSolicitudes){ batch.set(doc(db,'Archivo Solicitudes',s.id), { clienteID: uid }, { merge:true }); }
+      for(const p of cachePagos){ batch.set(doc(db,'pagos',p.id), { clienteID: uid }, { merge:true }); }
+      await batch.commit();
+    }
+
+    // Crear cuenta (caso mayoritario)
+    async function crearYVincular(){
+      $('#statusLink').textContent='Vinculación: creando cuenta…';
+      const dui = $('#b_dui').value.trim();
+      const nombre = $('#b_nombre').value.trim();
+      const email = $('#r_email').value.trim().toLowerCase();
+      const p1 = $('#r_pass1').value;
+      const p2 = $('#r_pass2').value;
+
+      if(!/^\d{8}-\d$/.test(dui)) return Swal.fire({icon:'warning', title:'DUI inválido', text:'Usa 00000000-0'});
+      if(!isEmail(email)) return Swal.fire({icon:'warning', title:'Correo inválido'});
+      if(p1.length<6) return Swal.fire({icon:'warning', title:'Contraseña muy corta (mínimo 6)'});
+      if(p1!==p2) return Swal.fire({icon:'warning', title:'Las contraseñas no coinciden'});
+
+      try{
+        const { user } = await createUserWithEmailAndPassword(auth, email, p1);
+        const uid = user.uid;
+        await upsertUserDoc(uid, dui, nombre);
+        await relinkTo(uid);
+
+        const [finalC, finalS] = await Promise.all([
+          getDocs(query(collection(db,'creditos'), where('clienteID','==', uid))),
+          getDocs(query(collection(db,'Archivo Solicitudes'), where('clienteID','==', uid)))
+        ]);
+
+        $('#boxResult').classList.remove('hidden');
+        $('#resumeFinal').textContent = `Usuario ${uid} vinculado a DUI ${dui}. Créditos: ${finalC.size} · Solicitudes: ${finalS.size}`;
+        $('#statusLink').textContent='Vinculación: realizada';
+        Swal.fire({icon:'success', title:'¡Cuenta creada y vinculada!'});
+      }catch(e){
+        // si el correo ya existe, indicamos el siguiente paso
+        if(e.code==='auth/email-already-in-use'){
+          Swal.fire({
+            icon:'info',
+            title:'El correo ya existe',
+            text:'Puedes iniciar sesión con esa contraseña para vincular, o enviar un correo de restablecimiento.',
+          });
+          $('#statusLink').textContent='Vinculación: el correo ya existe';
+        }else{
+          const map={
+            'auth/invalid-email':'Correo inválido.',
+            'auth/weak-password':'Contraseña muy débil (mínimo 6).',
+            'auth/network-request-failed':'Problema de red. Intenta de nuevo.',
+            'auth/operation-not-allowed':'Habilita Email/Password en Firebase Console.'
+          };
+          Swal.fire({icon:'error', title:'No se pudo crear la cuenta', text: map[e.code]||e.message});
+          $('#statusLink').textContent='Vinculación: error al crear';
+        }
+      }
+    }
+
+    // Iniciar sesión (si ya tenía cuenta) y vincular
+    async function loginYVincular(){
+      $('#statusLink').textContent='Vinculación: iniciando sesión…';
+      const dui = $('#b_dui').value.trim();
+      const nombre = $('#b_nombre').value.trim();
+      const email = $('#r_email').value.trim().toLowerCase();
+      const pass = $('#r_pass1').value;
+
+      if(!isEmail(email)) return Swal.fire({icon:'warning', title:'Correo inválido'});
+      if(pass.length<1) return Swal.fire({icon:'warning', title:'Ingresa tu contraseña'});
+
+      try{
+        const { user } = await signInWithEmailAndPassword(auth, email, pass);
+        const uid = user.uid;
+        await upsertUserDoc(uid, dui, nombre);
+        await relinkTo(uid);
+
+        const [finalC, finalS] = await Promise.all([
+          getDocs(query(collection(db,'creditos'), where('clienteID','==', uid))),
+          getDocs(query(collection(db,'Archivo Solicitudes'), where('clienteID','==', uid)))
+        ]);
+        $('#boxResult').classList.remove('hidden');
+        $('#resumeFinal').textContent = `Usuario ${uid} vinculado a DUI ${dui}. Créditos: ${finalC.size} · Solicitudes: ${finalS.size}`;
+        $('#statusLink').textContent='Vinculación: realizada';
+        Swal.fire({icon:'success', title:'¡Sesión iniciada y cuenta vinculada!'});
+      }catch(e){
+        const map={
+          'auth/invalid-login-credentials':'Correo o contraseña incorrectos.',
+          'auth/wrong-password':'Contraseña incorrecta.',
+          'auth/user-not-found':'No existe una cuenta con ese correo.',
+          'auth/too-many-requests':'Demasiados intentos. Espera unos minutos.',
+          'auth/network-request-failed':'Problema de red.'
+        };
+        Swal.fire({icon:'error', title:'No se pudo iniciar sesión', text: map[e.code]||e.message});
+        $('#statusLink').textContent='Vinculación: error al iniciar sesión';
+      }
+    }
+
+    // Reset
+    async function enviarReset(){
+      const email = $('#r_email').value.trim().toLowerCase();
+      if(!isEmail(email)) return Swal.fire({icon:'info', title:'Escribe un correo válido primero'});
+      try{
+        await sendPasswordResetEmail(auth, email);
+        Swal.fire({icon:'success', title:'Correo enviado', text:'Revisa tu bandeja para restablecer tu contraseña.'});
+      }catch(e){
+        const map={
+          'auth/user-not-found':'No existe una cuenta con ese correo.',
+          'auth/invalid-email':'Correo inválido.'
+        };
+        Swal.fire({icon:'error', title:'No se pudo enviar', text: map[e.code]||e.message});
+      }
+    }
+
+    // Listeners
+    $('#btnCrear').addEventListener('click', crearYVincular);
+    $('#btnLogin').addEventListener('click', loginYVincular);
+    $('#btnReset').addEventListener('click', enviarReset);
   </script>
 </body>
 </html>
+
+
 

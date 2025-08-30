@@ -196,45 +196,41 @@
       tabla.dataset.json = JSON.stringify(items);
     }
 
-    // Exportar a CSV sencillo
-    function exportarCSV() {
+    // ===== Exportar a Excel (.xlsx) con SheetJS =====
+    function exportarExcel() {
       const tabla = document.getElementById("tabla-detalle");
       const raw = tabla.dataset.json ? JSON.parse(tabla.dataset.json) : [];
       if (!raw || raw.length === 0) return;
 
-      const headers = [
-        "ID Credito",
-        "Cliente",
-        "Estado",
-        "Saldo Actual",
-        "Capital Atrasado",
-        "Para Ponerse Al Dia",
-        "Cuotas Atrasadas"
+      const ws_data = [
+        ["ID Credito","Cliente","Estado","Saldo Actual","Capital Atrasado","Para Ponerse Al Dia","Cuotas Atrasadas"],
+        ...raw.map(r => [
+          r.idCredito,
+          r.nombreCliente,
+          r.estadoCredito,
+          r.saldoActual,
+          r.capitalAtrasado,
+          r.paraPonerseAlDia,
+          r.cuotasAtrasadas
+        ])
       ];
 
-      const filas = raw.map(r => ([
-        r.idCredito,
-        r.nombreCliente,
-        r.estadoCredito,
-        r.saldoActual,
-        r.capitalAtrasado,
-        r.paraPonerseAlDia,
-        r.cuotasAtrasadas
-      ]));
+      const ws = XLSX.utils.aoa_to_sheet(ws_data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Créditos en mora");
 
-      const contenido = [headers, ...filas]
-        .map(row => row.map(v => (typeof v === "string" ? `"${v.replace(/"/g,'""')}"` : v)).join(","))
-        .join("\n");
+      // (Opcional) Ajustar ancho de columnas para que se vea mejor al abrir
+      ws['!cols'] = [
+        { wch: 20 }, // ID
+        { wch: 28 }, // Cliente
+        { wch: 14 }, // Estado
+        { wch: 16 }, // Saldo Actual
+        { wch: 18 }, // Capital Atrasado
+        { wch: 20 }, // Para Ponerse al Día
+        { wch: 16 }  // Cuotas Atrasadas
+      ];
 
-      const blob = new Blob([contenido], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "creditos_en_mora.csv";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      XLSX.writeFile(wb, "creditos_en_mora.xlsx");
     }
 
     // Eventos
@@ -244,9 +240,13 @@
         cargarTasaMoraAgencia(user.uid);
       });
 
-      document.getElementById("btn-exportar").addEventListener("click", exportarCSV);
+      // Cambiado para Excel
+      document.getElementById("btn-exportar").addEventListener("click", exportarExcel);
     });
   </script>
+
+  <!-- SheetJS para exportar a Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
@@ -425,7 +425,10 @@
           <h2><i class="fa-solid fa-list"></i> Créditos en mora (detalle)</h2>
           <div style="display:flex;align-items:center;gap:.6rem;">
             <span class="pill">Registros: <strong id="total-registros">0</strong></span>
-            <button class="btn" id="btn-exportar" style="display:none;"><i class="fa-solid fa-file-csv"></i> Exportar CSV</button>
+            <!-- Cambiado a Excel -->
+            <button class="btn" id="btn-exportar" style="display:none;">
+              <i class="fa-solid fa-file-excel"></i> Exportar Excel
+            </button>
           </div>
         </div>
         <div style="overflow:auto;">
@@ -451,6 +454,7 @@
   </div>
 </body>
 </html>
+
 
 
 

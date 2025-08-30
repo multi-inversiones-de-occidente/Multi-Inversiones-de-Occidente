@@ -6,7 +6,9 @@
   <title>Tasa de Mora por Usuario – Multi Inversiones</title>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { 
+      getFirestore, collection, query, where, getDocs, doc, getDoc 
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -24,83 +26,260 @@
 
     let gerenteDepartment = null;
     let usersList = [];
+    let nombreLogueado = null;
+
+    // ===== Utilidades =====
+    function formatoDinero(valor) {
+      const n = (typeof valor === "number") ? valor : parseFloat(valor || "0");
+      return n.toLocaleString("es-SV", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
+    }
+    function asNumber(v, def = 0) {
+      if (typeof v === "number") return v;
+      const p = parseFloat(v);
+      return Number.isFinite(p) ? p : def;
+    }
+    function contarCuotasAtrasadas(amortizacion) {
+      if (!Array.isArray(amortizacion)) return 0;
+      return amortizacion.reduce((acc, q) => acc + (q && q.estado === "Atrasado" ? 1 : 0), 0);
+    }
+    async function resolverNombreCliente(d) {
+      const candidatos = [
+        d.nombreCliente && d.apellidoCliente ? `${d.nombreCliente} ${d.apellidoCliente}` : null,
+        d.clienteNombre && d.clienteApellidos ? `${d.clienteNombre} ${d.clienteApellidos}` : null,
+        d.titularNombre && d.titularApellido ? `${d.titularNombre} ${d.titularApellido}` : null,
+        d.nombreCompleto ? d.nombreCompleto : null,
+        d.nombre ? d.nombre : null
+      ].filter(Boolean);
+      if (candidatos.length > 0) return candidatos[0];
+
+      const cid = d.clienteID || d.idCliente || d.clienteUid || d.userId || null;
+      if (!cid) return "Sin nombre";
+      try {
+        const cliRef = doc(db, "clientes", cid);
+        const cliSnap = await getDoc(cliRef);
+        if (cliSnap.exists()) {
+          const c = cliSnap.data();
+          const alias = [
+            c.nombre && c.apellido ? `${c.nombre} ${c.apellido}` : null,
+            c.nombres && c.apellidos ? `${c.nombres} ${c.apellidos}` : null,
+            c.nombreCompleto ? c.nombreCompleto : null
+          ].filter(Boolean);
+          return alias[0] || "Sin nombre";
+        }
+      } catch (e) { console.warn("No se pudo resolver cliente", e); }
+      return "Sin nombre";
+    }
+    function resolverNombreUsuario(userDocData) {
+      const n = userDocData?.nombre ?? "";
+      const a = userDocData?.apellido ?? "";
+      const full = `${n} ${a}`.trim();
+      return full || (userDocData?.displayName ?? "Sin nombre");
+    }
 
     async function cargarUsuarios() {
       const select = document.getElementById('user-select');
       select.innerHTML = '<option value="">Cargando usuarios...</option>';
-      // Solo usuarios de la misma agencia (department) y rol permitido:
-      const q = query(
+
+      // Solo usuarios de la misma agencia (department) y rol permitido
+      const qUsers = query(
         collection(db, "users"),
         where("rol", "in", ["caja", "ejecutivo", "gerente"]),
         where("department", "==", gerenteDepartment)
       );
-      const snap = await getDocs(q);
+      const snap = await getDocs(qUsers);
       usersList = [];
-      select.innerHTML = '<option value="">Selecciona un usuario</option>';
+      const opciones = [];
+
+      // Opción "Yo" (usuario logueado)
+      if (nombreLogueado) {
+        opciones.push(`<option value="${nombreLogueado}">Yo (${nombreLogueado})</option>`);
+      }
+
       snap.forEach(docu => {
         const d = docu.data();
-        // Usar el nombre completo como value
-        const nombreCompleto = `${d.nombre ?? ""} ${d.apellido ?? ""}`.trim();
+        const nombreCompleto = resolverNombreUsuario(d);
         usersList.push({ nombre: nombreCompleto });
-        select.innerHTML += `<option value="${nombreCompleto}">${nombreCompleto}</option>`;
+        // Evitar duplicar "Yo" si coincide
+        if (!nombreLogueado || nombreCompleto !== nombreLogueado) {
+          opciones.push(`<option value="${nombreCompleto}">${nombreCompleto}</option>`);
+        }
       });
+
+      select.innerHTML = `<option value="">Selecciona un usuario</option>` + opciones.join("");
     }
 
     async function calcularMoraPorUsuario(nombreSeleccionado) {
       if (!nombreSeleccionado) {
         document.getElementById('resultado').innerHTML = '';
+        document.getElementById('detalle-box').style.display = "none";
         return;
       }
       document.getElementById('resultado').innerHTML = `<div class="cargando">Calculando...</div>`;
-      let capitalAtrasado = 0, carteraTotal = 0, moraPct = 0;
-      // Trae créditos asignados al usuario por nombre
-      const creds = await getDocs(
-        query(
-          collection(db, "creditos"),
-          where("asignadoA", "==", nombreSeleccionado),
-          where("estadoCredito", "!=", "Revertido")
-        )
+      document.getElementById('detalle-box').style.display = "none";
+      document.getElementById('detalle-body').innerHTML = "";
+
+      let capitalAtrasado = 0, carteraTotal = 0;
+      const listaMora = [];
+
+      // Filtrar SOLO por nombre exacto en asignadoA
+      const qCreds = query(
+        collection(db, "creditos"),
+        where("asignadoA", "==", nombreSeleccionado)
       );
-      creds.forEach(docu => {
+      const creds = await getDocs(qCreds);
+
+      for (const docu of creds.docs) {
         const d = docu.data();
-        // Solo suma el capitalAtrasado si alguna cuota está "Atrasado"
-        let tieneCuotaAtrasada = false;
-        if (Array.isArray(d.amortizacion)) {
-          tieneCuotaAtrasada = d.amortizacion.some(q => q.estado === "Atrasado");
+        const estado = d.estadoCredito || "";
+        // Cartera total: excluir Revertido (se filtra en cliente, igual que en tu otra página)
+        if (estado !== "Revertido") {
+          carteraTotal += asNumber(d.saldoActual);
         }
-        if (tieneCuotaAtrasada) {
-          const ca = typeof d.capitalAtrasado === 'number'
-            ? d.capitalAtrasado : parseFloat(d.capitalAtrasado || 0);
+
+        // Solo suma capitalAtrasado si hay al menos 1 cuota "Atrasado"
+        const cuotasAtrasadas = contarCuotasAtrasadas(d.amortizacion);
+        if (cuotasAtrasadas > 0) {
+          const ca = asNumber(d.capitalAtrasado);
           capitalAtrasado += ca;
+
+          const nombreCliente = await resolverNombreCliente(d);
+          const ppad = asNumber(d.paraPonerseAlDia);
+
+          listaMora.push({
+            idCredito: docu.id,
+            nombreCliente,
+            estadoCredito: estado || "—",
+            saldoActual: asNumber(d.saldoActual),
+            capitalAtrasado: ca,
+            paraPonerseAlDia: ppad,
+            cuotasAtrasadas
+          });
         }
-        // Cartera total siempre suma saldoActual, excepto Revertido (ya está filtrado)
-        const sa = typeof d.saldoActual === 'number'
-          ? d.saldoActual : parseFloat(d.saldoActual || 0);
-        carteraTotal += sa;
-      });
-      moraPct = carteraTotal > 0 ? (capitalAtrasado / carteraTotal) * 100 : 0;
+      }
+
+      const moraPct = carteraTotal > 0 ? (capitalAtrasado / carteraTotal) * 100 : 0;
+
+      // Resumen
       document.getElementById('resultado').innerHTML = `
         <div class="card-res">
-          <div><span>Capital en Mora:</span> <b class="num">${capitalAtrasado.toLocaleString('es-SV', {style:'currency',currency:'USD'})}</b></div>
-          <div><span>Cartera Total:</span> <b class="num verde">${carteraTotal.toLocaleString('es-SV', {style:'currency',currency:'USD'})}</b></div>
+          <div><span>Usuario:</span> <b>${nombreSeleccionado}</b></div>
+          <div><span>Capital en Mora:</span> <b class="num">${formatoDinero(capitalAtrasado)}</b></div>
+          <div><span>Cartera Total:</span> <b class="num verde">${formatoDinero(carteraTotal)}</b></div>
           <div><span>% Mora:</span> <b class="num rojo">${moraPct.toFixed(2)}%</b></div>
         </div>
       `;
+
+      // Detalle
+      renderDetalle(listaMora);
+    }
+
+    function renderDetalle(items) {
+      const cont = document.getElementById("detalle-body");
+      const box  = document.getElementById("detalle-box");
+      const badge = document.getElementById("total-registros");
+      const btn = document.getElementById("btn-exportar");
+      cont.innerHTML = "";
+
+      if (!items || items.length === 0) {
+        cont.innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align:center;color:#fff9;padding:1rem;">
+              Este usuario no tiene créditos en mora.
+            </td>
+          </tr>
+        `;
+        badge.textContent = "0";
+        btn.style.display = "none";
+        box.style.display = "block";
+        // Limpia dataset
+        document.getElementById("tabla-detalle").dataset.json = "[]";
+        return;
+      }
+
+      items.sort((a, b) => b.capitalAtrasado - a.capitalAtrasado);
+      for (const it of items) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="td-corto">${it.idCredito}</td>
+          <td>${it.nombreCliente}</td>
+          <td>${it.estadoCredito}</td>
+          <td class="num">${formatoDinero(it.saldoActual)}</td>
+          <td class="num imp">${formatoDinero(it.capitalAtrasado)}</td>
+          <td class="num">${formatoDinero(it.paraPonerseAlDia)}</td>
+          <td class="num">${it.cuotasAtrasadas}</td>
+        `;
+        cont.appendChild(tr);
+      }
+
+      badge.textContent = String(items.length);
+      btn.style.display = "inline-flex";
+      document.getElementById("tabla-detalle").dataset.json = JSON.stringify(items);
+      box.style.display = "block";
+    }
+
+    // ===== Exportar a Excel (.xlsx) con SheetJS =====
+    function exportarExcel() {
+      const tabla = document.getElementById("tabla-detalle");
+      const raw = tabla.dataset.json ? JSON.parse(tabla.dataset.json) : [];
+      if (!raw || raw.length === 0) return;
+
+      const ws_data = [
+        ["ID Credito","Cliente","Estado","Saldo Actual","Capital Atrasado","Para Ponerse Al Dia","Cuotas Atrasadas"],
+        ...raw.map(r => [
+          r.idCredito,
+          r.nombreCliente,
+          r.estadoCredito,
+          r.saldoActual,
+          r.capitalAtrasado,
+          r.paraPonerseAlDia,
+          r.cuotasAtrasadas
+        ])
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet(ws_data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Mora por Usuario");
+      ws['!cols'] = [
+        { wch: 22 },
+        { wch: 28 },
+        { wch: 14 },
+        { wch: 16 },
+        { wch: 18 },
+        { wch: 20 },
+        { wch: 16 },
+      ];
+      XLSX.writeFile(wb, "creditos_en_mora_por_usuario.xlsx");
     }
 
     window.addEventListener("DOMContentLoaded", () => {
       onAuthStateChanged(auth, async user => {
         if (!user) return location.href = "login.html";
-        // Lee departamento del gerente logueado
+        // Lee info del usuario logueado
         const userDoc = await getDoc(doc(db, "users", user.uid));
-        gerenteDepartment = userDoc.data().department;
+        const userData = userDoc.data() || {};
+        gerenteDepartment = userData.department || null;
+        nombreLogueado = resolverNombreUsuario(userData);
+
         await cargarUsuarios();
+
         document.getElementById('user-select').addEventListener('change', e => {
           calcularMoraPorUsuario(e.target.value);
         });
+
+        // Si quieres seleccionar por defecto "Yo":
+        // if (nombreLogueado) {
+        //   document.getElementById('user-select').value = nombreLogueado;
+        //   calcularMoraPorUsuario(nombreLogueado);
+        // }
+
+        document.getElementById("btn-exportar").addEventListener("click", exportarExcel);
       });
     });
   </script>
+
+  <!-- SheetJS para exportar a Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body { background: #101212; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
@@ -116,19 +295,69 @@
     .num.verde { color: #13b66b; }
     .num.rojo { color: #ff6262; }
     .cargando { color: #ffd266; text-align: center; font-size: 1.08rem;}
+
+    /* Detalle tabla */
+    .detalle-container { margin-top: 22px; display:none; }
+    .header-detalle { display: flex; align-items: center; justify-content: space-between; gap: .8rem; margin-bottom: .8rem; }
+    .header-detalle h2 { margin: 0; font-size: 1.1rem; letter-spacing: .4px; color: #b8c0ff; }
+    .pill { background: #23272c; padding: .35rem .6rem; border-radius: 999px; font-size: .85rem; color: #fff9; }
+    .btn { display: inline-flex; align-items: center; gap: .5rem; padding: .5rem .8rem; border-radius: 10px; background: #0e7a45; color: #fff; font-weight: 600; border: none; cursor: pointer; }
+    .btn.secondary { background: #2c2c36; }
+
+    table { width: 100%; border-collapse: collapse; border-spacing: 0; border-radius: 12px; background: #17171f; overflow: hidden; }
+    thead th { text-align: left; font-size: .85rem; color: #b8c0ff; padding: .7rem .8rem; background: #1f1f28; position: sticky; top: 0; z-index: 2; }
+    tbody td { padding: .7rem .8rem; border-top: 1px solid #2a2a35; font-size: .94rem; color: #e6e6e6; }
+    tbody tr:hover { background: #1e1e27; }
+    .num { text-align: right; }
+    .imp { color: #ffd600; font-weight: 700; }
+    .td-corto { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
     @media (max-width:550px){.container{padding:1.3rem 1vw;}}
   </style>
 </head>
 <body>
   <header>Tasa de Mora por Usuario</header>
   <div class="container">
-    <div class="section-title">Consulta el % de mora y cartera de tus usuarios</div>
+    <div class="section-title">Consulta el % de mora y cartera por usuario</div>
+
     <label for="user-select">Selecciona un usuario:</label>
     <select id="user-select" class="input-main">
       <option value="">Cargando usuarios...</option>
     </select>
+
     <div id="resultado" style="margin-top:12px;"></div>
+
+    <!-- Detalle créditos en mora -->
+    <div id="detalle-box" class="detalle-container">
+      <div class="header-detalle">
+        <h2><i class="fa-solid fa-list"></i> Créditos en mora (detalle)</h2>
+        <div style="display:flex;align-items:center;gap:.6rem;">
+          <span class="pill">Registros: <strong id="total-registros">0</strong></span>
+          <button class="btn" id="btn-exportar" style="display:none;"><i class="fa-solid fa-file-excel"></i> Exportar Excel</button>
+        </div>
+      </div>
+      <div style="overflow:auto;">
+        <table id="tabla-detalle">
+          <thead>
+            <tr>
+              <th>ID Crédito</th>
+              <th>Cliente</th>
+              <th>Estado</th>
+              <th class="num">Saldo Actual</th>
+              <th class="num">Capital Atrasado</th>
+              <th class="num">Para Ponerse al Día</th>
+              <th class="num">Cuotas Atrasadas</th>
+            </tr>
+          </thead>
+          <tbody id="detalle-body"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
+
+  <!-- SheetJS para exportar a Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </body>
 </html>
+
 

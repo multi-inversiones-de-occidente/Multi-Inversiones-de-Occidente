@@ -125,18 +125,31 @@
       return 0;
     }
 
-    // ===== NUEVO: leer saldo de un cierre existente para la misma fecha (si ya fue cerrado) =====
-    async function obtenerSaldoCierreSiExiste(agencia, fechaOperacion /* "YYYY-MM-DD" */) {
-      const q = query(
+    // ===== NUEVO: obtener el saldo del último cierre (independiente de la fecha seleccionada) =====
+    async function obtenerSaldoUltimoCierre(agencia) {
+      // Primero por 'fecha' (operativa) descendente
+      let q1 = query(
         collection(db, "cierres_caja"),
         where("agencia", "==", agencia),
-        where("fecha", "==", fechaOperacion),
+        orderBy("fecha", "desc"),
         limit(1)
       );
-      const snap = await getDocs(q);
+      let snap = await getDocs(q1);
       if (!snap.empty) {
         const d = snap.docs[0].data();
-        return (d.saldo_siguiente ?? d.saldo_caja ?? null);
+        return Number((d.saldo_siguiente ?? d.saldo_caja) || 0);
+      }
+      // Fallback por 'fecha_cierre' (timestamp ISO) descendente
+      let q2 = query(
+        collection(db, "cierres_caja"),
+        where("agencia", "==", agencia),
+        orderBy("fecha_cierre", "desc"),
+        limit(1)
+      );
+      snap = await getDocs(q2);
+      if (!snap.empty) {
+        const d = snap.docs[0].data();
+        return Number((d.saldo_siguiente ?? d.saldo_caja) || 0);
       }
       return null;
     }
@@ -382,13 +395,13 @@
           ).join('');
       }
 
-      // Saldo proyectado
+      // Saldo proyectado (no se toca)
       const saldoFinalProyectado = saldoInicial + totalIngresos - totalEgresos;
 
-      // === NUEVO: si ya existe un cierre para esa fecha, mostrar ese saldo; de lo contrario, el proyectado ===
-      const saldoCierreExistente = await obtenerSaldoCierreSiExiste(agenciaActual, fecha);
-      const saldoParaMostrar = (saldoCierreExistente !== null && !isNaN(Number(saldoCierreExistente)))
-        ? Number(saldoCierreExistente)
+      // === Mostrar SIEMPRE el saldo del ÚLTIMO cierre de la agencia si existe ===
+      const saldoUltimoCierre = await obtenerSaldoUltimoCierre(agenciaActual);
+      const saldoParaMostrar = (saldoUltimoCierre !== null && !isNaN(Number(saldoUltimoCierre)))
+        ? Number(saldoUltimoCierre)
         : saldoFinalProyectado;
 
       document.getElementById("totales").innerHTML =
@@ -520,6 +533,7 @@
   </div>
 </body>
 </html>
+
 
 
 

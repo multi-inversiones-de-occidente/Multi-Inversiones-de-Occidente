@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -58,6 +58,10 @@
         docs = docs.filter(doc => {
           // Comparar asignadoA con el nombre del usuario logueado (no email)
           if (normaliza(doc.asignadoA) !== normaliza(usuarioNombre)) return false;
+
+          // 🔽 AÑADIDO: excluir créditos con estado "Revertido"
+          if (normaliza(doc.estadoCredito) === 'revertido') return false;
+
           // Filtrar por rango de fechas
           let fechaDoc = doc.fechaInicio;
           if (typeof fechaDoc === "object" && fechaDoc.seconds) {
@@ -441,6 +445,7 @@
   </div>
 </body>
 </html>
+
 
 
 

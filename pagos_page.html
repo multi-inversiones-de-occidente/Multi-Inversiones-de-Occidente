@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Recepción de Pagos – Multi Inversiones (política estricta)</title>
+  <title>Recepción de Pagos – Multi Inversiones</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body { background: #101212; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
@@ -58,15 +58,15 @@
     import { getFirestore, collection, query, where, getDocs, doc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
-    // ==== Utilidades de fecha ====
-    function startOfLocalDay(d){ const x = new Date(d); x.setHours(0,0,0,0); return x; }
-    function parseDateMaybe(s){ try{ const d = new Date(s); return isNaN(d.getTime())? null : d; }catch{ return null; } }
+    window.firebaseAddDoc = async function(collectionName, data) {
+      const col = collection(db, collectionName);
+      return await addDoc(col, data);
+    };
+    window.firebaseUpdateDoc = async function(collectionName, docId, data) {
+      const docRef = doc(db, collectionName, docId);
+      await updateDoc(docRef, data);
+    };
 
-    // ==== Redondeo estricto a 2 decimales y tolerancia (0.8 ctvs) ====
-    const r2 = (x) => +((Math.round((+x + Number.EPSILON) * 100) / 100).toFixed(2));
-    const EPS = 0.008;
-
-    // ==== Firebase init ====
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -82,22 +82,13 @@
 
     let userDepartment = null;
 
-    // ==== Correlativo único (blindado) ====
-    async function obtenerCorrelativoUnicoPagos() {
-      const pagosSnap = await getDocs(collection(db, "pagos"));
-      const usados = new Set();
-      pagosSnap.forEach(d => {
-        let c = d.data().correlativo;
-        if (typeof c === 'string' && !isNaN(c)) c = Number(c);
-        if (typeof c === 'number' && c > 0) usados.add(c);
-      });
-      let corr = 1; while (usados.has(corr)) corr++; return corr;
-    }
-
     function obtenerAgenciaUsuario() {
-      return new Promise((resolve) => {
+      return new Promise((resolve, reject) => {
         onAuthStateChanged(auth, async user => {
-          if (!user) { window.location.href = "login.html"; return; }
+          if (!user) {
+            window.location.href = "login.html";
+            return;
+          }
           const usersRef = collection(db, "users");
           const q = query(usersRef, where("__name__", "==", user.uid));
           const snap = await getDocs(q);
@@ -106,10 +97,18 @@
             userDepartment = data.department || null;
             const agenciaRow = document.getElementById('agencia-row');
             const agenciaNombre = document.getElementById('agencia-nombre');
-            if (userDepartment) { agenciaNombre.textContent = userDepartment; agenciaRow.style.display = ''; }
-            else { agenciaRow.style.display = 'none'; }
+            if (userDepartment) {
+              agenciaNombre.textContent = userDepartment;
+              agenciaRow.style.display = '';
+            } else {
+              agenciaRow.style.display = 'none';
+            }
             resolve(userDepartment);
-          } else { userDepartment = null; document.getElementById('agencia-row').style.display = 'none'; resolve(null); }
+          } else {
+            userDepartment = null;
+            document.getElementById('agencia-row').style.display = 'none';
+            resolve(null);
+          }
         });
       });
     }
@@ -118,9 +117,22 @@
       const clientesList = document.getElementById("clientes-list");
       clientesList.innerHTML = "Cargando...";
       let clientes = [];
-      if (!term.trim()) { clientesList.innerHTML = ""; return; }
-      if (!userDepartment) { clientesList.innerHTML = `<div style="color:#ccc;text-align:center;padding:34px 0;">No se detectó agencia asignada a tu usuario.</div>`; return; }
-      const estadosPermitidos = ["Activo", "Mora Temprana", "Mora Moderada", "Mora Severa", "Riesgo Alto"]; // excluye Pagado/Anulado
+      if (!term.trim()) {
+        clientesList.innerHTML = "";
+        return;
+      }
+      if (!userDepartment) {
+        clientesList.innerHTML = `<div style="color:#ccc;text-align:center;padding:34px 0;">No se detectó agencia asignada a tu usuario.</div>`;
+        return;
+      }
+      // Incluye créditos en mora (excepto Pagado o Anulado)
+      const estadosPermitidos = [
+        "Activo",
+        "Mora Temprana",
+        "Mora Moderada",
+        "Mora Severa",
+        "Riesgo Alto"
+      ];
       const creditosRef = collection(db, "creditos");
       const q = query(creditosRef, where("estadoCredito", "in", estadosPermitidos), where("agenciaAsignada", "==", userDepartment));
       const snap = await getDocs(q);
@@ -132,7 +144,10 @@
           clientes.push({ id: docSnap.id, ...d });
         }
       });
-      if (!clientes.length) { clientesList.innerHTML = `<div style="color:#ccc;text-align:center;padding:34px 0;">No se encontraron clientes para tu agencia.</div>`; return; }
+      if (!clientes.length) {
+        clientesList.innerHTML = `<div style="color:#ccc;text-align:center;padding:34px 0;">No se encontraron clientes para tu agencia.</div>`;
+        return;
+      }
       clientesList.innerHTML = clientes.map(cliente => `
         <div class="cliente-card">
           <div>
@@ -152,22 +167,32 @@
       `).join('');
       document.querySelectorAll('.btn-pagar').forEach(btn => {
         btn.onclick = function() {
-          mostrarDialogoPago({ id: btn.getAttribute('data-id'), nombre: btn.getAttribute('data-nombre'), numeroDui: btn.getAttribute('data-dui') });
+          mostrarDialogoPago({
+            id: btn.getAttribute('data-id'),
+            nombre: btn.getAttribute('data-nombre'),
+            numeroDui: btn.getAttribute('data-dui')
+          });
         };
       });
     }
 
     function mostrarDialogoPago(cliente) {
       let modalRoot = document.getElementById("modal-root");
-      let monto = ""; let errorMsg = "";
+      let monto = "";
+      let errorMsg = "";
 
       function closeModal() { modalRoot.innerHTML = ""; }
+
       function render() {
         modalRoot.innerHTML = `
           <div class="modal-bg" onclick="event.target===this && (${closeModal.toString()})();">
             <div class="modal">
-              <div class="modal-title"><i class="fas fa-coins" style="color:#13b66b;"></i> Pago a ${cliente.nombre}</div>
-              <div class="modal-sub"><i class="fas fa-id-card"></i> DUI: <b>${cliente.numeroDui}</b></div>
+              <div class="modal-title">
+                <i class="fas fa-coins" style="color:#13b66b;"></i> Pago a ${cliente.nombre}
+              </div>
+              <div class="modal-sub">
+                <i class="fas fa-id-card"></i> DUI: <b>${cliente.numeroDui}</b>
+              </div>
               <div class="modal-row">
                 <label for="monto-input" style="font-weight:600;margin-bottom:2px;display:block;">Monto a pagar</label>
                 <div class="input-group">
@@ -187,16 +212,25 @@
         document.getElementById("pagar-btn").onclick = () => {
           const montoValue = document.getElementById("monto-input").value.trim();
           const montoNum = parseFloat(montoValue);
-          if (isNaN(montoNum) || montoNum <= 0) { errorMsg = "Ingresa un monto válido mayor a $0.00"; render(); setTimeout(()=>document.getElementById("monto-input").focus(),50); return; }
+          if (isNaN(montoNum) || montoNum <= 0) {
+            errorMsg = "Ingresa un monto válido mayor a $0.00";
+            render();
+            setTimeout(() => {
+              document.getElementById("monto-input").focus();
+            }, 50);
+            return;
+          }
           realizarPago(cliente, montoNum);
           closeModal();
         };
-        document.getElementById("monto-input").onkeydown = e => { if (e.key === "Enter") document.getElementById("pagar-btn").click(); };
+        document.getElementById("monto-input").onkeydown = e => {
+          if (e.key === "Enter") document.getElementById("pagar-btn").click();
+        };
       }
       render();
     }
 
-    // ==== LÓGICA DE PAGO – política estricta (con tolerancia 0.008) ====
+    // === LÓGICA DE PAGO ADAPTADA: suma, marca multas pagadas y respeta todo lo tuyo ===
     async function realizarPago(cliente, montoNum) {
       try {
         const user = auth.currentUser;
@@ -205,287 +239,204 @@
         const userData = userSnap.docs[0].data();
         const cajeroNombre = userData.nombre_autorizacion || userData.nombre || "Sin Nombre";
         const sucursal = userData.department || "N/A";
-        const fechaPagoISO = new Date().toISOString();
+        const fechaPago = new Date().toISOString();
+        const ahora = new Date(fechaPago);
 
-        // Fecha-valor = hoy (pantalla normal)
-        const V0 = startOfLocalDay(new Date());
-
-        // Traer crédito
         const creditoSnap = await getDocs(query(collection(db, "creditos"), where("__name__", "==", cliente.id)));
         if (creditoSnap.empty) throw new Error("Crédito no encontrado.");
         const creditoData = creditoSnap.docs[0].data();
 
-        // Bases
         let saldoActual = parseFloat(creditoData.saldoActual || 0);
-        let interesActual = parseFloat(creditoData.interesActual || 0); // bucket global a hoy 00:00
+        let interesActual = parseFloat(creditoData.interesActual || 0);
         let multasAcumuladas = parseFloat(creditoData.multasAcumuladas || 0);
+        let paraPonerseAlDia = parseFloat(creditoData.paraPonerseAlDia || 0);
 
-        // Clonar
-        let amortizacion = Array.isArray(creditoData.amortizacion) ? creditoData.amortizacion.map(c => ({
-          ...c,
-          estado: c.estado || 'Pendiente',
-          montoPagado: typeof c.montoPagado === 'number' ? c.montoPagado : parseFloat(c.montoPagado || 0) || 0,
-          montoPagadoInteres: typeof c.montoPagadoInteres === 'number' ? c.montoPagadoInteres : parseFloat(c.montoPagadoInteres || 0) || 0,
-          fechaPagoReal: c.fechaPagoReal || null,
-        })) : [];
+        let amortizacion = Array.isArray(creditoData.amortizacion) ? creditoData.amortizacion : [];
+        amortizacion = amortizacion.map((cuota) => ({
+          ...cuota,
+          estado: cuota.estado || "Pendiente",
+          montoPagado: typeof cuota.montoPagado === "number" ? cuota.montoPagado : 0,
+          montoPagadoInteres: typeof cuota.montoPagadoInteres === "number" ? cuota.montoPagadoInteres : 0,
+          fechaPagoReal: cuota.fechaPagoReal || null
+        }));
+
         let historialMultas = Array.isArray(creditoData.historialMultas) ? JSON.parse(JSON.stringify(creditoData.historialMultas)) : [];
 
-        let restante = r2(montoNum);
+        let restante = montoNum;
         let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
+        const tolerancia = 0.10; // Tolerancia de centavos
 
-        // 1) MULTAS (fecha <= V0) y "No Pagada"
-        if (restante > 0 && historialMultas.length) {
-          for (let i = 0; i < historialMultas.length && restante > 0; i++) {
-            const m = historialMultas[i];
-            const f = parseDateMaybe(m.fecha) || V0;
-            const estado = m.estadoCuota || 'No Pagada';
-            const montoMulta = parseFloat(m.monto || 0) || 0;
-            if (estado === 'No Pagada' && startOfLocalDay(f) <= V0 && montoMulta > 0) {
-              const ab = Math.min(restante, montoMulta);
-              if (ab > 0) {
-                pagoMultas = r2(pagoMultas + ab);
-                restante   = r2(restante - ab);
-                const nuevo = r2(montoMulta - ab);
-                m.monto = nuevo;
-                if (nuevo <= EPS) { m.estadoCuota = 'Pagada'; m.monto = 0; }
-              }
-            }
-          }
-        }
-        // Recalcular multas NO PAGADAS
-        multasAcumuladas = r2(historialMultas.reduce((acc, m) => acc + ((m.estadoCuota === 'No Pagada' || !m.estadoCuota) ? (parseFloat(m.monto)||0) : 0), 0));
+        // 1. MULTAS: Suma todas las NO PAGADAS
+        let multasNoPagadas = historialMultas.filter(m => !m.estadoCuota || m.estadoCuota === "No Pagada");
+        let multasPendientes = multasNoPagadas.reduce((acc, m) => acc + (parseFloat(m.monto) || 0), 0);
 
-        // 2A) INTERÉS vencido por cuota (FIFO, capado por cuota) – NO tocar interesActual global aquí
-        if (restante > 0) {
-          const cuotasVencidasOrden = amortizacion
-            .map(c => ({...c}))
-            .filter(c => { const f = startOfLocalDay(parseDateMaybe(c.fecha) || V0); return f <= V0 && c.estado !== 'Pagada'; })
-            .sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
-
-          let interesPendTotal = 0;
-          for (const c of cuotasVencidasOrden) {
-            const intCuota = parseFloat(c.interes||0) || 0;
-            const pagInt   = parseFloat(c.montoPagadoInteres||0) || 0;
-            interesPendTotal += Math.max(0, r2(intCuota - pagInt));
-          }
-
-          let interesAConsumir = Math.min(restante, interesPendTotal);
-          let interesConsumido = 0;
-
-          for (let i = 0; i < amortizacion.length && interesAConsumir > 0; i++) {
-            const c = amortizacion[i];
-            const f = startOfLocalDay(parseDateMaybe(c.fecha) || V0);
-            if (f <= V0 && c.estado !== 'Pagada') {
-              const intCuota = parseFloat(c.interes || 0) || 0;
-              const pagInt   = parseFloat(c.montoPagadoInteres || 0) || 0;
-              const faltInt  = Math.max(0, r2(intCuota - pagInt));
-              if (faltInt > 0) {
-                const ab = Math.min(faltInt, interesAConsumir);
-                if (ab > 0) {
-                  c.montoPagadoInteres = r2(pagInt + ab);
-                  interesAConsumir = r2(interesAConsumir - ab);
-                  interesConsumido = r2(interesConsumido + ab);
+        // Paga primero las multas NO PAGADAS
+        let pagadoEnMultas = 0;
+        let nuevasMultasHistorial = historialMultas.map(m => ({...m}));
+        if (restante > 0 && multasPendientes > 0) {
+          for (let i = 0; i < nuevasMultasHistorial.length; i++) {
+            let multa = nuevasMultasHistorial[i];
+            if (!multa.estadoCuota || multa.estadoCuota === "No Pagada") {
+              let pagar = Math.min(restante, parseFloat(multa.monto) || 0);
+              if (pagar > 0) {
+                pagadoEnMultas += pagar;
+                restante -= pagar;
+                // Si se pagó toda la multa, márcala como Pagada
+                if (Math.abs(pagar - parseFloat(multa.monto)) < 0.01) {
+                  multa.estadoCuota = "Pagada";
                 }
-              }
-            }
-          }
-          if (interesConsumido > 0) {
-            pagoInteres = r2(pagoInteres + interesConsumido);
-            restante    = r2(restante - interesConsumido);
-            // NOTA: No ajustar interesActual aquí (2A).
-          }
-        }
-
-        // 2B) INTERÉS global remanente (antes de capital)
-        if (restante > 0 && interesActual > 0) {
-          const ab = Math.min(restante, interesActual);
-          pagoInteres   = r2(pagoInteres + ab);
-          interesActual = Math.max(0, r2(interesActual - ab));
-          restante      = r2(restante - ab);
-        }
-
-        // 3) CAPITAL de cuotas con fecha <= V0
-        if (restante > 0) {
-          for (let i = 0; i < amortizacion.length && restante > 0; i++) {
-            const c = amortizacion[i];
-            const f = startOfLocalDay(parseDateMaybe(c.fecha) || V0);
-            if (f <= V0 && c.estado !== 'Pagada') {
-              const cap  = parseFloat(c.capital || 0) || 0;
-              const pagC = parseFloat(c.montoPagado || 0) || 0;
-              const faltC= Math.max(0, r2(cap - pagC));
-              if (faltC > 0) {
-                const ab = Math.min(faltC, restante);
-                c.montoPagado = r2(pagC + ab);
-                pagoCapital   = r2(pagoCapital + ab);
-                restante      = r2(restante - ab);
+                // Si se pagó parcialmente (raro pero posible), se deja "No Pagada"
+                if (restante <= 0) break;
               }
             }
           }
         }
+        pagoMultas = pagadoEnMultas;
+        multasAcumuladas = nuevasMultasHistorial.filter(m => !m.estadoCuota || m.estadoCuota === "No Pagada")
+          .reduce((acc, m) => acc + (parseFloat(m.monto) || 0), 0);
 
-        // 4) PREPAGO de capital (cuotas futuras)
-        if (restante > 0) {
-          for (let i = 0; i < amortizacion.length && restante > 0; i++) {
-            const c = amortizacion[i];
-            const f = startOfLocalDay(parseDateMaybe(c.fecha) || V0);
-            if (f > V0 && c.estado !== 'Pagada') {
-              const cap  = parseFloat(c.capital || 0) || 0;
-              const pagC = parseFloat(c.montoPagado || 0) || 0;
-              const faltC= Math.max(0, r2(cap - pagC));
-              if (faltC > 0) {
-                const ab = Math.min(faltC, restante);
-                c.montoPagado = r2(pagC + ab);
-                pagoCapital   = r2(pagoCapital + ab);
-                restante      = r2(restante - ab);
-              }
-            }
-          }
-        }
+        // 2. INTERES CORRIDO (interesActual, solo a la fecha)
+        let interesPagadoHoy = Math.min(interesActual, restante);
+        restante -= interesPagadoHoy;
+        pagoInteres += interesPagadoHoy;
+        interesActual -= interesPagadoHoy;
 
-        // --- SNAP: normaliza cuotas saldadas por tolerancia (<= 0.8 ctvs) antes de evaluar estados
-        for (const c of amortizacion) {
-          const cap  = r2(c.capital || 0);
-          const int  = r2(c.interes || 0);
-          const pagC = r2(c.montoPagado || 0);
-          const pagI = r2(c.montoPagadoInteres || 0);
-
-          const capDiff = r2(cap - pagC);
-          const intDiff = r2(int - pagI);
-
-          if (capDiff <= EPS && intDiff <= EPS) {
-            c.montoPagado = cap;
-            c.montoPagadoInteres = int;
-            c.estado = 'Pagada';
-            c.fechaPagoReal = c.fechaPagoReal || new Date().toISOString();
-          }
-        }
-
-        // 5) Estados de cuotas (regla con tolerancia + r2)
-        const nowISO = new Date().toISOString();
+        // Aplica ese interesPagadoHoy al montoPagadoInteres de la primera cuota pendiente de capital
         for (let i = 0; i < amortizacion.length; i++) {
-          const c = amortizacion[i];
-          const f = startOfLocalDay(parseDateMaybe(c.fecha) || V0);
+          let cuota = amortizacion[i];
+          if ((parseFloat(cuota.montoPagado) || 0) < parseFloat(cuota.capital)) {
+            cuota.montoPagadoInteres = (parseFloat(cuota.montoPagadoInteres) || 0) + interesPagadoHoy;
+            break;
+          }
+        }
 
-          const cap  = r2(c.capital || 0);
-          const int  = r2(c.interes || 0);
-          const pagC = r2(c.montoPagado || 0);
-          const pagI = r2(c.montoPagadoInteres || 0);
+        // 3. CAPITAL: Reparte el resto a capital de las cuotas desde la más próxima
+        for (let i = 0; i < amortizacion.length && restante > 0; i++) {
+          let cuota = amortizacion[i];
+          let capitalPendiente = parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0);
+          if (capitalPendiente > 0) {
+            let abonoCapital = Math.min(restante, capitalPendiente);
+            cuota.montoPagado += abonoCapital;
+            pagoCapital += abonoCapital;
+            saldoActual -= abonoCapital;
+            if (saldoActual < 0) saldoActual = 0;
+            restante -= abonoCapital;
+          }
+        }
 
-          const capDiff = r2(cap - pagC);
-          const intDiff = r2(int - pagI);
-
-          const capOK = capDiff <= EPS;
-          const intOK = intDiff <= EPS;
-
-          if (f <= V0) {
-            if (capOK && intOK) { c.estado = 'Pagada'; c.fechaPagoReal = c.fechaPagoReal || nowISO; }
-            else if (pagC > 0 || pagI > 0) { c.estado = 'Parcial'; c.fechaPagoReal = null; }
-            else { c.estado = 'Pendiente'; c.fechaPagoReal = null; }
+        // 4. ACTUALIZAR ESTADOS DE CUOTAS (¡CORREGIDO!)
+        for (let i = 0; i < amortizacion.length; i++) {
+          let cuota = amortizacion[i];
+          if (
+            (parseFloat(cuota.montoPagado) || 0) + tolerancia >= (parseFloat(cuota.capital) || 0)
+          ) {
+            cuota.estado = "Pagada";
+            // CORRECCIÓN: Solo asigna fecha si antes no la tenía
+            if (!cuota.fechaPagoReal) {
+              cuota.fechaPagoReal = fechaPago;
+            }
+          } else if (
+            ((parseFloat(cuota.montoPagadoInteres) || 0) > 0) ||
+            ((parseFloat(cuota.montoPagado) || 0) > 0)
+          ) {
+            cuota.estado = "Parcial";
+            cuota.fechaPagoReal = null;
           } else {
-            // Futuras: el prepago se reconoce por capital
-            if (capOK) { c.estado = 'Pagada'; c.fechaPagoReal = c.fechaPagoReal || nowISO; c.pagadaAdelantada = true; }
-            else if (pagC > 0) { c.estado = 'Parcial'; c.fechaPagoReal = null; }
-            else { c.estado = 'Pendiente'; c.fechaPagoReal = null; }
+            cuota.estado = "Pendiente";
+            cuota.fechaPagoReal = null;
           }
         }
 
-        // 6) Recalcular saldos y PPD con r2
-        saldoActual = r2(amortizacion.reduce((acc, c) => {
-          const cap  = r2(c.capital || 0);
-          const pagC = r2(c.montoPagado || 0);
-          return acc + Math.max(0, r2(cap - pagC));
-        }, 0));
-
-        const hoyLocal = startOfLocalDay(new Date());
-        let capitalAtrasado = 0, cuotasAtrasadas = 0;
-        for (const c of amortizacion) {
-          const f = startOfLocalDay(parseDateMaybe(c.fecha) || V0);
-          if (f < hoyLocal && c.estado !== 'Pagada') {
-            const cap  = r2(c.capital || 0);
-            const pagC = r2(c.montoPagado || 0);
-            capitalAtrasado += Math.max(0, r2(cap - pagC));
-            cuotasAtrasadas++;
+        // 5. RECALCULAR paraPonerseAlDia
+        paraPonerseAlDia = 0;
+        let capitalAtrasado = 0;
+        for (let i = 0; i < amortizacion.length; i++) {
+          let cuota = amortizacion[i];
+          // Si es vencida y no pagada, falta pagar algo
+          const fechaCuota = new Date(cuota.fecha);
+          if (fechaCuota < ahora && cuota.estado !== "Pagada") {
+            let faltaCapital = Math.max(0, parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0));
+            let faltaInteres = Math.max(0, parseFloat(cuota.interes || 0) - (parseFloat(cuota.montoPagadoInteres) || 0));
+            paraPonerseAlDia += faltaCapital + faltaInteres;
+            capitalAtrasado += faltaCapital;
           }
         }
-        capitalAtrasado = r2(capitalAtrasado);
+        // Si está todo pagado, paraPonerseAlDia queda 0
+        if (paraPonerseAlDia < 0.01) paraPonerseAlDia = 0;
 
-        // Multas NO pagadas
-        multasAcumuladas = r2(historialMultas.reduce((acc, m) => {
-          const pendiente = (m.estadoCuota === 'No Pagada' || !m.estadoCuota) ? (parseFloat(m.monto)||0) : 0;
-          return acc + pendiente;
-        }, 0));
+        saldoActual = amortizacion
+          .reduce((acc, cuota) => acc + Math.max(0, parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0)), 0);
 
-        // Para ponerse al día = interesActual remanente + capital vencido + multas
-        const paraPonerseAlDia = r2((interesActual || 0) + (capitalAtrasado || 0) + (multasAcumuladas || 0));
-
-        // Estado crédito
-        const NEAR_ZERO = EPS; // usa misma tolerancia para cierre
-        let nuevoEstado = saldoActual <= NEAR_ZERO ? 'Pagado' : creditoData.estadoCredito;
-        if (nuevoEstado !== 'Pagado') {
-          if (cuotasAtrasadas === 0 && multasAcumuladas <= NEAR_ZERO) nuevoEstado = 'Activo';
-          else if (cuotasAtrasadas > 0) nuevoEstado = 'Mora Temprana';
-        }
-
-        // 7) Registrar pago (correlativo único)
-        const correlativo = await obtenerCorrelativoUnicoPagos();
-        await addDoc(collection(db, 'pagos'), {
+        // REGISTRO DEL PAGO
+        const correlativo = Math.floor(Math.random() * 90000) + 10000;
+        const correlativoStr = correlativo.toString().padStart(5, '0');
+        await window.firebaseAddDoc("pagos", {
           clienteID: creditoData.clienteID,
           creditoID: cliente.id,
           nombres: creditoData.nombre,
-          apellido: creditoData.apellido || '',
-          numeroDui: creditoData.numeroDui || '',
-          montoPagado: r2(montoNum),
-          fechaPago: fechaPagoISO,
-          pagoMultas: r2(pagoMultas),
-          pagoInteres: r2(pagoInteres),
-          pagoCapital: r2(pagoCapital),
-          saldoRestante: r2(saldoActual),
+          apellido: creditoData.apellido || "",
+          numeroDui: creditoData.numeroDui || "",
+          montoPagado: montoNum,
+          fechaPago: fechaPago,
+          pagoMultas: (parseFloat(pagoMultas) || 0).toFixed(2),
+          pagoInteres: (parseFloat(pagoInteres) || 0).toFixed(2),
+          pagoCapital: (parseFloat(pagoCapital) || 0).toFixed(2),
+          saldoRestante: (parseFloat(saldoActual) || 0).toFixed(2),
           cajeroID: user.uid,
           cajeroNombre: cajeroNombre,
           sucursal: sucursal,
-          correlativo: correlativo, // numérico global
-          timestamp: new Date()
+          correlativo: correlativoStr,
+          timestamp: new Date(),
+          paraPonerseAlDiaAntes: (parseFloat(creditoData.paraPonerseAlDia) || 0).toFixed(2)
         });
 
-        // 8) Actualizar crédito
-        await updateDoc(doc(db, 'creditos', cliente.id), {
-          saldoActual: r2(saldoActual),
-          interesActual: r2(interesActual),
-          capitalAtrasado: r2(capitalAtrasado),
-          paraPonerseAlDia: r2(paraPonerseAlDia),
-          multasAcumuladas: r2(multasAcumuladas),
-          ultimaActualizacion: fechaPagoISO,
-          fechaUltimoCalculoIntereses: fechaPagoISO,
+        // CAMBIO: Si el saldo es cero, pon Pagado; si no, revisa si debe volver a Activo
+        let nuevoEstado = saldoActual == 0 ? "Pagado" : creditoData.estadoCredito;
+        if (nuevoEstado !== "Pagado" && paraPonerseAlDia == 0 && capitalAtrasado == 0 && multasAcumuladas == 0) {
+          nuevoEstado = "Activo";
+        }
+
+        await window.firebaseUpdateDoc("creditos", cliente.id, {
+          saldoActual: (parseFloat(saldoActual) || 0).toFixed(2),
+          interesActual: interesActual.toFixed(2),
+          capitalAtrasado: (parseFloat(capitalAtrasado) || 0).toFixed(2),
+          paraPonerseAlDia: (parseFloat(paraPonerseAlDia) || 0).toFixed(2),
+          multasAcumuladas: (parseFloat(multasAcumuladas) || 0).toFixed(2),
+          ultimaActualizacion: fechaPago,
+          fechaUltimoCalculoIntereses: fechaPago,
           estadoCredito: nuevoEstado,
           amortizacion: amortizacion,
-          historialMultas: historialMultas
+          historialMultas: nuevasMultasHistorial // ← Aquí se actualiza el historial con "Pagada"
         });
 
-        // Ticket
-        window.location.href = `ticket_page.html?correlativo=${correlativo}` +
+        window.location.href = `ticket_page.html?correlativo=${correlativoStr}` +
           `&cliente=${encodeURIComponent(creditoData.nombre)}` +
           `&apellido=${encodeURIComponent(creditoData.apellido || '')}` +
           `&numeroDui=${encodeURIComponent(creditoData.numeroDui || '')}` +
-          `&monto=${(r2(montoNum)).toFixed(2)}` +
+          `&monto=${montoNum.toFixed(2)}` +
           `&agencia=${encodeURIComponent(sucursal)}` +
-          `&fecha=${encodeURIComponent(fechaPagoISO)}` +
-          `&pagoCapital=${(r2(pagoCapital)).toFixed(2)}` +
-          `&pagoInteres=${(r2(pagoInteres)).toFixed(2)}` +
-          `&pagoMultas=${(r2(pagoMultas)).toFixed(2)}` +
-          `&saldoRestante=${(r2(saldoActual)).toFixed(2)}`;
+          `&fecha=${encodeURIComponent(fechaPago)}` +
+          `&pagoCapital=${(parseFloat(pagoCapital)||0).toFixed(2)}` +
+          `&pagoInteres=${(parseFloat(pagoInteres)||0).toFixed(2)}` +
+          `&pagoMultas=${(parseFloat(pagoMultas)||0).toFixed(2)}` +
+          `&saldoRestante=${(parseFloat(saldoActual)||0).toFixed(2)}`;
 
       } catch (e) {
-        alert("Error al realizar el pago: " + (e?.message || e));
+        alert("Error al realizar el pago: " + e.message);
       }
     }
 
     window.addEventListener("DOMContentLoaded", async () => {
       await obtenerAgenciaUsuario();
-      document.getElementById("buscador").addEventListener("input", e => { buscarClientes(e.target.value); });
+      document.getElementById("buscador").addEventListener("input", e => {
+        buscarClientes(e.target.value);
+      });
     });
   </script>
 </body>
 </html>
+
+
 
 
 

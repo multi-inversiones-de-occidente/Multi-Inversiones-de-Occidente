@@ -9,32 +9,40 @@
     body { background: #191d20; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
     header { background: #000; padding: 1.1rem 0; text-align: center; font-size: 1.7rem; font-weight: 700; color: #F8AF40;}
     .container { max-width: 1100px; margin: 2.2rem auto 0 auto; background: #23272c; border-radius: 16px; box-shadow: 0 2px 22px #0008; padding: 2.2rem 1.6rem 1.7rem 1.6rem;}
-    h2 { color: #F8AF40; margin-bottom: 1.6rem; text-align: center; }
-    .filtros { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; align-items: end; margin-bottom: 1.1em;}
+    h2 { color: #F8AF40; margin-bottom: 1.2rem; text-align: center; }
+
+    .filtros { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; align-items: end; margin-bottom: .8em;}
     .filtros .campo { grid-column: span 3; min-width: 160px; }
-    .filtros .campo label { display:block; font-size:1.02rem; font-weight:600; margin-bottom:6px;}
-    .filtros input[type="date"], .filtros select { background: #202324; color: #fff; border: 1.5px solid #515151; border-radius: 7px; font-size: 1.02rem; padding: 8px 12px; width: 100%;}
-    .modo-asignacion { grid-column: span 6; display:flex; gap:16px; align-items:center; background:#1f2226; border:1px solid #3a3d42; border-radius:10px; padding:10px 14px; }
-    .modo-asignacion span { font-weight:700; color:#F8AF40; }
-    .modo-asignacion label { font-size:1rem; display:flex; gap:8px; align-items:center; }
+    .filtros .campo label { display:block; font-size:1.02rem; font-weight:700; margin-bottom:6px;}
+    .filtros input[type="date"], .filtros select {
+      background: #202324; color: #fff; border: 1.5px solid #515151; border-radius: 7px; font-size: 1.02rem; padding: 8px 12px; width: 100%;
+    }
     .btn-filtrar, .btn-imprimir, .btn-excel { background: #F8AF40; color: #181818; border: none; border-radius: 8px; font-size: 1.02rem; font-weight: 700; padding: 10px 22px; cursor: pointer;}
     .btn-filtrar:hover, .btn-imprimir:hover, .btn-excel:hover { background: #d98b1a;}
-    .acciones { display:flex; gap:10px; flex-wrap:wrap; margin-bottom: 15px; }
+    .acciones { display:flex; gap:10px; flex-wrap:wrap; margin: 12px 0 16px 0; }
+
+    .panel-ejecutivos { background:#1f2226; border:1px solid #3a3d42; border-radius:12px; padding:12px; margin: 12px 0 8px 0;}
+    .panel-ejecutivos h3 { margin:0 0 10px 0; font-size:1.02rem; color:#8fd3ff; }
+    .chips { display:flex; flex-wrap:wrap; gap:8px; }
+    .chip { background:#2a2f35; border:1px solid #3b424a; color:#e6f6ff; padding:6px 10px; border-radius:999px; font-size:.92rem; }
+    .chip b { color:#F8AF40; }
+
     table { width:100%; border-collapse:collapse; margin-bottom:24px; margin-top: 1.0rem; background:#24282d;}
     th, td { border-bottom: 1px solid #313336; padding: 9px 6px; text-align: left; font-size: 0.98rem;}
     th { color: #F8AF40; background: #18191b;}
     tr:last-child td { border-bottom: none;}
     .sumas { font-weight: bold; color: #F8AF40; border-top: 2px solid #F8AF40;}
     .nada {text-align:center; color:#bbb; padding:18px 0 24px 0;}
-    .subtitulo { margin-top: 12px; font-weight:700; color:#8fd3ff; }
+    .subtitulo { margin-top: 6px; font-weight:700; color:#8fd3ff; }
+
     @media (max-width: 1020px) {
       .filtros { grid-template-columns: 1fr; }
-      .filtros .campo, .modo-asignacion { grid-column: span 1; }
+      .filtros .campo { grid-column: span 1; }
     }
     @media print {
       body, html { background: #fff !important; color: #000 !important;}
       .container { box-shadow: none !important; background: #fff !important; color: #000;}
-      .filtros, .acciones, header { display: none !important;}
+      .filtros, .acciones, .panel-ejecutivos, header { display: none !important;}
       table { background: #fff !important; color: #000 !important;}
       th { color: #000 !important; background: #f8f8f8 !important;}
     }
@@ -54,23 +62,20 @@
         <label for="hasta">Hasta</label>
         <input type="date" id="hasta"/>
       </div>
-
-      <div class="modo-asignacion">
-        <span>Asignar por:</span>
-        <label><input type="radio" name="modoAsignacion" value="cobrador" checked> Cobrador (cajero)</label>
-        <label><input type="radio" name="modoAsignacion" value="ejecutivo"> Ejecutivo (del crédito / histórico)</label>
-      </div>
-
       <div class="campo">
-        <label id="lbl-persona" for="sel-persona">Cobrador</label>
-        <select id="sel-persona">
+        <label for="sel-ejecutivo">Ejecutivo</label>
+        <select id="sel-ejecutivo">
           <option value="">Todos</option>
         </select>
       </div>
-
       <div class="campo" style="display:flex; align-items:end;">
         <button class="btn-filtrar" id="btn-filtrar"><i class="fas fa-filter"></i> Filtrar</button>
       </div>
+    </div>
+
+    <div class="panel-ejecutivos">
+      <h3>Ejecutivos del departamento (asignados a créditos)</h3>
+      <div id="chips-ejecutivos" class="chips"></div>
     </div>
 
     <div class="acciones">
@@ -80,7 +85,7 @@
 
     <div id="tabla-resultados"></div>
 
-    <div class="subtitulo">Resumen por persona (según modo de asignación)</div>
+    <div class="subtitulo">Resumen por ejecutivo</div>
     <div id="tabla-resumen"></div>
   </div>
 
@@ -106,10 +111,9 @@
     const auth = getAuth(app);
 
     let agenciaActual = "";
-    let pagosFiltrados = [];     // resultados del query por fecha + agencia (detalle completo)
-    let resumenAsignado = [];    // resumen visible (para Excel)
-    let setCobradores = new Set();
-    let setEjecutivos = new Set();
+    let pagosFiltrados = [];   // resultados visibles (detalle)
+    let resumenAsignado = [];  // para Excel
+    let ejecutivosMap = new Map(); // nombre -> {nombre, conteoCreditos}
 
     // Fechas por defecto (21 de junio 2025 hasta hoy)
     function fechaActualISO() {
@@ -122,46 +126,70 @@
     window.addEventListener("DOMContentLoaded", () => {
       document.getElementById("desde").value = "2025-06-21";
       document.getElementById("hasta").value = fechaActualISO();
-      actualizarEtiquetaPersona(); // etiqueta inicial "Cobrador"
     });
 
     // Auth + agencia
     onAuthStateChanged(auth, async user => {
       if (!user) return location.href = "login.html";
       const snap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
-      if (!snap.empty) agenciaActual = snap.docs[0].data().department || "";
+      if (!snap.empty) {
+        agenciaActual = snap.docs[0].data().department || "";
+        await cargarEjecutivosDeAgencia(); // llena select + chips
+      }
     });
 
     // Eventos UI
     document.getElementById("btn-filtrar").onclick = cargarPagos;
     document.getElementById("btn-imprimir").onclick = () => {
-      if (!pagosVisibles().length) return alert("No hay datos para imprimir.");
+      if (!pagosFiltrados.length) return alert("No hay datos para imprimir.");
       window.print();
     };
     document.getElementById("btn-excel").onclick = generarExcel;
+    document.getElementById("sel-ejecutivo").addEventListener('change', cargarPagos);
 
-    document.querySelectorAll('input[name="modoAsignacion"]').forEach(r => {
-      r.addEventListener('change', () => {
-        actualizarEtiquetaPersona();
-        poblarSelectPersonas(); // cambia la lista según modo
-        renderTodo();           // re-render con el modo nuevo
-      });
-    });
+    // --- Cargar ejecutivos (lista a quienes se les han asignado créditos) de la agencia del usuario ---
+    async function cargarEjecutivosDeAgencia() {
+      const sel = document.getElementById("sel-ejecutivo");
+      const chips = document.getElementById("chips-ejecutivos");
+      sel.innerHTML = `<option value="">Todos</option>`;
+      chips.innerHTML = `<span class="chip">Cargando...</span>`;
+      ejecutivosMap = new Map();
 
-    document.getElementById("sel-persona").addEventListener('change', () => {
-      renderTodo();
-    });
+      if (!agenciaActual) {
+        chips.innerHTML = `<span class="chip">No se detectó agencia del usuario.</span>`;
+        return;
+      }
 
-    function modoActual(){ 
-      const el = document.querySelector('input[name="modoAsignacion"]:checked'); 
-      return el ? el.value : "cobrador"; 
+      // Traer TODOS los créditos de la agencia para listar ejecutivos únicos (asignadoA)
+      const creditosQ = query(
+        collection(db, "creditos"),
+        where("agenciaAsignada", "==", agenciaActual)
+      );
+      const credSnap = await getDocs(creditosQ);
+
+      if (credSnap.empty) {
+        chips.innerHTML = `<span class="chip">No hay créditos en tu agencia.</span>`;
+        return;
+      }
+
+      // Construir set/contador por asignadoA
+      for (const d of credSnap.docs) {
+        const c = d.data();
+        const nom = normalizeName(c.asignadoA || "");
+        if (!nom) continue;
+        if (!ejecutivosMap.has(nom)) ejecutivosMap.set(nom, { nombre: nom, conteo: 0 });
+        ejecutivosMap.get(nom).conteo += 1;
+      }
+
+      // Poblar select (ordenado)
+      const lista = Array.from(ejecutivosMap.values()).sort((a,b)=> a.nombre.localeCompare(b.nombre));
+      sel.innerHTML = `<option value="">Todos</option>` + lista.map(e => `<option value="${escapeHtml(e.nombre)}">${escapeHtml(e.nombre)}</option>`).join("");
+
+      // Render chips
+      chips.innerHTML = lista.map(e => `<span class="chip"><b>${escapeHtml(e.nombre)}</b> · ${e.conteo}</span>`).join("") || `<span class="chip">Sin ejecutivos.</span>`;
     }
 
-    function actualizarEtiquetaPersona() {
-      const lbl = document.getElementById("lbl-persona");
-      lbl.textContent = (modoActual() === "cobrador") ? "Cobrador" : "Ejecutivo";
-    }
-
+    // --- Cargar pagos por fecha + agencia + (opcional) ejecutivo seleccionado ---
     async function cargarPagos() {
       const desde = document.getElementById("desde").value;
       const hasta = document.getElementById("hasta").value;
@@ -175,7 +203,9 @@
 
       const desdeISO = new Date(desde + "T00:00:00").toISOString();
       const hastaISO = new Date(hasta + "T23:59:59").toISOString();
+      const ejecutivoSel = document.getElementById("sel-ejecutivo").value || "";
 
+      // Query a pagos por rango y sucursal (agencia)
       const pagosQ = query(
         collection(db, "pagos"),
         where("fechaPago", ">=", desdeISO),
@@ -183,115 +213,71 @@
         where("sucursal", "==", agenciaActual)
       );
       const pagosSnap = await getDocs(pagosQ);
+
       if (pagosSnap.empty) {
         tablaDiv.innerHTML = `<div class="nada">No se encontraron pagos en ese rango.</div>`;
         pagosFiltrados = [];
-        setCobradores = new Set();
-        setEjecutivos = new Set();
-        poblarSelectPersonas();
         return;
       }
 
-      // caches
       const creditosCache = {};
-      setCobradores = new Set();
-      setEjecutivos = new Set();
-
       const pagos = [];
+
       for (const docPago of pagosSnap.docs) {
         const p = docPago.data();
         if (p.anulado) continue;
 
+        // Buscar asignadoA (ejecutivo) del crédito
         if (!creditosCache[p.creditoID]) {
           const cr = await getDoc(doc(db, "creditos", p.creditoID));
           creditosCache[p.creditoID] = cr.exists() ? cr.data() : {};
         }
         const c = creditosCache[p.creditoID];
+        const ejecutivo = normalizeName(c?.asignadoA || "");
+
+        // Filtrar por ejecutivo si el usuario seleccionó uno
+        if (ejecutivoSel && ejecutivo !== ejecutivoSel) continue;
 
         const cliente = `${c?.nombre || ""} ${c?.apellido || ""}`.trim();
-        const cobrador = p.cajeroNombre || ""; // quien cobró
-        const ejecutivoHistorico = p.ejecutivoAsignado || c?.asignadoA || ""; // snapshot si existe
-
-        // llenar sets para el select
-        if (cobrador) setCobradores.add(cobrador);
-        if (ejecutivoHistorico) setEjecutivos.add(ejecutivoHistorico);
 
         pagos.push({
           fechaPago: p.fechaPago ? p.fechaPago.substring(0,10) : "",
           cliente,
+          ejecutivo,
           montoPagado: parseFloat(p.montoPagado || 0) || 0,
           pagoCapital: parseFloat(p.pagoCapital || 0) || 0,
-          pagoInteres: parseFloat(p.pagoInteres || 0) || 0,
-          cobrador,
-          ejecutivoHistorico
+          pagoInteres: parseFloat(p.pagoInteres || 0) || 0
         });
       }
 
-      pagosFiltrados = pagos;
-      poblarSelectPersonas();
-      renderTodo();
-    }
-
-    function poblarSelectPersonas() {
-      const sel = document.getElementById("sel-persona");
-      const modo = modoActual();
-      const valores = (modo === "cobrador") ? Array.from(setCobradores) : Array.from(setEjecutivos);
-      const seleccionadoPrevio = sel.value;
-
-      // reconstruir
-      sel.innerHTML = `<option value="">Todos</option>` + valores
-        .sort((a,b)=> a.localeCompare(b))
-        .map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`)
-        .join("");
-
-      // si el valor previo sigue existiendo, mantenerlo
-      if (seleccionadoPrevio && valores.includes(seleccionadoPrevio)) {
-        sel.value = seleccionadoPrevio;
-      } else {
-        sel.value = ""; // Todos
+      if (!pagos.length) {
+        const msg = ejecutivoSel ? `No hay pagos para el ejecutivo <b>${escapeHtml(ejecutivoSel)}</b> en ese rango.` : `No se encontraron pagos en ese rango.`;
+        tablaDiv.innerHTML = `<div class="nada">${msg}</div>`;
+        pagosFiltrados = [];
+        return;
       }
-    }
 
-    function pagosVisibles() {
-      const modo = modoActual();
-      const persona = document.getElementById("sel-persona").value || "";
-      if (!persona) return pagosFiltrados.slice(); // todos
-
-      return pagosFiltrados.filter(p => {
-        const campo = (modo === "cobrador") ? p.cobrador : p.ejecutivoHistorico;
-        return (campo || "") === persona;
-      });
-    }
-
-    function renderTodo() {
-      const datos = pagosVisibles();
-      renderTabla(datos);
-      renderResumen(datos);
+      pagosFiltrados = pagos;
+      renderTabla(pagosFiltrados);
+      renderResumen(pagosFiltrados);
     }
 
     function renderTabla(pagos) {
       const tablaDiv = document.getElementById("tabla-resultados");
-      if (!pagos.length) { tablaDiv.innerHTML = `<div class="nada">Sin datos.</div>`; return; }
-
       const totalPagado = pagos.reduce((a, b) => a + b.montoPagado, 0);
       const totalCapital = pagos.reduce((a, b) => a + b.pagoCapital, 0);
       const totalInteres = pagos.reduce((a, b) => a + b.pagoInteres, 0);
 
-      const rowsHTML = pagos.map(p => {
-        const asignado = (modoActual() === "cobrador") ? (p.cobrador || "") : (p.ejecutivoHistorico || "");
-        return `
-          <tr>
-            <td>${p.fechaPago}</td>
-            <td>${escapeHtml(p.cliente)}</td>
-            <td>$${p.montoPagado.toFixed(2)}</td>
-            <td>$${p.pagoCapital.toFixed(2)}</td>
-            <td>$${p.pagoInteres.toFixed(2)}</td>
-            <td>${escapeHtml(p.cobrador || "")}</td>
-            <td>${escapeHtml(p.ejecutivoHistorico || "")}</td>
-            <td>${escapeHtml(asignado)}</td>
-          </tr>
-        `;
-      }).join("");
+      const rowsHTML = pagos.map(p => `
+        <tr>
+          <td>${p.fechaPago}</td>
+          <td>${escapeHtml(p.cliente)}</td>
+          <td>${escapeHtml(p.ejecutivo)}</td>
+          <td>$${p.montoPagado.toFixed(2)}</td>
+          <td>$${p.pagoCapital.toFixed(2)}</td>
+          <td>$${p.pagoInteres.toFixed(2)}</td>
+        </tr>
+      `).join("");
 
       const html = `
         <table id="tabla-pagos">
@@ -299,22 +285,19 @@
             <tr>
               <th>Fecha de Pago</th>
               <th>Cliente</th>
+              <th>Ejecutivo</th>
               <th>Monto Pagado</th>
               <th>Capital</th>
               <th>Abono de Interés</th>
-              <th>Cobrador (cajero)</th>
-              <th>Ejecutivo (crédito)</th>
-              <th>Asignado a</th>
             </tr>
           </thead>
           <tbody>
             ${rowsHTML}
             <tr class="sumas">
-              <td colspan="2">Totales</td>
+              <td colspan="3">Totales</td>
               <td>$${totalPagado.toFixed(2)}</td>
               <td>$${totalCapital.toFixed(2)}</td>
               <td>$${totalInteres.toFixed(2)}</td>
-              <td colspan="3"></td>
             </tr>
           </tbody>
         </table>
@@ -324,13 +307,10 @@
 
     function renderResumen(pagos) {
       const resumenDiv = document.getElementById("tabla-resumen");
-      if (!pagos.length) { resumenDiv.innerHTML = `<div class="nada">Sin datos.</div>`; resumenAsignado = []; return; }
-
-      const usarCobrador = (modoActual() === "cobrador");
       const mapa = new Map();
 
       for (const p of pagos) {
-        const key = usarCobrador ? (p.cobrador || "—") : (p.ejecutivoHistorico || "—");
+        const key = p.ejecutivo || "—";
         if (!mapa.has(key)) mapa.set(key, { persona: key, total: 0, capital: 0, interes: 0 });
         const acc = mapa.get(key);
         acc.total += p.montoPagado;
@@ -345,7 +325,7 @@
         <table id="tabla-resumen-asignado">
           <thead>
             <tr>
-              <th>${usarCobrador ? "Cobrador / Cajero" : "Ejecutivo asignado"}</th>
+              <th>Ejecutivo</th>
               <th>Monto Pagado</th>
               <th>Capital</th>
               <th>Interés</th>
@@ -366,45 +346,29 @@
       resumenDiv.innerHTML = html;
     }
 
+    // --- Excel: Detalle + Resumen ---
     async function generarExcel() {
-      const datos = pagosVisibles();
-      if (!datos.length) return alert("No hay datos para exportar.");
+      if (!pagosFiltrados.length) return alert("No hay datos para exportar.");
 
       const workbook = new window.ExcelJS.Workbook();
       const detalle = workbook.addWorksheet("Detalle");
       const resumen = workbook.addWorksheet("Resumen");
 
-      detalle.addRow([
-        "Fecha de Pago", "Cliente", "Monto Pagado", "Capital", "Abono de Interés",
-        "Cobrador (cajero)", "Ejecutivo (crédito)", "Asignado a"
-      ]);
-
-      const usarCobrador = (modoActual() === "cobrador");
-      datos.forEach(p => {
-        const asignado = usarCobrador ? (p.cobrador || "") : (p.ejecutivoHistorico || "");
+      detalle.addRow(["Fecha de Pago", "Cliente", "Ejecutivo", "Monto Pagado", "Capital", "Abono de Interés"]);
+      pagosFiltrados.forEach(p => {
         detalle.addRow([
-          p.fechaPago,
-          p.cliente,
-          p.montoPagado,
-          p.pagoCapital,
-          p.pagoInteres,
-          p.cobrador,
-          p.ejecutivoHistorico,
-          asignado
+          p.fechaPago, p.cliente, p.ejecutivo, p.montoPagado, p.pagoCapital, p.pagoInteres
         ]);
       });
 
-      const totalPagado = datos.reduce((a,b)=>a+b.montoPagado,0);
-      const totalCapital = datos.reduce((a,b)=>a+b.pagoCapital,0);
-      const totalInteres = datos.reduce((a,b)=>a+b.pagoInteres,0);
+      const totalPagado = pagosFiltrados.reduce((a,b)=>a+b.montoPagado,0);
+      const totalCapital = pagosFiltrados.reduce((a,b)=>a+b.pagoCapital,0);
+      const totalInteres = pagosFiltrados.reduce((a,b)=>a+b.pagoInteres,0);
       detalle.addRow([]);
-      detalle.addRow(["Totales","", totalPagado, totalCapital, totalInteres, "", "", ""]);
+      detalle.addRow(["Totales", "", "", totalPagado, totalCapital, totalInteres]);
 
       // Resumen
-      resumen.addRow([
-        usarCobrador ? "Cobrador / Cajero" : "Ejecutivo asignado",
-        "Monto Pagado", "Capital", "Interés"
-      ]);
+      resumen.addRow(["Ejecutivo", "Monto Pagado", "Capital", "Interés"]);
       resumenAsignado.forEach(r => {
         resumen.addRow([r.persona, r.total, r.capital, r.interes]);
       });
@@ -421,7 +385,8 @@
       URL.revokeObjectURL(url);
     }
 
-    // util mínimo
+    // utils
+    function normalizeName(x){ return String(x||"").trim().replace(/\s+/g,' '); }
     function escapeHtml(str) {
       return String(str || "")
         .replaceAll("&","&amp;")
@@ -433,6 +398,7 @@
   </script>
 </body>
 </html>
+
 
 
 

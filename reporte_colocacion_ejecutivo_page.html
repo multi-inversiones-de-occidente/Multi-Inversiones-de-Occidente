@@ -25,7 +25,8 @@
     const auth = getAuth(app);
 
     let usuarioNombre = "";
-    let creditosData = [];
+    let creditosData = [];          // créditos del usuario logueado (para la tabla)
+    let docsPermitidosGlobal = [];  // créditos permitidos (todos los usuarios) para globales
     let fechaDesde = null;
     let fechaHasta = null;
 
@@ -38,47 +39,69 @@
       return d.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
 
+    // Helper robusto para número
+    function toNum(v) {
+      const n = typeof v === 'string' ? parseFloat(v.replace(',', '.')) : Number(v);
+      return isNaN(n) ? 0 : n;
+    }
+
+    // Estados permitidos
+    function estadoPermitido(estado) {
+      const e = normaliza(estado);
+      return e === 'activo' || e === 'mora temprana';
+    }
+
     async function obtenerCreditos() {
       try {
         if (!usuarioNombre) return;
         document.getElementById('resultados').innerHTML = '<div class="loader"></div>';
+        document.getElementById('resumen-global').innerHTML = '<div class="loader"></div>';
+        document.getElementById('resumen-por-usuario').innerHTML = '';
+        document.getElementById('resumen-linea').innerHTML = '';
+
         const creditosRef = collection(db, "creditos");
-        const q = query(
-          creditosRef,
-          orderBy("fechaInicio", "desc")
-        );
+        const q = query(creditosRef, orderBy("fechaInicio", "desc"));
         const snapshot = await getDocs(q);
+
+        // Trae TODO y luego filtra por fecha y estados permitidos
         let docs = [];
-        snapshot.forEach(doc => {
-          let d = doc.data();
-          d.id = doc.id;
-          docs.push(d);
+        snapshot.forEach(d => {
+          const data = d.data();
+          data.id = d.id;
+          docs.push(data);
         });
-        // Filtra por usuario asignado y fechas
-        docs = docs.filter(doc => {
-          // Comparar asignadoA con el nombre del usuario logueado (no email)
-          if (normaliza(doc.asignadoA) !== normaliza(usuarioNombre)) return false;
 
-          // 🔽 AÑADIDO: excluir créditos con estado "Revertido"
-          if (normaliza(doc.estadoCredito) === 'revertido') return false;
-
-          // Filtrar por rango de fechas
+        // Preprocesar fecha
+        docs = docs.map(doc => {
           let fechaDoc = doc.fechaInicio;
-          if (typeof fechaDoc === "object" && fechaDoc.seconds) {
+          if (typeof fechaDoc === "object" && fechaDoc?.seconds) {
             fechaDoc = new Date(fechaDoc.seconds * 1000);
           } else if (typeof fechaDoc === "string") {
             fechaDoc = new Date(fechaDoc);
           } else {
             fechaDoc = new Date(fechaDoc);
           }
-          if (fechaDesde && fechaDoc < fechaDesde) return false;
-          if (fechaHasta && fechaDoc > new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23,59,59)) return false;
           doc._fechaObj = fechaDoc;
-          return true;
+          return doc;
         });
 
-        creditosData = docs;
+        // Filtrar por rango fechas + estados permitidos
+        const docsFiltrados = docs.filter(doc => {
+          if (fechaDesde && doc._fechaObj < fechaDesde) return false;
+          if (fechaHasta && doc._fechaObj > new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23,59,59)) return false;
+          return estadoPermitido(doc.estadoCredito);
+        });
+
+        // Guardar globales (todos los usuarios) para tarjetas/tabla global
+        docsPermitidosGlobal = docsFiltrados;
+
+        // Filtrar por usuario logueado para la tabla principal (se mantiene comportamiento original)
+        creditosData = docsFiltrados.filter(doc => normaliza(doc.asignadoA) === normaliza(usuarioNombre));
+
         renderCreditos();
+        renderResumenGlobal();
+        renderResumenPorUsuario();
+        renderResumenLinea();
       } catch (err) {
         document.getElementById('resultados').innerHTML = '<div style="color:#f44; text-align:center">Error al cargar datos</div>';
         console.error(err);
@@ -88,7 +111,7 @@
     function renderCreditos() {
       const contenedor = document.getElementById('resultados');
       if (!creditosData.length) {
-        contenedor.innerHTML = `<div style="text-align:center;color:#fff7">No hay créditos en el rango seleccionado.</div>`;
+        contenedor.innerHTML = `<div style="text-align:center;color:#fff7">No hay créditos en el rango seleccionado para tu usuario.</div>`;
         document.getElementById("btn-imprimir")?.classList.add("oculto");
         document.getElementById("btn-pdf")?.classList.add("oculto");
         return;
@@ -115,18 +138,18 @@
         <tbody>
       `;
       creditosData.forEach(doc => {
-        totalGeneral += Number(doc.montoAprobado || 0);
+        totalGeneral += toNum(doc.montoAprobado);
         html += `
           <tr>
             <td>${formatFecha(doc._fechaObj)}</td>
             <td>${doc.agenciaAsignada ?? '-'}</td>
             <td>${(doc.nombre ?? '') + ' ' + (doc.apellido ?? '')}</td>
             <td>${doc.numeroDui ?? '-'}</td>
-            <td style="text-align:right;">$${Number(doc.montoAprobado || 0).toFixed(2)}</td>
+            <td style="text-align:right;">$${toNum(doc.montoAprobado).toFixed(2)}</td>
             <td>${doc.lineaDeCredito ?? '-'}</td>
             <td>${doc.frecuenciaPago ?? '-'}</td>
             <td>${doc.numeroCuotas ?? '-'}</td>
-            <td style="text-align:right;">$${Number(doc.cuotaAprobada || 0).toFixed(2)}</td>
+            <td style="text-align:right;">$${toNum(doc.cuotaAprobada).toFixed(2)}</td>
             <td>${doc.tasaAnualCredito ?? '-'}</td>
             <td>${doc.estadoCredito ?? '-'}</td>
           </tr>
@@ -149,16 +172,183 @@
       document.getElementById("btn-pdf")?.classList.remove("oculto");
     }
 
+    // === Resumen Global (tarjetas) ===
+    function renderResumenGlobal() {
+      const wrap = document.getElementById('resumen-global');
+
+      // Peso global = suma de saldoActual
+      const pesoGlobal = docsPermitidosGlobal.reduce((s, d) => s + toNum(d.saldoActual), 0);
+
+      // Para el usuario logueado
+      const misDocs = docsPermitidosGlobal.filter(d => normaliza(d.asignadoA) === normaliza(usuarioNombre));
+      const miPeso = misDocs.reduce((s, d) => s + toNum(d.saldoActual), 0);
+
+      // Distintos clientes (intenta por clienteID, si no DUI, si no nombre+apellido)
+      const clienteKey = (d) => (d.clienteID || d.numeroDui || ((d.nombre||'') + ' ' + (d.apellido||''))).toString();
+      const totalClientesSet = new Set(docsPermitidosGlobal.map(clienteKey));
+      const misClientesSet   = new Set(misDocs.map(clienteKey));
+
+      wrap.innerHTML = `
+        <div class="cards-row">
+          <div class="card kpi">
+            <div class="kpi-title">Peso de la Cartera (Global)</div>
+            <div class="kpi-value">$${pesoGlobal.toFixed(2)}</div>
+            <div class="kpi-sub">Estados: Activo + Mora Temprana</div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-title">Clientes (Global)</div>
+            <div class="kpi-value">${totalClientesSet.size}</div>
+            <div class="kpi-sub">Únicos en periodo</div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-title">Tu Cartera</div>
+            <div class="kpi-value">$${miPeso.toFixed(2)}</div>
+            <div class="kpi-sub">Asignado a: ${usuarioNombre}</div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-title">Tus Clientes</div>
+            <div class="kpi-value">${misClientesSet.size}</div>
+            <div class="kpi-sub">Únicos en periodo</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // === Resumen Por Usuario (tabla) ===
+    function renderResumenPorUsuario() {
+      const cont = document.getElementById('resumen-por-usuario');
+      if (!docsPermitidosGlobal.length) {
+        cont.innerHTML = '';
+        return;
+      }
+
+      const mapa = new Map();
+      const clienteKey = (d) => (d.clienteID || d.numeroDui || ((d.nombre||'') + ' ' + (d.apellido||''))).toString();
+
+      docsPermitidosGlobal.forEach(d => {
+        const user = (d.asignadoA || '—').toString().trim();
+        if (!mapa.has(user)) mapa.set(user, { peso: 0, clientes: new Set() });
+        const obj = mapa.get(user);
+        obj.peso += toNum(d.saldoActual);
+        obj.clientes.add(clienteKey(d));
+      });
+
+      const filas = Array.from(mapa.entries())
+        .map(([user, datos]) => ({
+          user,
+          peso: datos.peso,
+          clientes: datos.clientes.size
+        }))
+        .sort((a,b)=> b.peso - a.peso);
+
+      let html = `
+        <h2 class="subtitulo">Resumen por Usuario (asignadoA)</h2>
+        <div class="tabla-scroll">
+          <table class="tabla-resumen">
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th># Clientes</th>
+                <th>Peso de Cartera</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      filas.forEach(f => {
+        html += `
+          <tr>
+            <td>${f.user}</td>
+            <td style="text-align:right;">${f.clientes}</td>
+            <td style="text-align:right;">$${f.peso.toFixed(2)}</td>
+          </tr>
+        `;
+      });
+      html += `
+            </tbody>
+          </table>
+        </div>
+      `;
+      cont.innerHTML = html;
+    }
+
+    // === Resumen por Tipo de Crédito (se mantiene lo trabajado) ===
+    function renderResumenLinea() {
+      const cont = document.getElementById('resumen-linea');
+      if (!docsPermitidosGlobal.length) {
+        cont.innerHTML = '';
+        return;
+      }
+      const total = docsPermitidosGlobal.reduce((s,d)=> s + toNum(d.montoAprobado), 0);
+      const mapa = new Map();
+      docsPermitidosGlobal.forEach(d => {
+        const k = (d.lineaDeCredito || '—').toString().trim();
+        if (!mapa.has(k)) mapa.set(k, { count: 0, monto: 0 });
+        const o = mapa.get(k);
+        o.count += 1;
+        o.monto += toNum(d.montoAprobado);
+      });
+
+      const filas = Array.from(mapa.entries())
+        .map(([k, v]) => ({
+          linea: k,
+          cantidad: v.count,
+          monto: v.monto,
+          pct: total > 0 ? (v.monto / total) * 100 : 0
+        }))
+        .sort((a,b)=> b.monto - a.monto);
+
+      let html = `
+        <h2 class="subtitulo">Resumen por Tipo de Crédito</h2>
+        <div class="tabla-scroll">
+          <table class="tabla-resumen">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Cantidad</th>
+                <th>Monto Total</th>
+                <th>% del Total</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      filas.forEach(f => {
+        html += `
+          <tr>
+            <td>${f.linea}</td>
+            <td style="text-align:right;">${f.cantidad}</td>
+            <td style="text-align:right;">$${f.monto.toFixed(2)}</td>
+            <td style="text-align:right;">${f.pct.toFixed(1)}%</td>
+          </tr>
+        `;
+      });
+      html += `
+            </tbody>
+          </table>
+        </div>
+      `;
+      cont.innerHTML = html;
+    }
+
     function imprimirTabla() {
-      // Solo imprime la tabla del reporte
-      const contenido = document.getElementById('resultados').innerHTML;
-      const ventana = window.open('', '', 'width=900,height=600');
+      // Imprime tarjetas + resúmenes + tabla
+      const contenido = `
+        <h2>Datos Globales</h2>
+        ${document.getElementById('resumen-global').innerHTML}
+        ${document.getElementById('resumen-por-usuario').innerHTML}
+        ${document.getElementById('resumen-linea').innerHTML}
+        <h2>Detalle (Tus Créditos)</h2>
+        ${document.getElementById('resultados').innerHTML}
+      `;
+      const ventana = window.open('', '', 'width=1000,height=700');
       ventana.document.write(`
         <html>
         <head>
           <title>Reporte de Colocación de Créditos</title>
           <style>
             body { font-family: 'Segoe UI', Arial, sans-serif; padding: 24px; }
+            h2 { margin: 12px 0 6px 0; }
+            .cards-row { display:flex; gap:12px; flex-wrap:wrap; }
+            .card { border:1px solid #bbb; border-radius:10px; padding:12px 16px; }
             table { width: 100%; border-collapse: collapse; margin-top: 12px; }
             th, td { border: 1px solid #bbb; padding: 6px 10px; font-size: 1rem;}
             th { background: #19b3ae; color: #fff;}
@@ -175,12 +365,12 @@
       ventana.print();
     }
 
-    // ----- NUEVA FUNCIÓN PDF -----
+    // ----- PDF -----
     async function descargarPDF() {
-      if (!creditosData.length) return;
+      if (!docsPermitidosGlobal.length) return;
 
       const { jsPDF } = window.jspdf;
-      const doc = new jsPDF('l', 'pt', 'a4'); // 'l' = landscape
+      const doc = new jsPDF('l', 'pt', 'a4'); // landscape
       const fecha = new Date();
       const titulo = "Reporte de Colocación de Créditos";
       const empresa = "MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.";
@@ -193,41 +383,100 @@
       doc.text(`Usuario: ${usuario}`, 40, 78);
       doc.text(`Fecha de generación: ${fecha.toLocaleString('es-SV')}`, 40, 94);
 
-      // Encabezados
-      const head = [[
-        "Fecha", "Agencia", "Cliente", "DUI", "Monto", "Línea", "Frecuencia", "Cuotas", "Cuota", "Tasa %", "Estado"
-      ]];
+      // ======= Datos Globales (tarjetas) =======
+      const pesoGlobal = docsPermitidosGlobal.reduce((s, d) => s + toNum(d.saldoActual), 0);
+      const misDocs = docsPermitidosGlobal.filter(d => normaliza(d.asignadoA) === normaliza(usuarioNombre));
+      const miPeso = misDocs.reduce((s, d) => s + toNum(d.saldoActual), 0);
+      const clienteKey = (d) => (d.clienteID || d.numeroDui || ((d.nombre||'') + ' ' + (d.apellido||''))).toString();
+      const totalClientesSet = new Set(docsPermitidosGlobal.map(clienteKey));
+      const misClientesSet   = new Set(misDocs.map(clienteKey));
 
-      // Filas
-      const body = creditosData.map(doc => [
-        formatFecha(doc._fechaObj),
-        doc.agenciaAsignada ?? '-',
-        (doc.nombre ?? '') + ' ' + (doc.apellido ?? ''),
-        doc.numeroDui ?? '-',
-        `$${Number(doc.montoAprobado || 0).toFixed(2)}`,
-        doc.lineaDeCredito ?? '-',
-        doc.frecuenciaPago ?? '-',
-        doc.numeroCuotas ?? '-',
-        `$${Number(doc.cuotaAprobada || 0).toFixed(2)}`,
-        doc.tasaAnualCredito ?? '-',
-        doc.estadoCredito ?? '-'
-      ]);
-
-      // Total al final
-      let totalGeneral = creditosData.reduce((sum, d) => sum + Number(d.montoAprobado || 0), 0);
-
-      // Tabla con autoTable
       doc.autoTable({
-        head: head,
-        body: body,
+        head: [["Métrica","Valor"]],
+        body: [
+          ["Peso de la Cartera (Global)", `$${pesoGlobal.toFixed(2)}`],
+          ["Clientes (Global)", `${totalClientesSet.size}`],
+          [`Tu Cartera (${usuarioNombre})`, `$${miPeso.toFixed(2)}`],
+          ["Tus Clientes", `${misClientesSet.size}`],
+          ["Estados incluidos", "Activo, Mora Temprana"]
+        ],
         startY: 110,
         theme: 'striped',
         headStyles: { fillColor: [13, 197, 185], textColor: [255,255,255], fontStyle: 'bold' },
-        foot: [[
-          "", "", "", "TOTAL",
-          `$${totalGeneral.toFixed(2)}`,
-          "", "", "", "", "", ""
-        ]],
+        styles: { fontSize: 9, cellPadding: 3 }
+      });
+
+      // ======= Resumen por Usuario =======
+      const mapa = new Map();
+      docsPermitidosGlobal.forEach(d => {
+        const user = (d.asignadoA || '—').toString().trim();
+        if (!mapa.has(user)) mapa.set(user, { peso: 0, clientes: new Set() });
+        const o = mapa.get(user);
+        o.peso += toNum(d.saldoActual);
+        o.clientes.add(clienteKey(d));
+      });
+      const filasUsuarios = Array.from(mapa.entries())
+        .map(([user, datos]) => [user, `${datos.clientes.size}`, `$${datos.peso.toFixed(2)}`])
+        .sort((a,b)=> parseFloat(b[2].replace(/[^0-9.]/g,'')) - parseFloat(a[2].replace(/[^0-9.]/g,'')));
+
+      doc.autoTable({
+        head: [["Usuario","# Clientes","Peso de Cartera"]],
+        body: filasUsuarios,
+        startY: doc.lastAutoTable.finalY + 12,
+        theme: 'striped',
+        headStyles: { fillColor: [13, 197, 185], textColor: [255,255,255], fontStyle: 'bold' },
+        styles: { fontSize: 9, cellPadding: 3 }
+      });
+
+      // ======= Resumen por Tipo de Crédito =======
+      const totalMonto = docsPermitidosGlobal.reduce((s,d)=> s + toNum(d.montoAprobado), 0);
+      const mapaLinea = new Map();
+      docsPermitidosGlobal.forEach(d => {
+        const k = (d.lineaDeCredito || '—').toString().trim();
+        if (!mapaLinea.has(k)) mapaLinea.set(k, { count: 0, monto: 0 });
+        const o = mapaLinea.get(k);
+        o.count += 1;
+        o.monto += toNum(d.montoAprobado);
+      });
+      const bodyLinea = Array.from(mapaLinea.entries())
+        .map(([k,v]) => [k, `${v.count}`, `$${v.monto.toFixed(2)}`, `${(totalMonto>0 ? (v.monto/totalMonto*100) : 0).toFixed(1)}%`])
+        .sort((a,b)=> parseFloat(b[2].replace(/[^0-9.]/g,'')) - parseFloat(a[2].replace(/[^0-9.]/g,'')));
+
+      doc.autoTable({
+        head: [["Tipo","Cantidad","Monto Total","% del Total"]],
+        body: bodyLinea,
+        startY: doc.lastAutoTable.finalY + 12,
+        theme: 'striped',
+        headStyles: { fillColor: [13, 197, 185], textColor: [255,255,255], fontStyle: 'bold' },
+        styles: { fontSize: 9, cellPadding: 3 }
+      });
+
+      // ======= Detalle (tabla usuario logueado) =======
+      const head = [[
+        "Fecha", "Agencia", "Cliente", "DUI", "Monto", "Línea", "Frecuencia", "Cuotas", "Cuota", "Tasa %", "Estado"
+      ]];
+      const body = creditosData.map(d => [
+        formatFecha(d._fechaObj),
+        d.agenciaAsignada ?? '-',
+        (d.nombre ?? '') + ' ' + (d.apellido ?? ''),
+        d.numeroDui ?? '-',
+        `$${toNum(d.montoAprobado).toFixed(2)}`,
+        d.lineaDeCredito ?? '-',
+        d.frecuenciaPago ?? '-',
+        d.numeroCuotas ?? '-',
+        `$${toNum(d.cuotaAprobada).toFixed(2)}`,
+        d.tasaAnualCredito ?? '-',
+        d.estadoCredito ?? '-'
+      ]);
+      let totalUsuario = creditosData.reduce((s, d) => s + toNum(d.montoAprobado), 0);
+
+      doc.autoTable({
+        head,
+        body,
+        startY: doc.lastAutoTable.finalY + 12,
+        theme: 'striped',
+        headStyles: { fillColor: [13, 197, 185], textColor: [255,255,255], fontStyle: 'bold' },
+        foot: [[ "", "", "", "TOTAL", `$${totalUsuario.toFixed(2)}`, "", "", "", "", "", "" ]],
         footStyles: { fillColor: [27, 147, 106], textColor: [255,255,255], fontStyle: 'bold' },
         styles: { fontSize: 9, cellPadding: 3 }
       });
@@ -266,12 +515,14 @@
           return;
         }
         document.getElementById("usuario-nombre").textContent = user.email;
+
         // Primer día del mes actual hasta hoy
         const now = new Date();
         document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
         document.getElementById('fecha-hasta').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
         fechaDesde = new Date(now.getFullYear(), now.getMonth(), 1);
         fechaHasta = now;
+
         obtenerCreditos();
       });
       document.getElementById('fecha-desde').addEventListener('change', onFechaDesdeChange);
@@ -280,6 +531,7 @@
       document.getElementById('btn-pdf').addEventListener('click', descargarPDF);
     });
   </script>
+
   <!-- Librerías para PDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -318,14 +570,14 @@
       font-weight: bold;
       text-align: center;
       color: #00e6c0;
-      margin-bottom: 1.6rem;
+      margin-bottom: 1.2rem;
       letter-spacing: .8px;
     }
     .filtros-row {
       display: flex;
       gap: 1.1rem;
       justify-content: center;
-      margin-bottom: 1.6rem;
+      margin-bottom: 1.2rem;
       flex-wrap: wrap;
     }
     .filtro-fecha {
@@ -351,13 +603,30 @@
       padding: 0.39rem 0.7rem;
       font-size: 1.01rem;
     }
+
+    /* Tarjetas KPI */
+    .cards-row {
+      display:flex; gap:14px; flex-wrap:wrap; justify-content: center; margin: 8px 0 16px 0;
+    }
+    .card.kpi {
+      background:#141717; border:1px solid #244f4c; border-radius:12px; padding:14px 16px; min-width:220px;
+      box-shadow: 0 2px 10px #0006;
+    }
+    .kpi-title { color:#9ad7d2; font-weight:600; font-size:.95rem; }
+    .kpi-value { font-size:1.4rem; font-weight:800; margin-top:6px; color:#fff; }
+    .kpi-sub { font-size:.85rem; color:#8fb4b2; margin-top:2px; }
+
+    .subtitulo {
+      font-size: 1.05rem; color:#9ad7d2; margin: 14px 4px 6px 4px; font-weight:700; text-align:center;
+    }
+
     .tabla-scroll {
       width: 100%;
       overflow-x: auto;
-      margin-bottom: 1.7rem;
-      margin-top: 12px;
+      margin-bottom: 1.1rem;
+      margin-top: 10px;
     }
-    .tabla-reporte {
+    .tabla-reporte, .tabla-resumen {
       border-radius: 12px;
       background: #191e1e;
       width: 100%;
@@ -366,20 +635,20 @@
       margin: auto;
       font-size: 0.98rem;
     }
-    .tabla-reporte th, .tabla-reporte td {
+    .tabla-reporte th, .tabla-reporte td, .tabla-resumen th, .tabla-resumen td {
       border: 1px solid #244f4c;
       padding: 7px 7px;
       text-align: left;
     }
-    .tabla-reporte th {
+    .tabla-reporte th, .tabla-resumen th {
       background: #0dc5b9;
       color: #fff;
       font-weight: bold;
       text-align: center;
       font-size: 1.01rem;
     }
-    .tabla-reporte tr:nth-child(even) td { background: #191e1e; }
-    .tabla-reporte tr:nth-child(odd) td { background: #222627; }
+    .tabla-reporte tr:nth-child(even) td, .tabla-resumen tr:nth-child(even) td { background: #191e1e; }
+    .tabla-reporte tr:nth-child(odd) td, .tabla-resumen tr:nth-child(odd) td { background: #222627; }
     .tabla-reporte tfoot td {
       background: #1b936a;
       color: #fff;
@@ -402,23 +671,25 @@
       display: block;
     }
     #btn-imprimir:hover, #btn-pdf:hover { background: #11a09a; }
+
     .loader {
       border: 4px solid #232324;
       border-top: 4px solid #13b66b;
       border-radius: 50%;
       width: 46px; height: 46px;
       animation: spin 1.1s linear infinite;
-      margin: 1.8rem auto;
+      margin: 1.0rem auto;
     }
     @keyframes spin { 100% { transform: rotate(360deg); } }
     .oculto { display: none !important; }
+
     @media (max-width: 1100px) {
       .container { max-width: 99vw; }
-      .tabla-reporte { min-width: 650px; }
+      .tabla-reporte, .tabla-resumen { min-width: 650px; }
     }
     @media (max-width: 700px) {
       .container { padding: 1.1rem 1vw; }
-      .tabla-reporte { font-size: .91rem;}
+      .tabla-reporte, .tabla-resumen { font-size: .91rem;}
     }
   </style>
 </head>
@@ -429,6 +700,7 @@
     <h1>MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.<br>
       <span style="font-size:.97rem;color:#fff;font-weight:400">Colocación de Créditos</span>
     </h1>
+
     <div class="filtros-row">
       <div class="filtro-fecha">
         <label for="fecha-desde">Desde:</label>
@@ -439,12 +711,26 @@
         <input type="date" id="fecha-hasta" />
       </div>
     </div>
+
+    <!-- Tarjetas Globales -->
+    <div id="resumen-global"></div>
+
+    <!-- Resumen por Usuario -->
+    <div id="resumen-por-usuario"></div>
+
+    <!-- Resumen por Tipo de Crédito -->
+    <div id="resumen-linea"></div>
+
+    <!-- Detalle (tabla del usuario logueado) -->
     <div id="resultados"></div>
+
     <button id="btn-imprimir" class="oculto"><i class="fas fa-print"></i> Imprimir</button>
     <button id="btn-pdf" class="oculto"><i class="fas fa-file-pdf"></i> Descargar PDF</button>
   </div>
 </body>
 </html>
+
+
 
 
 

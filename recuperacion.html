@@ -132,10 +132,9 @@
     onAuthStateChanged(auth, async user => {
       if (!user) return location.href = "login.html";
       const snap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
-      if (!snap.empty) {
-        agenciaActual = snap.docs[0].data().department || "";
-        await cargarEjecutivosDeAgencia(); // llena select + chips
-      }
+      if (snap.empty) return;
+      agenciaActual = snap.docs[0].data().department || "";
+      await cargarEjecutivosDeAgencia(); // llena select + chips
     });
 
     // Eventos UI
@@ -225,7 +224,7 @@
 
       for (const docPago of pagosSnap.docs) {
         const p = docPago.data();
-        if (p.anulado) continue;
+        if (p.anulado) continue; // Excluir pagos anulados
 
         // Buscar asignadoA (ejecutivo) del crédito
         if (!creditosCache[p.creditoID]) {
@@ -246,7 +245,9 @@
           ejecutivo,
           montoPagado: parseFloat(p.montoPagado || 0) || 0,
           pagoCapital: parseFloat(p.pagoCapital || 0) || 0,
-          pagoInteres: parseFloat(p.pagoInteres || 0) || 0
+          pagoInteres: parseFloat(p.pagoInteres || 0) || 0,
+          // >>> NUEVO: pagoMulta <<<
+          pagoMulta: parseFloat(p.pagoMulta || 0) || 0
         });
       }
 
@@ -267,6 +268,8 @@
       const totalPagado = pagos.reduce((a, b) => a + b.montoPagado, 0);
       const totalCapital = pagos.reduce((a, b) => a + b.pagoCapital, 0);
       const totalInteres = pagos.reduce((a, b) => a + b.pagoInteres, 0);
+      // >>> NUEVO total de multas <<<
+      const totalMulta = pagos.reduce((a, b) => a + b.pagoMulta, 0);
 
       const rowsHTML = pagos.map(p => `
         <tr>
@@ -276,6 +279,7 @@
           <td>$${p.montoPagado.toFixed(2)}</td>
           <td>$${p.pagoCapital.toFixed(2)}</td>
           <td>$${p.pagoInteres.toFixed(2)}</td>
+          <td>$${p.pagoMulta.toFixed(2)}</td>
         </tr>
       `).join("");
 
@@ -289,6 +293,7 @@
               <th>Monto Pagado</th>
               <th>Capital</th>
               <th>Abono de Interés</th>
+              <th>Pago Multa</th>
             </tr>
           </thead>
           <tbody>
@@ -298,6 +303,7 @@
               <td>$${totalPagado.toFixed(2)}</td>
               <td>$${totalCapital.toFixed(2)}</td>
               <td>$${totalInteres.toFixed(2)}</td>
+              <td>$${totalMulta.toFixed(2)}</td>
             </tr>
           </tbody>
         </table>
@@ -316,6 +322,8 @@
         acc.total += p.montoPagado;
         acc.capital += p.pagoCapital;
         acc.interes += p.pagoInteres;
+        // Nota: el resumen continúa igual (solo total/capital/interés),
+        // porque pediste añadir pagoMulta únicamente en "esa misma tabla".
       }
 
       const filas = Array.from(mapa.values()).sort((a,b)=> b.interes - a.interes);
@@ -354,20 +362,22 @@
       const detalle = workbook.addWorksheet("Detalle");
       const resumen = workbook.addWorksheet("Resumen");
 
-      detalle.addRow(["Fecha de Pago", "Cliente", "Ejecutivo", "Monto Pagado", "Capital", "Abono de Interés"]);
+      // >>> Añadimos "Pago Multa" al detalle
+      detalle.addRow(["Fecha de Pago", "Cliente", "Ejecutivo", "Monto Pagado", "Capital", "Abono de Interés", "Pago Multa"]);
       pagosFiltrados.forEach(p => {
         detalle.addRow([
-          p.fechaPago, p.cliente, p.ejecutivo, p.montoPagado, p.pagoCapital, p.pagoInteres
+          p.fechaPago, p.cliente, p.ejecutivo, p.montoPagado, p.pagoCapital, p.pagoInteres, p.pagoMulta
         ]);
       });
 
-      const totalPagado = pagosFiltrados.reduce((a,b)=>a+b.montoPagado,0);
+      const totalPagado  = pagosFiltrados.reduce((a,b)=>a+b.montoPagado,0);
       const totalCapital = pagosFiltrados.reduce((a,b)=>a+b.pagoCapital,0);
       const totalInteres = pagosFiltrados.reduce((a,b)=>a+b.pagoInteres,0);
+      const totalMulta   = pagosFiltrados.reduce((a,b)=>a+b.pagoMulta,0);
       detalle.addRow([]);
-      detalle.addRow(["Totales", "", "", totalPagado, totalCapital, totalInteres]);
+      detalle.addRow(["Totales", "", "", totalPagado, totalCapital, totalInteres, totalMulta]);
 
-      // Resumen
+      // Resumen (se mantiene igual)
       resumen.addRow(["Ejecutivo", "Monto Pagado", "Capital", "Interés"]);
       resumenAsignado.forEach(r => {
         resumen.addRow([r.persona, r.total, r.capital, r.interes]);

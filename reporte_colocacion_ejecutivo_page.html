@@ -25,8 +25,9 @@
     const auth = getAuth(app);
 
     let usuarioNombre = "";
+    let usuarioAgencia = ""; // <- Agencia del usuario logueado
     let creditosData = [];          // créditos del usuario logueado (para la tabla)
-    let docsPermitidosGlobal = [];  // créditos permitidos (todos los usuarios) para globales
+    let docsPermitidosGlobal = [];  // créditos permitidos (todos los usuarios) para globales (de la misma agencia)
     let fechaDesde = null;
     let fechaHasta = null;
 
@@ -51,9 +52,26 @@
       return e === 'activo' || e === 'mora temprana';
     }
 
+    // Toma la agencia del usuario desde el doc de users, probando campos comunes
+    function extraerAgenciaUsuario(data) {
+      const candidatos = [
+        data.agenciaAsignada,
+        data.agencia,
+        data.sede,
+        data.agenciaNombre
+      ];
+      for (const c of candidatos) {
+        if ((c || '').toString().trim() !== '') return c.toString().trim();
+      }
+      return '';
+    }
+
     async function obtenerCreditos() {
       try {
-        if (!usuarioNombre) return;
+        if (!usuarioNombre || !usuarioAgencia) {
+          document.getElementById('resultados').innerHTML = '<div style="text-align:center;color:#ffb">Falta la agencia del usuario. Verifica el perfil en "users".</div>';
+          return;
+        }
         document.getElementById('resultados').innerHTML = '<div class="loader"></div>';
         document.getElementById('resumen-global').innerHTML = '<div class="loader"></div>';
         document.getElementById('resumen-por-usuario').innerHTML = '';
@@ -63,7 +81,7 @@
         const q = query(creditosRef, orderBy("fechaInicio", "desc"));
         const snapshot = await getDocs(q);
 
-        // Trae TODO y luego filtra por fecha y estados permitidos
+        // Trae TODO y luego filtra por fecha, estados permitidos y AGENCIA
         let docs = [];
         snapshot.forEach(d => {
           const data = d.data();
@@ -85,19 +103,22 @@
           return doc;
         });
 
-        // Filtrar por rango fechas + estados permitidos
+        // Filtrar por rango fechas + estados permitidos + AGENCIA del usuario
         const docsFiltrados = docs.filter(doc => {
           if (fechaDesde && doc._fechaObj < fechaDesde) return false;
           if (fechaHasta && doc._fechaObj > new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23,59,59)) return false;
-          return estadoPermitido(doc.estadoCredito);
+          if (!estadoPermitido(doc.estadoCredito)) return false;
+          if (normaliza(doc.agenciaAsignada) !== normaliza(usuarioAgencia)) return false;
+          return true;
         });
 
-        // Guardar globales (todos los usuarios) para tarjetas/tabla global
+        // Guardar globales (todos los usuarios) para tarjetas/tabla global (pero solo de ESTA AGENCIA)
         docsPermitidosGlobal = docsFiltrados;
 
         // Filtrar por usuario logueado para la tabla principal (se mantiene comportamiento original)
         creditosData = docsFiltrados.filter(doc => normaliza(doc.asignadoA) === normaliza(usuarioNombre));
 
+        renderEncabezadoAgencia();
         renderCreditos();
         renderResumenGlobal();
         renderResumenPorUsuario();
@@ -108,16 +129,22 @@
       }
     }
 
+    function renderEncabezadoAgencia() {
+      const el = document.getElementById('agencia-usuario');
+      el.textContent = usuarioAgencia ? `Agencia: ${usuarioAgencia}` : 'Agencia: —';
+    }
+
     function renderCreditos() {
       const contenedor = document.getElementById('resultados');
       if (!creditosData.length) {
-        contenedor.innerHTML = `<div style="text-align:center;color:#fff7">No hay créditos en el rango seleccionado para tu usuario.</div>`;
+        contenedor.innerHTML = `<div style="text-align:center;color:#fff7">No hay créditos en el rango seleccionado para tu usuario en esta agencia.</div>`;
         document.getElementById("btn-imprimir")?.classList.add("oculto");
         document.getElementById("btn-pdf")?.classList.add("oculto");
         return;
       }
       let totalGeneral = 0;
       let html = `
+      <h2 class="subtitulo">Detalle (Tus Créditos)</h2>
       <div class="tabla-scroll">
       <table class="tabla-reporte" id="tabla-reporte">
         <thead>
@@ -176,27 +203,28 @@
     function renderResumenGlobal() {
       const wrap = document.getElementById('resumen-global');
 
-      // Peso global = suma de saldoActual
+      // Peso global (de esta agencia) = suma de saldoActual
       const pesoGlobal = docsPermitidosGlobal.reduce((s, d) => s + toNum(d.saldoActual), 0);
 
       // Para el usuario logueado
       const misDocs = docsPermitidosGlobal.filter(d => normaliza(d.asignadoA) === normaliza(usuarioNombre));
       const miPeso = misDocs.reduce((s, d) => s + toNum(d.saldoActual), 0);
 
-      // Distintos clientes (intenta por clienteID, si no DUI, si no nombre+apellido)
+      // Distintos clientes (clienteID || DUI || nombre+apellido)
       const clienteKey = (d) => (d.clienteID || d.numeroDui || ((d.nombre||'') + ' ' + (d.apellido||''))).toString();
       const totalClientesSet = new Set(docsPermitidosGlobal.map(clienteKey));
       const misClientesSet   = new Set(misDocs.map(clienteKey));
 
       wrap.innerHTML = `
+        <h2 class="subtitulo">Datos Globales — ${usuarioAgencia}</h2>
         <div class="cards-row">
           <div class="card kpi">
-            <div class="kpi-title">Peso de la Cartera (Global)</div>
+            <div class="kpi-title">Peso de la Cartera (Agencia)</div>
             <div class="kpi-value">$${pesoGlobal.toFixed(2)}</div>
             <div class="kpi-sub">Estados: Activo + Mora Temprana</div>
           </div>
           <div class="card kpi">
-            <div class="kpi-title">Clientes (Global)</div>
+            <div class="kpi-title">Clientes (Agencia)</div>
             <div class="kpi-value">${totalClientesSet.size}</div>
             <div class="kpi-sub">Únicos en periodo</div>
           </div>
@@ -242,7 +270,7 @@
         .sort((a,b)=> b.peso - a.peso);
 
       let html = `
-        <h2 class="subtitulo">Resumen por Usuario (asignadoA)</h2>
+        <h2 class="subtitulo">Resumen por Usuario (asignadoA) — ${usuarioAgencia}</h2>
         <div class="tabla-scroll">
           <table class="tabla-resumen">
             <thead>
@@ -298,7 +326,7 @@
         .sort((a,b)=> b.monto - a.monto);
 
       let html = `
-        <h2 class="subtitulo">Resumen por Tipo de Crédito</h2>
+        <h2 class="subtitulo">Resumen por Tipo de Crédito — ${usuarioAgencia}</h2>
         <div class="tabla-scroll">
           <table class="tabla-resumen">
             <thead>
@@ -332,11 +360,10 @@
     function imprimirTabla() {
       // Imprime tarjetas + resúmenes + tabla
       const contenido = `
-        <h2>Datos Globales</h2>
+        <h2>Datos Globales — ${usuarioAgencia}</h2>
         ${document.getElementById('resumen-global').innerHTML}
         ${document.getElementById('resumen-por-usuario').innerHTML}
         ${document.getElementById('resumen-linea').innerHTML}
-        <h2>Detalle (Tus Créditos)</h2>
         ${document.getElementById('resultados').innerHTML}
       `;
       const ventana = window.open('', '', 'width=1000,height=700');
@@ -356,7 +383,7 @@
           </style>
         </head>
         <body>
-          <h2>Reporte de Colocación de Créditos</h2>
+          <h2>Reporte de Colocación de Créditos — ${usuarioAgencia}</h2>
           ${contenido}
         </body>
         </html>
@@ -374,13 +401,13 @@
       const fecha = new Date();
       const titulo = "Reporte de Colocación de Créditos";
       const empresa = "MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.";
-      const usuario = document.getElementById("usuario-nombre").textContent;
+      const usuarioEmail = document.getElementById("usuario-nombre").textContent;
 
       doc.setFontSize(15);
       doc.text(empresa, 40, 40);
       doc.setFontSize(11);
-      doc.text(titulo, 40, 60);
-      doc.text(`Usuario: ${usuario}`, 40, 78);
+      doc.text(`${titulo} — ${usuarioAgencia}`, 40, 60);
+      doc.text(`Usuario: ${usuarioEmail}`, 40, 78);
       doc.text(`Fecha de generación: ${fecha.toLocaleString('es-SV')}`, 40, 94);
 
       // ======= Datos Globales (tarjetas) =======
@@ -394,8 +421,9 @@
       doc.autoTable({
         head: [["Métrica","Valor"]],
         body: [
-          ["Peso de la Cartera (Global)", `$${pesoGlobal.toFixed(2)}`],
-          ["Clientes (Global)", `${totalClientesSet.size}`],
+          ["Agencia", `${usuarioAgencia}`],
+          ["Peso de la Cartera (Agencia)", `$${pesoGlobal.toFixed(2)}`],
+          ["Clientes (Agencia)", `${totalClientesSet.size}`],
           [`Tu Cartera (${usuarioNombre})`, `$${miPeso.toFixed(2)}`],
           ["Tus Clientes", `${misClientesSet.size}`],
           ["Estados incluidos", "Activo, Mora Temprana"]
@@ -406,7 +434,7 @@
         styles: { fontSize: 9, cellPadding: 3 }
       });
 
-      // ======= Resumen por Usuario =======
+      // ======= Resumen por Usuario (en la misma agencia) =======
       const mapa = new Map();
       docsPermitidosGlobal.forEach(d => {
         const user = (d.asignadoA || '—').toString().trim();
@@ -428,7 +456,7 @@
         styles: { fontSize: 9, cellPadding: 3 }
       });
 
-      // ======= Resumen por Tipo de Crédito =======
+      // ======= Resumen por Tipo de Crédito (en la misma agencia) =======
       const totalMonto = docsPermitidosGlobal.reduce((s,d)=> s + toNum(d.montoAprobado), 0);
       const mapaLinea = new Map();
       docsPermitidosGlobal.forEach(d => {
@@ -481,7 +509,7 @@
         styles: { fontSize: 9, cellPadding: 3 }
       });
 
-      doc.save(`reporte_creditos_${fecha.toLocaleDateString('es-SV').replace(/\//g, '-')}.pdf`);
+      doc.save(`reporte_creditos_${usuarioAgencia}_${fecha.toLocaleDateString('es-SV').replace(/\//g, '-')}.pdf`);
     }
 
     function onFechaDesdeChange(e) {
@@ -498,33 +526,39 @@
     window.addEventListener("DOMContentLoaded", async () => {
       onAuthStateChanged(auth, async user => {
         if (!user) return location.href = "login.html";
-        // Busca el usuario en la colección 'users' para obtener el nombre
+
+        // Busca el usuario en la colección 'users' para obtener nombre y AGENCIA
         const usersRef = collection(db, "users");
         const q = query(usersRef);
         const snapshot = await getDocs(q);
         let found = false;
+
         snapshot.forEach(docu => {
           const data = docu.data();
           if ((data.email || '').trim().toLowerCase() === (user.email || '').trim().toLowerCase()) {
             usuarioNombre = (data.nombre || '').trim();
+            usuarioAgencia = extraerAgenciaUsuario(data); // <- tomar agencia del usuario
             found = true;
           }
         });
+
         if (!found) {
           alert("No se encontró el usuario en la base de datos.");
           return;
         }
         document.getElementById("usuario-nombre").textContent = user.email;
+        renderEncabezadoAgencia();
 
         // Primer día del mes actual hasta hoy
         const now = new Date();
         document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
-        document.getElementById('fecha-hasta').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        document.getElementById('fecha-hasta').value = `${now.getFullYear()}-${String(now.getDate()).padStart(2,'0')}`;
         fechaDesde = new Date(now.getFullYear(), now.getMonth(), 1);
         fechaHasta = now;
 
         obtenerCreditos();
       });
+
       document.getElementById('fecha-desde').addEventListener('change', onFechaDesdeChange);
       document.getElementById('fecha-hasta').addEventListener('change', onFechaHastaChange);
       document.getElementById('btn-imprimir').addEventListener('click', imprimirTabla);
@@ -562,22 +596,29 @@
       color: #F8AF40;
       font-size: 1.03rem;
       text-align: right;
-      margin-bottom: 0.4rem;
+      margin-bottom: 0.2rem;
       font-weight: 600;
+    }
+    #agencia-usuario {
+      color:#9ad7d2;
+      font-size: .96rem;
+      text-align:right;
+      margin-bottom: .6rem;
+      font-weight:600;
     }
     h1 {
       font-size: 1.36rem;
       font-weight: bold;
       text-align: center;
       color: #00e6c0;
-      margin-bottom: 1.2rem;
+      margin-bottom: 1.0rem;
       letter-spacing: .8px;
     }
     .filtros-row {
       display: flex;
       gap: 1.1rem;
       justify-content: center;
-      margin-bottom: 1.2rem;
+      margin-bottom: .9rem;
       flex-wrap: wrap;
     }
     .filtro-fecha {
@@ -697,6 +738,7 @@
   <header>Reporte de Colocación de Créditos</header>
   <div class="container">
     <div id="usuario-nombre"></div>
+    <div id="agencia-usuario"></div>
     <h1>MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.<br>
       <span style="font-size:.97rem;color:#fff;font-weight:400">Colocación de Créditos</span>
     </h1>
@@ -712,13 +754,13 @@
       </div>
     </div>
 
-    <!-- Tarjetas Globales -->
+    <!-- Tarjetas Globales (de la misma agencia) -->
     <div id="resumen-global"></div>
 
-    <!-- Resumen por Usuario -->
+    <!-- Resumen por Usuario (de la misma agencia) -->
     <div id="resumen-por-usuario"></div>
 
-    <!-- Resumen por Tipo de Crédito -->
+    <!-- Resumen por Tipo de Crédito (de la misma agencia) -->
     <div id="resumen-linea"></div>
 
     <!-- Detalle (tabla del usuario logueado) -->
@@ -729,6 +771,7 @@
   </div>
 </body>
 </html>
+
 
 
 

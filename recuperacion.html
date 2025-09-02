@@ -8,32 +8,33 @@
   <style>
     body { background: #191d20; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
     header { background: #000; padding: 1.1rem 0; text-align: center; font-size: 1.7rem; font-weight: 700; color: #F8AF40;}
-    .container { max-width: 980px; margin: 2.2rem auto 0 auto; background: #23272c; border-radius: 16px; box-shadow: 0 2px 22px #0008; padding: 2.2rem 1.6rem 1.7rem 1.6rem;}
+    .container { max-width: 1100px; margin: 2.2rem auto 0 auto; background: #23272c; border-radius: 16px; box-shadow: 0 2px 22px #0008; padding: 2.2rem 1.6rem 1.7rem 1.6rem;}
     h2 { color: #F8AF40; margin-bottom: 1.6rem; text-align: center; }
-    .filtros { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 1.9em; align-items: flex-end;}
-    .filtros label { display:block; font-size:1.08rem; font-weight:500; margin-bottom:2px;}
-    .filtros input[type="date"] { background: #202324; color: #fff; border: 1.5px solid #515151; border-radius: 7px; font-size: 1.08rem; padding: 8px 12px;}
-    .btn-filtrar, .btn-imprimir, .btn-excel { background: #F8AF40; color: #181818; border: none; border-radius: 8px; font-size: 1.07rem; font-weight: 600; padding: 10px 22px; cursor: pointer; margin-right: 8px;}
-    .btn-filtrar:active, .btn-filtrar:hover,
-    .btn-imprimir:active, .btn-imprimir:hover,
-    .btn-excel:active, .btn-excel:hover { background: #d98b1a;}
-    table { width:100%; border-collapse:collapse; margin-bottom:24px; margin-top: 1.4rem;}
-    th, td { border-bottom: 1px solid #313336; padding: 9px 6px; text-align: left; font-size: 1.04rem;}
+    .filtros { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; align-items: end; margin-bottom: 1.1em;}
+    .filtros .campo { grid-column: span 3; min-width: 160px; }
+    .filtros .campo label { display:block; font-size:1.02rem; font-weight:600; margin-bottom:6px;}
+    .filtros input[type="date"], .filtros select { background: #202324; color: #fff; border: 1.5px solid #515151; border-radius: 7px; font-size: 1.02rem; padding: 8px 12px; width: 100%;}
+    .modo-asignacion { grid-column: span 6; display:flex; gap:16px; align-items:center; background:#1f2226; border:1px solid #3a3d42; border-radius:10px; padding:10px 14px; }
+    .modo-asignacion span { font-weight:700; color:#F8AF40; }
+    .modo-asignacion label { font-size:1rem; display:flex; gap:8px; align-items:center; }
+    .btn-filtrar, .btn-imprimir, .btn-excel { background: #F8AF40; color: #181818; border: none; border-radius: 8px; font-size: 1.02rem; font-weight: 700; padding: 10px 22px; cursor: pointer;}
+    .btn-filtrar:hover, .btn-imprimir:hover, .btn-excel:hover { background: #d98b1a;}
+    .acciones { display:flex; gap:10px; flex-wrap:wrap; margin-bottom: 15px; }
+    table { width:100%; border-collapse:collapse; margin-bottom:24px; margin-top: 1.0rem; background:#24282d;}
+    th, td { border-bottom: 1px solid #313336; padding: 9px 6px; text-align: left; font-size: 0.98rem;}
     th { color: #F8AF40; background: #18191b;}
     tr:last-child td { border-bottom: none;}
     .sumas { font-weight: bold; color: #F8AF40; border-top: 2px solid #F8AF40;}
     .nada {text-align:center; color:#bbb; padding:18px 0 24px 0;}
-    .botonera { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 15px; }
-    @media (max-width: 740px){
-      .container {padding:1.1rem .7rem;}
-      .filtros { flex-direction:column; gap:11px;}
-      th, td { font-size:.97rem;}
-      .botonera {flex-direction: column; gap:7px;}
+    .subtitulo { margin-top: 12px; font-weight:700; color:#8fd3ff; }
+    @media (max-width: 1020px) {
+      .filtros { grid-template-columns: 1fr; }
+      .filtros .campo, .modo-asignacion { grid-column: span 1; }
     }
     @media print {
       body, html { background: #fff !important; color: #000 !important;}
       .container { box-shadow: none !important; background: #fff !important; color: #000;}
-      .filtros, .botonera, header { display: none !important;}
+      .filtros, .acciones, header { display: none !important;}
       table { background: #fff !important; color: #000 !important;}
       th { color: #000 !important; background: #f8f8f8 !important;}
     }
@@ -43,26 +44,50 @@
   <header>Recuperación</header>
   <div class="container">
     <h2>Entrega de Intereses</h2>
+
     <div class="filtros">
-      <div>
-        <label for="desde">Desde:</label>
+      <div class="campo">
+        <label for="desde">Desde</label>
         <input type="date" id="desde"/>
       </div>
-      <div>
-        <label for="hasta">Hasta:</label>
+      <div class="campo">
+        <label for="hasta">Hasta</label>
         <input type="date" id="hasta"/>
       </div>
-      <button class="btn-filtrar" id="btn-filtrar"><i class="fas fa-filter"></i> Filtrar</button>
+
+      <div class="modo-asignacion">
+        <span>Asignar por:</span>
+        <label><input type="radio" name="modoAsignacion" value="cobrador" checked> Cobrador (cajero)</label>
+        <label><input type="radio" name="modoAsignacion" value="ejecutivo"> Ejecutivo (del crédito / histórico)</label>
+      </div>
+
+      <div class="campo">
+        <label id="lbl-persona" for="sel-persona">Cobrador</label>
+        <select id="sel-persona">
+          <option value="">Todos</option>
+        </select>
+      </div>
+
+      <div class="campo" style="display:flex; align-items:end;">
+        <button class="btn-filtrar" id="btn-filtrar"><i class="fas fa-filter"></i> Filtrar</button>
+      </div>
     </div>
-    <div class="botonera">
+
+    <div class="acciones">
       <button class="btn-imprimir" id="btn-imprimir"><i class="fas fa-print"></i> Imprimir Reporte</button>
       <button class="btn-excel" id="btn-excel"><i class="fas fa-file-excel"></i> Generar Excel</button>
     </div>
+
     <div id="tabla-resultados"></div>
+
+    <div class="subtitulo">Resumen por persona (según modo de asignación)</div>
+    <div id="tabla-resumen"></div>
   </div>
 
-  <!-- Firebase + lógica + ExcelJS CDN -->
+  <!-- ExcelJS -->
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
+
+  <!-- Firebase + lógica -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -80,8 +105,11 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    let pagosFiltrados = [];
     let agenciaActual = "";
+    let pagosFiltrados = [];     // resultados del query por fecha + agencia (detalle completo)
+    let resumenAsignado = [];    // resumen visible (para Excel)
+    let setCobradores = new Set();
+    let setEjecutivos = new Set();
 
     // Fechas por defecto (21 de junio 2025 hasta hoy)
     function fechaActualISO() {
@@ -94,47 +122,60 @@
     window.addEventListener("DOMContentLoaded", () => {
       document.getElementById("desde").value = "2025-06-21";
       document.getElementById("hasta").value = fechaActualISO();
+      actualizarEtiquetaPersona(); // etiqueta inicial "Cobrador"
     });
 
-    // Bloquea acceso a usuarios no autenticados y obtiene agencia
+    // Auth + agencia
     onAuthStateChanged(auth, async user => {
       if (!user) return location.href = "login.html";
-      // Obtén agencia del usuario
-      const usersSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
-      if (!usersSnap.empty) {
-        agenciaActual = usersSnap.docs[0].data().department;
-      }
+      const snap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
+      if (!snap.empty) agenciaActual = snap.docs[0].data().department || "";
     });
 
+    // Eventos UI
     document.getElementById("btn-filtrar").onclick = cargarPagos;
     document.getElementById("btn-imprimir").onclick = () => {
-      if (!pagosFiltrados.length) return alert("No hay datos para imprimir.");
+      if (!pagosVisibles().length) return alert("No hay datos para imprimir.");
       window.print();
     };
     document.getElementById("btn-excel").onclick = generarExcel;
+
+    document.querySelectorAll('input[name="modoAsignacion"]').forEach(r => {
+      r.addEventListener('change', () => {
+        actualizarEtiquetaPersona();
+        poblarSelectPersonas(); // cambia la lista según modo
+        renderTodo();           // re-render con el modo nuevo
+      });
+    });
+
+    document.getElementById("sel-persona").addEventListener('change', () => {
+      renderTodo();
+    });
+
+    function modoActual(){ 
+      const el = document.querySelector('input[name="modoAsignacion"]:checked'); 
+      return el ? el.value : "cobrador"; 
+    }
+
+    function actualizarEtiquetaPersona() {
+      const lbl = document.getElementById("lbl-persona");
+      lbl.textContent = (modoActual() === "cobrador") ? "Cobrador" : "Ejecutivo";
+    }
 
     async function cargarPagos() {
       const desde = document.getElementById("desde").value;
       const hasta = document.getElementById("hasta").value;
       const tablaDiv = document.getElementById("tabla-resultados");
+      const resumenDiv = document.getElementById("tabla-resumen");
       tablaDiv.innerHTML = "<div style='text-align:center;padding:25px;'>Cargando...</div>";
+      resumenDiv.innerHTML = "";
 
-      if (!desde || !hasta) {
-        tablaDiv.innerHTML = `<div class="nada">Seleccione el rango de fechas.</div>`;
-        pagosFiltrados = [];
-        return;
-      }
-      if (!agenciaActual) {
-        tablaDiv.innerHTML = `<div class="nada">No se pudo determinar la agencia del usuario.</div>`;
-        pagosFiltrados = [];
-        return;
-      }
+      if (!desde || !hasta) { tablaDiv.innerHTML = `<div class="nada">Seleccione el rango de fechas.</div>`; pagosFiltrados = []; return; }
+      if (!agenciaActual) { tablaDiv.innerHTML = `<div class="nada">No se pudo determinar la agencia del usuario.</div>`; pagosFiltrados = []; return; }
 
-      // Rango para incluir TODO el último día
       const desdeISO = new Date(desde + "T00:00:00").toISOString();
       const hastaISO = new Date(hasta + "T23:59:59").toISOString();
 
-      // Consulta los pagos dentro del rango de fechas Y de la agencia del usuario
       const pagosQ = query(
         collection(db, "pagos"),
         where("fechaPago", ">=", desdeISO),
@@ -142,55 +183,117 @@
         where("sucursal", "==", agenciaActual)
       );
       const pagosSnap = await getDocs(pagosQ);
-
       if (pagosSnap.empty) {
         tablaDiv.innerHTML = `<div class="nada">No se encontraron pagos en ese rango.</div>`;
         pagosFiltrados = [];
+        setCobradores = new Set();
+        setEjecutivos = new Set();
+        poblarSelectPersonas();
         return;
       }
 
-      let pagos = [];
-      let creditosCache = {};
+      // caches
+      const creditosCache = {};
+      setCobradores = new Set();
+      setEjecutivos = new Set();
 
+      const pagos = [];
       for (const docPago of pagosSnap.docs) {
         const p = docPago.data();
-        if (p.anulado) continue; // OMITIR PAGOS ANULADOS
+        if (p.anulado) continue;
 
-        // Busca datos del crédito si no los tienes en caché
         if (!creditosCache[p.creditoID]) {
-          const credSnap = await getDoc(doc(db, "creditos", p.creditoID));
-          if (credSnap.exists()) {
-            const c = credSnap.data();
-            creditosCache[p.creditoID] = {
-              nombre: c.nombre || "",
-              apellido: c.apellido || "",
-              ejecutivo: c.asignadoA || ""
-            };
-          } else {
-            creditosCache[p.creditoID] = { nombre: "", apellido: "", ejecutivo: "" };
-          }
+          const cr = await getDoc(doc(db, "creditos", p.creditoID));
+          creditosCache[p.creditoID] = cr.exists() ? cr.data() : {};
         }
+        const c = creditosCache[p.creditoID];
+
+        const cliente = `${c?.nombre || ""} ${c?.apellido || ""}`.trim();
+        const cobrador = p.cajeroNombre || ""; // quien cobró
+        const ejecutivoHistorico = p.ejecutivoAsignado || c?.asignadoA || ""; // snapshot si existe
+
+        // llenar sets para el select
+        if (cobrador) setCobradores.add(cobrador);
+        if (ejecutivoHistorico) setEjecutivos.add(ejecutivoHistorico);
 
         pagos.push({
-          fechaPago: p.fechaPago ? p.fechaPago.substring(0, 10) : "",
-          cliente: creditosCache[p.creditoID].nombre + " " + creditosCache[p.creditoID].apellido,
-          montoPagado: parseFloat(p.montoPagado || 0),
-          pagoCapital: parseFloat(p.pagoCapital || 0),
-          pagoInteres: parseFloat(p.pagoInteres || 0),
-          ejecutivo: creditosCache[p.creditoID].ejecutivo
+          fechaPago: p.fechaPago ? p.fechaPago.substring(0,10) : "",
+          cliente,
+          montoPagado: parseFloat(p.montoPagado || 0) || 0,
+          pagoCapital: parseFloat(p.pagoCapital || 0) || 0,
+          pagoInteres: parseFloat(p.pagoInteres || 0) || 0,
+          cobrador,
+          ejecutivoHistorico
         });
       }
 
-      // Guarda pagos filtrados para exportar/imprimir
       pagosFiltrados = pagos;
+      poblarSelectPersonas();
+      renderTodo();
+    }
 
-      // Sumas
-      let totalPagado = pagos.reduce((a, b) => a + b.montoPagado, 0);
-      let totalCapital = pagos.reduce((a, b) => a + b.pagoCapital, 0);
-      let totalInteres = pagos.reduce((a, b) => a + b.pagoInteres, 0);
+    function poblarSelectPersonas() {
+      const sel = document.getElementById("sel-persona");
+      const modo = modoActual();
+      const valores = (modo === "cobrador") ? Array.from(setCobradores) : Array.from(setEjecutivos);
+      const seleccionadoPrevio = sel.value;
 
-      // Render tabla
-      let html = `
+      // reconstruir
+      sel.innerHTML = `<option value="">Todos</option>` + valores
+        .sort((a,b)=> a.localeCompare(b))
+        .map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`)
+        .join("");
+
+      // si el valor previo sigue existiendo, mantenerlo
+      if (seleccionadoPrevio && valores.includes(seleccionadoPrevio)) {
+        sel.value = seleccionadoPrevio;
+      } else {
+        sel.value = ""; // Todos
+      }
+    }
+
+    function pagosVisibles() {
+      const modo = modoActual();
+      const persona = document.getElementById("sel-persona").value || "";
+      if (!persona) return pagosFiltrados.slice(); // todos
+
+      return pagosFiltrados.filter(p => {
+        const campo = (modo === "cobrador") ? p.cobrador : p.ejecutivoHistorico;
+        return (campo || "") === persona;
+      });
+    }
+
+    function renderTodo() {
+      const datos = pagosVisibles();
+      renderTabla(datos);
+      renderResumen(datos);
+    }
+
+    function renderTabla(pagos) {
+      const tablaDiv = document.getElementById("tabla-resultados");
+      if (!pagos.length) { tablaDiv.innerHTML = `<div class="nada">Sin datos.</div>`; return; }
+
+      const totalPagado = pagos.reduce((a, b) => a + b.montoPagado, 0);
+      const totalCapital = pagos.reduce((a, b) => a + b.pagoCapital, 0);
+      const totalInteres = pagos.reduce((a, b) => a + b.pagoInteres, 0);
+
+      const rowsHTML = pagos.map(p => {
+        const asignado = (modoActual() === "cobrador") ? (p.cobrador || "") : (p.ejecutivoHistorico || "");
+        return `
+          <tr>
+            <td>${p.fechaPago}</td>
+            <td>${escapeHtml(p.cliente)}</td>
+            <td>$${p.montoPagado.toFixed(2)}</td>
+            <td>$${p.pagoCapital.toFixed(2)}</td>
+            <td>$${p.pagoInteres.toFixed(2)}</td>
+            <td>${escapeHtml(p.cobrador || "")}</td>
+            <td>${escapeHtml(p.ejecutivoHistorico || "")}</td>
+            <td>${escapeHtml(asignado)}</td>
+          </tr>
+        `;
+      }).join("");
+
+      const html = `
         <table id="tabla-pagos">
           <thead>
             <tr>
@@ -199,69 +302,113 @@
               <th>Monto Pagado</th>
               <th>Capital</th>
               <th>Abono de Interés</th>
-              <th>Ejecutivo</th>
+              <th>Cobrador (cajero)</th>
+              <th>Ejecutivo (crédito)</th>
+              <th>Asignado a</th>
             </tr>
           </thead>
           <tbody>
-            ${
-              pagos.map(p=>`
-                <tr>
-                  <td>${p.fechaPago}</td>
-                  <td>${p.cliente}</td>
-                  <td>$${p.montoPagado.toFixed(2)}</td>
-                  <td>$${p.pagoCapital.toFixed(2)}</td>
-                  <td>$${p.pagoInteres.toFixed(2)}</td>
-                  <td>${p.ejecutivo}</td>
-                </tr>
-              `).join("")
-            }
+            ${rowsHTML}
             <tr class="sumas">
               <td colspan="2">Totales</td>
               <td>$${totalPagado.toFixed(2)}</td>
               <td>$${totalCapital.toFixed(2)}</td>
               <td>$${totalInteres.toFixed(2)}</td>
-              <td></td>
+              <td colspan="3"></td>
             </tr>
           </tbody>
         </table>
       `;
-
       tablaDiv.innerHTML = html;
     }
 
-    // --- Descargar Excel ---
-    async function generarExcel() {
-      if (!pagosFiltrados.length) return alert("No hay datos para exportar.");
-      const workbook = new window.ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet("Recuperación");
+    function renderResumen(pagos) {
+      const resumenDiv = document.getElementById("tabla-resumen");
+      if (!pagos.length) { resumenDiv.innerHTML = `<div class="nada">Sin datos.</div>`; resumenAsignado = []; return; }
 
-      sheet.addRow([
-        "Fecha de Pago", "Cliente", "Monto Pagado", "Capital", "Abono de Interés", "Ejecutivo"
+      const usarCobrador = (modoActual() === "cobrador");
+      const mapa = new Map();
+
+      for (const p of pagos) {
+        const key = usarCobrador ? (p.cobrador || "—") : (p.ejecutivoHistorico || "—");
+        if (!mapa.has(key)) mapa.set(key, { persona: key, total: 0, capital: 0, interes: 0 });
+        const acc = mapa.get(key);
+        acc.total += p.montoPagado;
+        acc.capital += p.pagoCapital;
+        acc.interes += p.pagoInteres;
+      }
+
+      const filas = Array.from(mapa.values()).sort((a,b)=> b.interes - a.interes);
+      resumenAsignado = filas;
+
+      const html = `
+        <table id="tabla-resumen-asignado">
+          <thead>
+            <tr>
+              <th>${usarCobrador ? "Cobrador / Cajero" : "Ejecutivo asignado"}</th>
+              <th>Monto Pagado</th>
+              <th>Capital</th>
+              <th>Interés</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filas.map(f => `
+              <tr>
+                <td>${escapeHtml(f.persona)}</td>
+                <td>$${f.total.toFixed(2)}</td>
+                <td>$${f.capital.toFixed(2)}</td>
+                <td>$${f.interes.toFixed(2)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+      resumenDiv.innerHTML = html;
+    }
+
+    async function generarExcel() {
+      const datos = pagosVisibles();
+      if (!datos.length) return alert("No hay datos para exportar.");
+
+      const workbook = new window.ExcelJS.Workbook();
+      const detalle = workbook.addWorksheet("Detalle");
+      const resumen = workbook.addWorksheet("Resumen");
+
+      detalle.addRow([
+        "Fecha de Pago", "Cliente", "Monto Pagado", "Capital", "Abono de Interés",
+        "Cobrador (cajero)", "Ejecutivo (crédito)", "Asignado a"
       ]);
 
-      pagosFiltrados.forEach(p => {
-        sheet.addRow([
+      const usarCobrador = (modoActual() === "cobrador");
+      datos.forEach(p => {
+        const asignado = usarCobrador ? (p.cobrador || "") : (p.ejecutivoHistorico || "");
+        detalle.addRow([
           p.fechaPago,
           p.cliente,
           p.montoPagado,
           p.pagoCapital,
           p.pagoInteres,
-          p.ejecutivo
+          p.cobrador,
+          p.ejecutivoHistorico,
+          asignado
         ]);
       });
 
-      // Totales
-      const totalPagado = pagosFiltrados.reduce((a,b)=>a+b.montoPagado,0);
-      const totalCapital = pagosFiltrados.reduce((a,b)=>a+b.pagoCapital,0);
-      const totalInteres = pagosFiltrados.reduce((a,b)=>a+b.pagoInteres,0);
+      const totalPagado = datos.reduce((a,b)=>a+b.montoPagado,0);
+      const totalCapital = datos.reduce((a,b)=>a+b.pagoCapital,0);
+      const totalInteres = datos.reduce((a,b)=>a+b.pagoInteres,0);
+      detalle.addRow([]);
+      detalle.addRow(["Totales","", totalPagado, totalCapital, totalInteres, "", "", ""]);
 
-      sheet.addRow([]);
-      sheet.addRow([
-        "Totales", "",
-        totalPagado, totalCapital, totalInteres, ""
+      // Resumen
+      resumen.addRow([
+        usarCobrador ? "Cobrador / Cajero" : "Ejecutivo asignado",
+        "Monto Pagado", "Capital", "Interés"
       ]);
+      resumenAsignado.forEach(r => {
+        resumen.addRow([r.persona, r.total, r.capital, r.interes]);
+      });
 
-      // Descargar
       const buf = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buf], {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
       const url = URL.createObjectURL(blob);
@@ -273,8 +420,20 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }
+
+    // util mínimo
+    function escapeHtml(str) {
+      return String(str || "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
   </script>
 </body>
 </html>
+
+
 
 

@@ -7,7 +7,9 @@
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { 
+      getFirestore, collection, query, orderBy, getDocs, where, doc, getDoc 
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -25,47 +27,28 @@
     const auth = getAuth(app);
 
     let usuarioNombre = "";
-    let usuarioAgencia = ""; // <- Agencia del usuario logueado
+    let usuarioAgencia = ""; // <- Agencia del usuario logueado (department)
     let creditosData = [];          // créditos del usuario logueado (para la tabla)
-    let docsPermitidosGlobal = [];  // créditos permitidos (todos los usuarios) para globales (de la misma agencia)
+    let docsPermitidosGlobal = [];  // créditos permitidos (todos los usuarios) dentro de la misma agencia
     let fechaDesde = null;
     let fechaHasta = null;
 
-    function normaliza(str) {
-      return (str || '').toString().trim().toLowerCase();
-    }
-
+    // ==== Utils ====
+    function normaliza(str) { return (str || '').toString().trim().toLowerCase(); }
     function formatFecha(fecha) {
       const d = new Date(fecha);
       return d.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
-
-    // Helper robusto para número
     function toNum(v) {
       const n = typeof v === 'string' ? parseFloat(v.replace(',', '.')) : Number(v);
       return isNaN(n) ? 0 : n;
     }
-
-    // Estados permitidos
     function estadoPermitido(estado) {
       const e = normaliza(estado);
       return e === 'activo' || e === 'mora temprana';
     }
 
-    // Toma la agencia del usuario desde el doc de users, probando campos comunes
-    function extraerAgenciaUsuario(data) {
-      const candidatos = [
-        data.agenciaAsignada,
-        data.agencia,
-        data.sede,
-        data.agenciaNombre
-      ];
-      for (const c of candidatos) {
-        if ((c || '').toString().trim() !== '') return c.toString().trim();
-      }
-      return '';
-    }
-
+    // ==== Carga créditos + filtros ====
     async function obtenerCreditos() {
       try {
         if (!usuarioNombre || !usuarioAgencia) {
@@ -77,45 +60,36 @@
         document.getElementById('resumen-por-usuario').innerHTML = '';
         document.getElementById('resumen-linea').innerHTML = '';
 
+        // Traemos SÓLO los créditos de la agencia del usuario (como en tu ejemplo)
         const creditosRef = collection(db, "creditos");
-        const q = query(creditosRef, orderBy("fechaInicio", "desc"));
-        const snapshot = await getDocs(q);
+        const qAgencia = query(creditosRef, where("agenciaAsignada", "==", usuarioAgencia), orderBy("fechaInicio", "desc"));
+        const snapshot = await getDocs(qAgencia);
 
-        // Trae TODO y luego filtra por fecha, estados permitidos y AGENCIA
+        // Map + normalización de fecha
         let docs = [];
         snapshot.forEach(d => {
           const data = d.data();
           data.id = d.id;
+          let f = data.fechaInicio;
+          if (typeof f === "object" && f?.seconds) f = new Date(f.seconds * 1000);
+          else if (typeof f === "string") f = new Date(f);
+          else f = new Date(f);
+          data._fechaObj = f;
           docs.push(data);
         });
 
-        // Preprocesar fecha
-        docs = docs.map(doc => {
-          let fechaDoc = doc.fechaInicio;
-          if (typeof fechaDoc === "object" && fechaDoc?.seconds) {
-            fechaDoc = new Date(fechaDoc.seconds * 1000);
-          } else if (typeof fechaDoc === "string") {
-            fechaDoc = new Date(fechaDoc);
-          } else {
-            fechaDoc = new Date(fechaDoc);
-          }
-          doc._fechaObj = fechaDoc;
-          return doc;
-        });
-
-        // Filtrar por rango fechas + estados permitidos + AGENCIA del usuario
+        // Rango de fechas + estados permitidos
+        const finDia = (dt) => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 23,59,59);
         const docsFiltrados = docs.filter(doc => {
           if (fechaDesde && doc._fechaObj < fechaDesde) return false;
-          if (fechaHasta && doc._fechaObj > new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23,59,59)) return false;
-          if (!estadoPermitido(doc.estadoCredito)) return false;
-          if (normaliza(doc.agenciaAsignada) !== normaliza(usuarioAgencia)) return false;
-          return true;
+          if (fechaHasta && doc._fechaObj > finDia(fechaHasta)) return false;
+          return estadoPermitido(doc.estadoCredito);
         });
 
-        // Guardar globales (todos los usuarios) para tarjetas/tabla global (pero solo de ESTA AGENCIA)
+        // Globales (de la agencia)
         docsPermitidosGlobal = docsFiltrados;
 
-        // Filtrar por usuario logueado para la tabla principal (se mantiene comportamiento original)
+        // Detalle: sólo usuario logueado
         creditosData = docsFiltrados.filter(doc => normaliza(doc.asignadoA) === normaliza(usuarioNombre));
 
         renderEncabezadoAgencia();
@@ -203,14 +177,10 @@
     function renderResumenGlobal() {
       const wrap = document.getElementById('resumen-global');
 
-      // Peso global (de esta agencia) = suma de saldoActual
       const pesoGlobal = docsPermitidosGlobal.reduce((s, d) => s + toNum(d.saldoActual), 0);
+      const misDocs   = docsPermitidosGlobal.filter(d => normaliza(d.asignadoA) === normaliza(usuarioNombre));
+      const miPeso    = misDocs.reduce((s, d) => s + toNum(d.saldoActual), 0);
 
-      // Para el usuario logueado
-      const misDocs = docsPermitidosGlobal.filter(d => normaliza(d.asignadoA) === normaliza(usuarioNombre));
-      const miPeso = misDocs.reduce((s, d) => s + toNum(d.saldoActual), 0);
-
-      // Distintos clientes (clienteID || DUI || nombre+apellido)
       const clienteKey = (d) => (d.clienteID || d.numeroDui || ((d.nombre||'') + ' ' + (d.apellido||''))).toString();
       const totalClientesSet = new Set(docsPermitidosGlobal.map(clienteKey));
       const misClientesSet   = new Set(misDocs.map(clienteKey));
@@ -299,7 +269,7 @@
       cont.innerHTML = html;
     }
 
-    // === Resumen por Tipo de Crédito (se mantiene lo trabajado) ===
+    // === Resumen por Tipo de Crédito ===
     function renderResumenLinea() {
       const cont = document.getElementById('resumen-linea');
       if (!docsPermitidosGlobal.length) {
@@ -357,8 +327,8 @@
       cont.innerHTML = html;
     }
 
+    // === Imprimir ===
     function imprimirTabla() {
-      // Imprime tarjetas + resúmenes + tabla
       const contenido = `
         <h2>Datos Globales — ${usuarioAgencia}</h2>
         ${document.getElementById('resumen-global').innerHTML}
@@ -392,28 +362,26 @@
       ventana.print();
     }
 
-    // ----- PDF -----
+    // === PDF ===
     async function descargarPDF() {
       if (!docsPermitidosGlobal.length) return;
 
       const { jsPDF } = window.jspdf;
-      const doc = new jsPDF('l', 'pt', 'a4'); // landscape
+      const doc = new jsPDF('l', 'pt', 'a4');
       const fecha = new Date();
-      const titulo = "Reporte de Colocación de Créditos";
       const empresa = "MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.";
       const usuarioEmail = document.getElementById("usuario-nombre").textContent;
 
       doc.setFontSize(15);
       doc.text(empresa, 40, 40);
       doc.setFontSize(11);
-      doc.text(`${titulo} — ${usuarioAgencia}`, 40, 60);
+      doc.text(`Reporte de Colocación de Créditos — ${usuarioAgencia}`, 40, 60);
       doc.text(`Usuario: ${usuarioEmail}`, 40, 78);
       doc.text(`Fecha de generación: ${fecha.toLocaleString('es-SV')}`, 40, 94);
 
-      // ======= Datos Globales (tarjetas) =======
       const pesoGlobal = docsPermitidosGlobal.reduce((s, d) => s + toNum(d.saldoActual), 0);
       const misDocs = docsPermitidosGlobal.filter(d => normaliza(d.asignadoA) === normaliza(usuarioNombre));
-      const miPeso = misDocs.reduce((s, d) => s + toNum(d.saldoActual), 0);
+      const miPeso  = misDocs.reduce((s, d) => s + toNum(d.saldoActual), 0);
       const clienteKey = (d) => (d.clienteID || d.numeroDui || ((d.nombre||'') + ' ' + (d.apellido||''))).toString();
       const totalClientesSet = new Set(docsPermitidosGlobal.map(clienteKey));
       const misClientesSet   = new Set(misDocs.map(clienteKey));
@@ -434,7 +402,6 @@
         styles: { fontSize: 9, cellPadding: 3 }
       });
 
-      // ======= Resumen por Usuario (en la misma agencia) =======
       const mapa = new Map();
       docsPermitidosGlobal.forEach(d => {
         const user = (d.asignadoA || '—').toString().trim();
@@ -456,7 +423,6 @@
         styles: { fontSize: 9, cellPadding: 3 }
       });
 
-      // ======= Resumen por Tipo de Crédito (en la misma agencia) =======
       const totalMonto = docsPermitidosGlobal.reduce((s,d)=> s + toNum(d.montoAprobado), 0);
       const mapaLinea = new Map();
       docsPermitidosGlobal.forEach(d => {
@@ -479,7 +445,6 @@
         styles: { fontSize: 9, cellPadding: 3 }
       });
 
-      // ======= Detalle (tabla usuario logueado) =======
       const head = [[
         "Fecha", "Agencia", "Cliente", "DUI", "Monto", "Línea", "Frecuencia", "Cuotas", "Cuota", "Tasa %", "Estado"
       ]];
@@ -509,9 +474,12 @@
         styles: { fontSize: 9, cellPadding: 3 }
       });
 
-      doc.save(`reporte_creditos_${usuarioAgencia}_${fecha.toLocaleDateString('es-SV').replace(/\//g, '-')}.pdf`);
+      const mm = String(fecha.getMonth()+1).padStart(2,'0');
+      const dd = String(fecha.getDate()).padStart(2,'0');
+      doc.save(`reporte_creditos_${usuarioAgencia}_${fecha.getFullYear()}-${mm}-${dd}.pdf`);
     }
 
+    // ==== Handlers de fecha ====
     function onFechaDesdeChange(e) {
       const val = e.target.value;
       fechaDesde = val ? new Date(val) : null;
@@ -523,36 +491,34 @@
       obtenerCreditos();
     }
 
+    // ==== Inicio ====
     window.addEventListener("DOMContentLoaded", async () => {
       onAuthStateChanged(auth, async user => {
         if (!user) return location.href = "login.html";
 
-        // Busca el usuario en la colección 'users' para obtener nombre y AGENCIA
+        // === Tomar agencia como en tu ejemplo: users/{uid}.department ===
+        // Buscamos por id de documento == uid
         const usersRef = collection(db, "users");
-        const q = query(usersRef);
-        const snapshot = await getDocs(q);
-        let found = false;
+        const qUser = query(usersRef, where("__name__", "==", user.uid));
+        const snap = await getDocs(qUser);
 
-        snapshot.forEach(docu => {
-          const data = docu.data();
-          if ((data.email || '').trim().toLowerCase() === (user.email || '').trim().toLowerCase()) {
-            usuarioNombre = (data.nombre || '').trim();
-            usuarioAgencia = extraerAgenciaUsuario(data); // <- tomar agencia del usuario
-            found = true;
-          }
-        });
-
-        if (!found) {
+        if (snap.empty) {
           alert("No se encontró el usuario en la base de datos.");
           return;
         }
+        const data = snap.docs[0].data();
+        usuarioNombre = (data.nombre || '').toString().trim();
+        usuarioAgencia = (data.department || '').toString().trim(); // <- campo de tu ejemplo
+
         document.getElementById("usuario-nombre").textContent = user.email;
         renderEncabezadoAgencia();
 
-        // Primer día del mes actual hasta hoy
+        // ==== FIX FECHAS: poner YYYY-MM-DD correctamente ====
         const now = new Date();
-        document.getElementById('fecha-desde').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
-        document.getElementById('fecha-hasta').value = `${now.getFullYear()}-${String(now.getDate()).padStart(2,'0')}`;
+        const mm = String(now.getMonth()+1).padStart(2,'0');
+        const dd = String(now.getDate()).padStart(2,'0');
+        document.getElementById('fecha-desde').value = `${now.getFullYear()}-${mm}-01`;
+        document.getElementById('fecha-hasta').value = `${now.getFullYear()}-${mm}-${dd}`;
         fechaDesde = new Date(now.getFullYear(), now.getMonth(), 1);
         fechaHasta = now;
 
@@ -771,6 +737,7 @@
   </div>
 </body>
 </html>
+
 
 
 

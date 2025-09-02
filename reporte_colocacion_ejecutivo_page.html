@@ -8,7 +8,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { 
-      getFirestore, collection, query, orderBy, getDocs, where, doc, getDoc 
+      getFirestore, collection, query, orderBy, getDocs, where 
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
@@ -27,13 +27,21 @@
     const auth = getAuth(app);
 
     let usuarioNombre = "";
-    let usuarioAgencia = ""; // <- Agencia del usuario logueado (department)
-    let creditosData = [];          // créditos del usuario logueado (para la tabla)
-    let docsPermitidosGlobal = [];  // créditos permitidos (todos los usuarios) dentro de la misma agencia
+    let usuarioAgencia = ""; // users/{uid}.department
+    let docsUsuario = [];    // Créditos del usuario logueado (en su agencia, fechas, estados) -> base de todo
     let fechaDesde = null;
     let fechaHasta = null;
 
     // ==== Utils ====
+    const ESTADOS_PERMITIDOS = new Set([
+      'activo',
+      'mora temprana',
+      'mora moderada',
+      'mora severa',
+      'riesgo alto',
+      'cobro judicial'
+    ]);
+
     function normaliza(str) { return (str || '').toString().trim().toLowerCase(); }
     function formatFecha(fecha) {
       const d = new Date(fecha);
@@ -44,8 +52,7 @@
       return isNaN(n) ? 0 : n;
     }
     function estadoPermitido(estado) {
-      const e = normaliza(estado);
-      return e === 'activo' || e === 'mora temprana';
+      return ESTADOS_PERMITIDOS.has(normaliza(estado));
     }
 
     // ==== Carga créditos + filtros ====
@@ -57,15 +64,14 @@
         }
         document.getElementById('resultados').innerHTML = '<div class="loader"></div>';
         document.getElementById('resumen-global').innerHTML = '<div class="loader"></div>';
-        document.getElementById('resumen-por-usuario').innerHTML = '';
         document.getElementById('resumen-linea').innerHTML = '';
 
-        // Traemos SÓLO los créditos de la agencia del usuario (como en tu ejemplo)
+        // Traer SOLO créditos de la agencia del usuario
         const creditosRef = collection(db, "creditos");
         const qAgencia = query(creditosRef, where("agenciaAsignada", "==", usuarioAgencia), orderBy("fechaInicio", "desc"));
         const snapshot = await getDocs(qAgencia);
 
-        // Map + normalización de fecha
+        // Normalizar y preparar
         let docs = [];
         snapshot.forEach(d => {
           const data = d.data();
@@ -78,25 +84,20 @@
           docs.push(data);
         });
 
-        // Rango de fechas + estados permitidos
+        // Filtrar: rango fechas + estados permitidos + asignadoA = usuarioNombre
         const finDia = (dt) => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 23,59,59);
-        const docsFiltrados = docs.filter(doc => {
+        docsUsuario = docs.filter(doc => {
           if (fechaDesde && doc._fechaObj < fechaDesde) return false;
           if (fechaHasta && doc._fechaObj > finDia(fechaHasta)) return false;
-          return estadoPermitido(doc.estadoCredito);
+          if (!estadoPermitido(doc.estadoCredito)) return false;
+          if (normaliza(doc.asignadoA) !== normaliza(usuarioNombre)) return false;
+          return true;
         });
 
-        // Globales (de la agencia)
-        docsPermitidosGlobal = docsFiltrados;
-
-        // Detalle: sólo usuario logueado
-        creditosData = docsFiltrados.filter(doc => normaliza(doc.asignadoA) === normaliza(usuarioNombre));
-
         renderEncabezadoAgencia();
-        renderCreditos();
-        renderResumenGlobal();
-        renderResumenPorUsuario();
-        renderResumenLinea();
+        renderKPIsUsuario();
+        renderResumenLinea();     // por tipo de crédito, pero SOLO del usuario
+        renderTablaDetalle();     // detalle SOLO del usuario
       } catch (err) {
         document.getElementById('resultados').innerHTML = '<div style="color:#f44; text-align:center">Error al cargar datos</div>';
         console.error(err);
@@ -108,10 +109,97 @@
       el.textContent = usuarioAgencia ? `Agencia: ${usuarioAgencia}` : 'Agencia: —';
     }
 
-    function renderCreditos() {
+    // === KPIs (SOLO usuario logueado) ===
+    function renderKPIsUsuario() {
+      const wrap = document.getElementById('resumen-global');
+
+      // Peso de tu cartera = suma de saldoActual de tus créditos
+      const pesoUsuario = docsUsuario.reduce((s,d)=> s + toNum(d.saldoActual), 0);
+
+      // Clientes únicos
+      const clienteKey = (d) => (d.clienteID || d.numeroDui || ((d.nombre||'') + ' ' + (d.apellido||''))).toString();
+      const clientesSet = new Set(docsUsuario.map(clienteKey));
+
+      wrap.innerHTML = `
+        <h2 class="subtitulo">Tus KPIs (solo usuario logueado)</h2>
+        <div class="cards-row">
+          <div class="card kpi">
+            <div class="kpi-title">Peso de tu Cartera</div>
+            <div class="kpi-value">$${pesoUsuario.toFixed(2)}</div>
+            <div class="kpi-sub">Estados: Activo, Mora Temprana, Mora Moderada, Mora Severa, Riesgo Alto, Cobro Judicial</div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-title">Tus Clientes</div>
+            <div class="kpi-value">${clientesSet.size}</div>
+            <div class="kpi-sub">Únicos en período</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // === Resumen por Tipo de Crédito (SOLO usuario) ===
+    function renderResumenLinea() {
+      const cont = document.getElementById('resumen-linea');
+      if (!docsUsuario.length) {
+        cont.innerHTML = '';
+        return;
+      }
+      const total = docsUsuario.reduce((s,d)=> s + toNum(d.montoAprobado), 0);
+      const mapa = new Map();
+      docsUsuario.forEach(d => {
+        const k = (d.lineaDeCredito || '—').toString().trim();
+        if (!mapa.has(k)) mapa.set(k, { count: 0, monto: 0 });
+        const o = mapa.get(k);
+        o.count += 1;
+        o.monto += toNum(d.montoAprobado);
+      });
+
+      const filas = Array.from(mapa.entries())
+        .map(([k, v]) => ({
+          linea: k,
+          cantidad: v.count,
+          monto: v.monto,
+          pct: total > 0 ? (v.monto / total) * 100 : 0
+        }))
+        .sort((a,b)=> b.monto - a.monto);
+
+      let html = `
+        <h2 class="subtitulo">Resumen por Tipo de Crédito (tú)</h2>
+        <div class="tabla-scroll">
+          <table class="tabla-resumen">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Cantidad</th>
+                <th>Monto Total</th>
+                <th>% del Total</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      filas.forEach(f => {
+        html += `
+          <tr>
+            <td>${f.linea}</td>
+            <td style="text-align:right;">${f.cantidad}</td>
+            <td style="text-align:right;">$${f.monto.toFixed(2)}</td>
+            <td style="text-align:right;">${f.pct.toFixed(1)}%</td>
+          </tr>
+        `;
+      });
+      html += `
+            </tbody>
+          </table>
+        </div>
+      `;
+      cont.innerHTML = html;
+    }
+
+    // === Detalle (SOLO usuario) ===
+    function renderTablaDetalle() {
       const contenedor = document.getElementById('resultados');
-      if (!creditosData.length) {
-        contenedor.innerHTML = `<div style="text-align:center;color:#fff7">No hay créditos en el rango seleccionado para tu usuario en esta agencia.</div>`;
+      if (!docsUsuario.length) {
+        contenedor.innerHTML = `<div style="text-align:center;color:#fff7">No hay créditos en el rango seleccionado para tu usuario.</div>`;
         document.getElementById("btn-imprimir")?.classList.add("oculto");
         document.getElementById("btn-pdf")?.classList.add("oculto");
         return;
@@ -138,7 +226,7 @@
         </thead>
         <tbody>
       `;
-      creditosData.forEach(doc => {
+      docsUsuario.forEach(doc => {
         totalGeneral += toNum(doc.montoAprobado);
         html += `
           <tr>
@@ -173,166 +261,10 @@
       document.getElementById("btn-pdf")?.classList.remove("oculto");
     }
 
-    // === Resumen Global (tarjetas) ===
-    function renderResumenGlobal() {
-      const wrap = document.getElementById('resumen-global');
-
-      const pesoGlobal = docsPermitidosGlobal.reduce((s, d) => s + toNum(d.saldoActual), 0);
-      const misDocs   = docsPermitidosGlobal.filter(d => normaliza(d.asignadoA) === normaliza(usuarioNombre));
-      const miPeso    = misDocs.reduce((s, d) => s + toNum(d.saldoActual), 0);
-
-      const clienteKey = (d) => (d.clienteID || d.numeroDui || ((d.nombre||'') + ' ' + (d.apellido||''))).toString();
-      const totalClientesSet = new Set(docsPermitidosGlobal.map(clienteKey));
-      const misClientesSet   = new Set(misDocs.map(clienteKey));
-
-      wrap.innerHTML = `
-        <h2 class="subtitulo">Datos Globales — ${usuarioAgencia}</h2>
-        <div class="cards-row">
-          <div class="card kpi">
-            <div class="kpi-title">Peso de la Cartera (Agencia)</div>
-            <div class="kpi-value">$${pesoGlobal.toFixed(2)}</div>
-            <div class="kpi-sub">Estados: Activo + Mora Temprana</div>
-          </div>
-          <div class="card kpi">
-            <div class="kpi-title">Clientes (Agencia)</div>
-            <div class="kpi-value">${totalClientesSet.size}</div>
-            <div class="kpi-sub">Únicos en periodo</div>
-          </div>
-          <div class="card kpi">
-            <div class="kpi-title">Tu Cartera</div>
-            <div class="kpi-value">$${miPeso.toFixed(2)}</div>
-            <div class="kpi-sub">Asignado a: ${usuarioNombre}</div>
-          </div>
-          <div class="card kpi">
-            <div class="kpi-title">Tus Clientes</div>
-            <div class="kpi-value">${misClientesSet.size}</div>
-            <div class="kpi-sub">Únicos en periodo</div>
-          </div>
-        </div>
-      `;
-    }
-
-    // === Resumen Por Usuario (tabla) ===
-    function renderResumenPorUsuario() {
-      const cont = document.getElementById('resumen-por-usuario');
-      if (!docsPermitidosGlobal.length) {
-        cont.innerHTML = '';
-        return;
-      }
-
-      const mapa = new Map();
-      const clienteKey = (d) => (d.clienteID || d.numeroDui || ((d.nombre||'') + ' ' + (d.apellido||''))).toString();
-
-      docsPermitidosGlobal.forEach(d => {
-        const user = (d.asignadoA || '—').toString().trim();
-        if (!mapa.has(user)) mapa.set(user, { peso: 0, clientes: new Set() });
-        const obj = mapa.get(user);
-        obj.peso += toNum(d.saldoActual);
-        obj.clientes.add(clienteKey(d));
-      });
-
-      const filas = Array.from(mapa.entries())
-        .map(([user, datos]) => ({
-          user,
-          peso: datos.peso,
-          clientes: datos.clientes.size
-        }))
-        .sort((a,b)=> b.peso - a.peso);
-
-      let html = `
-        <h2 class="subtitulo">Resumen por Usuario (asignadoA) — ${usuarioAgencia}</h2>
-        <div class="tabla-scroll">
-          <table class="tabla-resumen">
-            <thead>
-              <tr>
-                <th>Usuario</th>
-                <th># Clientes</th>
-                <th>Peso de Cartera</th>
-              </tr>
-            </thead>
-            <tbody>
-      `;
-      filas.forEach(f => {
-        html += `
-          <tr>
-            <td>${f.user}</td>
-            <td style="text-align:right;">${f.clientes}</td>
-            <td style="text-align:right;">$${f.peso.toFixed(2)}</td>
-          </tr>
-        `;
-      });
-      html += `
-            </tbody>
-          </table>
-        </div>
-      `;
-      cont.innerHTML = html;
-    }
-
-    // === Resumen por Tipo de Crédito ===
-    function renderResumenLinea() {
-      const cont = document.getElementById('resumen-linea');
-      if (!docsPermitidosGlobal.length) {
-        cont.innerHTML = '';
-        return;
-      }
-      const total = docsPermitidosGlobal.reduce((s,d)=> s + toNum(d.montoAprobado), 0);
-      const mapa = new Map();
-      docsPermitidosGlobal.forEach(d => {
-        const k = (d.lineaDeCredito || '—').toString().trim();
-        if (!mapa.has(k)) mapa.set(k, { count: 0, monto: 0 });
-        const o = mapa.get(k);
-        o.count += 1;
-        o.monto += toNum(d.montoAprobado);
-      });
-
-      const filas = Array.from(mapa.entries())
-        .map(([k, v]) => ({
-          linea: k,
-          cantidad: v.count,
-          monto: v.monto,
-          pct: total > 0 ? (v.monto / total) * 100 : 0
-        }))
-        .sort((a,b)=> b.monto - a.monto);
-
-      let html = `
-        <h2 class="subtitulo">Resumen por Tipo de Crédito — ${usuarioAgencia}</h2>
-        <div class="tabla-scroll">
-          <table class="tabla-resumen">
-            <thead>
-              <tr>
-                <th>Tipo</th>
-                <th>Cantidad</th>
-                <th>Monto Total</th>
-                <th>% del Total</th>
-              </tr>
-            </thead>
-            <tbody>
-      `;
-      filas.forEach(f => {
-        html += `
-          <tr>
-            <td>${f.linea}</td>
-            <td style="text-align:right;">${f.cantidad}</td>
-            <td style="text-align:right;">$${f.monto.toFixed(2)}</td>
-            <td style="text-align:right;">${f.pct.toFixed(1)}%</td>
-          </tr>
-        `;
-      });
-      html += `
-            </tbody>
-          </table>
-        </div>
-      `;
-      cont.innerHTML = html;
-    }
-
     // === Imprimir ===
     function imprimirTabla() {
       const contenido = `
-        <h2>Datos Globales — ${usuarioAgencia}</h2>
         ${document.getElementById('resumen-global').innerHTML}
-        ${document.getElementById('resumen-por-usuario').innerHTML}
         ${document.getElementById('resumen-linea').innerHTML}
         ${document.getElementById('resultados').innerHTML}
       `;
@@ -364,7 +296,7 @@
 
     // === PDF ===
     async function descargarPDF() {
-      if (!docsPermitidosGlobal.length) return;
+      if (!docsUsuario.length) return;
 
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF('l', 'pt', 'a4');
@@ -379,22 +311,18 @@
       doc.text(`Usuario: ${usuarioEmail}`, 40, 78);
       doc.text(`Fecha de generación: ${fecha.toLocaleString('es-SV')}`, 40, 94);
 
-      const pesoGlobal = docsPermitidosGlobal.reduce((s, d) => s + toNum(d.saldoActual), 0);
-      const misDocs = docsPermitidosGlobal.filter(d => normaliza(d.asignadoA) === normaliza(usuarioNombre));
-      const miPeso  = misDocs.reduce((s, d) => s + toNum(d.saldoActual), 0);
+      // KPIs usuario
+      const pesoUsuario = docsUsuario.reduce((s,d)=> s + toNum(d.saldoActual), 0);
       const clienteKey = (d) => (d.clienteID || d.numeroDui || ((d.nombre||'') + ' ' + (d.apellido||''))).toString();
-      const totalClientesSet = new Set(docsPermitidosGlobal.map(clienteKey));
-      const misClientesSet   = new Set(misDocs.map(clienteKey));
+      const clientesSet = new Set(docsUsuario.map(clienteKey));
 
       doc.autoTable({
         head: [["Métrica","Valor"]],
         body: [
           ["Agencia", `${usuarioAgencia}`],
-          ["Peso de la Cartera (Agencia)", `$${pesoGlobal.toFixed(2)}`],
-          ["Clientes (Agencia)", `${totalClientesSet.size}`],
-          [`Tu Cartera (${usuarioNombre})`, `$${miPeso.toFixed(2)}`],
-          ["Tus Clientes", `${misClientesSet.size}`],
-          ["Estados incluidos", "Activo, Mora Temprana"]
+          ["Peso de tu Cartera", `$${pesoUsuario.toFixed(2)}`],
+          ["Tus Clientes", `${clientesSet.size}`],
+          ["Estados incluidos", "Activo, Mora Temprana, Mora Moderada, Mora Severa, Riesgo Alto, Cobro Judicial"]
         ],
         startY: 110,
         theme: 'striped',
@@ -402,30 +330,10 @@
         styles: { fontSize: 9, cellPadding: 3 }
       });
 
-      const mapa = new Map();
-      docsPermitidosGlobal.forEach(d => {
-        const user = (d.asignadoA || '—').toString().trim();
-        if (!mapa.has(user)) mapa.set(user, { peso: 0, clientes: new Set() });
-        const o = mapa.get(user);
-        o.peso += toNum(d.saldoActual);
-        o.clientes.add(clienteKey(d));
-      });
-      const filasUsuarios = Array.from(mapa.entries())
-        .map(([user, datos]) => [user, `${datos.clientes.size}`, `$${datos.peso.toFixed(2)}`])
-        .sort((a,b)=> parseFloat(b[2].replace(/[^0-9.]/g,'')) - parseFloat(a[2].replace(/[^0-9.]/g,'')));
-
-      doc.autoTable({
-        head: [["Usuario","# Clientes","Peso de Cartera"]],
-        body: filasUsuarios,
-        startY: doc.lastAutoTable.finalY + 12,
-        theme: 'striped',
-        headStyles: { fillColor: [13, 197, 185], textColor: [255,255,255], fontStyle: 'bold' },
-        styles: { fontSize: 9, cellPadding: 3 }
-      });
-
-      const totalMonto = docsPermitidosGlobal.reduce((s,d)=> s + toNum(d.montoAprobado), 0);
+      // Resumen por tipo (usuario)
+      const totalMonto = docsUsuario.reduce((s,d)=> s + toNum(d.montoAprobado), 0);
       const mapaLinea = new Map();
-      docsPermitidosGlobal.forEach(d => {
+      docsUsuario.forEach(d => {
         const k = (d.lineaDeCredito || '—').toString().trim();
         if (!mapaLinea.has(k)) mapaLinea.set(k, { count: 0, monto: 0 });
         const o = mapaLinea.get(k);
@@ -445,10 +353,11 @@
         styles: { fontSize: 9, cellPadding: 3 }
       });
 
+      // Detalle (usuario)
       const head = [[
         "Fecha", "Agencia", "Cliente", "DUI", "Monto", "Línea", "Frecuencia", "Cuotas", "Cuota", "Tasa %", "Estado"
       ]];
-      const body = creditosData.map(d => [
+      const body = docsUsuario.map(d => [
         formatFecha(d._fechaObj),
         d.agenciaAsignada ?? '-',
         (d.nombre ?? '') + ' ' + (d.apellido ?? ''),
@@ -461,7 +370,7 @@
         d.tasaAnualCredito ?? '-',
         d.estadoCredito ?? '-'
       ]);
-      let totalUsuario = creditosData.reduce((s, d) => s + toNum(d.montoAprobado), 0);
+      let totalUsuario = docsUsuario.reduce((s, d) => s + toNum(d.montoAprobado), 0);
 
       doc.autoTable({
         head,
@@ -496,8 +405,7 @@
       onAuthStateChanged(auth, async user => {
         if (!user) return location.href = "login.html";
 
-        // === Tomar agencia como en tu ejemplo: users/{uid}.department ===
-        // Buscamos por id de documento == uid
+        // users/{uid} => department (agencia) y nombre (para asignadoA)
         const usersRef = collection(db, "users");
         const qUser = query(usersRef, where("__name__", "==", user.uid));
         const snap = await getDocs(qUser);
@@ -507,13 +415,13 @@
           return;
         }
         const data = snap.docs[0].data();
-        usuarioNombre = (data.nombre || '').toString().trim();
-        usuarioAgencia = (data.department || '').toString().trim(); // <- campo de tu ejemplo
+        usuarioNombre  = (data.nombre || '').toString().trim();
+        usuarioAgencia = (data.department || '').toString().trim();
 
         document.getElementById("usuario-nombre").textContent = user.email;
         renderEncabezadoAgencia();
 
-        // ==== FIX FECHAS: poner YYYY-MM-DD correctamente ====
+        // Fechas correctas YYYY-MM-DD
         const now = new Date();
         const mm = String(now.getMonth()+1).padStart(2,'0');
         const dd = String(now.getDate()).padStart(2,'0');
@@ -720,16 +628,13 @@
       </div>
     </div>
 
-    <!-- Tarjetas Globales (de la misma agencia) -->
+    <!-- KPIs (solo usuario) -->
     <div id="resumen-global"></div>
 
-    <!-- Resumen por Usuario (de la misma agencia) -->
-    <div id="resumen-por-usuario"></div>
-
-    <!-- Resumen por Tipo de Crédito (de la misma agencia) -->
+    <!-- Resumen por Tipo (solo usuario) -->
     <div id="resumen-linea"></div>
 
-    <!-- Detalle (tabla del usuario logueado) -->
+    <!-- Detalle (solo usuario) -->
     <div id="resultados"></div>
 
     <button id="btn-imprimir" class="oculto"><i class="fas fa-print"></i> Imprimir</button>
@@ -737,6 +642,7 @@
   </div>
 </body>
 </html>
+
 
 
 

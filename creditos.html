@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Créditos Migrados — Tablero</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0f1216;--card:#161a20;--muted:#9aa4b2;--text:#e9eef5;
+      --brand:#f8af40;--ok:#22c55e;--err:#ef4444;--blue:#3b82f6;--radius:16px
+    }
+    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+    body{margin:0;background:linear-gradient(180deg,#0d0f13,#11151b);color:var(--text)}
+    header{position:sticky;top:0;background:rgba(15,18,22,.8);backdrop-filter:saturate(140%) blur(6px);border-bottom:1px solid #22262d;z-index:10}
+    header .wrap{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:14px 20px}
+    .logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.3px}
+    .logo .dot{width:12px;height:12px;border-radius:999px;background:var(--brand)}
+    .container{max-width:1160px;margin:22px auto;padding:0 16px 60px}
+    .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+    .card{background:var(--card);border:1px solid #232833;border-radius:var(--radius);padding:18px}
+    h2{margin:0 0 8px 0;font-size:20px}
+    h3{margin:14px 0 8px 0;font-size:16px;color:#c9d2df}
+    .muted{color:var(--muted);font-size:13px}
+    .pill{padding:3px 10px;border-radius:999px;background:#202635;border:1px solid #2c3445;font-size:12px;color:#cfe2ff}
+    .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    .controls input[type="date"]{background:#0f1318;color:var(--text);border:1px solid #273041;border-radius:10px;padding:8px 10px}
+    .controls .btn{background:#1d2939;color:#e9eef5;border:1px solid #2a3444;border-radius:10px;padding:8px 12px;font-weight:600;cursor:pointer}
+    .controls .btn.primary{background:var(--brand);border-color:#c6892b;color:#1a1206}
+    .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .chip{padding:6px 10px;border-radius:999px;border:1px solid #2b3241;background:#121721;font-size:12px;cursor:pointer;user-select:none}
+    .chip.active{background:#1e293b;border-color:#334155}
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .kpi{background:#0f1318;border:1px solid #273041;border-radius:14px;padding:16px}
+    .kpi h4{margin:0 0 10px 0;color:#cfe2ff}
+    .kpi .big{font-size:28px;font-weight:800}
+    .kpi .mini{color:#9fb3d1;font-size:12px}
+    table{width:100%;border-collapse:collapse}
+    th,td{font-size:13px;padding:8px;border-bottom:1px solid #263144;vertical-align:top}
+    th{color:#c9d2df;text-align:left}
+    .tag{display:inline-flex;align-items:center;gap:6px;background:#141a22;border:1px solid #263144;color:#b9c3d0;border-radius:999px;padding:4px 8px;font-size:12px}
+    .warn{background:#2e1b10;border:1px solid #3c2817;color:#ffd9b3;border-radius:12px;padding:10px;margin-top:10px}
+    .ok{color:#b7ffd0}
+    .err{color:#ffd0d0}
+    .switch{display:flex;gap:10px;align-items:center;margin-top:6px}
+    .switch input{margin-right:6px}
+    .checkboxes{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+    .checkboxes label{background:#0f1318;border:1px solid #273041;border-radius:10px;padding:6px 10px;font-size:13px;display:flex;gap:8px;align-items:center}
+    .footerNote{color:#99a8bf;font-size:12px;margin-top:6px}
+    @media (max-width:840px){.grid-3{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="logo"><span class="dot"></span> Créditos Migrados — Tablero</div>
+      <div class="muted">Solo uso interno</div>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Filtros -->
+    <div class="card">
+      <h2>Filtros</h2>
+      <div class="muted">Cuenta únicamente <b>créditos migrados</b>. Por defecto se identifican por <span class="pill">agenciaAsignada ∈ { Juayúa, Chalchuapa, Ahuachapán }</span>. Puedes ajustar la lista o activar el modo automático (detecta flags <code>origen:"Migracion"</code> / <code>migrado:true</code> si existen).</div>
+      <div class="row" style="margin-top:10px">
+        <div class="col-12">
+          <div class="controls">
+            <label class="tag">Día:</label>
+            <input id="day" type="date"/>
+            <button class="btn" id="btnHoy">Hoy</button>
+            <button class="btn" id="btn7">Últimos 7</button>
+            <button class="btn" id="btn14">Últimos 14</button>
+            <button class="btn primary" id="btnRefrescar">Refrescar</button>
+          </div>
+
+          <div class="switch">
+            <input type="checkbox" id="autoMode"/>
+            <label for="autoMode">Modo automático (usa <code>origen/migrado</code> si está disponible, si no, cae a agencias)</label>
+          </div>
+
+          <h3 style="margin-top:14px">Agencias consideradas “Migración”</h3>
+          <div class="checkboxes" id="agenciasBox"></div>
+          <div class="footerNote">Puedes marcar/desmarcar las agencias que quieras considerar “migradas”.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="row" style="margin-top:12px">
+      <div class="col-12 grid-3">
+        <div class="kpi">
+          <h4>Migrados — Hoy</h4>
+          <div class="big" id="kpiHoy">—</div>
+          <div class="mini" id="kpiHoyAgencias">—</div>
+        </div>
+        <div class="kpi">
+          <h4>Total Migrados</h4>
+          <div class="big" id="kpiTotal">—</div>
+          <div class="mini" id="kpiTotalAgencias">—</div>
+        </div>
+        <div class="kpi">
+          <h4>Agencias (hoy)</h4>
+          <div id="kpiPorAgencia" class="mini">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tendencia últimos días -->
+    <div class="card" style="margin-top:12px">
+      <h2>Tendencia — Últimos 14 días</h2>
+      <div class="muted">Conteo diario de créditos migrados.</div>
+      <div class="table-wrap" style="margin-top:10px">
+        <table id="tablaTrend">
+          <thead>
+            <tr><th>Fecha</th><th>Migrados</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="trendWarn" class="warn" style="display:none"></div>
+    </div>
+
+    <!-- Detalle de hoy -->
+    <div class="card" style="margin-top:12px">
+      <h2>Detalle de hoy</h2>
+      <div class="muted">Créditos migrados en la fecha seleccionada.</div>
+      <div class="table-wrap" style="margin-top:10px">
+        <table id="tablaHoy">
+          <thead>
+            <tr><th>#</th><th>CreditoID</th><th>ClienteID</th><th>Agencia</th><th>Estado</th><th>Fecha base</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="detalleWarn" class="warn" style="display:none"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    /* ================= Firebase SDK ================= */
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+    import {
+      getFirestore, collection, query, where, orderBy, startAt, endAt, limit,
+      getDocs, getCountFromServer, Timestamp, doc, getDoc
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    /* ============== Utilidades de fecha (El Salvador) ============== */
+    const TZ = 'America/El_Salvador';
+    function toLocalParts(d=new Date()){
+      const p = new Intl.DateTimeFormat('en-CA', {
+        timeZone: TZ, year:'numeric', month:'2-digit', day:'2-digit',
+        hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
+      }).formatToParts(d).reduce((a,p)=> (a[p.type]=p.value, a), {});
+      return p; // {year, month, day, hour, minute, second}
+    }
+    function startOfDayLocal(d=new Date()){
+      const p = toLocalParts(d);
+      return new Date(`${p.year}-${p.month}-${p.day}T00:00:00`);
+    }
+    function endOfDayLocal(d=new Date()){
+      const p = toLocalParts(d);
+      return new Date(`${p.year}-${p.month}-${p.day}T23:59:59.999`);
+    }
+    function ymd(d){
+      const p = toLocalParts(d);
+      return `${p.year}-${p.month}-${p.day}`;
+    }
+
+    /* ============== Config / Estado UI ============== */
+    const DEFAULT_AGENCIAS = ["Juayúa", "Chalchuapa", "Ahuachapán"];
+    const state = {
+      agencias: new Set(DEFAULT_AGENCIAS),
+      autoMode: false, // intenta usar flags (origen/migrado), si no, cae a agencias
+      day: ymd(new Date()),
+    };
+
+    const $ = s => document.querySelector(s);
+    function setHoy(){ $('#day').value = ymd(new Date()); state.day = $('#day').value; }
+    function setNdays(n){
+      // solo mueve el selector de día al de hoy; la tendencia igual muestra n días
+      setHoy(); renderAll(n);
+    }
+
+    /* ============== Detección “migrado” ============== */
+    function isMigradoByFlags(c){
+      const o = (c.origen || c.source || '').toLowerCase();
+      return c.migrado === true || o === 'migracion' || o === 'migración';
+    }
+    function isMigrado(c){
+      // si autoMode y el doc tiene flags -> usa flags
+      if (state.autoMode && isMigradoByFlags(c)) return true;
+      // si no hay flags, considera la agencia
+      return state.agencias.has((c.agenciaAsignada || '').trim());
+    }
+
+    // Fecha base para agrupar/filtrar (preferimos serverTimestamp de creación)
+    function pickDateField(c){
+      // orden preferente: fechaUltimoCalculoIntereses (la ponemos al crear el crédito)
+      // fallback: ultimaActualizacion, fechaInicio
+      return c.fechaUltimoCalculoIntereses || c.ultimaActualizacion || c.fechaInicio || null;
+    }
+    function toDateValue(v){
+      if (!v) return null;
+      // Firestore Timestamp
+      if (typeof v === 'object' && typeof v.toDate === 'function') return v.toDate();
+      if (typeof v === 'object' && v.seconds) return new Date(v.seconds * 1000);
+      // ISO string o 'YYYY-MM-DD'
+      const d = new Date(v);
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    /* ============== Firestore helpers ============== */
+    function qBaseAgencias(){
+      // base query solo por agencias (eficiente y sin OR)
+      const arr = Array.from(state.agencias);
+      if (!arr.length) {
+        // Si no hay agencias seleccionadas, devolvemos query a toda la colección (se filtra en cliente)
+        return collection(db, 'creditos');
+      }
+      // Nota: 'in' admite hasta 10 valores
+      return query(collection(db, 'creditos'), where('agenciaAsignada', 'in', arr));
+    }
+
+    async function safeCount(q){
+      try{
+        const snap = await getCountFromServer(q);
+        return snap.data().count || 0;
+      }catch(e){
+        // Fallback: leer docs y contar (costo mayor, pero robusto)
+        const docs = await getDocs(q);
+        return docs.size;
+      }
+    }
+
+    async function getDocsFilteredByDay(dayDate){
+      const start = startOfDayLocal(dayDate);
+      const end   = endOfDayLocal(dayDate);
+      // Intento 1: si la mayoría trae fechaUltimoCalculoIntereses timestamp, uso rango + agencias
+      let qb = qBaseAgencias();
+      try{
+        qb = query(
+          collection(db, 'creditos'),
+          where('agenciaAsignada', 'in', Array.from(state.agencias)),
+          where('fechaUltimoCalculoIntereses', '>=', Timestamp.fromDate(start)),
+          where('fechaUltimoCalculoIntereses', '<=', Timestamp.fromDate(end))
+        );
+        const snap = await getDocs(qb);
+        // Filtrado final por flags/agencias en cliente
+        return snap.docs.map(d=>({id:d.id, ...d.data()})).filter(isMigrado)
+                        .filter(c => {
+                          const dt = toDateValue(pickDateField(c));
+                          return dt && dt >= start && dt <= end;
+                        });
+      }catch(e){
+        // Fallback: solo agencias, sin rango (filtramos local por fecha)
+        const snap = await getDocs(qBaseAgencias());
+        return snap.docs.map(d=>({id:d.id, ...d.data()})).filter(isMigrado)
+                        .filter(c => {
+                          const dt = toDateValue(pickDateField(c));
+                          return dt && dt >= start && dt <= end;
+                        });
+      }
+    }
+
+    async function countToday(){
+      const dayDate = $('#day').value ? new Date($('#day').value) : new Date();
+      const start = startOfDayLocal(dayDate);
+      const end   = endOfDayLocal(dayDate);
+
+      // Query por rango + agencias para count (rápido). Si falla, fallback con getDocsFilteredByDay
+      try{
+        const qb = query(
+          collection(db, 'creditos'),
+          where('agenciaAsignada', 'in', Array.from(state.agencias)),
+          where('fechaUltimoCalculoIntereses', '>=', Timestamp.fromDate(start)),
+          where('fechaUltimoCalculoIntereses', '<=', Timestamp.fromDate(end))
+        );
+        const rawCount = await safeCount(qb);
+
+        // Aún así filtramos por flags si autoMode y por fecha base robusta
+        const docs = await getDocs(qb);
+        const filtered = docs.docs.map(d=>({id:d.id, ...d.data()}))
+          .filter(isMigrado)
+          .filter(c => {
+            const dt = toDateValue(pickDateField(c));
+            return dt && dt >= start && dt <= end;
+          });
+
+        return {count: filtered.length, list: filtered};
+      }catch(e){
+        const list = await getDocsFilteredByDay(dayDate);
+        return {count: list.length, list};
+      }
+    }
+
+    async function countTotalMigrados(){
+      // Conteo total por agencias; si autoMode y hay flags, igual filtramos en cliente
+      try{
+        const qb = qBaseAgencias();
+        const docs = await getDocs(qb);
+        const filtered = docs.docs.map(d=>({id:d.id, ...d.data()})).filter(isMigrado);
+        return filtered.length;
+      }catch(e){
+        // Fallback a toda la colección (solo si no hay agencias)
+        const snap = await getDocs(collection(db, 'creditos'));
+        return snap.docs.map(d=>({id:d.id, ...d.data()})).filter(isMigrado).length;
+      }
+    }
+
+    async function trendLastNDays(n=14){
+      const out = [];
+      const today = $('#day').value ? new Date($('#day').value) : new Date();
+      const base = startOfDayLocal(today);
+      for(let i=0;i<n;i++){
+        const d = new Date(base); d.setDate(base.getDate() - (n-1-i));
+        const list = await getDocsFilteredByDay(d);
+        out.push({ date: ymd(d), count: list.length });
+      }
+      return out;
+    }
+
+    /* ============== UI: Agencias ============== */
+    const AGENCIAS_PRESET = ["Juayúa","Chalchuapa","Ahuachapán","Sonsonate","Santa Ana","Ahuachapan","Ataco","Nahuizalco"];
+    function renderAgenciasBox(){
+      const box = $('#agenciasBox');
+      box.innerHTML = '';
+      AGENCIAS_PRESET.forEach(a=>{
+        const id = 'ag_'+a.replace(/\s+/g,'_');
+        const checked = state.agencias.has(a) ? 'checked' : '';
+        const el = document.createElement('label');
+        el.innerHTML = `<input type="checkbox" id="${id}" ${checked}/> ${a}`;
+        box.appendChild(el);
+        el.querySelector('input').addEventListener('change', (e)=>{
+          if (e.target.checked) state.agencias.add(a); else state.agencias.delete(a);
+        });
+      });
+    }
+
+    /* ============== Render principal ============== */
+    function fmtMiniAgencias(){
+      const arr = Array.from(state.agencias);
+      return arr.length ? arr.join(', ') : 'Todas (filtro por flags si auto)';
+    }
+
+    function renderKpiPorAgencia(list){
+      const map = {};
+      list.forEach(c=>{
+        const ag = (c.agenciaAsignada || '—').trim();
+        map[ag] = (map[ag]||0) + 1;
+      });
+      const items = Object.entries(map).sort((a,b)=>b[1]-a[1])
+                    .map(([ag, n])=> `<span class="tag">${ag}: <b>${n}</b></span>`).join(' ');
+      $('#kpiPorAgencia').innerHTML = items || '—';
+    }
+
+    function renderTablaHoy(list){
+      const tb = $('#tablaHoy tbody');
+      tb.innerHTML = '';
+      list.forEach((c,i)=>{
+        const dt = toDateValue(pickDateField(c));
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i+1}</td>
+          <td>${c.creditoID || c.id || '—'}</td>
+          <td>${c.clienteID || '—'}</td>
+          <td>${c.agenciaAsignada || '—'}</td>
+          <td>${c.estadoCredito || '—'}</td>
+          <td>${dt ? ymd(dt) : '—'}</td>
+        `;
+        tb.appendChild(tr);
+      });
+    }
+
+    function renderTrendTable(rows){
+      const tb = $('#tablaTrend tbody');
+      tb.innerHTML = '';
+      rows.slice().reverse().forEach(r=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${r.date}</td><td>${r.count}</td>`;
+        tb.appendChild(tr);
+      });
+    }
+
+    async function renderAll(nTrend=14){
+      $('#trendWarn').style.display = 'none';
+      $('#detalleWarn').style.display = 'none';
+
+      // KPIs
+      const {count: hoyCount, list: hoyList} = await countToday();
+      const total = await countTotalMigrados();
+
+      $('#kpiHoy').textContent = hoyCount;
+      $('#kpiTotal').textContent = total;
+      $('#kpiHoyAgencias').textContent = 'Agencias: ' + fmtMiniAgencias();
+      $('#kpiTotalAgencias').textContent = 'Agencias: ' + fmtMiniAgencias();
+
+      renderKpiPorAgencia(hoyList);
+      renderTablaHoy(hoyList);
+
+      try{
+        const trend = await trendLastNDays(nTrend);
+        renderTrendTable(trend);
+      }catch(e){
+        $('#trendWarn').style.display = '';
+        $('#trendWarn').textContent = 'No se pudo calcular la tendencia con agregaciones. Se requiere índice o hay pocos datos. Intenta de nuevo.';
+      }
+    }
+
+    /* ============== Eventos UI ============== */
+    onAuthStateChanged(auth, user=>{
+      if (!user) {
+        // Si tu app requiere login, redirige:
+        // window.location.href = 'login.html';
+        // Para pruebas locales, seguimos:
+      }
+      // Init UI
+      renderAgenciasBox();
+      setHoy();
+
+      $('#btnHoy').addEventListener('click', ()=> { setHoy(); renderAll(); });
+      $('#btn7').addEventListener('click', ()=> setNdays(7));
+      $('#btn14').addEventListener('click', ()=> setNdays(14));
+      $('#btnRefrescar').addEventListener('click', ()=> renderAll());
+
+      $('#day').addEventListener('change', (e)=> { state.day = e.target.value; renderAll(); });
+      $('#autoMode').addEventListener('change', (e)=> { state.autoMode = e.target.checked; renderAll(); });
+
+      renderAll();
+    });
+  </script>
+</body>
+</html>

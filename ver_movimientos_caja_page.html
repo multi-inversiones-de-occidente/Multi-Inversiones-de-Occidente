@@ -67,7 +67,7 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // ===== Helpers de fecha/seguridad =====
+    // ===== Helpers =====
     function formatFecha(date) {
       return date.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
@@ -76,7 +76,6 @@
       if (x instanceof Date) return x;
       if (x?.toDate) return x.toDate();            // Firestore Timestamp
       if (typeof x === 'string') {
-        // Intenta parsear ISO; si falla, devuelve null
         const d = new Date(x);
         return isNaN(d.getTime()) ? null : d;
       }
@@ -95,12 +94,13 @@
     let now = new Date();
     let selectedDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
     let agenciaActual = "";
+    let flagEsCierre = false; // Para imprimir aviso
 
     function renderFecha() {
       document.getElementById("fecha-label").textContent = "Fecha: " + formatFecha(selectedDate);
     }
 
-    // ===== Lee el cierre inmediatamente anterior (para saldo_anterior en modo "en vivo")
+    // ===== Saldo anterior (último cierre previo) para modo en vivo
     async function obtenerSaldoAnterior(agencia, fecha) {
       try {
         const cierresRef = collection(db, "cierres_caja");
@@ -117,11 +117,11 @@
           const d = snap.docs[0].data();
           return num((d.saldo_siguiente ?? d.saldo_caja), 0);
         }
-      } catch (e) { /* noop: si falla, regresamos 0 */ }
+      } catch (e) {}
       return 0;
     }
 
-    // ===== NUEVO: busca el cierre exacto del día
+    // ===== Busca el cierre exacto del día
     async function buscarCierreDelDia(agencia, fechaDate) {
       try {
         const fechaStr = fechaDate.toISOString().slice(0,10);
@@ -133,7 +133,7 @@
         );
         const snap = await getDocs(qy);
         if (!snap.empty) return snap.docs[0].data();
-      } catch (e) { /* si falla, retorna null y seguimos en vivo */ }
+      } catch (e) {}
       return null;
     }
 
@@ -142,20 +142,21 @@
       const totalDiv = document.getElementById("total-caja");
       listDiv.innerHTML = "Cargando...";
       totalDiv.textContent = "";
+      flagEsCierre = false;
 
-      // Detectar agencia del usuario
+      // Agencia del usuario
       if (!agenciaActual) {
         try {
           const usrSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
           if (!usrSnap.empty) agenciaActual = usrSnap.docs[0].data().department || "";
-        } catch (e) { /* noop */ }
+        } catch (e) {}
       }
       if (!agenciaActual) {
         listDiv.innerHTML = `<div class="empty-msg">Tu usuario no tiene agencia asignada.</div>`;
         return;
       }
 
-      // Rangos del día (Date, ISO y Timestamp)
+      // Rango del día
       const y = selectedDate.getFullYear(), m = selectedDate.getMonth(), d = selectedDate.getDate();
       const startOfDay = new Date(y, m, d, 0, 0, 0, 0);
       const endOfDay   = new Date(y, m, d, 23, 59, 59, 999);
@@ -164,9 +165,11 @@
       const startTS  = Timestamp.fromDate(startOfDay);
       const endTS    = Timestamp.fromDate(endOfDay);
 
-      // ===== 1) Intentar usar CIERRE del día =====
+      // ===== 1) Intentar leer CIERRE del día
       const cierre = await buscarCierreDelDia(agenciaActual, selectedDate);
       if (cierre) {
+        flagEsCierre = true;
+
         const movimientos = (Array.isArray(cierre.movimientos) ? cierre.movimientos : []).map(m => ({
           tipo: m?.tipo || "",
           descripcion: m?.descripcion || "",
@@ -178,21 +181,18 @@
           cliente: (m?.origen === "pago") ? "Cliente" : ""
         }));
 
-        // Ordenar desc por hora
         movimientos.sort((a, b) => {
           const da = toDateAny(a.fecha)?.getTime() || 0;
           const dbb = toDateAny(b.fecha)?.getTime() || 0;
           return dbb - da;
         });
 
-        // Render encabezado/nota
         const infoHtml = `
           <div class="info-chip">
             Datos provenientes del <b>cierre</b>${cierre.fecha_cierre ? ` (realizado a las ${formatHoraAny(cierre.fecha_cierre)})` : ''}.
           </div>
         `;
 
-        // Render movimientos
         if (!movimientos.length) {
           listDiv.innerHTML = infoHtml + `<div class="empty-msg">No hay movimientos registrados en el cierre.</div>`;
         } else {
@@ -207,7 +207,6 @@
           `).join('');
         }
 
-        // Totales EXACTOS del cierre
         const saldoAnterior = num(cierre.saldo_inicial, 0);
         const totalIngresos = num(cierre.total_ingresos, 0);
         const totalEgresos  = num(cierre.total_egresos, 0);
@@ -220,14 +219,23 @@
           <div class="mov-sub" style="margin-bottom:4px;">Ingresos: $${totalIngresos.toFixed(2)} | Egresos: $${totalEgresos.toFixed(2)}</div>
           <div><b style="color:#fff;">Total de Caja: $${total.toFixed(2)}</b></div>
         `;
-        return; // Importante: no continuar al modo "en vivo"
+
+        // === Guardar totales en data-* para impresión segura
+        totalDiv.dataset.saldoAnterior = saldoAnterior.toFixed(2);
+        totalDiv.dataset.ingresos = totalIngresos.toFixed(2);
+        totalDiv.dataset.egresos = totalEgresos.toFixed(2);
+        totalDiv.dataset.total = total.toFixed(2);
+        totalDiv.dataset.esCierre = "1";
+        totalDiv.dataset.horaCierre = cierre.fecha_cierre ? formatHoraAny(cierre.fecha_cierre) : "";
+
+        return; // no seguir a modo en vivo
       }
 
-      // ===== 2) SIN CIERRE: construir “en vivo” como respaldo =====
+      // ===== 2) SIN CIERRE: reconstruir en vivo
       let movimientos = [];
       const correlativosSumados = new Set();
 
-      // 2.1 Movimientos manuales (dual Timestamp/ISO) en ambas colecciones
+      // Movimientos manuales en ambas colecciones (Timestamp/ISO)
       for (const collName of ["movimientosCaja", "movimientos_caja"]) {
         const qTS = query(
           collection(db, collName),
@@ -272,7 +280,7 @@
         }
       }
 
-      // 2.2 Pagos (normales y retroactivos) dual por fechaPago/fechaRegistro
+      // Pagos (normales y retroactivos) dual por fechaPago/fechaRegistro
       const pagosQ_TS = query(
         collection(db, "pagos"),
         where("sucursal", "==", agenciaActual),
@@ -325,7 +333,6 @@
         });
       });
 
-      // Orden y totales
       movimientos.sort((a, b) => {
         const da = toDateAny(a.fecha)?.getTime() || 0;
         const dbb = toDateAny(b.fecha)?.getTime() || 0;
@@ -340,7 +347,6 @@
       }
       const total = saldoAnterior + totalIngresos - totalEgresos;
 
-      // Render final
       if (!movimientos.length) {
         listDiv.innerHTML = `<div class="empty-msg">No hay movimientos registrados.</div>`;
       } else {
@@ -363,6 +369,14 @@
         <div class="mov-sub" style="margin-bottom:4px;">Ingresos: $${totalIngresos.toFixed(2)} | Egresos: $${totalEgresos.toFixed(2)}</div>
         <div><b style="color:#fff;">Total de Caja: $${total.toFixed(2)}</b></div>
       `;
+
+      // === Guardar totales en data-* para impresión segura
+      totalDiv.dataset.saldoAnterior = saldoAnterior.toFixed(2);
+      totalDiv.dataset.ingresos = totalIngresos.toFixed(2);
+      totalDiv.dataset.egresos = totalEgresos.toFixed(2);
+      totalDiv.dataset.total = total.toFixed(2);
+      totalDiv.dataset.esCierre = ""; // vacío => modo en vivo
+      totalDiv.dataset.horaCierre = "";
     }
 
     // ===== Selector de fecha
@@ -390,11 +404,37 @@
   </script>
 
   <script>
-    // ===== Impresión de Corte =====
+    // ===== Impresión de Corte (colores corregidos y TOTAL garantizado) =====
     document.getElementById("btn-imprimir-corte").onclick = function() {
       const fecha = document.getElementById("fecha-label").textContent || '';
       const movimientosHtml = document.getElementById("movimientos-list").innerHTML;
-      const totalHtml = document.getElementById("total-caja").innerHTML;
+      const totalBox = document.getElementById("total-caja");
+
+      // Normaliza colores para fondo blanco (evita texto blanco invisible)
+      let totalHtml = (totalBox.innerHTML || "").replace(/color:\s*#fff;?/gi, "color:#222;");
+
+      // Totales desde data-* (garantiza presencia explícita del TOTAL)
+      const saldoAnterior = totalBox.dataset.saldoAnterior || "";
+      const ingresos = totalBox.dataset.ingresos || "";
+      const egresos = totalBox.dataset.egresos || "";
+      const totalValue = Number(totalBox.dataset.total || NaN);
+      const esCierre = totalBox.dataset.esCierre === "1";
+      const horaCierre = totalBox.dataset.horaCierre || "";
+
+      const chipCierre = esCierre
+        ? `<div style="text-align:center;color:#00527c;margin:8px 0 0 0;font-weight:600;">
+             Datos provenientes del <b>cierre</b>${horaCierre ? ` (realizado a las ${horaCierre})` : ''}.
+           </div>`
+        : "";
+
+      const totalesHtmlSeguro = `
+        <div class="totales-corte">
+          ${chipCierre}
+          <div style="margin-top:10px;">${totalHtml}</div>
+          ${Number.isFinite(totalValue)
+            ? `<div style="margin-top:8px;font-size:1.18rem;"><b style="color:#222;">Total de Caja: $${totalValue.toFixed(2)}</b></div>`
+            : ``}
+        </div>`;
 
       const printHtml = `
         <html>
@@ -408,6 +448,7 @@
             .mov-title { font-weight: bold; font-size: 1.01rem; margin-bottom: 3px;}
             .mov-sub { font-size: .97rem; color: #333;}
             .totales-corte { font-size: 1.13rem; font-weight: bold; margin: 20px 0 18px 0; text-align: center;}
+            .totales-corte b { color:#222; }
             .firmas-corte { margin-top:52px; display:flex; justify-content:space-between; }
             .firma { width:47%; border-top:1.5px solid #222; text-align:center; padding-top:5px; font-size:1rem; }
           </style>
@@ -416,7 +457,7 @@
           <div class="header-corte">CORTE DE CAJA</div>
           <div class="fecha-corte">${fecha}</div>
           <div>${movimientosHtml}</div>
-          <div class="totales-corte">${totalHtml}</div>
+          ${totalesHtmlSeguro}
           <div class="firmas-corte">
             <div class="firma">Firma de Caja</div>
             <div class="firma">Firma de Gerente</div>
@@ -424,6 +465,7 @@
         </body>
         </html>
       `;
+
       const w = window.open('', '', 'width=900,height=800');
       if (!w) { alert('Bloqueador de ventanas emergentes activo. Permite pop-ups para imprimir.'); return; }
       w.document.write(printHtml);
@@ -433,6 +475,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 

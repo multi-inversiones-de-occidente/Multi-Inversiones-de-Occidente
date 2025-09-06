@@ -19,7 +19,8 @@
     .mov-title { font-weight: bold; font-size: 1.05rem; margin-bottom: 6px;}
     .mov-sub { font-size: .98rem; color: #8ae1fc;}
     .total-caja { margin-top: 14px; background: #101212; border-radius: 10px; text-align: center; padding: 18px; font-size: 1.32rem; font-weight: bold; color: #fff;}
-    .empty-msg { text-align:center; color:#ccc; padding: 32px 0;}
+    .empty-msg { text-align:center; color:#ccc; padding: 16px 0;}
+    .info-chip { text-align:center; color:#8ae1fc; margin: 6px 0 12px 0; font-size: .95rem; }
     .btn-main {
       width: 100%;
       background: #13b66b; color: #fff; font-size: 1.11rem; font-weight: bold;
@@ -48,10 +49,11 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import {
-      getFirestore, collection, query, where, getDocs, orderBy, limit, getDoc, doc as docRef, Timestamp
+      getFirestore, collection, query, where, getDocs, orderBy, limit, Timestamp
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
+    // ===== Firebase =====
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -65,21 +67,29 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // ===== Helpers de fecha =====
+    // ===== Helpers de fecha/seguridad =====
     function formatFecha(date) {
       return date.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
     function toDateAny(x) {
-      // Convierte Timestamp/Date/string ISO a Date
       if (!x) return null;
       if (x instanceof Date) return x;
-      if (x?.toDate) return x.toDate(); // Firestore Timestamp
-      return new Date(x);
+      if (x?.toDate) return x.toDate();            // Firestore Timestamp
+      if (typeof x === 'string') {
+        // Intenta parsear ISO; si falla, devuelve null
+        const d = new Date(x);
+        return isNaN(d.getTime()) ? null : d;
+      }
+      return null;
     }
     function formatHoraAny(x) {
       const d = toDateAny(x);
       if (!d || isNaN(d.getTime())) return "-";
       return d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true });
+    }
+    function num(x, fallback=0) {
+      const n = Number(x);
+      return Number.isFinite(n) ? n : fallback;
     }
 
     let now = new Date();
@@ -90,23 +100,41 @@
       document.getElementById("fecha-label").textContent = "Fecha: " + formatFecha(selectedDate);
     }
 
-    // Saldo anterior (igual que lo tenías)
+    // ===== Lee el cierre inmediatamente anterior (para saldo_anterior en modo "en vivo")
     async function obtenerSaldoAnterior(agencia, fecha) {
-      const cierresRef = collection(db, "cierres_caja");
-      const fechaStr = fecha.toISOString().slice(0,10);
-      const q = query(
-        cierresRef,
-        where("agencia", "==", agencia),
-        where("fecha", "<", fechaStr),
-        orderBy("fecha", "desc"),
-        limit(1)
-      );
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        const d = snap.docs[0].data();
-        return Number((d.saldo_siguiente ?? d.saldo_caja) || 0);
-      }
+      try {
+        const cierresRef = collection(db, "cierres_caja");
+        const fechaStr = fecha.toISOString().slice(0,10); // YYYY-MM-DD
+        const qy = query(
+          cierresRef,
+          where("agencia", "==", agencia),
+          where("fecha", "<", fechaStr),
+          orderBy("fecha", "desc"),
+          limit(1)
+        );
+        const snap = await getDocs(qy);
+        if (!snap.empty) {
+          const d = snap.docs[0].data();
+          return num((d.saldo_siguiente ?? d.saldo_caja), 0);
+        }
+      } catch (e) { /* noop: si falla, regresamos 0 */ }
       return 0;
+    }
+
+    // ===== NUEVO: busca el cierre exacto del día
+    async function buscarCierreDelDia(agencia, fechaDate) {
+      try {
+        const fechaStr = fechaDate.toISOString().slice(0,10);
+        const qy = query(
+          collection(db, "cierres_caja"),
+          where("agencia", "==", agencia),
+          where("fecha", "==", fechaStr),
+          limit(1)
+        );
+        const snap = await getDocs(qy);
+        if (!snap.empty) return snap.docs[0].data();
+      } catch (e) { /* si falla, retorna null y seguimos en vivo */ }
+      return null;
     }
 
     async function cargarMovimientos(user) {
@@ -115,17 +143,19 @@
       listDiv.innerHTML = "Cargando...";
       totalDiv.textContent = "";
 
-      // Detectar agencia
+      // Detectar agencia del usuario
       if (!agenciaActual) {
-        const docUser = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
-        if (!docUser.empty) agenciaActual = docUser.docs[0].data().department || "";
+        try {
+          const usrSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
+          if (!usrSnap.empty) agenciaActual = usrSnap.docs[0].data().department || "";
+        } catch (e) { /* noop */ }
       }
       if (!agenciaActual) {
         listDiv.innerHTML = `<div class="empty-msg">Tu usuario no tiene agencia asignada.</div>`;
         return;
       }
 
-      // Rango del día (Date, ISO y Timestamp para consultas duales)
+      // Rangos del día (Date, ISO y Timestamp)
       const y = selectedDate.getFullYear(), m = selectedDate.getMonth(), d = selectedDate.getDate();
       const startOfDay = new Date(y, m, d, 0, 0, 0, 0);
       const endOfDay   = new Date(y, m, d, 23, 59, 59, 999);
@@ -134,19 +164,77 @@
       const startTS  = Timestamp.fromDate(startOfDay);
       const endTS    = Timestamp.fromDate(endOfDay);
 
+      // ===== 1) Intentar usar CIERRE del día =====
+      const cierre = await buscarCierreDelDia(agenciaActual, selectedDate);
+      if (cierre) {
+        const movimientos = (Array.isArray(cierre.movimientos) ? cierre.movimientos : []).map(m => ({
+          tipo: m?.tipo || "",
+          descripcion: m?.descripcion || "",
+          monto: num(m?.monto, 0),
+          observaciones: "",
+          usuario: m?.usuario || "",
+          fecha: m?.fecha || null,
+          clase: (m?.tipo === "Ingreso") ? "mov-ingreso" : "mov-egreso",
+          cliente: (m?.origen === "pago") ? "Cliente" : ""
+        }));
+
+        // Ordenar desc por hora
+        movimientos.sort((a, b) => {
+          const da = toDateAny(a.fecha)?.getTime() || 0;
+          const dbb = toDateAny(b.fecha)?.getTime() || 0;
+          return dbb - da;
+        });
+
+        // Render encabezado/nota
+        const infoHtml = `
+          <div class="info-chip">
+            Datos provenientes del <b>cierre</b>${cierre.fecha_cierre ? ` (realizado a las ${formatHoraAny(cierre.fecha_cierre)})` : ''}.
+          </div>
+        `;
+
+        // Render movimientos
+        if (!movimientos.length) {
+          listDiv.innerHTML = infoHtml + `<div class="empty-msg">No hay movimientos registrados en el cierre.</div>`;
+        } else {
+          listDiv.innerHTML = infoHtml + movimientos.map(mov => `
+            <div class="mov-card ${mov.clase}">
+              <div class="mov-title">${mov.tipo} - ${mov.descripcion}</div>
+              <div class="mov-sub">Monto: $${mov.monto.toFixed(2)}</div>
+              <div class="mov-sub">Usuario: ${mov.usuario || '-'}</div>
+              ${mov.cliente ? `<div class="mov-sub">Cliente: ${mov.cliente}</div>` : ""}
+              <div class="mov-sub">Hora: ${formatHoraAny(mov.fecha)}</div>
+            </div>
+          `).join('');
+        }
+
+        // Totales EXACTOS del cierre
+        const saldoAnterior = num(cierre.saldo_inicial, 0);
+        const totalIngresos = num(cierre.total_ingresos, 0);
+        const totalEgresos  = num(cierre.total_egresos, 0);
+        const total = num((cierre.saldo_siguiente ?? cierre.saldo_caja ?? (saldoAnterior + totalIngresos - totalEgresos)), 0);
+
+        totalDiv.innerHTML = `
+          <div style="font-size:1.12rem;font-weight:400;margin-bottom:4px;">
+            <b style="color:#2ef37a;">Saldo Anterior: $${saldoAnterior.toFixed(2)}</b>
+          </div>
+          <div class="mov-sub" style="margin-bottom:4px;">Ingresos: $${totalIngresos.toFixed(2)} | Egresos: $${totalEgresos.toFixed(2)}</div>
+          <div><b style="color:#fff;">Total de Caja: $${total.toFixed(2)}</b></div>
+        `;
+        return; // Importante: no continuar al modo "en vivo"
+      }
+
+      // ===== 2) SIN CIERRE: construir “en vivo” como respaldo =====
       let movimientos = [];
       const correlativosSumados = new Set();
 
-      // ===== 1) MOVIMIENTOS MANUALES – dual (Timestamp o string ISO) en ambas colecciones =====
+      // 2.1 Movimientos manuales (dual Timestamp/ISO) en ambas colecciones
       for (const collName of ["movimientosCaja", "movimientos_caja"]) {
-        // a) Fecha tipo Timestamp
         const qTS = query(
           collection(db, collName),
           where("agencia", "==", agenciaActual),
           where("fecha", ">=", startTS),
           where("fecha", "<=", endTS)
         );
-        // b) Fecha tipo string ISO
         const qISO = query(
           collection(db, collName),
           where("agencia", "==", agenciaActual),
@@ -154,38 +242,37 @@
           where("fecha", "<=", endIso)
         );
 
-        // Ejecutar ambas y unir resultados
-        const [snapTS, snapISO] = await Promise.allSettled([getDocs(qTS), getDocs(qISO)]);
+        const [snapTSRes, snapISORes] = await Promise.allSettled([getDocs(qTS), getDocs(qISO)]);
         const packs = [];
-        if (snapTS.status === "fulfilled") packs.push(snapTS.value);
-        if (snapISO.status === "fulfilled") packs.push(snapISO.value);
+        if (snapTSRes.status === "fulfilled") packs.push(snapTSRes.value);
+        if (snapISORes.status === "fulfilled") packs.push(snapISORes.value);
 
         for (const pack of packs) {
           pack.forEach(doc => {
-            const d = doc.data();
+            const d = doc.data() || {};
             if (d.cierre === true) return;
             if ('anulado' in d && d.anulado === true) return;
-            if (d.descripcion && (d.descripcion.startsWith('Reversión de pago') || d.descripcion.startsWith('Reversión correlativo'))) return;
-
+            if (typeof d.descripcion === 'string' &&
+                (d.descripcion.startsWith('Reversión de pago') || d.descripcion.startsWith('Reversión correlativo'))) return;
             if (d.correlativo && correlativosSumados.has(d.correlativo)) return;
             if (d.correlativo) correlativosSumados.add(d.correlativo);
 
+            const tipo = d.tipo === "Egreso" ? "Egreso" : "Ingreso";
             movimientos.push({
-              tipo: d.tipo,
+              tipo,
               descripcion: d.descripcion || '',
-              monto: Number(d.monto || 0),
+              monto: num(d.monto, 0),
               observaciones: d.observaciones || '',
               usuario: d.usuario || '',
               fecha: d.fecha || d.createdAt || null,
-              clase: d.tipo === "Ingreso" ? "mov-ingreso" : "mov-egreso",
+              clase: tipo === "Ingreso" ? "mov-ingreso" : "mov-egreso",
               cliente: ""
             });
           });
         }
       }
 
-      // ===== 2) PAGOS – dual (fechaPago y fechaRegistro pueden ser Timestamp o string) =====
-      // a) Pagos normales por fechaPago
+      // 2.2 Pagos (normales y retroactivos) dual por fechaPago/fechaRegistro
       const pagosQ_TS = query(
         collection(db, "pagos"),
         where("sucursal", "==", agenciaActual),
@@ -198,8 +285,6 @@
         where("fechaPago", ">=", startIso),
         where("fechaPago", "<=", endIso)
       );
-
-      // b) Pagos retroactivos registrados hoy (fechaRegistro)
       const pagosR_TS = query(
         collection(db, "pagos"),
         where("sucursal", "==", agenciaActual),
@@ -215,46 +300,47 @@
         where("fechaRegistro", "<=", endIso)
       );
 
-      const results = await Promise.allSettled([getDocs(pagosQ_TS), getDocs(pagosQ_ISO), getDocs(pagosR_TS), getDocs(pagosR_ISO)]);
-      const pagosList = [];
-      const pagosIds = new Set();
+      const results = await Promise.allSettled([
+        getDocs(pagosQ_TS), getDocs(pagosQ_ISO), getDocs(pagosR_TS), getDocs(pagosR_ISO)
+      ]);
 
-      function pushPago(doc) {
-        const d = doc.data();
-        if (("anulado" in d) && d.anulado) return;
-        const id = doc.id;
-        if (pagosIds.has(id)) return;
-        pagosIds.add(id);
-
-        movimientos.push({
-          tipo: "Ingreso",
-          descripcion: d.retroactivo ? "Abono retroactivo" : "Pago",
-          monto: Number(d.montoPagado) || 0,
-          observaciones: d.motivo || '',
-          usuario: d.cajeroNombre || '',
-          fecha: d.fechaRegistro || d.fechaPago || null,
-          clase: "mov-pago",
-          cliente: d.nombres || "Cliente"
-        });
-      }
-
+      const pagosVistos = new Set();
       results.forEach(r => {
-        if (r.status === "fulfilled") r.value.forEach(pushPago);
+        if (r.status !== "fulfilled") return;
+        r.value.forEach(doc => {
+          if (pagosVistos.has(doc.id)) return; pagosVistos.add(doc.id);
+          const d = doc.data() || {};
+          if (("anulado" in d) && d.anulado) return;
+
+          movimientos.push({
+            tipo: "Ingreso",
+            descripcion: d.retroactivo ? "Abono retroactivo" : "Pago",
+            monto: num(d.montoPagado, 0),
+            observaciones: d.motivo || '',
+            usuario: d.cajeroNombre || '',
+            fecha: d.fechaRegistro || d.fechaPago || null,
+            clase: "mov-pago",
+            cliente: d.nombres || "Cliente"
+          });
+        });
       });
 
-      // ===== Ordenar y totales =====
+      // Orden y totales
       movimientos.sort((a, b) => {
         const da = toDateAny(a.fecha)?.getTime() || 0;
         const dbb = toDateAny(b.fecha)?.getTime() || 0;
-        return dbb - da; // desc
+        return dbb - da;
       });
 
       const saldoAnterior = await obtenerSaldoAnterior(agenciaActual, selectedDate);
       let totalIngresos = 0, totalEgresos = 0;
-      movimientos.forEach(mov => (mov.tipo === "Ingreso" ? (totalIngresos += mov.monto) : (totalEgresos += mov.monto)));
+      for (const mov of movimientos) {
+        if (mov.tipo === "Ingreso") totalIngresos += mov.monto;
+        else totalEgresos += mov.monto;
+      }
       const total = saldoAnterior + totalIngresos - totalEgresos;
 
-      // ===== Render =====
+      // Render final
       if (!movimientos.length) {
         listDiv.innerHTML = `<div class="empty-msg">No hay movimientos registrados.</div>`;
       } else {
@@ -263,7 +349,7 @@
             <div class="mov-title">${mov.tipo} - ${mov.descripcion}</div>
             <div class="mov-sub">Monto: $${mov.monto.toFixed(2)}</div>
             ${mov.observaciones ? `<div class="mov-sub">Obs: ${mov.observaciones}</div>` : ""}
-            <div class="mov-sub">Usuario: ${mov.usuario}</div>
+            <div class="mov-sub">Usuario: ${mov.usuario || '-'}</div>
             ${mov.cliente ? `<div class="mov-sub">Cliente: ${mov.cliente}</div>` : ""}
             <div class="mov-sub">Hora: ${formatHoraAny(mov.fecha)}</div>
           </div>
@@ -274,33 +360,37 @@
         <div style="font-size:1.12rem;font-weight:400;margin-bottom:4px;">
           <b style="color:#2ef37a;">Saldo Anterior: $${saldoAnterior.toFixed(2)}</b>
         </div>
+        <div class="mov-sub" style="margin-bottom:4px;">Ingresos: $${totalIngresos.toFixed(2)} | Egresos: $${totalEgresos.toFixed(2)}</div>
         <div><b style="color:#fff;">Total de Caja: $${total.toFixed(2)}</b></div>
       `;
     }
 
-    // Cambiar fecha por prompt (igual que tenías)
+    // ===== Selector de fecha
     document.getElementById("fecha-btn").onclick = async function() {
       const val = prompt("Ingrese la fecha en formato DD/MM/AAAA", formatFecha(selectedDate));
       if (!val) return;
-      const [d, m, y] = val.split('/');
-      const parsed = new Date(`${y}-${m}-${d}T00:00:00`);
+      const [dd, mm, yy] = val.split('/');
+      const parsed = new Date(`${yy}-${mm}-${dd}T00:00:00`);
       if (isNaN(parsed.getTime())) {
         alert("Fecha inválida");
         return;
       }
       selectedDate = parsed;
       renderFecha();
-      onAuthStateChanged(auth, user => { if (user) cargarMovimientos(user); });
+      const user = auth.currentUser;
+      if (user) cargarMovimientos(user);
     };
 
+    // ===== Inicio
     onAuthStateChanged(auth, user => {
-      if (!user) return location.href = "login.html";
+      if (!user) { location.href = "login.html"; return; }
       renderFecha();
       cargarMovimientos(user);
     });
   </script>
 
   <script>
+    // ===== Impresión de Corte =====
     document.getElementById("btn-imprimir-corte").onclick = function() {
       const fecha = document.getElementById("fecha-label").textContent || '';
       const movimientosHtml = document.getElementById("movimientos-list").innerHTML;
@@ -335,14 +425,14 @@
         </html>
       `;
       const w = window.open('', '', 'width=900,height=800');
+      if (!w) { alert('Bloqueador de ventanas emergentes activo. Permite pop-ups para imprimir.'); return; }
       w.document.write(printHtml);
       w.document.close();
-      setTimeout(() => { w.focus(); }, 300);
-    }
+      setTimeout(() => { try { w.focus(); } catch(e){} }, 300);
+    };
   </script>
 </body>
 </html>
-
 
 
 

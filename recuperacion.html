@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
@@ -33,7 +33,7 @@
     tr:last-child td { border-bottom: none;}
     .sumas { font-weight: bold; color: #F8AF40; border-top: 2px solid #F8AF40;}
     .nada {text-align:center; color:#bbb; padding:18px 0 24px 0;}
-    .subtitulo { margin-top: 6px; font-weight:700; color:#8fd3ff; }
+    .subtitulo { margin-top: 16px; font-weight:700; color:#8fd3ff; }
 
     @media (max-width: 1020px) {
       .filtros { grid-template-columns: 1fr; }
@@ -200,6 +200,7 @@
       if (!desde || !hasta) { tablaDiv.innerHTML = `<div class="nada">Seleccione el rango de fechas.</div>`; pagosFiltrados = []; return; }
       if (!agenciaActual) { tablaDiv.innerHTML = `<div class="nada">No se pudo determinar la agencia del usuario.</div>`; pagosFiltrados = []; return; }
 
+      // Mantengo tu lógica original (ISO completo). Si quieres evitar desfase local/UTC, dime y lo cambio a comparación "local".
       const desdeISO = new Date(desde + "T00:00:00").toISOString();
       const hastaISO = new Date(hasta + "T23:59:59").toISOString();
       const ejecutivoSel = document.getElementById("sel-ejecutivo").value || "";
@@ -226,6 +227,9 @@
         const p = docPago.data();
         if (p.anulado) continue; // Excluir pagos anulados
 
+        // LOG de diagnóstico: ver campos crudos del documento de pago
+        console.log("DOC PAGO RAW", docPago.id, p);
+
         // Buscar asignadoA (ejecutivo) del crédito
         if (!creditosCache[p.creditoID]) {
           const cr = await getDoc(doc(db, "creditos", p.creditoID));
@@ -240,14 +244,13 @@
         const cliente = `${c?.nombre || ""} ${c?.apellido || ""}`.trim();
 
         pagos.push({
-          fechaPago: p.fechaPago ? p.fechaPago.substring(0,10) : "",
+          fechaPago: p.fechaPago ? String(p.fechaPago).substring(0,10) : "",
           cliente,
           ejecutivo,
-          montoPagado: parseFloat(p.montoPagado || 0) || 0,
-          pagoCapital: parseFloat(p.pagoCapital || 0) || 0,
-          pagoInteres: parseFloat(p.pagoInteres || 0) || 0,
-          // >>> NUEVO: pagoMulta <<<
-          pagoMulta: parseFloat(p.pagoMulta || 0) || 0
+          montoPagado: toNum(p.montoPagado),
+          pagoCapital: toNum(p.pagoCapital),
+          pagoInteres: toNum(p.pagoInteres),
+          pagoMulta: toNum(p.pagoMulta)
         });
       }
 
@@ -261,27 +264,33 @@
       pagosFiltrados = pagos;
       renderTabla(pagosFiltrados);
       renderResumen(pagosFiltrados);
+      // Panel de anomalías (diferencias)
+      renderAnomalias(pagosFiltrados);
     }
 
     function renderTabla(pagos) {
       const tablaDiv = document.getElementById("tabla-resultados");
-      const totalPagado = pagos.reduce((a, b) => a + b.montoPagado, 0);
+      const totalPagado  = pagos.reduce((a, b) => a + b.montoPagado, 0);
       const totalCapital = pagos.reduce((a, b) => a + b.pagoCapital, 0);
       const totalInteres = pagos.reduce((a, b) => a + b.pagoInteres, 0);
-      // >>> NUEVO total de multas <<<
-      const totalMulta = pagos.reduce((a, b) => a + b.pagoMulta, 0);
+      const totalMulta   = pagos.reduce((a, b) => a + b.pagoMulta, 0);
+      const totalOtros   = +(totalPagado - (totalCapital + totalInteres + totalMulta)).toFixed(2);
 
-      const rowsHTML = pagos.map(p => `
-        <tr>
-          <td>${p.fechaPago}</td>
-          <td>${escapeHtml(p.cliente)}</td>
-          <td>${escapeHtml(p.ejecutivo)}</td>
-          <td>$${p.montoPagado.toFixed(2)}</td>
-          <td>$${p.pagoCapital.toFixed(2)}</td>
-          <td>$${p.pagoInteres.toFixed(2)}</td>
-          <td>$${p.pagoMulta.toFixed(2)}</td>
-        </tr>
-      `).join("");
+      const rowsHTML = pagos.map(p => {
+        const otros = +(p.montoPagado - (p.pagoCapital + p.pagoInteres + p.pagoMulta)).toFixed(2);
+        return `
+          <tr>
+            <td>${p.fechaPago}</td>
+            <td>${escapeHtml(p.cliente)}</td>
+            <td>${escapeHtml(p.ejecutivo)}</td>
+            <td>$${p.montoPagado.toFixed(2)}</td>
+            <td>$${p.pagoCapital.toFixed(2)}</td>
+            <td>$${p.pagoInteres.toFixed(2)}</td>
+            <td>$${p.pagoMulta.toFixed(2)}</td>
+            <td>$${otros.toFixed(2)}</td>
+          </tr>
+        `;
+      }).join("");
 
       const html = `
         <table id="tabla-pagos">
@@ -294,6 +303,7 @@
               <th>Capital</th>
               <th>Abono de Interés</th>
               <th>Pago Multa</th>
+              <th>Otros</th>
             </tr>
           </thead>
           <tbody>
@@ -304,6 +314,7 @@
               <td>$${totalCapital.toFixed(2)}</td>
               <td>$${totalInteres.toFixed(2)}</td>
               <td>$${totalMulta.toFixed(2)}</td>
+              <td>$${totalOtros.toFixed(2)}</td>
             </tr>
           </tbody>
         </table>
@@ -322,8 +333,7 @@
         acc.total += p.montoPagado;
         acc.capital += p.pagoCapital;
         acc.interes += p.pagoInteres;
-        // Nota: el resumen continúa igual (solo total/capital/interés),
-        // porque pediste añadir pagoMulta únicamente en "esa misma tabla".
+        // El resumen mantiene la lógica original (sin multas/otros).
       }
 
       const filas = Array.from(mapa.values()).sort((a,b)=> b.interes - a.interes);
@@ -354,34 +364,100 @@
       resumenDiv.innerHTML = html;
     }
 
-    // --- Excel: Detalle + Resumen ---
+    // --- Panel de Anomalías: filas donde Monto != Capital+Interés+Multa ---
+    function renderAnomalias(pagos) {
+      const cont = document.getElementById("tabla-resumen");
+      const anomalias = [];
+
+      for (const p of pagos) {
+        const otros = +(p.montoPagado - (p.pagoCapital + p.pagoInteres + p.pagoMulta)).toFixed(2);
+        if (Math.abs(otros) >= 0.01) {
+          anomalias.push({ ...p, otros });
+        }
+      }
+
+      if (!anomalias.length) {
+        cont.insertAdjacentHTML("beforeend", `<div class="subtitulo">Anomalías</div><div class="nada">Sin diferencias.</div>`);
+        return;
+      }
+
+      const rows = anomalias.map(a => `
+        <tr>
+          <td>${a.fechaPago}</td>
+          <td>${escapeHtml(a.cliente)}</td>
+          <td>${escapeHtml(a.ejecutivo)}</td>
+          <td>$${a.montoPagado.toFixed(2)}</td>
+          <td>$${a.pagoCapital.toFixed(2)}</td>
+          <td>$${a.pagoInteres.toFixed(2)}</td>
+          <td>$${a.pagoMulta.toFixed(2)}</td>
+          <td style="font-weight:700">$${a.otros.toFixed(2)}</td>
+        </tr>
+      `).join("");
+
+      const totalOtros = anomalias.reduce((s,a)=>s+a.otros,0);
+
+      cont.insertAdjacentHTML("beforeend", `
+        <div class="subtitulo">Anomalías (donde MontoPagado ≠ Capital+Interés+Multa)</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Cliente</th><th>Ejecutivo</th>
+              <th>Monto</th><th>Capital</th><th>Interés</th><th>Multa</th><th>Otros</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+            <tr class="sumas">
+              <td colspan="7">Total “Otros”</td>
+              <td>$${totalOtros.toFixed(2)}</td>
+            </tr>
+          </tbody>
+        </table>
+      `);
+    }
+
+    // --- Excel: Detalle + Resumen + Anomalias ---
     async function generarExcel() {
       if (!pagosFiltrados.length) return alert("No hay datos para exportar.");
 
       const workbook = new window.ExcelJS.Workbook();
       const detalle = workbook.addWorksheet("Detalle");
       const resumen = workbook.addWorksheet("Resumen");
+      const anom = workbook.addWorksheet("Anomalias");
 
-      // >>> Añadimos "Pago Multa" al detalle
-      detalle.addRow(["Fecha de Pago", "Cliente", "Ejecutivo", "Monto Pagado", "Capital", "Abono de Interés", "Pago Multa"]);
+      // Detalle (incluye 'Otros')
+      detalle.addRow(["Fecha de Pago", "Cliente", "Ejecutivo", "Monto Pagado", "Capital", "Abono de Interés", "Pago Multa", "Otros"]);
       pagosFiltrados.forEach(p => {
-        detalle.addRow([
-          p.fechaPago, p.cliente, p.ejecutivo, p.montoPagado, p.pagoCapital, p.pagoInteres, p.pagoMulta
-        ]);
+        const otros = +(p.montoPagado - (p.pagoCapital + p.pagoInteres + p.pagoMulta)).toFixed(2);
+        detalle.addRow([p.fechaPago, p.cliente, p.ejecutivo, p.montoPagado, p.pagoCapital, p.pagoInteres, p.pagoMulta, otros]);
       });
 
       const totalPagado  = pagosFiltrados.reduce((a,b)=>a+b.montoPagado,0);
       const totalCapital = pagosFiltrados.reduce((a,b)=>a+b.pagoCapital,0);
       const totalInteres = pagosFiltrados.reduce((a,b)=>a+b.pagoInteres,0);
       const totalMulta   = pagosFiltrados.reduce((a,b)=>a+b.pagoMulta,0);
+      const totalOtros   = +(totalPagado - (totalCapital + totalInteres + totalMulta)).toFixed(2);
       detalle.addRow([]);
-      detalle.addRow(["Totales", "", "", totalPagado, totalCapital, totalInteres, totalMulta]);
+      detalle.addRow(["Totales", "", "", totalPagado, totalCapital, totalInteres, totalMulta, totalOtros]);
 
-      // Resumen (se mantiene igual)
+      // Resumen (como estaba)
       resumen.addRow(["Ejecutivo", "Monto Pagado", "Capital", "Interés"]);
       resumenAsignado.forEach(r => {
         resumen.addRow([r.persona, r.total, r.capital, r.interes]);
       });
+
+      // Anomalias (solo filas con diferencia)
+      anom.addRow(["Fecha", "Cliente", "Ejecutivo", "Monto", "Capital", "Interés", "Multa", "Otros"]);
+      let totalOtrosAnom = 0;
+      pagosFiltrados.forEach(p => {
+        const otros = +(p.montoPagado - (p.pagoCapital + p.pagoInteres + p.pagoMulta)).toFixed(2);
+        if (Math.abs(otros) >= 0.01) {
+          totalOtrosAnom += otros;
+          anom.addRow([p.fechaPago, p.cliente, p.ejecutivo, p.montoPagado, p.pagoCapital, p.pagoInteres, p.pagoMulta, otros]);
+        }
+      });
+      anom.addRow([]);
+      anom.addRow(["Total Otros", "", "", "", "", "", "", totalOtrosAnom]);
 
       const buf = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buf], {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
@@ -405,9 +481,15 @@
         .replaceAll('"',"&quot;")
         .replaceAll("'","&#039;");
     }
+    function toNum(x){
+      // Normaliza: quita $ , espacios y convierte a número seguro; si falla, 0
+      return parseFloat(String(x ?? 0).replace(/[,$\s]/g,'')) || 0;
+    }
   </script>
 </body>
 </html>
+
+
 
 
 

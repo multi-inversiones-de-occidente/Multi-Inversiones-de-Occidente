@@ -96,15 +96,6 @@
       }
     }
 
-    // === PATCH HELPER: días a medianoche (evita TZ/horas) ===
-    function diffDaysOnly(dateA, dateB) {
-      const d1 = new Date(dateA); d1.setHours(0,0,0,0);
-      const d2 = new Date(dateB); d2.setHours(0,0,0,0);
-      const MS = 86400000;
-      return Math.max(0, Math.floor((d2 - d1) / MS));
-    }
-    // === END PATCH HELPER ===
-
     // --- PIN GERENTE MODAL ---
     function showGerentePinDialog() {
       return new Promise((resolve) => {
@@ -269,6 +260,14 @@
       return capitalAtrasado;
     }
 
+    // --- Diff días entre fechas (corte a medianoche local, sin horas) ---
+    function diffDiasCalendario(d1, d2) {
+      const a = new Date(d1); a.setHours(0,0,0,0);
+      const b = new Date(d2); b.setHours(0,0,0,0);
+      const MS = 86400000;
+      return Math.max(0, Math.floor((b - a) / MS));
+    }
+
     // --- LOGICA DE REVERSIÓN MEJORADA ---
     async function revertirPago() {
       try {
@@ -327,15 +326,15 @@
         for (let i = nuevaAmortizacion.length - 1; i >= 0; i--) {
           let cuota = nuevaAmortizacion[i];
           // Revertir capital
-          if (montoRestanteCapital > 0 && cuota.montoPagado > 0) {
-            let descontar = Math.min(montoRestanteCapital, cuota.montoPagado);
-            cuota.montoPagado -= descontar;
+          if (montoRestanteCapital > 0 && (cuota.montoPagado || 0) > 0) {
+            let descontar = Math.min(montoRestanteCapital, (cuota.montoPagado || 0));
+            cuota.montoPagado = +( (cuota.montoPagado || 0) - descontar ).toFixed(2);
             montoRestanteCapital -= descontar;
           }
           // Revertir interés
-          if (montoRestanteInteres > 0 && cuota.montoPagadoInteres > 0) {
-            let descontarInt = Math.min(montoRestanteInteres, cuota.montoPagadoInteres);
-            cuota.montoPagadoInteres -= descontarInt;
+          if (montoRestanteInteres > 0 && (cuota.montoPagadoInteres || 0) > 0) {
+            let descontarInt = Math.min(montoRestanteInteres, (cuota.montoPagadoInteres || 0));
+            cuota.montoPagadoInteres = +( (cuota.montoPagadoInteres || 0) - descontarInt ).toFixed(2);
             montoRestanteInteres -= descontarInt;
           }
         }
@@ -359,11 +358,9 @@
           let pagado = parseFloat(cuota.montoPagado || "0");
           let capitalCuota = parseFloat(cuota.capital || "0");
 
-          // Si la cuota ya venció y no está completamente pagada (aunque tenga parcial):
           if (fechaCuota < hoy && pagado < capitalCuota) {
             cuota.estado = "Atrasada";
             cuota.fechaPagoReal = null;
-            // Si no tiene multa, se agrega
             let yaTieneMulta = historialMultas.some(m =>
               m.tipo === "por cuota atrasada" && String(m.cuotaNumero) === String(cuota.numeroCuota)
             );
@@ -398,49 +395,41 @@
         const pagosSnap = await getDocs(pagosQ);
         let ultimaFechaPago = null;
         pagosSnap.forEach(d => {
-          if (d.id !== pagoDoc.id) { // <-- EXCLUYE el pago que estamos anulando
-            if (!ultimaFechaPago || new Date(d.data().fechaPago) > new Date(ultimaFechaPago)) {
-              ultimaFechaPago = d.data().fechaPago;
+          if (d.id !== pagoDoc.id) {
+            const f = d.data().fechaPago;
+            if (f && (!ultimaFechaPago || new Date(f) > new Date(ultimaFechaPago))) {
+              ultimaFechaPago = f;
             }
           }
         });
 
-        // === PATCH: Cálculo correcto de interesActual (saldo real, última fecha vigente, días a medianoche) ===
-        // 1) saldo pendiente REAL para devengar (desde amortización)
-        let saldoParaInteres = 0;
-        for (const c of nuevaAmortizacion) {
-          const cap = parseFloat(c.capital || 0);
-          const pag = parseFloat(c.montoPagado || 0);
-          const pendiente = Math.max(0, cap - pag);
-          if (pendiente > 0) saldoParaInteres += pendiente;
-        }
-        saldoParaInteres = +saldoParaInteres.toFixed(2);
+        // === CORRECCIÓN: Recalcular interesActual estrictamente por días calendario desde la ÚLTIMA FECHA DE PAGO ===
+        // Saldo base para interés: suma de capital pendiente tras la reversión (coincide con saldo teórico).
+        let saldoPendienteCalc = nuevaAmortizacion
+          .reduce((acc, c) => acc + Math.max(0, parseFloat(c.capital || 0) - parseFloat(c.montoPagado || 0)), 0);
 
-        // 2) fecha base = última fecha de pago vigente (excluyendo el revertido), o inicio del crédito
-        let fechaBaseInteres = ultimaFechaPago
-          ? new Date(ultimaFechaPago)
-          : new Date(credito.fechaInicio || credito.fechaDesembolso || credito.fechaColocacion);
+        // Ajuste de saldo actual: devolver capital revertido (después sincronizamos con el calculado).
+        saldoActual = +(saldoPendienteCalc).toFixed(2);
 
-        // 3) días exactos a medianoche (evita desfaces por zona horaria)
-        const diasDevengo = diffDaysOnly(fechaBaseInteres, new Date());
+        // Fecha base de intereses
+        let fechaBaseInteres = ultimaFechaPago ? new Date(ultimaFechaPago) : new Date(credito.fechaInicio);
 
-        // 4) interesActual devengado
-        let interesActual = +(saldoParaInteres * parseFloat(credito.tasaDiariaCredito || 0) * diasDevengo).toFixed(2);
-        // === END PATCH ===
+        // Días exactos (sin horas) usando corte a medianoche local y FLOOR
+        const dias = diffDiasCalendario(fechaBaseInteres, hoy);
 
-        // Calcula paraPonerseAlDia correctamente
-        let paraPonerseAlDia = interesActual + capitalAtrasado + multasAcumuladas;
+        // Interés del periodo
+        let interesActual = +(saldoActual * (tasaDiaria || 0) * dias).toFixed(2);
+
+        // Calcula paraPonerseAlDia
+        let paraPonerseAlDia = +(interesActual + capitalAtrasado + Math.max(0, multasAcumuladas)).toFixed(2);
 
         // Estado de crédito
-        let estadoCreditoFinal = tieneAtrasos || multasAcumuladas > 0 ? "Mora Temprana" : "Activo";
-
-        // Ajuste de saldo: (mantengo tu lógica original aquí sin cambios)
-        saldoActual = +(saldoActual + parseFloat(pagoData.pagoCapital || 0)).toFixed(2);
+        let estadoCreditoFinal = (tieneAtrasos || multasAcumuladas > 0) ? "Mora Temprana" : "Activo";
 
         await updateDoc(creditoRef, {
           saldoActual: saldoActual.toFixed(2),
           interesActual: interesActual.toFixed(2),
-          multasAcumuladas: multasAcumuladas.toFixed(2),
+          multasAcumuladas: Math.max(0, multasAcumuladas).toFixed(2),
           paraPonerseAlDia: paraPonerseAlDia.toFixed(2),
           estadoCredito: estadoCreditoFinal,
           amortizacion: nuevaAmortizacion,
@@ -622,6 +611,7 @@
   </script>
 </body>
 </html>
+
 
 
 

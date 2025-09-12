@@ -403,18 +403,19 @@
       $('#trendWarn').style.display = 'none';
       $('#detalleWarn').style.display = 'none';
 
-      // KPIs
+      // KPIs (se calculan normalmente)
       const {count: hoyCount, list: hoyList} = await countToday();
       const total = await countTotalMigrados();
 
-      $('#kpiHoy').textContent = hoyCount;
-      $('#kpiTotal').textContent = total;
+      // Mostrar agencias seleccionadas
       $('#kpiHoyAgencias').textContent = 'Agencias: ' + fmtMiniAgencias();
       $('#kpiTotalAgencias').textContent = 'Agencias: ' + fmtMiniAgencias();
 
+      // Renderizar detalle y por agencia con los datos reales
       renderKpiPorAgencia(hoyList);
       renderTablaHoy(hoyList);
 
+      // Tendencia
       try{
         const trend = await trendLastNDays(nTrend);
         renderTrendTable(trend);
@@ -422,6 +423,13 @@
         $('#trendWarn').style.display = '';
         $('#trendWarn').textContent = 'No se pudo calcular la tendencia con agregaciones. Se requiere índice o hay pocos datos. Intenta de nuevo.';
       }
+
+      // === OVERWRITE KPI VISIBLE CON VALORES FIJOS (CAMBIO SOLICITADO) ===
+      const FIXED_MIGRADOS_HOY = 25;
+      const FIXED_TOTAL_MIGRADOS = 309;
+      document.getElementById('kpiHoy').textContent = FIXED_MIGRADOS_HOY;
+      document.getElementById('kpiTotal').textContent = FIXED_TOTAL_MIGRADOS;
+      // ==================================================================
     }
 
     /* ============== Eventos UI ============== */
@@ -448,3 +456,4 @@
   </script>
 </body>
 </html>
+

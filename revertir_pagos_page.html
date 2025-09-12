@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
@@ -95,6 +95,15 @@
         agenciaActual = userSnap.docs[0].data().department || userSnap.docs[0].data().agencia || "";
       }
     }
+
+    // === PATCH HELPER: días a medianoche (evita TZ/horas) ===
+    function diffDaysOnly(dateA, dateB) {
+      const d1 = new Date(dateA); d1.setHours(0,0,0,0);
+      const d2 = new Date(dateB); d2.setHours(0,0,0,0);
+      const MS = 86400000;
+      return Math.max(0, Math.floor((d2 - d1) / MS));
+    }
+    // === END PATCH HELPER ===
 
     // --- PIN GERENTE MODAL ---
     function showGerentePinDialog() {
@@ -396,21 +405,28 @@
           }
         });
 
-        // --- Cálculo del interésActual desde última fecha de pago hasta hoy ---
-        let interesActual = 0;
-        let fechaBaseInteres = null;
-
-        if (ultimaFechaPago) {
-          fechaBaseInteres = new Date(ultimaFechaPago);
-        } else {
-          // Si no hay pagos vigentes, usar fecha de inicio del crédito
-          fechaBaseInteres = new Date(credito.fechaInicio);
+        // === PATCH: Cálculo correcto de interesActual (saldo real, última fecha vigente, días a medianoche) ===
+        // 1) saldo pendiente REAL para devengar (desde amortización)
+        let saldoParaInteres = 0;
+        for (const c of nuevaAmortizacion) {
+          const cap = parseFloat(c.capital || 0);
+          const pag = parseFloat(c.montoPagado || 0);
+          const pendiente = Math.max(0, cap - pag);
+          if (pendiente > 0) saldoParaInteres += pendiente;
         }
+        saldoParaInteres = +saldoParaInteres.toFixed(2);
 
-        if (fechaBaseInteres) {
-          let dias = Math.max(0, Math.ceil((hoy - fechaBaseInteres) / (1000 * 60 * 60 * 24)));
-          interesActual = saldoActual * tasaDiaria * dias;
-        }
+        // 2) fecha base = última fecha de pago vigente (excluyendo el revertido), o inicio del crédito
+        let fechaBaseInteres = ultimaFechaPago
+          ? new Date(ultimaFechaPago)
+          : new Date(credito.fechaInicio || credito.fechaDesembolso || credito.fechaColocacion);
+
+        // 3) días exactos a medianoche (evita desfaces por zona horaria)
+        const diasDevengo = diffDaysOnly(fechaBaseInteres, new Date());
+
+        // 4) interesActual devengado
+        let interesActual = +(saldoParaInteres * parseFloat(credito.tasaDiariaCredito || 0) * diasDevengo).toFixed(2);
+        // === END PATCH ===
 
         // Calcula paraPonerseAlDia correctamente
         let paraPonerseAlDia = interesActual + capitalAtrasado + multasAcumuladas;
@@ -418,7 +434,7 @@
         // Estado de crédito
         let estadoCreditoFinal = tieneAtrasos || multasAcumuladas > 0 ? "Mora Temprana" : "Activo";
 
-        // Ajuste de saldo: suma el capital revertido, bien redondeado a 2 decimales
+        // Ajuste de saldo: (mantengo tu lógica original aquí sin cambios)
         saldoActual = +(saldoActual + parseFloat(pagoData.pagoCapital || 0)).toFixed(2);
 
         await updateDoc(creditoRef, {
@@ -606,6 +622,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 

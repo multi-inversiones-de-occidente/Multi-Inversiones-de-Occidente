@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
@@ -29,7 +29,8 @@
     let usuarioEmail = "";
     let usuarioNombre = "";
     let usuarioAgencia = ""; // users/{uid}.department
-    let docsAgencia = [];    // Créditos de la agencia (todos los usuarios) filtrados por fechas + estados
+    let docsAgencia = [];    // Créditos de la agencia (base, sin filtro de usuario)
+    let filtroUsuario = "";  // "" = Todos; si no vacío, filtra por asignadoA exacto
 
     let fechaDesde = null;
     let fechaHasta = null;
@@ -52,7 +53,6 @@
       const s = String(v).replace(/,/g, ".").replace(/[^\d.-]/g, "");
       const n = parseFloat(s);
       if (!Number.isFinite(n)) return 0;
-      // Evita micro-residuos tipo 2.664535e-15
       return Math.abs(n) < 1e-9 ? 0 : n;
     }
     function asMoney(n) {
@@ -66,9 +66,34 @@
     function endOfDay(d) {
       return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23,59,59,999);
     }
-
     function keyCliente(d) {
       return (d.clienteID || d.numeroDui || ((d.nombre||"") + " " + (d.apellido||"")) || d.telefono || d.direccion || "s/clave").toString();
+    }
+
+    // ====== Helpers de filtro por usuario ======
+    function getVista() {
+      // Devuelve el dataset a renderizar, aplicando el filtroUsuario actual
+      if (!filtroUsuario) return docsAgencia;
+      const sel = filtroUsuario.trim();
+      return docsAgencia.filter(d => ((d.asignadoA ?? "—").toString().trim() === sel));
+    }
+
+    function poblarSelectUsuarios(data) {
+      const sel = document.getElementById("sel-usuario");
+      const nombresSet = new Set(
+        data.map(d => (d.asignadoA ?? "—").toString().trim() || "—")
+      );
+      const nombres = Array.from(nombresSet).sort((a,b)=> a.localeCompare(b, 'es', {sensitivity:'base'}));
+      sel.innerHTML = `<option value="">Todos</option>` + 
+        nombres.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+
+      // Mantener selección si sigue existiendo
+      if (filtroUsuario && nombresSet.has(filtroUsuario)) {
+        sel.value = filtroUsuario;
+      } else {
+        filtroUsuario = "";
+        sel.value = "";
+      }
     }
 
     // ====== Carga de créditos (AGENCIA + FECHAS + ESTADOS) ======
@@ -78,11 +103,9 @@
         return;
       }
 
-      // Loaders
       setLoading(true);
 
       const creditosRef = collection(db, "creditos");
-      // No cruzar agencias: filtra por agenciaAsignada (como tu patrón)
       const qAgencia = query(creditosRef, where("agenciaAsignada", "==", usuarioAgencia), orderBy("fechaInicio", "desc"));
       const snap = await getDocs(qAgencia);
 
@@ -110,13 +133,9 @@
 
       docsAgencia = filtrados;
 
-      // Render
-      renderHeaderInfo();
-      renderKPIs();
-      renderResumenEstados();
-      renderResumenUsuarios();
-      renderResumenLineas();
-      renderTablaDetalle();
+      // Poblar select de usuarios (asignadoA) y renderizar toda la vista con el filtro actual
+      poblarSelectUsuarios(docsAgencia);
+      renderAll();
 
       setLoading(false);
     }
@@ -127,32 +146,43 @@
       blocks.forEach(id => document.getElementById(id).style.opacity = isLoading ? "0.4" : "1");
     }
 
+    // ====== Render Orquestador ======
+    function renderAll() {
+      renderHeaderInfo();
+      const data = getVista();
+      renderKPIs(data);
+      renderResumenEstados(data);
+      renderResumenUsuarios(data);
+      renderResumenLineas(data);
+      renderTablaDetalle(data);
+    }
+
     // ====== Renders ======
     function renderHeaderInfo() {
       document.getElementById("usuario-email").textContent = usuarioEmail;
       document.getElementById("agencia-usuario").textContent = `Agencia: ${usuarioAgencia || "—"}`;
     }
 
-    function renderKPIs() {
+    function renderKPIs(data) {
       const kpis = document.getElementById("kpis");
-      if (!docsAgencia.length) {
+      if (!data.length) {
         kpis.innerHTML = `<div class="msg-void">No hay datos en el rango seleccionado.</div>`;
         return;
       }
 
-      const peso = docsAgencia.reduce((s,d)=> s + toNum(d.saldoActual), 0);
-      const clientes = new Set(docsAgencia.map(keyCliente)).size;
-      const totalCreditos = docsAgencia.length;
+      const peso = data.reduce((s,d)=> s + toNum(d.saldoActual), 0);
+      const clientes = new Set(data.map(keyCliente)).size;
+      const totalCreditos = data.length;
 
       kpis.innerHTML = `
         <div class="cards-row">
           <div class="card kpi">
-            <div class="kpi-title">Peso de la Cartera (Agencia)</div>
+            <div class="kpi-title">Peso de la Cartera (${filtroUsuario ? 'Usuario' : 'Agencia'})</div>
             <div class="kpi-value">${asMoney(peso)}</div>
             <div class="kpi-sub">Estados: Activo, Mora T., Mora Mod., Mora Sev., Riesgo Alto, Cobro Judicial</div>
           </div>
           <div class="card kpi">
-            <div class="kpi-title">Clientes (Agencia)</div>
+            <div class="kpi-title">Clientes ${filtroUsuario ? '(Usuario)' : '(Agencia)'}</div>
             <div class="kpi-value">${clientes}</div>
             <div class="kpi-sub">Únicos en período</div>
           </div>
@@ -165,12 +195,12 @@
       `;
     }
 
-    function renderResumenEstados() {
+    function renderResumenEstados(data) {
       const cont = document.getElementById("res-estado");
-      if (!docsAgencia.length) { cont.innerHTML = ""; return; }
+      if (!data.length) { cont.innerHTML = ""; return; }
 
       const mapa = new Map(); // estado -> { count, pesoSaldo }
-      docsAgencia.forEach(d => {
+      data.forEach(d => {
         const e = (d.estadoCredito || "—").toString();
         if (!mapa.has(e)) mapa.set(e, { count: 0, peso: 0 });
         const o = mapa.get(e);
@@ -183,7 +213,7 @@
         .sort((a,b)=> b.peso - a.peso);
 
       let html = `
-        <h2 class="subtitulo">Resumen por Estado</h2>
+        <h2 class="subtitulo">Resumen por Estado ${filtroUsuario ? `(Usuario: ${escapeHtml(filtroUsuario)})` : ''}</h2>
         <div class="tabla-scroll">
           <table class="tabla-resumen">
             <thead>
@@ -202,12 +232,12 @@
       cont.innerHTML = html;
     }
 
-    function renderResumenUsuarios() {
+    function renderResumenUsuarios(data) {
       const cont = document.getElementById("res-usuario");
-      if (!docsAgencia.length) { cont.innerHTML = ""; return; }
+      if (!data.length) { cont.innerHTML = ""; return; }
 
       const mapa = new Map(); // asignadoA -> { pesoSaldo, clientes:Set, creditos }
-      docsAgencia.forEach(d => {
+      data.forEach(d => {
         const u = (d.asignadoA || "—").toString().trim();
         if (!mapa.has(u)) mapa.set(u, { peso: 0, clientes: new Set(), creditos: 0 });
         const o = mapa.get(u);
@@ -221,7 +251,7 @@
         .sort((a,b)=> b.peso - a.peso);
 
       let html = `
-        <h2 class="subtitulo">Resumen por Ejecutivo (asignadoA)</h2>
+        <h2 class="subtitulo">Resumen por Ejecutivo (asignadoA) ${filtroUsuario ? `(Filtrado en ${escapeHtml(filtroUsuario)})` : ''}</h2>
         <div class="tabla-scroll">
           <table class="tabla-resumen">
             <thead>
@@ -241,13 +271,13 @@
       cont.innerHTML = html;
     }
 
-    function renderResumenLineas() {
+    function renderResumenLineas(data) {
       const cont = document.getElementById("res-linea");
-      if (!docsAgencia.length) { cont.innerHTML = ""; return; }
+      if (!data.length) { cont.innerHTML = ""; return; }
 
-      const totalMonto = docsAgencia.reduce((s,d)=> s + toNum(d.montoAprobado), 0);
+      const totalMonto = data.reduce((s,d)=> s + toNum(d.montoAprobado), 0);
       const mapa = new Map(); // linea -> { count, monto }
-      docsAgencia.forEach(d => {
+      data.forEach(d => {
         const lin = (d.lineaDeCredito || "—").toString().trim();
         if (!mapa.has(lin)) mapa.set(lin, { count: 0, monto: 0 });
         const o = mapa.get(lin);
@@ -260,7 +290,7 @@
         .sort((a,b)=> b.monto - a.monto);
 
       let html = `
-        <h2 class="subtitulo">Resumen por Tipo de Crédito</h2>
+        <h2 class="subtitulo">Resumen por Tipo de Crédito ${filtroUsuario ? `(Usuario: ${escapeHtml(filtroUsuario)})` : ''}</h2>
         <div class="tabla-scroll">
           <table class="tabla-resumen">
             <thead>
@@ -280,22 +310,26 @@
       cont.innerHTML = html;
     }
 
-    function renderTablaDetalle() {
+    function renderTablaDetalle(data) {
       const cont = document.getElementById("detalle");
-      if (!docsAgencia.length) {
+      if (!data.length) {
         cont.innerHTML = `<div class="msg-void">No hay créditos para mostrar.</div>`;
         toggleActions(false);
         return;
       }
 
       // Orden por fecha desc
-      const filas = [...docsAgencia].sort((a,b)=> b._fechaObj - a._fechaObj);
+      const filas = [...data].sort((a,b)=> b._fechaObj - a._fechaObj);
 
       let totalMonto = 0;
       let totalSaldo = 0;
 
+      const tituloDetalle = filtroUsuario
+        ? `Detalle de Créditos (Usuario: ${escapeHtml(filtroUsuario)})`
+        : `Detalle de Créditos (Todos los usuarios de ${usuarioAgencia})`;
+
       let html = `
-        <h2 class="subtitulo">Detalle de Créditos (Todos los usuarios de ${usuarioAgencia})</h2>
+        <h2 class="subtitulo">${tituloDetalle}</h2>
         <div class="tabla-scroll">
           <table class="tabla-reporte" id="tabla-detalle">
             <thead>
@@ -375,7 +409,7 @@
                 <td></td>
                 <td></td>
                 <td></td>
-                <td class="num"><b>${asMoney(docsAgencia.reduce((s,d)=> s + toNum(d.saldoInicial),0))}</b></td>
+                <td class="num"><b>${asMoney(data.reduce((s,d)=> s + toNum(d.saldoInicial),0))}</b></td>
                 <td class="num"><b>${asMoney(totalSaldo)}</b></td>
                 <td colspan="6"></td>
               </tr>
@@ -399,7 +433,8 @@
 
     // ====== Modal de detalle (amortización y multas) ======
     window.verDetalleCredito = function(id) {
-      const d = docsAgencia.find(x => x.id === id);
+      const data = getVista();
+      const d = data.find(x => x.id === id);
       if (!d) return;
 
       const cliente = `${d.nombre ?? ""} ${d.apellido ?? ""}`.trim() || (d.nombreCompleto ?? "—");
@@ -556,12 +591,12 @@
         {wch:12},{wch:12},{wch:8},{wch:8},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:10},{wch:16},{wch:12},{wch:20}
       ];
       XLSX.utils.book_append_sheet(wb, ws, "Detalle");
-      XLSX.writeFile(wb, `reporte_colocacion_gerencial_${usuarioAgencia}.xlsx`);
+      XLSX.writeFile(wb, `reporte_colocacion_gerencial_${usuarioAgencia}${filtroUsuario ? "_"+sanitizeFile(filtroUsuario) : ""}.xlsx`);
     };
 
     window.imprimir = function() {
       const contenido = `
-        <h2>Reporte Colocacion Gerencial — ${usuarioAgencia}</h2>
+        <h2>Reporte Colocacion Gerencial — ${usuarioAgencia}${filtroUsuario ? " — Usuario: " + escapeHtml(filtroUsuario) : ""}</h2>
         ${document.getElementById("kpis").innerHTML}
         ${document.getElementById("res-estado").innerHTML}
         ${document.getElementById("res-usuario").innerHTML}
@@ -592,7 +627,8 @@
     };
 
     window.exportarPDF = function() {
-      if (!docsAgencia.length) return;
+      const data = getVista();
+      if (!data.length) return;
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF('l','pt','a4');
       const fecha = new Date();
@@ -600,20 +636,20 @@
       doc.setFontSize(15);
       doc.text("MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.", 40, 40);
       doc.setFontSize(11);
-      doc.text(`Reporte Colocacion Gerencial — ${usuarioAgencia}`, 40, 60);
+      doc.text(`Reporte Colocacion Gerencial — ${usuarioAgencia}${filtroUsuario ? " — Usuario: " + filtroUsuario : ""}`, 40, 60);
       doc.text(`Usuario: ${usuarioEmail}`, 40, 78);
       doc.text(`Fecha de generación: ${fecha.toLocaleString('es-SV')}`, 40, 94);
 
       // KPIs
-      const peso = docsAgencia.reduce((s,d)=> s + toNum(d.saldoActual), 0);
-      const clientes = new Set(docsAgencia.map(keyCliente)).size;
-      const totalCreditos = docsAgencia.length;
+      const peso = data.reduce((s,d)=> s + toNum(d.saldoActual), 0);
+      const clientes = new Set(data.map(keyCliente)).size;
+      const totalCreditos = data.length;
 
       doc.autoTable({
         head: [["Métrica","Valor"]],
         body: [
-          ["Peso de la Cartera (Agencia)", asMoney(peso)],
-          ["Clientes (Agencia)", String(clientes)],
+          ["Peso de la Cartera", asMoney(peso)],
+          ["Clientes", String(clientes)],
           ["Créditos", String(totalCreditos)],
           ["Estados incluidos", "Activo, Mora Temprana, Mora Moderada, Mora Severa, Riesgo Alto, Cobro Judicial"]
         ],
@@ -625,7 +661,7 @@
 
       // Resumen por estado
       const mapaEstado = new Map();
-      docsAgencia.forEach(d => {
+      data.forEach(d => {
         const e = d.estadoCredito || "—";
         if (!mapaEstado.has(e)) mapaEstado.set(e, { count:0, peso:0 });
         const o = mapaEstado.get(e);
@@ -646,7 +682,7 @@
 
       // Resumen por usuario
       const mapaUser = new Map();
-      docsAgencia.forEach(d => {
+      data.forEach(d => {
         const u = (d.asignadoA || "—").toString().trim();
         if (!mapaUser.has(u)) mapaUser.set(u, { peso:0, clientes:new Set(), creditos:0 });
         const o = mapaUser.get(u);
@@ -671,7 +707,7 @@
       const head = [[
         "Inicio","Agencia","AsignadoA","Cliente","DUI","Linea","Frecuencia","Monto","Cuota","#Cuotas","Tasa%","SaldoAct","Estado"
       ]];
-      const body = docsAgencia.map(d => [
+      const body = data.map(d => [
         formatFecha(d._fechaObj),
         d.agenciaAsignada ?? "—",
         (d.asignadoA ?? "—").toString().trim(),
@@ -698,7 +734,7 @@
 
       const mm = String(fecha.getMonth()+1).padStart(2,'0');
       const dd = String(fecha.getDate()).padStart(2,'0');
-      doc.save(`reporte_colocacion_gerencial_${usuarioAgencia}_${fecha.getFullYear()}-${mm}-${dd}.pdf`);
+      doc.save(`reporte_colocacion_gerencial_${usuarioAgencia}${filtroUsuario ? "_"+sanitizeFile(filtroUsuario) : ""}_${fecha.getFullYear()}-${mm}-${dd}.pdf`);
     };
 
     // ====== Fechas ======
@@ -709,6 +745,12 @@
     function onFechaHastaChange(e) {
       fechaHasta = e.target.value ? new Date(e.target.value) : null;
       cargarCreditosGerencial();
+    }
+
+    // ====== Filtro Usuario (select) ======
+    function onUsuarioChange(e) {
+      filtroUsuario = e.target.value || "";
+      renderAll(); // re-render rápido sin ir a Firestore
     }
 
     // ====== Inicio ======
@@ -748,7 +790,23 @@
       document.getElementById("btn-imprimir").addEventListener("click", imprimir);
       document.getElementById("btn-pdf").addEventListener("click", exportarPDF);
       document.getElementById("modal-overlay").addEventListener("click", cerrarModal);
+
+      // Nuevo: change del filtro de usuario
+      document.getElementById("sel-usuario").addEventListener("change", onUsuarioChange);
     });
+
+    // ====== Utils UI extra ======
+    function escapeHtml(str) {
+      return String(str || "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+    function sanitizeFile(s) {
+      return String(s).replace(/[\\/:*?"<>|]+/g, "_").slice(0,60);
+    }
   </script>
 
   <!-- jsPDF & AutoTable -->
@@ -772,7 +830,10 @@
     .filtros { display:flex; gap:.8rem; justify-content:center; flex-wrap:wrap; margin-bottom:.8rem; }
     .filtro { background:#222; padding:.6rem .9rem; border-radius:8px; display:flex; flex-direction:column; }
     .filtro label { color:#67C8F1; font-weight:600; font-size:.92rem; margin-bottom:3px; }
-    .filtro input[type="date"]{ background:#191a1c; color:#fff; border:none; border-radius:5px; padding:.35rem .6rem; font-size:.98rem; }
+    .filtro input[type="date"],
+    .filtro select{
+      background:#191a1c; color:#fff; border:none; border-radius:5px; padding:.35rem .6rem; font-size:.98rem;
+    }
 
     .actions { display:flex; gap:.6rem; justify-content:center; margin: .6rem 0 1rem; }
     .btn {
@@ -841,6 +902,13 @@
         <label for="fecha-hasta">Hasta:</label>
         <input type="date" id="fecha-hasta"/>
       </div>
+      <!-- NUEVO: Filtro por Usuario (asignadoA) -->
+      <div class="filtro">
+        <label for="sel-usuario">Usuario:</label>
+        <select id="sel-usuario">
+          <option value="">Todos</option>
+        </select>
+      </div>
     </div>
 
     <div class="actions">
@@ -867,3 +935,5 @@
   </div>
 </body>
 </html>
+
+

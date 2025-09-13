@@ -6,129 +6,173 @@
   <title>Cuotas por Vencer – Multi Inversiones</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <style>
+    :root{
+      --bg:#f5f8fa; --card:#fff; --brand:#1371b6; --muted:#6b7c93;
+      --line:#e3e9f2; --chip:#e7f2fb; --chipText:#125c9c; --warm:#ffa726;
+      --shadow: 0 6px 24px #00538b16;
+    }
+    *{ box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
-      background: #f5f8fa;
+      background: var(--bg);
       min-height: 100vh;
       font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      color: #0f1b2d;
     }
     .container {
-      max-width: 1050px;
-      margin: 2.8rem auto 0 auto;
-      background: #fff;
+      max-width: 1200px;
+      margin: 2.8rem auto 2rem;
+      background: var(--card);
       border-radius: 18px;
-      box-shadow: 0 3px 18px #00538b16;
-      padding: 2.5rem 2.2rem 2rem 2.2rem;
+      box-shadow: var(--shadow);
+      padding: 2.2rem 2rem 2rem;
     }
     h2 {
       font-size: 2rem;
-      font-weight: bold;
-      color: #1371b6;
-      margin-bottom: 0.9rem;
-      letter-spacing: 1px;
+      font-weight: 800;
+      color: var(--brand);
+      margin: 0 0 .4rem 0;
+      letter-spacing: .5px;
       display: flex;
       align-items: center;
       gap: 10px;
     }
     .subtitulo {
-      font-size: 1.45rem;
-      color: #ffa726;
+      font-size: 1.25rem;
+      color: var(--warm);
       font-weight: 700;
-      margin-bottom: 1.7rem;
+      margin: .15rem 0 1.2rem 0;
       letter-spacing: .2px;
-      text-align: center;
+      text-align: left;
     }
     .user-email {
       color: #1785ba;
-      font-size: 1.09rem;
+      font-size: 1.02rem;
       font-weight: 600;
-      margin-bottom: 0.5rem;
-      text-align: center;
+      margin: 0 0 1.1rem 0;
     }
-    .filter-row {
+    .filters {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .filter-row, .date-row {
       display: flex;
       align-items: center;
-      gap: 15px;
-      margin-bottom: 19px;
+      gap: 10px;
       flex-wrap: wrap;
     }
-    select {
-      padding: 8px 22px;
-      border-radius: 8px;
-      border: 1px solid #d2e2ee;
-      background: #e7f2fb;
-      color: #125c9c;
-      font-size: 1.04rem;
-      font-weight: bold;
-      outline: none;
-      transition: border .16s;
+    .group-label{
+      font-weight:700; color:#126caa; white-space:nowrap;
     }
-    select:focus {
-      border: 1.5px solid #1371b6;
+    select, input[type="date"] {
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #d2e2ee;
+      background: var(--chip);
+      color: var(--chipText);
+      font-size: 1rem;
+      font-weight: 700;
+      outline: none;
+      transition: border .16s, box-shadow .16s;
+    }
+    select:focus, input[type="date"]:focus {
+      border: 1.5px solid var(--brand);
+      box-shadow: 0 0 0 3px #1371b620;
+    }
+    .btn {
+      appearance: none;
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .06s ease, box-shadow .2s ease, opacity .2s ease;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: var(--brand);
+      color: #fff;
+      box-shadow: 0 6px 16px #1371b644;
+    }
+    .btn-secondary {
+      background: #eef4fb;
+      color: #0b3a67;
+      border: 1px solid #cfe2f3;
+    }
+    .btn:active { transform: translateY(1px); }
+
+    .table-wrap{
+      width: 100%;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fafdff;
     }
     table {
       width: 100%;
-      min-width: 980px;
+      min-width: 1080px;
       border-collapse: collapse;
-      margin-top: 6px;
-      background: #fafdff;
       table-layout: fixed;
     }
-    th, td {
-      padding: 8.5px 10px;
-      border-bottom: 1px solid #e3e9f2;
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #e7f2fb;
+      color: #125c9c;
+      font-size: 1.02rem;
+      letter-spacing: .6px;
+      padding: 10px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    tbody td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
       text-align: left;
-      font-size: 1rem;
+      font-size: .98rem;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    th {
-      background: #e7f2fb;
-      color: #125c9c;
-      font-size: 1.03rem;
-      letter-spacing: .7px;
-    }
-    .pendiente {
-      color: #dbab16;
-      font-weight: bold;
-    }
-    .tel {
-      color: #14b060;
-      font-weight: 600;
-      white-space: nowrap;
-    }
+    tbody tr:hover { background: #f3f9ff; }
+    tbody tr:nth-child(even){ background: #fbfdff; }
+
+    .pendiente { color: #dbab16; font-weight: 700; }
+    .tel { color: #14b060; font-weight: 600; white-space: nowrap; }
     .tel i { margin-right: 5px;}
-    .total-monto {
-      color: #ffa726;
-      font-weight: bold;
-    }
-    .row-today {
-      background: #fefbe7 !important;
-    }
-    .row-7d {
-      background: #e8fbe7 !important;
-    }
-    .row-15d {
-      background: #e7f3fb !important;
-    }
-    .row-30d {
-      background: #f4e7fb !important;
-    }
+    .total-monto { color: var(--warm); font-weight: 800; }
+
+    /* Colores por buckets existentes */
+    .row-today { background: #fefbe7 !important; }
+    .row-7d   { background: #e8fbe7 !important; }
+    .row-15d  { background: #e7f3fb !important; }
+    .row-30d  { background: #f4e7fb !important; }
+
     .loading {
-      color: #888;
-      text-align: center;
-      padding: 35px 0 25px 0;
-      font-size: 1.15rem;
+      color: #667; text-align: center; padding: 28px 0; font-size: 1.05rem;
     }
-    @media (max-width: 1200px) {
-      .container { padding: 1.2rem 0.2rem; max-width: 99vw;}
-      table { font-size: 0.95rem; min-width:800px;}
-      th, td { padding: 7px 3px; }
+
+    .legend{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+      margin: 10px 2px 14px;
+      color:#496480; font-size:.92rem;
     }
-    @media (max-width: 700px) {
-      .container { padding: 1.3rem .4rem; }
-      table { font-size: 0.92rem; min-width:700px;}
-      th, td { padding: 7px 3px; }
+    .chip{
+      display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:20px; border:1px solid var(--line);
+      background:#fff;
+    }
+    .dot{ width:12px; height:12px; border-radius:50%; display:inline-block; }
+    .dot-today{ background:#f1d46a; }
+    .dot-7{ background:#9de29d; }
+    .dot-15{ background:#aedaff; }
+    .dot-30{ background:#dfc7ff; }
+
+    @media (max-width: 640px){
+      .filters{ grid-template-columns: 1fr; }
+      .date-row{ justify-content: space-between; }
     }
   </style>
 </head>
@@ -137,31 +181,52 @@
     <h2><i class="fa-solid fa-calendar-day"></i> Cuotas por Vencer</h2>
     <div class="subtitulo">Cuotas Pendientes Próximas a Vencer</div>
     <div class="user-email" id="usuario-email"></div>
-    <div class="filter-row">
-      <label for="rango" style="font-weight:600; color:#126caa;">Filtrar por:</label>
-      <select id="rango">
-        <option value="hoy">Hoy</option>
-        <option value="7">Próximos 7 días</option>
-        <option value="15">Próximos 15 días</option>
-        <option value="30">Próximos 30 días</option>
-      </select>
+
+    <!-- Filtros existentes + NUEVO selector de fecha (extra) -->
+    <div class="filters">
+      <div class="filter-row">
+        <span class="group-label">Filtrar por:</span>
+        <select id="rango" aria-label="Rango de fechas">
+          <option value="hoy">Hoy</option>
+          <option value="7">Próximos 7 días</option>
+          <option value="15">Próximos 15 días</option>
+          <option value="30">Próximos 30 días</option>
+        </select>
+      </div>
+
+      <div class="date-row" role="group" aria-label="Filtrar por fecha exacta">
+        <span class="group-label">Fecha exacta:</span>
+        <input type="date" id="fechaSeleccionada"/>
+        <button class="btn btn-primary" id="btnFecha"><i class="fa-solid fa-filter"></i> Ver esa fecha</button>
+        <button class="btn btn-secondary" id="btnLimpiar"><i class="fa-solid fa-rotate-left"></i> Limpiar</button>
+      </div>
     </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Cliente</th>
-          <th>Cuota #</th>
-          <th>Fecha</th>
-          <th>Días</th>
-          <th>Capital</th>
-          <th>Interés</th>
-          <th>Total</th>
-          <th>Saldo Crédito</th>
-          <th>Teléfono</th>
-        </tr>
-      </thead>
-      <tbody id="cuotas-list"></tbody>
-    </table>
+
+    <div class="legend" aria-hidden="true">
+      <span class="chip"><span class="dot dot-today"></span> Hoy</span>
+      <span class="chip"><span class="dot dot-7"></span> ≤ 7 días</span>
+      <span class="chip"><span class="dot dot-15"></span> ≤ 15 días</span>
+      <span class="chip"><span class="dot dot-30"></span> ≤ 30 días</span>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 240px;">Cliente</th>
+            <th style="width: 95px;">Cuota #</th>
+            <th style="width: 130px;">Fecha</th>
+            <th style="width: 90px;">Días</th>
+            <th style="width: 120px;">Capital</th>
+            <th style="width: 120px;">Interés</th>
+            <th style="width: 120px;">Total</th>
+            <th style="width: 140px;">Saldo Crédito</th>
+            <th style="width: 160px;">Teléfono</th>
+          </tr>
+        </thead>
+        <tbody id="cuotas-list"></tbody>
+      </table>
+    </div>
   </div>
 
   <script type="module">
@@ -180,96 +245,163 @@
 
     function formateaFechaUTC(fechaIso) {
       if(!fechaIso) return '';
-      let fecha = new Date(fechaIso);
-      let dia = fecha.getUTCDate().toString().padStart(2, '0');
-      let mes = (fecha.getUTCMonth()+1).toString().padStart(2, '0');
-      let anio = fecha.getUTCFullYear();
-      return `${dia}/${mes}/${anio}`;
+      const f = new Date(fechaIso);
+      const dd = String(f.getUTCDate()).padStart(2,'0');
+      const mm = String(f.getUTCMonth()+1).padStart(2,'0');
+      const yyyy = f.getUTCFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    }
+
+    function toUTCDateOnly(d){
+      return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
     }
 
     function diasEntreUTC(f1, f2) {
-      let d1 = new Date(Date.UTC(f1.getUTCFullYear(),f1.getUTCMonth(),f1.getUTCDate()));
-      let d2 = new Date(Date.UTC(f2.getUTCFullYear(),f2.getUTCMonth(),f2.getUTCDate()));
+      // f1 - f2 en días
+      const d1 = toUTCDateOnly(f1);
+      const d2 = toUTCDateOnly(f2);
       return Math.floor((d1 - d2) / (1000*60*60*24));
     }
 
+    function sameUTCDate(a, b){
+      return a.getUTCFullYear()===b.getUTCFullYear()
+        && a.getUTCMonth()===b.getUTCMonth()
+        && a.getUTCDate()===b.getUTCDate();
+    }
+
     let agenciaActual = "";
+    let ultimoRango = "hoy"; // recordamos el último filtro de rango
 
     onAuthStateChanged(auth, async user => {
       if (!user) return location.href = "login.html";
       document.getElementById("usuario-email").textContent = "Usuario: " + user.email;
+
       const usersSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
       if (!usersSnap.empty) {
-        agenciaActual = usersSnap.docs[0].data().department;
+        const data = usersSnap.docs[0].data();
+        agenciaActual = data?.department || "";
       }
-      cargarCuotas("hoy");
+
+      cargarCuotas("hoy"); // default
     });
 
-    async function cargarCuotas(rango) {
-      let hoy = new Date();
-      let hoyUTC = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate()));
+    async function cargarCuotas(rango, fechaSeleccionadaStr=null) {
+      const hoy = new Date();
+      const hoyUTC = toUTCDateOnly(new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate())));
       let cuotas = [];
-      document.getElementById("cuotas-list").innerHTML = `<tr><td colspan="9" class="loading"><i class="fa-solid fa-spinner fa-spin"></i> Cargando...</td></tr>`;
+
+      const tbody = document.getElementById("cuotas-list");
+      tbody.innerHTML = `<tr><td colspan="9" class="loading"><i class="fa-solid fa-spinner fa-spin"></i> Cargando...</td></tr>`;
+
       if (!agenciaActual) {
-        document.getElementById("cuotas-list").innerHTML = `<tr><td colspan="9" class="loading">No se pudo determinar la agencia del usuario.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="loading">No se pudo determinar la agencia del usuario.</td></tr>`;
         return;
       }
-      // SOLO créditos de la agencia del usuario Y que NO estén revertidos
+
+      // Consulta: créditos de la agencia del usuario (se excluyen revertidos)
       const snapshot = await getDocs(query(collection(db, "creditos"), where("agenciaAsignada", "==", agenciaActual)));
+
       snapshot.forEach(doc => {
-        let d = doc.data();
-        // 👉 Nuevo filtro para NO mostrar créditos revertidos
-        if (d.estadoCredito && d.estadoCredito === "Revertido") return;
+        const d = doc.data();
+        if (d.estadoCredito === "Revertido") return;
         if (!Array.isArray(d.amortizacion)) return;
-        (d.amortizacion).forEach(cuota => {
-          if (["Pendiente", "Parcial", "Atrasado"].includes(cuota.estado) && cuota.fecha) {
-            let fcuota = new Date(cuota.fecha);
-            let fcuotaUTC = new Date(Date.UTC(fcuota.getUTCFullYear(), fcuota.getUTCMonth(), fcuota.getUTCDate()));
-            let dias = diasEntreUTC(fcuotaUTC, hoyUTC);
-            let mostrar = false, clase = "";
-            if      (rango === "hoy" && dias === 0)             { mostrar = true; clase = "row-today"; }
-            else if (rango === "7"  && dias > 0 && dias <= 7)   { mostrar = true; clase = "row-7d"; }
-            else if (rango === "15" && dias > 0 && dias <= 15)  { mostrar = true; clase = "row-15d"; }
-            else if (rango === "30" && dias > 0 && dias <= 30)  { mostrar = true; clase = "row-30d"; }
-            if (mostrar) {
-              cuotas.push({
-                cliente: (d.nombre ? d.nombre.trim() : "") + (d.apellido ? " " + d.apellido.trim() : ""),
-                numero: cuota.numeroCuota,
-                fecha: cuota.fecha,
-                dias: dias,
-                capital: cuota.capital,
-                interes: cuota.interes,
-                total: cuota.cuota,
-                saldo: d.saldoActual,
-                telefono: d.telefono,
-                clase: clase
-              });
+
+        d.amortizacion.forEach(cuota => {
+          if (!["Pendiente", "Parcial", "Atrasado"].includes(cuota?.estado)) return;
+          if (!cuota?.fecha) return;
+
+          const fcuota = new Date(cuota.fecha);
+          const fcuotaUTC = toUTCDateOnly(new Date(Date.UTC(fcuota.getUTCFullYear(), fcuota.getUTCMonth(), fcuota.getUTCDate())));
+          const dias = diasEntreUTC(fcuotaUTC, hoyUTC);
+
+          // Determinar si se muestra según el rango OR fecha exacta (extra)
+          let mostrar = false, clase = "";
+          if (rango === "fecha" && fechaSeleccionadaStr){
+            const sel = new Date(fechaSeleccionadaStr + "T00:00:00Z");
+            const selUTC = toUTCDateOnly(sel);
+            if (sameUTCDate(fcuotaUTC, selUTC)) {
+              mostrar = true;
+              // Coloreamos con el bucket relativo a HOY para mantener consistencia visual
+              if (dias === 0) clase = "row-today";
+              else if (dias > 0 && dias <= 7) clase = "row-7d";
+              else if (dias > 0 && dias <= 15) clase = "row-15d";
+              else if (dias > 0 && dias <= 30) clase = "row-30d";
             }
+          } else {
+            if      (rango === "hoy" && dias === 0)            { mostrar = true; clase = "row-today"; }
+            else if (rango === "7"  && dias > 0 && dias <= 7)  { mostrar = true; clase = "row-7d"; }
+            else if (rango === "15" && dias > 0 && dias <= 15) { mostrar = true; clase = "row-15d"; }
+            else if (rango === "30" && dias > 0 && dias <= 30) { mostrar = true; clase = "row-30d"; }
+          }
+
+          if (mostrar) {
+            const cliente = `${(d.nombre||"").trim()}${d.apellido ? " " + d.apellido.trim() : ""}`.trim();
+            const tsUTC = Date.UTC(fcuotaUTC.getUTCFullYear(), fcuotaUTC.getUTCMonth(), fcuotaUTC.getUTCDate());
+            cuotas.push({
+              cliente,
+              numero: cuota.numeroCuota,
+              fecha: cuota.fecha,
+              fechaUTCts: tsUTC, // para ordenar por fecha ascendente
+              dias,
+              capital: cuota.capital,
+              interes: cuota.interes,
+              total: cuota.cuota,
+              saldo: d.saldoActual,
+              telefono: d.telefono,
+              clase
+            });
           }
         });
       });
 
-      let html = cuotas.length ? cuotas.map(c => `
-        <tr class="${c.clase}">
-          <td title="${c.cliente}">${c.cliente}</td>
-          <td>${c.numero}</td>
-          <td>${formateaFechaUTC(c.fecha)}</td>
-          <td>${c.dias}</td>
-          <td>$${parseFloat(c.capital).toFixed(2)}</td>
-          <td>$${parseFloat(c.interes).toFixed(2)}</td>
-          <td class="total-monto">$${parseFloat(c.total).toFixed(2)}</td>
-          <td>$${parseFloat(c.saldo).toFixed(2)}</td>
-          <td class="tel"><i class="fa-solid fa-phone"></i> ${c.telefono}</td>
-        </tr>
-      `).join('') : `<tr><td colspan="9" class="loading">Sin cuotas por vencer en este rango</td></tr>`;
-      document.getElementById("cuotas-list").innerHTML = html;
+      // ORDEN ASCENDENTE por fecha (más próxima primero). Si empatan, por # de cuota
+      cuotas.sort((a,b) => (a.fechaUTCts - b.fechaUTCts) || ((a.numero||0) - (b.numero||0)));
+
+      const html = cuotas.length
+        ? cuotas.map(c => `
+          <tr class="${c.clase}">
+            <td title="${c.cliente}">${c.cliente || "-"}</td>
+            <td>${(c.numero ?? "-")}</td>
+            <td>${formateaFechaUTC(c.fecha)}</td>
+            <td>${(c.dias ?? "-")}</td>
+            <td>$${parseFloat(c.capital ?? 0).toFixed(2)}</td>
+            <td>$${parseFloat(c.interes ?? 0).toFixed(2)}</td>
+            <td class="total-monto">$${parseFloat(c.total ?? 0).toFixed(2)}</td>
+            <td>$${parseFloat(c.saldo ?? 0).toFixed(2)}</td>
+            <td class="tel"><i class="fa-solid fa-phone"></i> ${c.telefono || "-"}</td>
+          </tr>
+        `).join('')
+        : `<tr><td colspan="9" class="loading">Sin cuotas por vencer en este filtro</td></tr>`;
+
+      tbody.innerHTML = html;
     }
 
-    document.getElementById("rango").onchange = function() {
+    // Mantener filtros originales
+    document.getElementById("rango").addEventListener("change", function(){
+      ultimoRango = this.value;
       cargarCuotas(this.value);
-    };
+    });
+
+    // NUEVO: filtrar por fecha exacta (extra, sin remover lo anterior)
+    document.getElementById("btnFecha").addEventListener("click", () => {
+      const val = document.getElementById("fechaSeleccionada").value;
+      if (!val){
+        // Si no elige fecha, mantenemos el último rango activo
+        cargarCuotas(ultimoRango || "hoy");
+        return;
+      }
+      cargarCuotas("fecha", val);
+    });
+
+    // Limpiar selector de fecha y volver al último rango
+    document.getElementById("btnLimpiar").addEventListener("click", () => {
+      const inp = document.getElementById("fechaSeleccionada");
+      inp.value = "";
+      cargarCuotas(ultimoRango || "hoy");
+    });
   </script>
 </body>
 </html>
+
 
 

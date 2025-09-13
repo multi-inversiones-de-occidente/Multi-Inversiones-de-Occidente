@@ -126,7 +126,16 @@
       <h3>Datos Generales de Solicitud</h3>
       <div class="row">
         <div class="field col-3"><label>Analista ID</label><input id="s_analistaID" placeholder="uid del analista"></div>
-        <div class="field col-3"><label>Crédito (línea)</label><select id="s_creditLine"><option>Credicash</option><option>Credicel</option><option>Amuebla2</option></select></div>
+        <div class="field col-3"><label>Crédito (línea)</label>
+          <select id="s_creditLine">
+            <option>Credicash</option>
+            <option>Credicel</option>
+            <option>Amuebla2</option>
+            <!-- NUEVAS LÍNEAS -->
+            <option>Estacionario</option>
+            <option>Refinanciamiento</option>
+          </select>
+        </div>
         <div class="field col-3"><label>Estado de solicitud</label><select id="s_estado"><option>Aprobado</option><option>Rechazado</option><option>Pendiente</option></select></div>
         <div class="field col-3"><label>Fecha de solicitud</label><input id="s_fechaSolicitud" type="date"></div>
       </div>
@@ -237,7 +246,14 @@
         <div class="field col-3"><label>Agencia asignada</label><input id="c_agencia" placeholder="Ahuachapán / Sonsonate…"></div>
         <div class="field col-3"><label>Asesor</label><input id="c_asesor" placeholder="Nombre del ejecutivo"></div>
         <div class="field col-3"><label>Línea de crédito</label>
-          <select id="c_linea"><option>Credicash</option><option>Credicel</option><option>Amuebla2</option></select>
+          <select id="c_linea">
+            <option>Credicash</option>
+            <option>Credicel</option>
+            <option>Amuebla2</option>
+            <!-- NUEVAS LÍNEAS -->
+            <option>Estacionario</option>
+            <option>Refinanciamiento</option>
+          </select>
         </div>
         <div class="field col-3"><label>Estado crédito</label>
           <select id="c_estado"><option>Activo</option><option>Pagado</option><option>En Mora</option></select>
@@ -458,7 +474,7 @@
         timeZone: TZ, year:'numeric', month:'2-digit', day:'2-digit',
         hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
       }).formatToParts(new Date())
-       .reduce((a,p)=>{a[p.type]=p.value; return a;},{});
+       .reduce((a,p)=>{a[p.type]=p.value; return a;}, {});
       return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}.000${TZ_OFFSET}`;
     }
 
@@ -917,6 +933,7 @@
   </script>
 </body>
 </html>
+
 
 
 

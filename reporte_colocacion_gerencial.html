@@ -154,7 +154,7 @@
       renderResumenEstados(data);
       renderResumenUsuarios(data);
       renderResumenLineas(data);
-      renderTablaDetalle(data);
+      renderTablaDetalle(data); // <-- aquí aplicamos la clase compact
     }
 
     // ====== Renders ======
@@ -331,7 +331,7 @@
       let html = `
         <h2 class="subtitulo">${tituloDetalle}</h2>
         <div class="tabla-scroll">
-          <table class="tabla-reporte" id="tabla-detalle">
+          <table class="tabla-reporte compact" id="tabla-detalle">
             <thead>
               <tr>
                 <th>Inicio</th>
@@ -732,8 +732,8 @@
         styles: { fontSize: 8.5, cellPadding: 2 }
       });
 
-      const mm = String(fecha.getMonth()+1).padStart(2,'0');
-      const dd = String(fecha.getDate()).padStart(2,'0');
+      const mm = String(fecha.getMonth()+1).toString().padStart(2,'0');
+      const dd = String(fecha.getDate()).toString().padStart(2,'0');
       doc.save(`reporte_colocacion_gerencial_${usuarioAgencia}${filtroUsuario ? "_"+sanitizeFile(filtroUsuario) : ""}_${fecha.getFullYear()}-${mm}-${dd}.pdf`);
     };
 
@@ -881,6 +881,39 @@
     .kv-wide { grid-column: 1 / -1; }
     .kv span { color:#8fb4b2; margin-right:.3rem; }
 
+    /* === SOLO PARA “Detalle de Créditos” (más ancho/compacto) === */
+    #detalle .tabla-scroll {
+      width: 100%;
+      overflow-x: auto;
+      margin: .5rem 0 1rem;
+      box-shadow: inset 0 0 0 1px rgba(36,79,76,.35);
+      border-radius: 10px;
+    }
+    #detalle .tabla-reporte.compact {
+      min-width: 1600px;         /* más ancho para todas las columnas */
+      font-size: 12.5px;         /* texto más pequeño */
+    }
+    #detalle .tabla-reporte.compact thead th {
+      position: sticky; top: 0; z-index: 2;
+      font-size: 12.5px;
+    }
+    #detalle .tabla-reporte.compact th,
+    #detalle .tabla-reporte.compact td {
+      padding: 5px 6px;          /* menos padding */
+    }
+    #detalle .tabla-reporte.compact .num {
+      font-variant-numeric: tabular-nums;
+      font-size: 12.5px;
+    }
+    #detalle .tabla-reporte.compact .td-dir {
+      max-width: 420px;          /* muestra más de la dirección antes de elipsis */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #detalle .tabla-reporte.compact tfoot td {
+      font-size: 12.8px;
+    }
   </style>
 </head>
 <body>
@@ -935,5 +968,7 @@
   </div>
 </body>
 </html>
+
+
 
 

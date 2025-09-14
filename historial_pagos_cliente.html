@@ -211,8 +211,11 @@
     function formatDate(iso) {
       if (!iso) return '';
       const d = new Date(iso);
-      return d.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
-        d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true });
+      return (
+        d.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+        ' ' +
+        d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true })
+      );
     }
 
     // Autenticación antes de todo
@@ -271,20 +274,30 @@
           return;
         }
 
-        // Calcular totales y cuotas pactadas
+        // 🔧 Normalizar tipos y unificar multa (pagoMulta|pagoMultas -> pagoMultas)
+        pagos = pagos.map(p => ({
+          ...p,
+          montoPagado: Number(p.montoPagado ?? 0),
+          pagoCapital: Number(p.pagoCapital ?? 0),
+          pagoInteres: Number(p.pagoInteres ?? 0),
+          pagoMultas: Number((p.pagoMultas ?? p.pagoMulta) ?? 0),
+          saldoRestante: Number(p.saldoRestante ?? 0)
+        }));
+
+        // Calcular totales
         let totalPagado = 0, totalCapital = 0, totalInteres = 0, totalMultas = 0;
-        let cuotasPactadas = 0, creditoID = pagos[0].creditoID;
         pagos.forEach(d => {
-          totalPagado += Number(d.montoPagado || 0);
-          totalCapital += Number(d.pagoCapital || 0);
-          totalInteres += Number(d.pagoInteres || 0);
-          totalMultas += Number(d.pagoMultas || 0);
+          totalPagado += d.montoPagado;
+          totalCapital += d.pagoCapital;
+          totalInteres += d.pagoInteres;
+          totalMultas += d.pagoMultas;
         });
 
         // Buscar número de cuotas pactadas
         let cuotasPagadas = pagos.length;
         let cuotasTotales = '';
         try {
+          const creditoID = pagos[0].creditoID;
           if (creditoID) {
             const credQ = query(collection(db, "creditos"), where("__name__", "==", creditoID));
             const creditoSnap = await getDocs(credQ);
@@ -293,7 +306,7 @@
               cuotasTotales = credito.numeroCuotas || "";
             }
           }
-        } catch {}
+        } catch { /* silencioso */ }
 
         // Render resumen totales
         document.getElementById('resumen-totales').innerHTML = `
@@ -312,12 +325,12 @@
           <div class="bloque-ultimo-pago">
             <span><b>Último pago realizado</b></span><br>
             <span><b>Fecha:</b> ${formatDate(ultimo.fechaPago)}</span><br>
-            <span><b>Monto pagado:</b> $${Number(ultimo.montoPagado).toFixed(2)}</span><br>
+            <span><b>Monto pagado:</b> $${ultimo.montoPagado.toFixed(2)}</span><br>
             <span><b>Cajero:</b> ${ultimo.cajeroNombre || ''}</span><br>
-            <span><b>Capital:</b> $${Number(ultimo.pagoCapital || 0).toFixed(2)} &nbsp; 
-                  <b>Interés:</b> $${Number(ultimo.pagoInteres || 0).toFixed(2)} &nbsp;
-                  <b>Multas:</b> $${Number(ultimo.pagoMultas || 0).toFixed(2)}</span><br>
-            <span><b>Saldo restante después del pago:</b> $${Number(ultimo.saldoRestante || 0).toFixed(2)}</span>
+            <span><b>Capital:</b> $${ultimo.pagoCapital.toFixed(2)} &nbsp; 
+                  <b>Interés:</b> $${ultimo.pagoInteres.toFixed(2)} &nbsp;
+                  <b>Multas:</b> $${ultimo.pagoMultas.toFixed(2)}</span><br>
+            <span><b>Saldo restante después del pago:</b> $${ultimo.saldoRestante.toFixed(2)}</span>
           </div>
         `;
 
@@ -325,12 +338,12 @@
         document.getElementById('tabla-pagos').innerHTML = pagos.map((d, i) => `
           <tr class="${i === pagos.length - 1 ? 'resaltado' : ''}">
             <td>${formatDate(d.fechaPago)}</td>
-            <td>$${Number(d.montoPagado).toFixed(2)}</td>
-            <td>$${Number(d.pagoCapital || 0).toFixed(2)}</td>
-            <td>$${Number(d.pagoInteres || 0).toFixed(2)}</td>
-            <td>$${Number(d.pagoMultas || 0).toFixed(2)}</td>
+            <td>$${d.montoPagado.toFixed(2)}</td>
+            <td>$${d.pagoCapital.toFixed(2)}</td>
+            <td>$${d.pagoInteres.toFixed(2)}</td>
+            <td>$${d.pagoMultas.toFixed(2)}</td>
             <td>${d.cajeroNombre || ''}</td>
-            <td>$${Number(d.saldoRestante || 0).toFixed(2)}</td>
+            <td>$${d.saldoRestante.toFixed(2)}</td>
           </tr>
         `).join('');
       } catch (err) {
@@ -341,4 +354,6 @@
   </script>
 </body>
 </html>
+
+
 

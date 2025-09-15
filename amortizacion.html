@@ -4,6 +4,8 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Plan de Pagos</title>
+
+  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -37,19 +39,25 @@
 
     // Tarjeta de cada cuota
     function cuotaCard(cuota) {
+      const estadoClass =
+        cuota.estado === 'Pagada' ? 'estado-pagada' :
+        (cuota.estado === 'Parcial' ? 'estado-parcial' : 'estado-pendiente');
+
       return `
         <div class="cuota-card">
           <div class="cuota-avatar">${cuota.numeroCuota ?? "-"}</div>
           <div class="cuota-main">
-            <div class="cuota-fecha"><b>Fecha:</b> ${cuota.fecha ?? "-"}</div>
+            <div class="cuota-fecha">
+              <span class="pill-fecha"><span class="material-icons" aria-hidden="true">event</span> ${cuota.fecha ?? "-"}</span>
+            </div>
             <div class="cuota-info">
-              <span>Cuota: <b>${money(cuota.cuota)}</b></span>
-              <span>Capital: <b>${money(cuota.capital)}</b></span>
-              <span>Interés: <b>${money(cuota.interes)}</b></span>
-              <span>Saldo: <b>${money(cuota.saldo)}</b></span>
+              <div class="kv"><span class="k">Cuota</span><span class="v">${money(cuota.cuota)}</span></div>
+              <div class="kv"><span class="k">Capital</span><span class="v">${money(cuota.capital)}</span></div>
+              <div class="kv"><span class="k">Interés</span><span class="v">${money(cuota.interes)}</span></div>
+              <div class="kv"><span class="k">Saldo</span><span class="v">${money(cuota.saldo)}</span></div>
             </div>
             <div class="cuota-estado">
-              <span class="${cuota.estado === 'Pagada' ? 'estado-pagada' : cuota.estado === 'Parcial' ? 'estado-parcial' : 'estado-pendiente'}">
+              <span class="estado-badge ${estadoClass}">
                 ${cuota.estado || '-'}
               </span>
             </div>
@@ -60,11 +68,12 @@
 
     async function cargarAmortizacion() {
       const creditoId = getIdParam();
+      const mount = document.getElementById("main-amortizacion");
       if (!creditoId) {
-        document.getElementById("main-amortizacion").innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
+        mount.innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
         return;
       }
-      document.getElementById("main-amortizacion").innerHTML = `<div class="loader"></div>`;
+      mount.innerHTML = `<div class="loader" aria-label="Cargando plan de pagos"></div>`;
 
       onAuthStateChanged(auth, async user => {
         if (!user) {
@@ -76,14 +85,14 @@
           const snap = await getDoc(ref);
 
           if (!snap.exists()) {
-            document.getElementById("main-amortizacion").innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
+            mount.innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
             return;
           }
           const c = snap.data();
           const amortizacion = c.amortizacion || [];
 
           if (!amortizacion.length) {
-            document.getElementById("main-amortizacion").innerHTML = `<div class="notfound">No se encontró información de la amortización.</div>`;
+            mount.innerHTML = `<div class="notfound">No se encontró información de la amortización.</div>`;
             return;
           }
 
@@ -94,75 +103,204 @@
 
           // Render cards
           let cuotasHtml = "";
-          amortizacion.forEach(cuota => {
-            cuotasHtml += cuotaCard(cuota);
-          });
+          amortizacion.forEach(cuota => { cuotasHtml += cuotaCard(cuota); });
 
-          document.getElementById("main-amortizacion").innerHTML = `
+          mount.innerHTML = `
             <div class="resumen-plan">
-              <div class="resumen-titulo">Resumen del Plan</div>
-              <div>Cuotas totales: <b>${cuotasTotales}</b></div>
-              <div>Primera cuota: <b>${primeraCuota}</b></div>
-              <div>Última cuota: <b>${ultimaCuota}</b></div>
+              <div class="resumen-titulo"><span class="material-icons" aria-hidden="true">schedule</span> Resumen del Plan</div>
+              <div class="resumen-grid">
+                <div class="res-item"><span class="k">Cuotas totales</span><span class="v">${cuotasTotales}</span></div>
+                <div class="res-item"><span class="k">Primera cuota</span><span class="v">${primeraCuota}</span></div>
+                <div class="res-item"><span class="k">Última cuota</span><span class="v">${ultimaCuota}</span></div>
+              </div>
             </div>
             <div class="cuotas-list">
               ${cuotasHtml}
             </div>
           `;
         } catch (err) {
-          document.getElementById("main-amortizacion").innerHTML = `<div class="notfound">No tienes permisos para ver este crédito.</div>`;
+          mount.innerHTML = `<div class="notfound">No tienes permisos para ver este crédito.</div>`;
         }
       });
     }
 
     window.addEventListener("DOMContentLoaded", cargarAmortizacion);
   </script>
+
+  <!-- Iconos -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
   <style>
-    body { background: #101012; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
-    .main { max-width: 480px; margin: 0 auto; padding: 1.5rem 1rem 3rem 1rem; }
-    .resumen-plan {
-      background: #ffb30012; border-radius: 13px; margin-bottom: 18px; padding: 15px 18px 10px 18px;
+    /* ===== Nueva línea gráfica clara (glass) ===== */
+    :root{
+      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --muted:#5b6776; --white:#ffffff;
+      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
+      --danger:#e03131; --warn:#f59f00; --ok:#2f9e44;
+      --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
+      --card-bg:#ffffff; --radius:16px; --radius-lg:22px;
     }
-    .resumen-titulo {
-      color: #ffb300; font-size: 1.18rem; font-weight: bold; margin-bottom: 4px;
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0c0f14; --bg-2:#0f141b; --text:#dfe6ef; --muted:#9aa6b6;
+        --glass-bg:rgba(255,255,255,.12); --glass-brd:rgba(255,255,255,.18); --glass-shadow:0 24px 60px rgba(0,0,0,.45);
+        --card-bg:#10151e;
+      }
     }
-    .cuotas-list {
-      margin-top: 8px;
+
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      min-height:100vh;
     }
-    .cuota-card {
-      display: flex; background: #191927; border-radius: 10px;
-      margin-bottom: 13px; padding: 12px 16px; gap: 16px; align-items: flex-start; box-shadow: 0 2px 9px #0002;
+    .pattern{
+      position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image:
+        radial-gradient(1px 1px at 25px 25px, rgba(255,255,255,.10), transparent 40%),
+        radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.06), transparent 40%);
+      background-size:100px 100px; mix-blend-mode:soft-light; opacity:.5;
     }
-    .cuota-avatar {
-      background: #ff9800; color: #fff; min-width: 36px; min-height: 36px;
-      border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      font-weight: bold; font-size: 1.09rem; margin-top: 3px; flex-shrink: 0;
-      box-shadow: 0 2px 7px #0002;
+
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
+      background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
+      border-bottom:1px solid var(--glass-brd);
     }
-    .cuota-main { flex: 1 1 0; }
-    .cuota-fecha { color: #fff5; font-size: 1rem; font-weight: 600; margin-bottom: 5px;}
-    .cuota-info { display: flex; flex-wrap: wrap; gap: 17px 19px; color: #ffe6c8; font-size: .98rem; margin-bottom: 6px; }
-    .cuota-estado { margin-top: 3px; }
-    .estado-pagada { color: #39ea8e; font-weight: bold; }
-    .estado-parcial { color: #ffd000; font-weight: bold; }
-    .estado-pendiente { color: #ff4c40; font-weight: bold; }
-    .loader {
-      width: 44px; height: 44px; margin: 60px auto 70px auto; border-radius: 50%;
-      border: 4.5px solid #ffb300; border-top: 4.5px solid #eee0; animation: spin 1s linear infinite;
-      display: block;
+    .topbar{
+      max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
     }
-    @keyframes spin { 100% { transform: rotate(360deg); } }
-    .notfound { color: #fff9; font-size: 1.22rem; text-align: center; margin: 70px 0;}
-    @media (max-width: 570px) {
-      .main { max-width: 99vw; padding: 1rem .4rem 2rem .4rem;}
-      .cuota-card { font-size: .98rem; }
+    .logo-plate{
+      display:inline-flex; align-items:center; gap:10px; background:var(--glass-bg);
+      border:1px solid var(--glass-brd); padding:8px 14px; border-radius:16px;
+      box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
+    }
+    .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
+    .title-right{ margin-left:auto; font-weight:700; color:var(--muted); }
+
+    /* ===== Container ===== */
+    .container{
+      position:relative; z-index:1;
+      max-width:min(96vw, 960px);
+      margin: 2.2rem auto; padding: 1.2rem 1rem 2rem;
+      background:var(--glass-bg); border:1px solid var(--glass-brd);
+      border-radius:var(--radius-lg); box-shadow:var(--glass-shadow);
+    }
+    h1{
+      margin: .2rem 0 1rem; text-align:center;
+      font-size:clamp(1.4rem, .8vw + 1.2rem, 2rem);
+      color:var(--brand-blue); font-weight:800;
+    }
+
+    /* ===== Resumen ===== */
+    .resumen-plan{
+      background: linear-gradient(180deg, rgba(36,59,134,.06), rgba(103,200,241,.06));
+      border: 1px solid rgba(36,59,134,.15);
+      border-radius: 16px; padding: 14px 16px 10px; box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
+      margin-bottom: 16px;
+    }
+    .resumen-titulo{
+      display:flex; align-items:center; gap:8px;
+      color: var(--brand-blue); font-size:1.05rem; font-weight:900; margin-bottom:6px;
+    }
+    .resumen-titulo .material-icons{ color:var(--brand-gold); }
+    .resumen-grid{
+      display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:10px;
+    }
+    .res-item{ background: var(--card-bg); border:1px solid var(--glass-brd); border-radius:12px; padding:10px 12px;
+      display:flex; justify-content:space-between; align-items:center; }
+    .res-item .k{ color:var(--muted); font-weight:700; }
+    .res-item .v{ color:var(--brand-blue); font-weight:900; }
+
+    /* ===== Lista de cuotas ===== */
+    .cuotas-list{ display:flex; flex-direction:column; gap:12px; }
+
+    .cuota-card{
+      display:flex; gap:14px; align-items:flex-start;
+      background: var(--card-bg);
+      border:1px solid var(--glass-brd); border-radius:16px; padding:12px 14px;
+      box-shadow: var(--glass-shadow);
+    }
+    .cuota-avatar{
+      flex:0 0 auto; width:42px; height:42px; display:grid; place-items:center; font-weight:900;
+      color:#fff; border-radius:50%;
+      background: conic-gradient(from 210deg, var(--brand-cel), var(--brand-gold), var(--brand-green), var(--brand-cel));
+      box-shadow: 0 6px 16px rgba(36,59,134,.18);
+    }
+    .cuota-main{ flex:1 1 auto; min-width:0; }
+    .cuota-fecha{ margin-bottom:8px; }
+    .pill-fecha{
+      display:inline-flex; align-items:center; gap:6px;
+      padding:6px 10px; border-radius:999px;
+      background: linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
+      border:1px solid rgba(36,59,134,.15); color:var(--brand-blue); font-weight:800;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+      font-size:.95rem;
+    }
+    .pill-fecha .material-icons{ font-size:18px; color:var(--brand-blue); opacity:.85; }
+
+    .cuota-info{
+      display:grid; grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap:10px; margin-bottom:6px;
+    }
+    @media (max-width: 720px){
+      .cuota-info{ grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+    }
+    .kv{ display:flex; justify-content:space-between; gap:12px; background:linear-gradient(180deg, rgba(36,59,134,.05), rgba(103,200,241,.05));
+         border:1px solid rgba(36,59,134,.12); border-radius:12px; padding:8px 10px; }
+    .k{ color:var(--muted); font-weight:800; }
+    .v{ color:var(--brand-blue); font-weight:900; }
+
+    .cuota-estado{ margin-top:4px; }
+    .estado-badge{
+      display:inline-block; padding:6px 10px; border-radius:999px; font-weight:900; letter-spacing:.2px;
+      border:1px solid; background:rgba(255,255,255,.6);
+    }
+    .estado-pagada{ color:var(--ok);   border-color: rgba(47,158,68,.35);  background: rgba(47,158,68,.08); }
+    .estado-parcial{ color:var(--warn); border-color: rgba(245,159,0,.35);  background: rgba(245,159,0,.10); }
+    .estado-pendiente{ color:var(--danger); border-color: rgba(224,49,49,.35); background: rgba(224,49,49,.10); }
+
+    /* Mensajes / loader */
+    .loader{
+      width:46px; height:46px; margin:40px auto 50px; border-radius:50%;
+      border:4px solid rgba(36,59,134,.18); border-top:4px solid var(--brand-cel);
+      animation:spin 1s linear infinite;
+    }
+    @keyframes spin{ to{ transform: rotate(1turn) } }
+    .notfound{ color:#7b8bb4; font-size:1.06rem; text-align:center; margin: 60px 0; }
+
+    /* Layout base */
+    .main{
+      max-width:min(96vw, 980px);
+      margin: 0 auto; padding: 1.2rem 1rem 2.4rem;
     }
   </style>
 </head>
 <body>
-  <div class="main">
-    <div id="main-amortizacion"></div>
+  <div class="pattern" aria-hidden="true"></div>
+
+  <header>
+    <div class="topbar">
+      <div class="logo-plate" aria-label="Identidad">
+        <strong class="brand-name">MULTI INVERSIONES</strong>
+      </div>
+      <div class="title-right">Plan de Pagos</div>
+    </div>
+  </header>
+
+  <div class="container">
+    <h1><span class="material-icons" style="vertical-align:middle; margin-right:6px; color:#243b86;">schedule</span>Plan de Pagos</h1>
+    <div class="main">
+      <div id="main-amortizacion"></div>
+    </div>
   </div>
 </body>
 </html>
+
+

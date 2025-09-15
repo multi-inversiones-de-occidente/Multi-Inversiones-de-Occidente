@@ -8,7 +8,7 @@
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, onSnapshot, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -24,21 +24,6 @@
     const db   = getFirestore(app);
     const auth = getAuth(app);
 
-    // Badges en vivo
-    function suscribirBadge(idBadge, filtros=[]) {
-      const q = query(collection(db, "Archivo Solicitudes"), ...filtros);
-      onSnapshot(q, snap => {
-        const el = document.getElementById(idBadge);
-        if (!el) return;
-        el.textContent = snap.docs.length;
-        el.classList.add('badge-pulse');
-      }, err => {
-        const el = document.getElementById(idBadge);
-        if (!el) return;
-        el.textContent = "!";
-      });
-    }
-
     // Iniciales desde correo (fallback de avatar)
     function inicialesDesdeEmail(email){
       const base = (email || "").split("@")[0];
@@ -46,6 +31,75 @@
       let ini = partes.slice(0,2).map(s=>s[0]).join("").toUpperCase();
       if(!ini) ini = (email||"U")[0].toUpperCase();
       return ini;
+    }
+
+    // Actualiza los cuatro badges
+    function actualizarBadges({credicash=0, credicel=0, amuebla2=0, refi=0}){
+      const map = {
+        "badge-app-credicash": credicash,
+        "badge-app-credicel": credicel,
+        "badge-app-amuebla2": amuebla2,
+        "badge-app-refinanciamiento": refi
+      };
+      Object.entries(map).forEach(([id,val])=>{
+        const el = document.getElementById(id);
+        if(!el) return;
+        el.textContent = val;
+        el.classList.add('badge-pulse');
+      });
+    }
+
+    // Cuenta aprobadas por línea haciendo JOIN: asignaciones -> Archivo Solicitudes
+    function suscribirBadgesJoin(uid){
+      // Solo asignaciones del usuario y aceptadas
+      const qAsig = query(
+        collection(db, "asignacion_de_cuota"),
+        where("AsignacionID","==", uid),
+        where("respuestaCliente","==","Aceptado")
+      );
+
+      onSnapshot(qAsig, async (snap)=>{
+        // Tomamos solicitudID únicos (evita duplicados si hubiera varias asignaciones)
+        const ids = new Set();
+        snap.forEach(d=>{
+          const a = d.data();
+          if (a && a.solicitudID) ids.add(a.solicitudID);
+        });
+
+        if (ids.size === 0){
+          actualizarBadges({credicash:0, credicel:0, amuebla2:0, refi:0});
+          return;
+        }
+
+        const contadores = {credicash:0, credicel:0, amuebla2:0, refi:0};
+
+        // Traemos cada solicitud y sumamos si está Aprobado
+        await Promise.all([...ids].map(async sid=>{
+          try{
+            const sref = doc(db, "Archivo Solicitudes", sid);
+            const ssnap = await getDoc(sref);
+            if (!ssnap.exists()) return;
+            const s = ssnap.data();
+            if (s.estado !== "Aprobado") return;
+
+            // Algunas bases usan creditLine, otras tipo para Refinanciamiento
+            const linea = (s.creditLine || s.tipo || "").trim();
+
+            if (linea === "Credicash") contadores.credicash++;
+            else if (linea === "Credicel") contadores.credicel++;
+            else if (linea === "Amuebla2") contadores.amuebla2++;
+            else if (linea === "Refinanciamiento") contadores.refi++;
+          }catch(_e){ /* ignoramos errores individuales */ }
+        }));
+
+        actualizarBadges(contadores);
+      }, (_err)=>{
+        // En caso de error, muestra "!" para señalizar
+        ["badge-app-credicash","badge-app-credicel","badge-app-amuebla2","badge-app-refinanciamiento"].forEach(id=>{
+          const el = document.getElementById(id);
+          if(el) el.textContent = "!";
+        });
+      });
     }
 
     window.addEventListener("DOMContentLoaded", () => {
@@ -59,48 +113,20 @@
         const initEl  = document.getElementById("usuario-iniciales");
 
         emailEl.textContent = user.email;
-        h1El.textContent    = user.email;     // a11y (está oculto visualmente)
+        h1El.textContent    = user.email;     // a11y (oculto)
         initEl.textContent  = inicialesDesdeEmail(user.email);
 
         // Avatar: photoURL -> assets/avatar_user.png -> iniciales
         const fallbackSrc = "assets/avatar_user.png";
-        const usarIniciales = () => {
-          imgEl.style.display = "none";
-          initEl.style.display = "grid";
-        };
+        const usarIniciales = () => { imgEl.style.display = "none"; initEl.style.display = "grid"; };
         imgEl.onerror = () => {
-          // si falla el asset, mostrar iniciales
-          if (imgEl.dataset.fallbackTried === "1") { usarIniciales(); }
-          else {
-            imgEl.dataset.fallbackTried = "1";
-            imgEl.src = fallbackSrc;
-          }
+          if (imgEl.dataset.fallbackTried === "1") usarIniciales();
+          else { imgEl.dataset.fallbackTried = "1"; imgEl.src = fallbackSrc; }
         };
         if (user.photoURL) imgEl.src = user.photoURL; else imgEl.src = fallbackSrc;
 
-        const uid = user.uid;
-
-        // Badges aprobadas
-        suscribirBadge("badge-app-credicash", [
-          where("estado","==","Aprobado"),
-          where("creditLine","==","Credicash"),
-          where("AsignacionID", "==", uid)
-        ]);
-        suscribirBadge("badge-app-credicel", [
-          where("estado","==","Aprobado"),
-          where("creditLine","==","Credicel"),
-          where("AsignacionID", "==", uid)
-        ]);
-        suscribirBadge("badge-app-amuebla2", [
-          where("estado","==","Aprobado"),
-          where("creditLine","==","Amuebla2"),
-          where("AsignacionID", "==", uid)
-        ]);
-        suscribirBadge("badge-app-refinanciamiento", [
-          where("estado","==","Aprobado"),
-          where("tipo","==","Refinanciamiento"),
-          where("AsignacionID", "==", uid)
-        ]);
+        // === NUEVO: badges correctos con JOIN ===
+        suscribirBadgesJoin(user.uid);
       });
     });
   </script>
@@ -173,7 +199,6 @@
       display:flex; flex-direction:column; align-items:center;
     }
 
-    /* Ocultamos visualmente el h1 pero conservamos semántica y a11y */
     .visually-hidden{
       position:absolute !important; clip: rect(1px, 1px, 1px, 1px);
       padding:0; border:0; height:1px; width:1px; overflow:hidden; white-space:nowrap;
@@ -191,7 +216,6 @@
       box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
     }
     .identity-card::before{
-      /* halo animado muy sutil */
       content:""; position:absolute; inset:-2px; border-radius:inherit; pointer-events:none;
       background: conic-gradient(from 220deg,
         rgba(103,200,241,.18), rgba(248,175,64,.16), rgba(139,209,58,.16), rgba(103,200,241,.18));
@@ -237,7 +261,6 @@
       position:relative; overflow:hidden;
     }
     .email-pill::after{
-      /* brillo deslizante */
       content:""; position:absolute; inset:0; pointer-events:none;
       background: linear-gradient(120deg, transparent 0 40%, rgba(255,255,255,.6) 50%, transparent 60% 100%);
       transform: translateX(-120%); opacity:.55; mix-blend-mode: screen;
@@ -253,7 +276,7 @@
       font-size:clamp(.98rem, .4vw + .86rem, 1.1rem); margin-bottom:1.8rem; max-width:720px;
     }
 
-    /* === ÚNICA GRILLA (3 columnas por fila) === */
+    /* === GRILLA 3 por fila === */
     .grid-botones{
       width:100%;
       display:grid;
@@ -263,7 +286,7 @@
     @media (max-width:980px){ .grid-botones{ grid-template-columns:repeat(2, minmax(220px,1fr)); } }
     @media (max-width:600px){ .grid-botones{ grid-template-columns:1fr; } }
 
-    /* ===== Botón pro: glass + borde iónico + sheen + tilt + ripple ===== */
+    /* ===== Botón pro ===== */
     .btn-grande{
       position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
       gap:.65rem; min-height:112px; padding:22px 18px; text-decoration:none;
@@ -484,6 +507,7 @@
   </script>
 </body>
 </html>
+
 
 
 

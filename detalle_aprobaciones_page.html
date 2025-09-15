@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Detalle de Aprobaciones</title>
-
   <!-- Firebase SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
@@ -154,57 +153,52 @@
 
     function renderDetalle() {
       let html = `
-        <section class="card">
-          <h2>Datos del Cliente</h2>
-          <div class="info-row"><span>Nombre:</span> ${solData.nombre || '—'}</div>
-          <div class="info-row"><span>Apellido:</span> ${solData.apellido || '—'}</div>
-          <div class="info-row"><span>DUI:</span> ${solData.numeroDui || '—'}</div>
-          <div class="info-row"><span>Dirección:</span> ${solData.direccion || '—'}</div>
-          <div class="info-row"><span>Fecha Solicitud:</span> ${
-            solData.fechaSolicitud && solData.fechaSolicitud.toDate
-              ? solData.fechaSolicitud.toDate().toLocaleDateString("es-SV")
-              : (typeof solData.fechaSolicitud === 'string' ? solData.fechaSolicitud : '—')
-          }</div>
-        </section>
-
-        <section class="card">
-          <h2>Datos de la Asignación</h2>
-          <div class="info-row"><span>Frecuencia de Pago:</span> ${asignData.frecuenciaPago || '—'}</div>
-          <div class="info-row"><span>Número de Cuotas:</span> ${asignData.numeroCuotas || '—'}</div>
-          <div class="info-row"><span>Cuota Aprobada:</span> $${asignData.cuota || '—'}</div>
-          <div class="info-row"><span>Monto Aprobado:</span> $${asignData.montoAprobado || '—'}</div>
-          <div class="info-row"><span>Tasa Anual:</span> ${asignData.tasaAnual || '—'}%</div>
-          <div class="info-row"><span>Asignado a:</span> ${asignData.asignadoA || '—'}</div>
-          <div class="info-row"><span>Agencia:</span> ${asignData.agenciaAsignada || '—'}</div>
-        </section>
+        <h2>Datos del Cliente</h2>
+        <div class="info-row"><span>Nombre:</span> ${solData.nombre || '—'}</div>
+        <div class="info-row"><span>Apellido:</span> ${solData.apellido || '—'}</div>
+        <div class="info-row"><span>DUI:</span> ${solData.numeroDui || '—'}</div>
+        <div class="info-row"><span>Dirección:</span> ${solData.direccion || '—'}</div>
+        <div class="info-row"><span>Fecha Solicitud:</span> ${
+          solData.fechaSolicitud && solData.fechaSolicitud.toDate
+            ? solData.fechaSolicitud.toDate().toLocaleDateString("es-SV")
+            : (typeof solData.fechaSolicitud === 'string' ? solData.fechaSolicitud : '—')
+        }</div>
+        <hr>
+        <h2>Datos de la Asignación</h2>
+        <div class="info-row"><span>Frecuencia de Pago:</span> ${asignData.frecuenciaPago || '—'}</div>
+        <div class="info-row"><span>Número de Cuotas:</span> ${asignData.numeroCuotas || '—'}</div>
+        <div class="info-row"><span>Cuota Aprobada:</span> $${asignData.cuota || '—'}</div>
+        <div class="info-row"><span>Asignado a:</span> ${asignData.asignadoA || '—'}</div>
+        <div class="info-row"><span>Agencia:</span> ${asignData.agenciaAsignada || '—'}</div>
       `;
 
       // --- BLOQUE DE DESEMBOLSO NETO PARA REFINANCIAMIENTO ---
       if (esRefinanciamiento && creditoAnteriorInfo) {
         html += `
-          <section class="card payout">
-            <div class="payout-main">Efectivo a entregar al cliente: <b>$${desembolsoNeto.toFixed(2)}</b></div>
-            <div class="payout-meta">
-              Nuevo aprobado: <b>$${Number(asignData.montoAprobado).toFixed(2)}</b> •
-              Menos saldo anterior: <b>$${creditoAnteriorInfo.saldoActual.toFixed(2)}</b> •
-              Intereses pendientes: <b>$${creditoAnteriorInfo.interesActual.toFixed(2)}</b>
-            </div>
-          </section>
+        <div style="padding:18px;background:#ffd840;border-radius:12px;color:#2d2d2d;font-size:1.3em;font-weight:bold;margin:22px 0 10px 0;">
+          Efectivo a entregar al cliente: $${desembolsoNeto.toFixed(2)}<br>
+          <span style="font-size:.82em;color:#df9900">
+            (Nuevo aprobado: $${Number(asignData.montoAprobado).toFixed(2)}<br>
+            Menos saldo anterior: $${creditoAnteriorInfo.saldoActual.toFixed(2)}<br>
+            Menos intereses pendientes: $${creditoAnteriorInfo.interesActual.toFixed(2)})
+          </span>
+        </div>
         `;
       }
 
       html += `
-        <div class="actions">
+        <div style="height:18px"></div>
+        <div class="btns-acciones">
           <button class="btn-legal" id="btn-papeleria-legal"><i class="fas fa-file-alt"></i> Papelería Legal</button>
           <a class="btn-apertura" href="apertura_credito_page.html?solicitudID=${encodeURIComponent(asignData.solicitudID)}">Apertura de Crédito</a>
         </div>
-
-        <section class="card">
+        <div style="margin-top:28px">
           <button id="btn-nueva-tabla" class="btn-nueva-tabla">Generar nueva tabla de amortización</button>
-          <div id="amort-table-div" class="amort"></div>
-        </section>
+        </div>
+        <div id="amort-table-div"></div>
 
-        <section class="card note">
+        <!-- SOLO se corrigió esta nota para que no se desborde -->
+        <div class="nota-importante">
           <b>IMPORTANTE:</b> Esta tabla se genera usando la fecha actual.
           <ul>
             <li>La PRIMERA cuota se agenda N días después de hoy (hoy + período).</li>
@@ -212,30 +206,27 @@
             <li>Si han pasado días desde la asignación, las fechas de pago e intereses se ajustarán.</li>
             <li>Usa la tabla recalculada para papelería legal y control real del crédito.</li>
           </ul>
-        </section>
+        </div>
       `;
 
       document.getElementById('detalle-contenido').innerHTML = html;
 
-      // Generar nueva tabla
       document.getElementById("btn-nueva-tabla").onclick = function () {
         recalcularAmortizacion();
         if (asignacionID && nuevaAmortizacion.length > 0) {
           localStorage.setItem('amortizacion_temp_' + asignacionID, JSON.stringify(nuevaAmortizacion));
         }
-        let tabla = `<h3>Tabla de Amortización (RECALCULADA)</h3>
-        <div style="overflow-x:auto;"><table class="tab">
-          <thead>
-            <tr>
-              <th>N°</th>
-              <th>Fecha</th>
-              <th>Cuota</th>
-              <th>Interés</th>
-              <th>Capital</th>
-              <th>Saldo</th>
-            </tr>
-          </thead>
-          <tbody>`;
+        let tabla = `<h2>Tabla de Amortización (RECALCULADA)</h2>
+        <div style="overflow-x:auto;"><table><thead>
+          <tr>
+            <th>N°</th>
+            <th>Fecha</th>
+            <th>Cuota</th>
+            <th>Interés</th>
+            <th>Capital</th>
+            <th>Saldo</th>
+          </tr></thead><tbody>
+        `;
         for (const row of nuevaAmortizacion) {
           tabla += `<tr>
             <td>${row.numeroCuota}</td>
@@ -250,7 +241,7 @@
         document.getElementById("amort-table-div").innerHTML = tabla;
       };
 
-      // Validación para Papelería Legal con modal
+      // --- Lógica anti-avance con único modal ---
       setTimeout(() => {
         const btnPapeleria = document.getElementById('btn-papeleria-legal');
         if (btnPapeleria) {
@@ -261,9 +252,11 @@
               if (!asignSnap.exists()) throw new Error("No se encontró la asignación.");
               const asignDataFresh = asignSnap.data();
 
+              // SOLO permite avanzar si creditoAperturado === true
               if (asignDataFresh.creditoAperturado === true) {
                 window.location.href = `papeleria_legal.html?id=${asignacionID}`;
               } else {
+                // Para cualquier otro caso: flujo antiguo o campo false
                 document.getElementById('modal-bloqueo').style.display = 'flex';
               }
             } catch (err) {
@@ -276,137 +269,40 @@
 
     window.addEventListener("DOMContentLoaded", loadDetalleAprobacion);
   </script>
-
-  <!-- FontAwesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
   <style>
-    :root{
-      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --muted:#5b6776; --white:#fff;
-      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#32D47B; --brand-gold:#F8AF40;
-      --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
-      --radius-2xl: 22px;
-    }
-    @media (prefers-color-scheme: dark){
-      :root{
-        --bg:#0c0f14; --bg-2:#0f141b; --text:#dfe6ef; --muted:#9aa6b6;
-        --glass-bg:rgba(255,255,255,.10); --glass-brd:rgba(255,255,255,.16); --glass-shadow:0 24px 60px rgba(0,0,0,.45);
-      }
-    }
+    body { background: #111; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; margin: 0; }
+    header { background:#000; padding:1rem 0; text-align:center; font-size:1.5rem; letter-spacing:1px; font-weight:700; color: #67C8F1; }
+    .container { max-width: 750px; margin:2.2rem auto 0 auto; background: #181818; border-radius: 18px; box-shadow: 0 2px 25px #0005; padding: 2.5rem 2.3rem; }
+    h1 { color: #F8AF40; font-size:2rem; text-align:center; font-weight:bold; margin-top:0; margin-bottom:1.5rem;}
+    h2 { color:#67C8F1; font-size:1.13rem; margin:1.3rem 0 0.4rem 0; letter-spacing:.5px;}
+    .info-row { margin: 0.36em 0; font-size:1.06rem;}
+    .info-row span { color:#F8AF40; font-weight:700; margin-right:10px;}
+    .btns-acciones { display:flex; gap:14px; margin-bottom:12px; }
+    .btn-legal, .btn-apertura { padding: 13px 18px; border-radius:10px; font-size:1rem; font-weight:600; border:none; cursor:pointer; outline:none; text-decoration:none; transition: background .16s; display: flex; align-items: center; gap: 10px;}
+    .btn-legal { background: #253045; color:#F8AF40; opacity:1; cursor:pointer;}
+    .btn-legal:hover { background: #67C8F1; color: #181818; }
+    .btn-apertura { background: #13b66b; color:#fff; }
+    .btn-apertura:hover { background: #0a8a5a; color:#fff;}
+    .btn-nueva-tabla { background:#f5af19; color:#181818; font-weight:700; font-size:1.08em; border-radius:8px; border:none; padding:9px 22px; cursor:pointer; margin-bottom:14px;}
+    .btn-nueva-tabla:hover { background:#ffce42; color:#000;}
+    table { width: 100%; border-collapse: collapse; background:#212a2c; margin-top:10px;}
+    th, td { padding: .75em .6em; text-align: left; }
+    th { background: #253045; color: #67C8F1; }
+    tr { border-bottom: 1px solid #2b2b2b; }
+    tr:last-child { border-bottom:none; }
+    td { color:#fff; }
+    .error { color:#f55; font-size:1.13rem; padding:24px 0; text-align:center;}
 
-    *{ box-sizing:border-box }
-    html,body{ height:100% }
-    body{
-      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
-      color:var(--text);
-      background:
-        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
-        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
-        linear-gradient(180deg, var(--bg), var(--bg-2));
-      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
-      min-height:100vh;
-    }
-
-    .pattern{
-      position:fixed; inset:0; pointer-events:none; z-index:0;
-      background-image:
-        radial-gradient(1px 1px at 25px 25px, rgba(255,255,255,.10), transparent 40%),
-        radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.06), transparent 40%);
-      background-size:100px 100px; mix-blend-mode:soft-light; opacity:.5;
-    }
-
-    header{
-      position:sticky; top:0; z-index:10;
-      backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
-      background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
-      border-bottom:1px solid var(--glass-brd);
-    }
-    @media (prefers-color-scheme: dark){
-      header{ background:linear-gradient(180deg, rgba(15,20,30,.75), rgba(15,20,30,.35)); }
-    }
-
-    .topbar{
-      max-width: 980px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
-    }
-    .logo-plate{
-      display:inline-flex; align-items:center; gap:10px; background:var(--glass-bg); border:1px solid var(--glass-brd);
-      padding:8px 14px; border-radius:16px; box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
-    }
-    .logo-plate::after{
-      content:""; position:absolute; inset:-1px;
-      background:linear-gradient(120deg, transparent 0 35%, rgba(255,255,255,.55) 45%, transparent 55% 100%);
-      transform:translateX(-120%); animation:plateSheen 6s linear infinite; pointer-events:none;
-    }
-    @keyframes plateSheen{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
-    .logo-plate img{ height:28px; width:auto; display:block }
-    .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
-
-    .container{
-      position:relative; z-index:1;
-      max-width: 980px; margin: 1.6rem auto 2.2rem auto; padding: 0 16px 24px;
-    }
-
-    h1{
-      margin: 1.1rem 0 1rem; text-align:center;
-      font-size: clamp(1.4rem, 2.1vw + 1rem, 2.1rem);
-      color: var(--brand-blue); font-weight: 800;
-    }
-
-    /* Tarjetas base */
-    .card{
-      background: var(--glass-bg);
-      border: 1px solid var(--glass-brd);
-      border-radius: var(--radius-2xl);
-      box-shadow: var(--glass-shadow);
-      padding: 16px 18px;
-      margin: 14px 0;
-    }
-    .card h2{
-      margin: 0 0 8px 0;
-      font-size: 1.05rem;
-      color: var(--brand-blue);
-      letter-spacing:.3px;
-    }
-
-    .info-row{ margin:.38em 0; font-size:1.02rem; }
-    .info-row span{ color: var(--brand-gold); font-weight:800; margin-right:8px; }
-
-    /* Payout (refinanciamiento) */
-    .payout{ background: linear-gradient(180deg, #fff7d6, #ffeaa8); color:#2a2a2a; border-color: #ffe08a; }
-    .payout-main{ font-size:1.16rem; font-weight:900; }
-    .payout-main b{ color:#0c3c2b; }
-    .payout-meta{ margin-top:6px; font-size:.95rem; color:#925a00; }
-
-    /* Botones */
-    .actions{ display:flex; gap:12px; flex-wrap:wrap; margin: 12px 0; }
-    .btn-legal, .btn-apertura{
-      padding: 12px 16px; border-radius:12px; border:none; cursor:pointer; text-decoration:none;
-      font-weight:800; letter-spacing:.2px; display:inline-flex; align-items:center; gap:10px;
-    }
-    .btn-legal{ background:#253045; color:#F8AF40; }
-    .btn-legal:hover{ background:#3a4a6a; color:#fff; }
-    .btn-apertura{ background:#13b66b; color:#fff; }
-    .btn-apertura:hover{ background:#0a8a5a; }
-
-    .btn-nueva-tabla{
-      background:#f5af19; color:#181818; font-weight:900; font-size:1.02rem;
-      border-radius:10px; border:none; padding:10px 18px; cursor:pointer;
-    }
-    .btn-nueva-tabla:hover{ background:#ffce42; }
-
-    /* Tabla amortización */
-    .amort{ margin-top:12px; }
-    .tab{ width:100%; border-collapse: collapse; }
-    .tab th, .tab td{ padding:.7em .6em; text-align:left; border-bottom:1px solid rgba(10,20,40,.12); }
-    .tab thead th{ background:#253045; color:var(--brand-cel); border-bottom:none; }
-
-    /* Notas – FIX para que no se salga de la card */
-    .note{
+    /* ====== FIX para que la nota no se desborde ====== */
+    .nota-importante{
+      margin-top:18px;
+      padding:12px 14px;
       background:#213d4b;
-      color:#fff;
-      border:1px solid rgba(103,200,241,.25);
-      border-radius:22px;
-      padding:14px 16px;
+      color:#F8AF40;           /* texto principal dorado (igual que antes) */
+      border-radius:12px;
+
+      /* Evitar desbordes */
       font-size:.95rem;
       line-height:1.5;
       overflow:hidden;
@@ -414,62 +310,64 @@
       overflow-wrap:anywhere;
       hyphens:auto;
     }
-    .note b{
+    .nota-importante b{
       display:inline-block;
-      color: var(--brand-gold);
-      font-size:.9rem;
-      letter-spacing:.3px;
-      margin-bottom:6px;
+      color:#F8AF40;
+      font-weight:900;
+      font-size:.9rem;          /* un poco más compacto para que no rompa layout */
       background:rgba(248,175,64,.15);
-      padding:4px 8px;
-      border-radius:8px;
+      padding:3px 8px;
+      border-radius:6px;
+      margin-bottom:6px;
     }
-    .note ul{ margin:8px 0 0 16px; padding-left:0; }
-    .note li{ margin:4px 0; }
-
-    .error{ color:#f55; font-size:1.06rem; padding:24px 0; text-align:center; }
-
-    /* Modal */
-    #modal-bloqueo{
-      display:none; position:fixed; z-index:1000; inset:0;
-      background:rgba(17,18,26,.88); align-items:center; justify-content:center;
+    .nota-importante ul{
+      margin:8px 0 0 19px;
+      padding-left:0;
+      color:#fff;               /* bullets en blanco como lo tenías */
     }
-    .modal-box{
-      background:#222a2c; padding:42px 28px; border-radius:18px; max-width:340px;
-      text-align:center; box-shadow: 0 8px 32px #000b; color:#fff;
-    }
-    .modal-box i{ font-size:2.4em; color:#f55; margin-bottom:8px; }
-    .modal-box h3{ color:#F8AF40; font-weight:900; margin: 0 0 8px; }
-    .modal-box p{ margin:0 0 16px; font-size:1.05rem; }
-    .modal-box button{
-      background:#f55; border:none; color:#fff; font-weight:800; padding:9px 30px;
-      border-radius:10px; font-size:1.02rem; cursor:pointer;
+    .nota-importante li{ margin:4px 0; }
+    @media (max-width:700px){
+      .nota-importante{ font-size:.9rem; }
     }
 
-    @media (max-width:800px){
-      .container{ padding: 0 10px 18px; }
-      h1{ font-size:1.4rem; }
-      .note{ font-size:.9rem; }
+    /* MODAL */
+    #modal-bloqueo {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(17,18,26,0.88);
+      align-items: center; justify-content: center;
+    }
+    .modal-box {
+      background: #222a2c;
+      padding: 42px 28px;
+      border-radius: 18px;
+      max-width: 340px;
+      text-align: center;
+      box-shadow: 0 8px 32px #000b;
+    }
+    .modal-box i { font-size:2.4em;color:#f55;margin-bottom:8px;}
+    .modal-box h3 { color:#F8AF40;font-weight:900;}
+    .modal-box p {margin:16px 0 12px 0;color:#fff;font-size:1.08em;}
+    .modal-box button {
+      background:#f55;border:none;color:#fff;
+      font-weight:700;padding:9px 30px;
+      border-radius:10px;font-size:1.07em;
+      cursor:pointer;
+    }
+    @media (max-width:800px) {
+      .container { padding: 1.4rem 0.5rem;}
+      h1 { font-size: 1.17rem;}
     }
   </style>
 </head>
 <body>
-  <div class="pattern" aria-hidden="true"></div>
-
-  <header>
-    <div class="topbar">
-      <div class="logo-plate">
-        <img src="assets/logo_mi_bw.png" alt="Logo Multi Inversiones" />
-        <strong class="brand-name">MULTI INVERSIONES</strong>
-      </div>
-      <div style="margin-left:auto; font-weight:700; color:var(--muted);">Detalle de Aprobaciones</div>
-    </div>
-  </header>
-
+  <header>Detalle de Aprobaciones</header>
   <div class="container">
     <h1><i class="fas fa-file-alt"></i> Detalle de Aprobaciones</h1>
     <div id="detalle-contenido">
-      <div class="card" style="text-align:center;color:#8593a3;">Cargando información...</div>
+      <div style="color:#ccc;text-align:center;padding:38px 0;">Cargando información...</div>
     </div>
   </div>
 
@@ -478,12 +376,17 @@
     <div class="modal-box">
       <i class="fas fa-ban"></i>
       <h3>¡Acceso bloqueado!</h3>
-      <p>No puedes generar la papelería legal.<br><b>Primero debes aperturar el crédito.</b></p>
+      <p>
+        No puedes generar la papelería legal.<br>
+        <b>Primero debes aperturar el crédito.</b>
+      </p>
       <button onclick="document.getElementById('modal-bloqueo').style.display='none'">Cerrar</button>
     </div>
   </div>
 </body>
 </html>
+
+
 
 
 

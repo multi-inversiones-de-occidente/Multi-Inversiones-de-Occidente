@@ -4,11 +4,14 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Tasa de Mora por Usuario – Multi Inversiones</title>
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
+  <!-- Firebase + App (módulo) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { 
-      getFirestore, collection, query, where, getDocs, doc, getDoc 
-    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -26,8 +29,8 @@
 
     // ===== Estado en memoria =====
     let department = null;            // Agencia del logueado
-    let nombreLogueado = null;        // Nombre "humano" del logueado
-    let morososDeAgencia = [];        // Créditos de la agencia que tienen al menos una cuota "Atrasado"
+    let nombreLogueado = null;        // Nombre del logueado
+    let morososDeAgencia = [];        // Créditos de la agencia con al menos una cuota "Atrasado"
 
     // ===== Utilidades =====
     function formatoDinero(valor) {
@@ -75,9 +78,8 @@
       return "Sin nombre";
     }
 
-    // ===== Carga base: morosos por agencia y ejecutivos reales de esos créditos =====
+    // ===== Carga base: morosos por agencia =====
     async function cargarBase() {
-      // 1) Traemos todos los créditos de la agencia
       const qCreds = query(collection(db, "creditos"), where("agenciaAsignada", "==", department));
       const snap = await getDocs(qCreds);
 
@@ -100,20 +102,16 @@
         }
       }
 
-      // 2) Poblar el select con valores REALES de asignadoA (únicos)
+      // Usuarios únicos (asignadoA) que realmente tienen mora
       const select = document.getElementById("user-select");
       const set = new Set(
-        morososDeAgencia
-          .map(x => x.asignadoA)
-          .filter(n => n && n.length > 0)
+        morososDeAgencia.map(x => x.asignadoA).filter(n => n && n.length > 0)
       );
       const opciones = [];
-      // “Yo” si aparece en créditos
       if (nombreLogueado && set.has(nombreLogueado)) {
         opciones.push(`<option value="${nombreLogueado}">Yo (${nombreLogueado})</option>`);
         set.delete(nombreLogueado);
       }
-      // Resto
       [...set].sort().forEach(n => opciones.push(`<option value="${n}">${n}</option>`));
 
       select.innerHTML = `
@@ -134,18 +132,13 @@
       if (!nombreSeleccionado) { resBox.innerHTML = ""; return; }
       resBox.innerHTML = `<div class="cargando">Calculando...</div>`;
 
-      // Fuente: morososDeAgencia (ya filtrados por agencia y con mora)
       let items = [];
       if (nombreSeleccionado === "__todos__") {
         items = morososDeAgencia.map(x => ({...x}));
       } else {
-        // Match EXACTO con lo que hay en creditos.asignadoA
         items = morososDeAgencia.filter(x => x.asignadoA === nombreSeleccionado);
       }
 
-      // Cartera total: suma de saldoActual de créditos NO "Revertido" (igual que tu otra página)
-      // OJO: cartera total debería considerar TODOS los créditos del usuario, pero aquí usamos
-      // la misma lógica que tu panel por agencia (sobre los datos que mostramos).
       let capitalAtrasado = 0;
       let carteraTotal    = 0;
       for (const it of items) {
@@ -154,7 +147,6 @@
       }
       const moraPct = carteraTotal > 0 ? (capitalAtrasado / carteraTotal) * 100 : 0;
 
-      // Resumen
       const tituloUsuario = (nombreSeleccionado === "__todos__") ? "Todos (con mora)" : nombreSeleccionado;
       resBox.innerHTML = `
         <div class="card-res">
@@ -165,23 +157,21 @@
         </div>
       `;
 
-      // Detalle (con nombre de cliente resuelto)
-      // Orden por capitalAtrasado desc
+      // Detalle
       items.sort((a, b) => b.capitalAtrasado - a.capitalAtrasado);
-
       for (const it of items) {
         const nombreCliente = await resolverNombreCliente(it.raw);
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td class="td-corto">${it.idCredito}</td>
-          <td>${nombreCliente}</td>
-          <td>${it.estadoCredito}</td>
-          <td class="num">${formatoDinero(it.saldoActual)}</td>
-          <td class="num imp">${formatoDinero(it.capitalAtrasado)}</td>
-          <td class="num">${formatoDinero(it.paraPonerseAlDia)}</td>
-          <td class="num">${it.cuotasAtrasadas}</td>
+          <td title="${it.idCredito}" class="mono">${it.idCredito}</td>
+          <td title="${nombreCliente}">${nombreCliente}</td>
+          <td title="${it.estadoCredito}">${it.estadoCredito}</td>
+          <td class="num" title="${formatoDinero(it.saldoActual)}">${formatoDinero(it.saldoActual)}</td>
+          <td class="num imp" title="${formatoDinero(it.capitalAtrasado)}">${formatoDinero(it.capitalAtrasado)}</td>
+          <td class="num" title="${formatoDinero(it.paraPonerseAlDia)}">${formatoDinero(it.paraPonerseAlDia)}</td>
+          <td class="num" title="${it.cuotasAtrasadas}">${it.cuotasAtrasadas}</td>
         `;
-        tbody.appendChild(tr);
+        document.getElementById('detalle-body').appendChild(tr);
       }
 
       document.getElementById("total-registros").textContent = String(items.length);
@@ -199,18 +189,16 @@
       const ws_data = [
         ["ID Credito","Asignado A","Cliente","Estado","Saldo Actual","Capital Atrasado","Para Ponerse Al Dia","Cuotas Atrasadas"],
       ];
-
       const rows = raw.map(r => ([
         r.idCredito,
         r.asignadoA,
-        "", // lo dejamos vacío para no resolver nombres otra vez aquí
+        "", // cliente (omitimos re-resolver aquí)
         r.estadoCredito,
         r.saldoActual,
         r.capitalAtrasado,
         r.paraPonerseAlDia,
         r.cuotasAtrasadas
       ]));
-
       ws_data.push(...rows);
 
       const ws = XLSX.utils.aoa_to_sheet(ws_data);
@@ -234,13 +222,9 @@
         department = udata.department || null;
         nombreLogueado = resolverNombreUsuario(udata);
 
-        // Cargar base desde CREDITOS (evita mismatch de nombres)
         await cargarBase();
 
-        // Listeners
-        const select = document.getElementById('user-select');
-        select.addEventListener('change', e => calcular(e.target.value));
-
+        document.getElementById('user-select').addEventListener('change', e => calcular(e.target.value));
         document.getElementById("btn-exportar").addEventListener("click", exportarExcel);
       });
     });
@@ -249,42 +233,182 @@
   <!-- SheetJS para exportar a Excel -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body { background: #101212; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
-    header { background: #000; padding: 1rem 0; text-align: center; font-size: 1.45rem; font-weight: 700; color: #67C8F1;}
-    .container { max-width: 520px; margin: 2.2rem auto 0 auto; background: #181b1f; border-radius: 16px; box-shadow: 0 4px 24px #0009; padding: 2.2rem 1.3rem 1.6rem 1.3rem;}
-    .section-title { color: #F8AF40; font-weight: 700; font-size: 1.17rem; margin-bottom: 18px; text-align:center;}
-    .input-main, select { width: 100%; background: #23272c; color: #fff; border: 1.7px solid #3c3f43; border-radius: 10px; font-size: 1.13rem; padding: 12px 14px; margin-bottom: 1.1em; outline: none; box-sizing: border-box;}
-    label { color: #67C8F1; font-weight: 600; margin-bottom: 4px; display: block;}
-    .card-res { background: #23272c; border-radius: 14px; padding: 22px 15px 18px 15px; margin: 28px 0 0 0; box-shadow: 0 2px 10px #0004; }
-    .card-res div { font-size: 1.09rem; margin-bottom: 10px; color: #ffd266;}
-    .card-res span { color: #67C8F1; font-weight:600;}
-    .num { color: #ffd266; font-weight:700; font-size: 1.18em;}
-    .num.verde { color: #13b66b; }
-    .num.rojo { color: #ff6262; }
-    .cargando { color: #ffd266; text-align: center; font-size: 1.08rem;}
+    /* ======= Estilo gráfico CLARO / GLASS (mismo del Panel de Gerente) ======= */
+    :root{
+      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --white:#ffffff; --muted:#5b6776;
+      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
+      --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
+      --radius-2xl:22px; --radius-xl:16px;
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0c0f14; --bg-2:#0f141b; --text:#dfe6ef; --muted:#9aa6b6;
+        --glass-bg:rgba(255,255,255,.12); --glass-brd:rgba(255,255,255,.18); --glass-shadow:0 24px 60px rgba(0,0,0,.45);
+      }
+    }
 
-    .detalle-container { margin-top: 22px; display:none; }
-    .header-detalle { display: flex; align-items: center; justify-content: space-between; gap: .8rem; margin-bottom: .8rem; }
-    .header-detalle h2 { margin: 0; font-size: 1.1rem; letter-spacing: .4px; color: #b8c0ff; }
-    .pill { background: #23272c; padding: .35rem .6rem; border-radius: 999px; font-size: .85rem; color: #fff9; }
-    .btn { display: inline-flex; align-items: center; gap: .5rem; padding: .5rem .8rem; border-radius: 10px; background: #0e7a45; color: #fff; font-weight: 600; border: none; cursor: pointer; }
-    .btn.secondary { background: #2c2c36; }
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      min-height:100vh;
+    }
+    .pattern{
+      position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image:
+        radial-gradient(1px 1px at 25px 25px, rgba(255,255,255,.10), transparent 40%),
+        radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.06), transparent 40%);
+      background-size:100px 100px; mix-blend-mode:soft-light; opacity:.5;
+    }
 
-    table { width: 100%; border-collapse: collapse; border-spacing: 0; border-radius: 12px; background: #17171f; overflow: hidden; }
-    thead th { text-align: left; font-size: .85rem; color: #b8c0ff; padding: .7rem .8rem; background: #1f1f28; position: sticky; top: 0; z-index: 2; }
-    tbody td { padding: .7rem .8rem; border-top: 1px solid #2a2a35; font-size: .94rem; color: #e6e6e6; }
-    tbody tr:hover { background: #1e1e27; }
-    .num { text-align: right; }
-    .imp { color: #ffd600; font-weight: 700; }
-    .td-corto { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
+      background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
+      border-bottom:1px solid var(--glass-brd);
+    }
+    @media (prefers-color-scheme: dark){
+      header{ background:linear-gradient(180deg, rgba(15,20,30,.75), rgba(15,20,30,.35)); }
+    }
+    .topbar{
+      max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
+    }
+    .logo-plate{
+      display:inline-flex; align-items:center; gap:10px; background:var(--glass-bg);
+      border:1px solid var(--glass-brd); padding:8px 14px; border-radius:16px;
+      box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
+    }
+    .logo-plate::after{
+      content:""; position:absolute; inset:-1px;
+      background:linear-gradient(120deg, transparent 0 35%, rgba(255,255,255,.55) 45%, transparent 55% 100%);
+      transform:translateX(-120%); animation:plateSheen 6s linear infinite; pointer-events:none;
+    }
+    @keyframes plateSheen{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
+    .logo-plate img{ height:28px; width:auto; display:block }
+    .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
 
-    @media (max-width:550px){.container{padding:1.3rem 1vw;}}
+    /* Contenedor ancho para tabla */
+    .container{
+      position:relative; z-index:1;
+      max-width: min(95vw, 1200px);
+      margin: 2rem auto; padding: 1.2rem;
+      background:var(--glass-bg); border:1px solid var(--glass-brd);
+      border-radius:var(--radius-2xl); box-shadow:var(--glass-shadow);
+    }
+
+    .section-title{
+      text-align:center; color:var(--brand-blue); font-weight:800;
+      font-size:clamp(1.1rem, .8vw + 1rem, 1.5rem); margin-bottom:1rem;
+    }
+
+    /* Select y botones */
+    label{ color:var(--muted); font-weight:700; display:block; margin-bottom:.3rem; }
+    .input-main, select{
+      width:100%; background:var(--white); color:var(--text);
+      border:1px solid var(--glass-brd); border-radius:12px;
+      font-size:1rem; padding:.75rem .85rem; outline:none;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 6px 18px rgba(10,20,40,.06);
+    }
+    .btn{
+      display:inline-flex; align-items:center; gap:.5rem;
+      padding:.6rem .9rem; border-radius:12px;
+      background:linear-gradient(90deg, var(--brand-green), #10a164);
+      color:#fff; font-weight:800; border:none; cursor:pointer;
+      box-shadow:0 14px 30px rgba(16,161,100,.18);
+    }
+    .btn i{ font-size:1rem; }
+
+    /* Tarjeta resumen */
+    .card-res{
+      margin-top:1rem; padding:1rem; border-radius:16px;
+      background:var(--white); border:1px solid var(--glass-brd);
+      box-shadow:0 10px 26px rgba(10,20,40,.08), inset 0 1px 0 rgba(255,255,255,.7);
+      display:grid; grid-template-columns:repeat(2,minmax(240px,1fr)); gap:.6rem 1rem;
+    }
+    .card-res span{ color:var(--brand-blue); font-weight:800; }
+    .num{ color:#8a5a00; font-weight:900; }
+    .num.verde{ color:#0c8a58; }
+    .num.rojo{ color:#d03838; }
+    .cargando{ color:#7a4b00; text-align:center; font-weight:800; }
+
+    /* Cabecera detalle */
+    .detalle-container{ margin-top:1rem; display:none; }
+    .header-detalle{ display:flex; align-items:center; justify-content:space-between; gap:.8rem; margin-bottom:.6rem; }
+    .header-detalle h2{ margin:0; font-size:1rem; color:var(--brand-blue); font-weight:900; }
+    .pill{
+      background:linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
+      border:1px solid rgba(36,59,134,.15);
+      padding:.35rem .6rem; border-radius:999px; font-size:.85rem; color:var(--text);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    }
+
+    /* Tabla a todo ancho sin doble línea */
+    .table-wrap{ width:100%; overflow:auto; }
+    table#tabla-detalle{
+      width:100%;
+      min-width:1200px;              /* aseguramos ancho amplio */
+      border-collapse:separate;
+      border-spacing:0;
+      background:var(--white);
+      border:1px solid var(--glass-brd);
+      border-radius:12px; overflow:hidden;
+      box-shadow:0 8px 22px rgba(10,20,40,.08), inset 0 1px 0 rgba(255,255,255,.7);
+      table-layout:fixed;            /* permite elipsis consistente */
+    }
+    table#tabla-detalle colgroup col:nth-child(1){ width:14%; }
+    table#tabla-detalle colgroup col:nth-child(2){ width:23%; }
+    table#tabla-detalle colgroup col:nth-child(3){ width:10%; }
+    table#tabla-detalle colgroup col:nth-child(4){ width:13%; }
+    table#tabla-detalle colgroup col:nth-child(5){ width:14%; }
+    table#tabla-detalle colgroup col:nth-child(6){ width:16%; }
+    table#tabla-detalle colgroup col:nth-child(7){ width:10%; }
+
+    thead th{
+      text-align:left; font-size:.9rem; color:var(--brand-blue);
+      padding:.7rem .8rem;
+      background:linear-gradient(180deg, rgba(103,200,241,.18), rgba(103,200,241,.08));
+      font-weight:800;
+      white-space:nowrap;
+      border-bottom:1px solid rgba(10,20,40,.08);
+    }
+    tbody td{
+      padding:.7rem .8rem; font-size:.95rem; color:var(--text);
+      border-top:1px solid rgba(10,20,40,.08);
+      white-space:nowrap;            /* evita doble línea */
+      overflow:hidden; text-overflow:ellipsis;  /* elipsis */
+    }
+    tbody tr:hover{ background:rgba(103,200,241,.05); }
+    td.num{ text-align:right; }
+    td.imp{ color:#c17900; font-weight:900; }
+    td.mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+    @media (max-width:800px){
+      .card-res{ grid-template-columns:1fr; }
+    }
   </style>
 </head>
 <body>
-  <header>Tasa de Mora por Usuario</header>
+  <div class="pattern" aria-hidden="true"></div>
+
+  <header>
+    <div class="topbar">
+      <div class="logo-plate">
+        <img src="assets/logo_mi_bw.png" alt="Logo Multi Inversiones" width="140" height="40" />
+        <strong class="brand-name">MULTI INVERSIONES</strong>
+      </div>
+      <div style="margin-left:auto; font-weight:700; color:var(--muted);">
+        Tasa de Mora por Usuario
+      </div>
+    </div>
+  </header>
+
   <div class="container">
     <div class="section-title">Consulta el % de mora y cartera por usuario</div>
 
@@ -293,7 +417,7 @@
       <option value="">Cargando usuarios...</option>
     </select>
 
-    <div id="resultado" style="margin-top:12px;"></div>
+    <div id="resultado" style="margin-top:.6rem;"></div>
 
     <!-- Detalle créditos en mora -->
     <div id="detalle-box" class="detalle-container">
@@ -304,8 +428,13 @@
           <button class="btn" id="btn-exportar" style="display:none;"><i class="fa-solid fa-file-excel"></i> Exportar Excel</button>
         </div>
       </div>
-      <div style="overflow:auto;">
+
+      <div class="table-wrap">
         <table id="tabla-detalle">
+          <!-- Definimos proporciones de columnas para mantener una sola línea por fila -->
+          <colgroup>
+            <col/><col/><col/><col/><col/><col/><col/>
+          </colgroup>
           <thead>
             <tr>
               <th>ID Crédito</th>
@@ -327,5 +456,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </body>
 </html>
+
+
 
 

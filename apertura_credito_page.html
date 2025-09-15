@@ -6,6 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Apertura de Crédito – Multi Inversiones</title>
 
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
@@ -45,7 +48,8 @@
     }
 
     function setLoading(msg = "Cargando...") {
-      document.getElementById('main-content').innerHTML = `<div style="color:#fff;text-align:center;padding:70px 0;">${msg}</div>`;
+      document.getElementById('main-content').innerHTML =
+        `<div style="color:var(--text);text-align:center;padding:70px 0;">${msg}</div>`;
     }
 
     function recalcularAmortizacion() {
@@ -122,23 +126,29 @@
       }
 
       let html = `
-        <div class="field">
-          <label>Línea de Crédito</label>
-          <input type="text" value="${solicitudData.creditLine ?? ''}" disabled class="input"/>
-        </div>
+        <div class="fields">
+          <div class="field">
+            <label>Línea de Crédito</label>
+            <input type="text" value="${solicitudData.creditLine ?? ''}" disabled class="input"/>
+          </div>
 
-        <div class="info-row">Nombre: ${solicitudData.nombre ?? ''}</div>
-        <div class="info-row">Apellido: ${solicitudData.apellido ?? ''}</div>
-        <div class="info-row">Monto Solicitado: $${(solicitudData.montoAprobado ?? '').toString()}</div>
+          <div class="info-grid">
+            <div class="info-row"><span>Nombre:</span> ${solicitudData.nombre ?? ''}</div>
+            <div class="info-row"><span>Apellido:</span> ${solicitudData.apellido ?? ''}</div>
+            <div class="info-row"><span>Monto Solicitado:</span> $${(solicitudData.montoAprobado ?? '').toString()}</div>
+          </div>
+        </div>
       `;
 
       if (!asignacionData) {
-        html += `<div style="margin-top:30px;color:#aaa;">Asignación: No disponible</div>`;
+        html += `<div class="muted" style="margin-top:10px;">Asignación: No disponible</div>`;
       } else {
         html += `
-          <div class="info-row">Frecuencia de Pago: ${asignacionData.frecuenciaPago ?? ''}</div>
-          <div class="info-row">Número de Cuotas: ${asignacionData.numeroCuotas ?? ''}</div>
-          <div class="info-row">Cuota Aprobada: $${asignacionData.cuota ?? ''}</div>
+          <div class="info-grid">
+            <div class="info-row"><span>Frecuencia de Pago:</span> ${asignacionData.frecuenciaPago ?? ''}</div>
+            <div class="info-row"><span>Número de Cuotas:</span> ${asignacionData.numeroCuotas ?? ''}</div>
+            <div class="info-row"><span>Cuota Aprobada:</span> $${asignacionData.cuota ?? ''}</div>
+          </div>
         `;
       }
 
@@ -146,12 +156,13 @@
       if (asignacionData && esRefinanciamiento && creditoAnteriorInfo) {
         html += `
           <div class="neto-box">
-            Efectivo a entregar al cliente: $${desembolsoNeto.toFixed(2)}<br>
-            <span class="neto-sub">
-              (Nuevo aprobado: $${Number(asignacionData.montoAprobado).toFixed(2)}<br>
-              Menos saldo anterior: $${creditoAnteriorInfo.saldoActual.toFixed(2)}<br>
+            <div class="neto-title"><i class="fa-solid fa-sack-dollar"></i> Efectivo a entregar al cliente</div>
+            <div class="neto-value">$${desembolsoNeto.toFixed(2)}</div>
+            <div class="neto-sub">
+              (Nuevo aprobado: $${Number(asignacionData.montoAprobado).toFixed(2)} ·
+              Menos saldo anterior: $${creditoAnteriorInfo.saldoActual.toFixed(2)} ·
               Menos intereses pendientes: $${creditoAnteriorInfo.interesActual.toFixed(2)})
-            </span>
+            </div>
           </div>
         `;
       }
@@ -160,7 +171,7 @@
       if (asignacionData) {
         amortizacion = recalcularAmortizacion();
         html += `
-          <div class="amort-title">Tabla de Amortización (al día de hoy):</div>
+          <div class="section-title"><i class="fa-regular fa-calendar-check"></i> Tabla de Amortización (al día de hoy)</div>
           <div class="table-wrap">
             <table class="tabla">
               <thead>
@@ -191,19 +202,20 @@
           </div>
 
           <div class="nota-importante">
-            <b>IMPORTANTE:</b> Esta tabla de amortización está calculada <b>al día de la apertura del crédito</b>.
+            <b>IMPORTANTE</b>
             <ul>
+              <li>La tabla está calculada <b>al día de la apertura del crédito</b>.</li>
               <li>La PRIMERA cuota se agenda N días después de hoy (hoy + período).</li>
               <li>Si la apertura es posterior a la asignación, las fechas y valores reflejan el día exacto de apertura.</li>
             </ul>
           </div>
         `;
       } else {
-        html += `<div style="margin-top:18px;color:#aaa;">No hay amortización disponible.</div>`;
+        html += `<div class="muted" style="margin-top:8px;">No hay amortización disponible.</div>`;
       }
 
       html += `
-        <div style="margin:30px 0 15px 0;">
+        <div style="margin:20px 0 10px 0;">
           <button id="guardar-credito-btn" ${guardando || !asignacionData || asignacionAperturada ? "disabled" : ""} class="btn-guardar">
             ${guardando ? "Guardando..." : (asignacionAperturada ? "Ya aperturado" : "Guardar Crédito")}
           </button>
@@ -378,167 +390,215 @@
     });
   </script>
 
-  <!-- Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
-
   <style>
-    /* ======= Estilo gráfico consistente (oscuro) ======= */
-    body {
-      background: #111;
-      color: #fff;
-      font-family: 'Segoe UI', Arial, sans-serif;
-      min-height: 100vh;
-      margin: 0;
+    /* ======= Estilo gráfico CLARO / GLASS, consistente con el Panel de Gerente ======= */
+    :root{
+      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --white:#ffffff; --muted:#5b6776;
+      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
+      --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
+      --radius-2xl:22px; --radius-xl:16px;
     }
-    header {
-      background: #000;
-      padding: 1rem 0;
-      text-align: center;
-      font-size: 1.5rem;
-      letter-spacing: 1px;
-      font-weight: 700;
-      color: #67C8F1;
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0c0f14; --bg-2:#0f141b; --text:#dfe6ef; --muted:#9aa6b6;
+        --glass-bg:rgba(255,255,255,.12); --glass-brd:rgba(255,255,255,.18); --glass-shadow:0 24px 60px rgba(0,0,0,.45);
+      }
     }
-    .container {
-      max-width: 720px;
-      margin: 2.2rem auto 0 auto;
-      background: #181818;
-      border-radius: 18px;
-      box-shadow: 0 2px 25px #0005;
-      padding: 2.5rem 2.3rem;
-      min-height: 320px;
+
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      min-height:100vh;
     }
-    h1 {
-      margin: 0 0 1.2rem 0;
-      font-size: 2rem;
-      color: #F8AF40;
-      font-weight: bold;
-      text-align: center;
+    .pattern{
+      position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image:
+        radial-gradient(1px 1px at 25px 25px, rgba(255,255,255,.10), transparent 40%),
+        radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.06), transparent 40%);
+      background-size:100px 100px; mix-blend-mode:soft-light; opacity:.5;
     }
+
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
+      background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
+      border-bottom:1px solid var(--glass-brd);
+    }
+    @media (prefers-color-scheme: dark){
+      header{ background:linear-gradient(180deg, rgba(15,20,30,.75), rgba(15,20,30,.35)); }
+    }
+    .topbar{
+      max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
+    }
+    .logo-plate{
+      display:inline-flex; align-items:center; gap:10px; background:var(--glass-bg);
+      border:1px solid var(--glass-brd); padding:8px 14px; border-radius:16px;
+      box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
+    }
+    .logo-plate::after{
+      content:""; position:absolute; inset:-1px;
+      background:linear-gradient(120deg, transparent 0 35%, rgba(255,255,255,.55) 45%, transparent 55% 100%);
+      transform:translateX(-120%); animation:plateSheen 6s linear infinite; pointer-events:none;
+    }
+    @keyframes plateSheen{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
+    .logo-plate img{ height:28px; width:auto; display:block }
+    .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
+
+    .container{
+      position:relative; z-index:1;
+      max-width:900px; margin:2rem auto; padding:1.4rem;
+      background:var(--glass-bg); border:1px solid var(--glass-brd);
+      border-radius:var(--radius-2xl); box-shadow:var(--glass-shadow);
+    }
+
+    h1{
+      margin:.2rem 0 1rem; font-size:clamp(1.4rem, 1.6vw + 1rem, 2rem);
+      font-weight:800; color:var(--brand-blue); letter-spacing:.2px; text-align:center;
+    }
+    h1 i{ font-size:1.1em; color:var(--brand-cel); vertical-align:-2px; margin-right:.35rem; }
+
+    .muted{ color:var(--muted); }
 
     /* Campos */
-    .field { margin-bottom: 22px; }
+    .fields{ margin-bottom:.6rem; }
+    .field { margin-bottom: 18px; }
     .field label {
-      color: #aaa; font-size: 14px; display:block; margin-bottom: 6px;
+      color: var(--muted); font-size: .92rem; display:block; margin-bottom: 6px; font-weight:700;
     }
     .input {
-      width: 100%; padding: 10px 12px; border-radius: 10px;
-      background: #191919; color: #fff; border: 1px solid #222; font-size: 16px;
-      outline: none;
+      width: 100%; padding: 10px 12px; border-radius: 12px;
+      background: var(--white); color: var(--text); border: 1px solid var(--glass-brd);
+      font-size: 16px; outline: none;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 6px 18px rgba(10,20,40,.06);
     }
 
-    .info-row { margin-bottom: 10px; color: #eaeaea; font-size: 16px; }
+    /* Info en grid responsivo */
+    .info-grid{
+      display:grid; grid-template-columns:repeat(2, minmax(220px, 1fr)); gap:10px 18px;
+    }
+    @media (max-width:700px){ .info-grid{ grid-template-columns:1fr; } }
 
-    /* Nota importante (no se desborda) */
-    .nota-importante{
-      margin-top:14px;
-      padding:12px 14px;
-      background:#213d4b;
-      color:#F8AF40;
-      border-radius:10px;
-      font-size:.95rem;
-      line-height:1.5;
-      overflow:hidden;
-      word-break: break-word;
-      overflow-wrap:anywhere;
-      hyphens:auto;
+    .info-row{
+      background:var(--white); border:1px solid var(--glass-brd); border-radius:12px;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 6px 18px rgba(10,20,40,.06);
+      padding:10px 12px; font-size:1rem;
     }
-    .nota-importante b{
-      display:inline-block;
-      color:#F8AF40;
-      font-weight:900;
-      font-size:.92rem;
-      background:rgba(248,175,64,.15);
-      padding:3px 8px;
-      border-radius:6px;
-      margin-bottom:6px;
-    }
-    .nota-importante ul{
-      margin:8px 0 0 19px; padding-left:0; color:#fff;
-    }
-    .nota-importante li{ margin:4px 0; }
+    .info-row span{ font-weight:800; color:var(--brand-blue); margin-right:6px; }
 
     /* Bloque de desembolso neto */
     .neto-box{
-      padding:18px;
-      background:#ffd840;
-      border-radius:12px;
+      margin:16px 0 8px; padding:16px; border-radius:16px;
+      background:linear-gradient(180deg, #fff6cf, #ffe99b); border:1px solid rgba(248,175,64,.35);
+      box-shadow:0 10px 26px rgba(248,175,64,.18), inset 0 1px 0 rgba(255,255,255,.7);
       color:#2d2d2d;
-      font-size:1.15em;
-      font-weight:bold;
-      margin:22px 0 10px 0;
     }
-    .neto-sub{ font-size:.86em; color:#df9900 }
+    .neto-title{ font-weight:900; color:#8a5a00; letter-spacing:.2px; margin-bottom:6px; }
+    .neto-value{ font-size:1.6rem; font-weight:900; color:#512d00; }
+    .neto-sub{ margin-top:6px; font-size:.94rem; color:#7a4b00; }
+
+    /* Título sección */
+    .section-title{
+      margin:18px 0 8px; font-weight:900; color:var(--brand-blue);
+      display:flex; align-items:center; gap:.5rem;
+    }
+    .section-title i{ color:var(--brand-cel); }
 
     /* Tabla */
     .table-wrap { overflow-x:auto; }
     .tabla {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 6px;
-      background: #191919;
+      background: var(--white);
       min-width: 700px;
+      border:1px solid var(--glass-brd);
+      box-shadow: 0 8px 22px rgba(10,20,40,.08), inset 0 1px 0 rgba(255,255,255,.7);
+      border-radius:12px; overflow:hidden;
     }
     .tabla th, .tabla td {
-      padding: 0.7rem .7rem;
-      border-bottom: 1px solid #222;
-      text-align: left;
-      font-size: 1rem;
+      padding: .75rem .7rem;
+      border-bottom: 1px solid rgba(10,20,40,.08);
+      text-align: left; font-size: .98rem; color:var(--text);
     }
     .tabla th {
-      background: #222a2c;
-      color: #67C8F1;
-      font-weight: 700;
-      font-size: 1.05rem;
+      background: linear-gradient(180deg, rgba(103,200,241,.18), rgba(103,200,241,.08));
+      color: var(--brand-blue);
+      font-weight: 800;
     }
-    .tabla tr:hover { background: #232c31; }
-    .amort-title{
-      margin: 35px 0 7px 0;
-      font-weight: bold;
-      font-size: 18px;
-      color: #fff;
-    }
+    .tabla tr:hover { background: rgba(103,200,241,.05); }
 
-    /* Botón Guardar (estilo marca) */
-    .btn-guardar{
-      background:#13b66b;
-      border:none;
-      color:#fff;
-      font-weight:bold;
-      padding:15px 0;
-      width:100%;
-      font-size:17px;
+    /* Nota importante (NO se desborda) */
+    .nota-importante{
+      margin-top:12px;
+      padding:12px 14px;
+      background:linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
+      color:var(--text);
+      border:1px solid rgba(36,59,134,.15);
       border-radius:12px;
-      cursor:pointer;
-      box-shadow: 0 6px 18px rgba(19,182,107,.25);
-      transition: transform .15s ease, box-shadow .2s ease, background .2s ease;
+      font-size:.95rem;
+      line-height:1.5;
+      overflow:hidden;
+      word-break: break-word;
+      overflow-wrap:anywhere;
+      hyphens:auto;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    }
+    .nota-importante b{
+      display:inline-block;
+      color:var(--brand-gold);
+      font-weight:900;
+      background:rgba(248,175,64,.15);
+      padding:3px 8px;
+      border-radius:6px;
+      margin:0 6px 6px 0;
+    }
+    .nota-importante ul{
+      margin:8px 0 0 18px; padding-left:0;
+    }
+    .nota-importante li{ margin:4px 0; }
+
+    /* Botón Guardar (verde marca) */
+    .btn-guardar{
+      background:linear-gradient(90deg, var(--brand-green), #10a164);
+      border:none; color:#fff; font-weight:800; letter-spacing:.2px;
+      padding:15px 0; width:100%; font-size:1.05rem; border-radius:16px; cursor:pointer;
+      box-shadow: 0 14px 30px rgba(16,161,100,.22);
+      transition: transform .15s ease, box-shadow .2s ease, filter .2s ease;
     }
     .btn-guardar:hover{
       transform: translateY(-1px);
-      box-shadow: 0 10px 24px rgba(19,182,107,.35);
-      background:#10a061;
+      box-shadow: 0 18px 40px rgba(16,161,100,.28);
+      filter:saturate(1.05);
     }
     .btn-guardar:disabled{
-      opacity:.6; cursor:not-allowed; transform:none; box-shadow:none;
+      opacity:.6; cursor:not-allowed; transform:none; box-shadow:none; filter:none;
     }
 
     .msg-aperturado{
-      color:#f55;
-      text-align:center;
-      font-weight:bold;
-      font-size:1.05em;
-    }
-
-    @media (max-width:750px) {
-      .container { padding: 1.3rem 0.9rem; }
-      h1 { font-size: 1.35rem; }
-      .info-row { font-size: 15px;}
-      .nota-importante{ font-size:.9rem; }
+      color:#c62828; text-align:center; font-weight:900; font-size:1.02rem;
     }
   </style>
 </head>
 <body>
-  <header>Apertura de Crédito</header>
+  <div class="pattern" aria-hidden="true"></div>
+
+  <header>
+    <div class="topbar">
+      <div class="logo-plate">
+        <img src="assets/logo_mi_bw.png" alt="Logo Multi Inversiones" width="140" height="40"/>
+        <strong class="brand-name">MULTI INVERSIONES</strong>
+      </div>
+      <div style="margin-left:auto; font-weight:700; color:var(--muted);">
+        Apertura de Crédito
+      </div>
+    </div>
+  </header>
 
   <div class="container">
     <h1><i class="fas fa-unlock"></i> Apertura de Crédito</h1>
@@ -546,6 +606,7 @@
   </div>
 </body>
 </html>
+
 
 
 

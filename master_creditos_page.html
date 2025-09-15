@@ -127,6 +127,7 @@
 
   <!-- Iconos -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
   <style>
     /* ===== Nueva línea gráfica clara (glass) ===== */
     :root{
@@ -220,14 +221,14 @@
     }
     .search-input::placeholder{ color:#7b8bb4; }
 
-    /* Lista de tarjetas (aprovecha ancho desktop) */
+    /* ===== LISTA EN COLUMNA (una card debajo de otra) ===== */
     .creditos-list{
-      display:grid; gap:14px;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      display:flex; flex-direction:column; gap:14px; align-items:center; /* centra y apila */
       margin-top:12px;
     }
 
     .card-credito{
+      width:min(860px, 100%);  /* ancho cómodo en desktop, full en móvil */
       display:flex; align-items:center; gap:14px; cursor:pointer; padding:14px 12px;
       background:var(--white); border:1px solid var(--glass-brd); border-radius:16px;
       box-shadow:var(--glass-shadow); transition:transform .12s ease, box-shadow .2s ease;
@@ -247,7 +248,7 @@
     .chev{ margin-left:auto; color:#7b8bb4; }
 
     .noresult{
-      grid-column:1 / -1; text-align:center; color:#7b8bb4; font-size:1.05rem; padding:1.6rem 0;
+      text-align:center; color:#7b8bb4; font-size:1.05rem; padding:1.6rem 0;
     }
 
     /* Loader */
@@ -257,10 +258,6 @@
       animation:spin 1s linear infinite;
     }
     @keyframes spin{ to{ transform:rotate(1turn) } }
-
-    @media (max-width:560px){
-      .creditos-list{ grid-template-columns:1fr; }
-    }
   </style>
 </head>
 <body>
@@ -293,6 +290,8 @@
   </div>
 </body>
 </html>
+
+
 
 
 

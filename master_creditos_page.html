@@ -4,6 +4,8 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Master de Créditos</title>
+
+  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -50,14 +52,17 @@
         contenedor.innerHTML += `
           <div class="card-credito" onclick="verDetalleCredito('${c.id}')">
             <div class="icon"><span class="material-icons">credit_score</span></div>
-            <div>
+            <div class="card-body">
               <div class="nombre">${c.nombre || ""} ${c.apellido || ""}</div>
               <div class="info">
-                <span>DUI: <b>${c.numeroDui || '-'}</b></span><br>
-                <span>Monto: <b>${money(c.montoAprobado)}</b></span><br>
-                <span>Estado: <b>${c.estadoCredito || '-'}</b></span>
+                <span class="tag">DUI</span> <b>${c.numeroDui || '-'}</b>
+                <span class="sep">•</span>
+                <span class="tag">Monto</span> <b>${money(c.montoAprobado)}</b>
+                <span class="sep">•</span>
+                <span class="tag">Estado</span> <b>${c.estadoCredito || '-'}</b>
               </div>
             </div>
+            <div class="chev"><span class="material-icons">chevron_right</span></div>
           </div>
         `;
       }
@@ -70,7 +75,7 @@
     function aplicarFiltro(term) {
       term = (term || "").toLowerCase();
       creditosFiltrados = creditos.filter(c => {
-        // Filtrar también aquí los "Revertido"
+        // Excluir “Revertido”
         if (c.estadoCredito === "Revertido") return false;
         return (c.nombre || "").toLowerCase().includes(term)
           || (c.apellido || "").toLowerCase().includes(term)
@@ -82,12 +87,13 @@
     async function cargarCreditos(department) {
       loading = true;
       mostrarCreditos();
-      let q = query(collection(db, "creditos"), where("agenciaAsignada", "==", department));
-      let snap = await getDocs(q);
-      // Filtrar aquí también los "Revertido"
+      const qRef = query(collection(db, "creditos"), where("agenciaAsignada", "==", department));
+      const snap = await getDocs(qRef);
+
       creditos = snap.docs
         .map(doc => ({ ...doc.data(), id: doc.id }))
-        .filter(c => c.estadoCredito !== "Revertido");
+        .filter(c => c.estadoCredito !== "Revertido"); // excluir aquí también
+
       creditosFiltrados = [...creditos];
       loading = false;
       mostrarCreditos();
@@ -109,101 +115,184 @@
         }
         const userData = snap.docs[0].data();
         const department = userData.department || "";
-        document.getElementById("nombre-usuario").innerText = `${userData.nombre || ""} ${userData.apellido || ""}`.trim() || user.email;
+        document.getElementById("nombre-usuario").innerText =
+          (`${userData.nombre || ""} ${userData.apellido || ""}`.trim()) || user.email;
+
         await cargarCreditos(department);
       });
 
       document.getElementById("busqueda").addEventListener("input", e => aplicarFiltro(e.target.value));
     });
   </script>
+
+  <!-- Iconos -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
-    body {
-      margin: 0; background: #101012; color: #fff; min-height: 100vh;
-      font-family: 'Segoe UI', Arial, sans-serif;
+    /* ===== Nueva línea gráfica clara (glass) ===== */
+    :root{
+      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --muted:#5b6776; --white:#ffffff;
+      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
+      --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
+      --radius:18px; --radius-lg:22px;
     }
-    header {
-      background: #191927; color: #fff; font-size: 1.35rem;
-      font-weight: 600; letter-spacing: .5px; text-align:center;
-      padding: 1.6rem 0 .8rem 0; margin-bottom: 0.3rem;
-      box-shadow: 0 1px 0 #211a3d33;
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0c0f14; --bg-2:#0f141b; --text:#dfe6ef; --muted:#9aa6b6;
+        --glass-bg:rgba(255,255,255,.12); --glass-brd:rgba(255,255,255,.18); --glass-shadow:0 24px 60px rgba(0,0,0,.45);
+        --white:#121821;
+      }
     }
-    .main-content {
-      max-width: 480px; margin: 0 auto; padding: 1.3rem 1rem 2.5rem 1rem;
+
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      min-height:100vh;
     }
-    .search-bar {
-      width: 100%;
-      margin-bottom: 20px;
+    .pattern{
+      position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image:
+        radial-gradient(1px 1px at 25px 25px, rgba(255,255,255,.10), transparent 40%),
+        radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.06), transparent 40%);
+      background-size:100px 100px; mix-blend-mode:soft-light; opacity:.5;
     }
-    .search-bar input {
-      width: 100%; background: #191927; color: #fff;
-      border-radius: 9px; border: 1.5px solid #3f3860;
-      padding: 13px 14px 13px 44px; font-size: 1.1rem;
-      outline: none; box-sizing: border-box;
-      transition: border .14s;
+
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
+      background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
+      border-bottom:1px solid var(--glass-brd);
     }
-    .search-bar input:focus { border-color: #845ef7; }
-    .search-bar .material-icons {
-      position: absolute; left: 17px; top: 14px; color: #dedede80; font-size: 1.2em;
+    .topbar{
+      max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
     }
-    .search-wrap { position:relative; }
-    .creditos-list {
-      margin-top: .2rem;
+    .logo-plate{
+      display:inline-flex; align-items:center; gap:10px; background:var(--glass-bg);
+      border:1px solid var(--glass-brd); padding:8px 14px; border-radius:16px;
+      box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
     }
-    .card-credito {
-      background: #181828; border-radius: 12px; padding: 1.15rem 1rem 1.1rem 1rem;
-      margin-bottom: 15px; display: flex; gap: 15px; align-items: flex-start;
-      cursor: pointer; box-shadow: 0 2px 10px #0002;
-      transition: box-shadow .16s, background .11s;
+    .logo-plate img{ height:28px; width:auto; display:block }
+    .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
+
+    /* ===== Container ===== */
+    .container{
+      position:relative; z-index:1;
+      max-width:min(96vw, 1100px);
+      margin: 2.2rem auto; padding: 1.6rem 1.2rem 2rem;
+      background:var(--glass-bg); border:1px solid var(--glass-brd);
+      border-radius:var(--radius-lg); box-shadow:var(--glass-shadow);
     }
-    .card-credito:hover { box-shadow: 0 3px 17px #0005; background: #201c2b; }
-    .card-credito .icon {
-      margin-top: 3px;
-      font-size: 34px;
-      background: #37335b;
-      border-radius: 50%;
-      width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+    h1{
+      margin:0 0 .8rem; text-align:center;
+      font-size:clamp(1.4rem, .8vw + 1.2rem, 2rem);
+      color:var(--brand-blue); font-weight:800;
     }
-    .card-credito .material-icons { color: #ffb300; font-size: 32px; }
-    .nombre {
-      color: #fff; font-size: 1.09rem; font-weight: 500; margin-bottom: 3px;
+
+    /* Usuario + búsqueda */
+    .user-row{
+      display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:center;
+      margin-bottom:14px;
     }
-    .info {
-      color: #babad9; font-size: 15px; line-height: 1.45;
+    .user-pill{
+      display:inline-flex; align-items:center; gap:8px; padding:.55rem .9rem; border-radius:999px;
+      background: linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
+      border:1px solid rgba(36,59,134,.15); color:var(--text);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+      font-weight:800;
     }
-    .noresult {
-      color: #fff9; font-size: 1.08rem; text-align: center; margin: 2.6rem 0;
+
+    .search-wrap{ position:relative; width:min(580px, 100%); }
+    .search-wrap .material-icons{
+      position:absolute; left:14px; top:50%; transform:translateY(-50%); font-size:22px; color:#7b8bb4;
+      pointer-events:none;
     }
-    .loader {
-      width: 38px; height: 38px; margin: 44px auto 50px auto; border-radius: 50%;
-      border: 4.5px solid #4428c8; border-top: 4.5px solid #eee0; animation: spin 1s linear infinite;
+    .search-input{
+      width:100%; padding:12px 14px 12px 44px; font-size:1.03rem; border-radius:12px;
+      border:1px solid rgba(36,59,134,.18);
+      background: linear-gradient(180deg, #ffffff, #f3f7fb);
+      color:var(--text); outline:none; box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
     }
-    @keyframes spin { 100% { transform: rotate(360deg); } }
-    @media (max-width: 570px) {
-      .main-content { max-width: 99vw; padding: 1rem .4rem 1.6rem .4rem; }
-      .card-credito { font-size: .97rem; }
+    .search-input::placeholder{ color:#7b8bb4; }
+
+    /* Lista de tarjetas (aprovecha ancho desktop) */
+    .creditos-list{
+      display:grid; gap:14px;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      margin-top:12px;
     }
-    .usuario-info {
-      font-size: .99rem;
-      color: #ffe5b7;
-      font-weight: 400;
-      margin-bottom: 16px;
+
+    .card-credito{
+      display:flex; align-items:center; gap:14px; cursor:pointer; padding:14px 12px;
+      background:var(--white); border:1px solid var(--glass-brd); border-radius:16px;
+      box-shadow:var(--glass-shadow); transition:transform .12s ease, box-shadow .2s ease;
+    }
+    .card-credito:hover{ transform: translateY(-2px); box-shadow:0 20px 45px rgba(12,20,40,.16); }
+    .card-credito .icon{
+      flex:0 0 auto; width:46px; height:46px; display:grid; place-items:center; border-radius:50%;
+      background: conic-gradient(from 210deg, var(--brand-cel), var(--brand-gold), var(--brand-green), var(--brand-cel));
+      box-shadow: 0 6px 16px rgba(36,59,134,.18);
+    }
+    .card-credito .icon .material-icons{ color:#fff; font-size:26px; text-shadow:0 1px 2px rgba(0,0,0,.3); }
+    .card-body{ min-width:0; }
+    .nombre{ color:var(--brand-blue); font-weight:800; letter-spacing:.2px; margin-bottom:4px; }
+    .info{ color:var(--muted); font-size:.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .tag{ color:#22367a; font-weight:800; }
+    .sep{ color:#aab4c2; margin:0 8px; }
+    .chev{ margin-left:auto; color:#7b8bb4; }
+
+    .noresult{
+      grid-column:1 / -1; text-align:center; color:#7b8bb4; font-size:1.05rem; padding:1.6rem 0;
+    }
+
+    /* Loader */
+    .loader{
+      width:46px; height:46px; margin:28px auto; border-radius:50%;
+      border:4px solid rgba(36,59,134,.18); border-top:4px solid var(--brand-cel);
+      animation:spin 1s linear infinite;
+    }
+    @keyframes spin{ to{ transform:rotate(1turn) } }
+
+    @media (max-width:560px){
+      .creditos-list{ grid-template-columns:1fr; }
     }
   </style>
 </head>
 <body>
-  <header>Master de Créditos</header>
-  <div class="main-content">
-    <div class="usuario-info">
-      <b>Usuario:</b> <span id="nombre-usuario">Cargando...</span>
+  <div class="pattern" aria-hidden="true"></div>
+
+  <!-- Header / topbar -->
+  <header>
+    <div class="topbar">
+      <div class="logo-plate">
+        <img src="assets/logo_mi_bw.png" alt="Logo Multi Inversiones" width="140" height="40" />
+        <strong class="brand-name">MULTI INVERSIONES</strong>
+      </div>
+      <div style="margin-left:auto; font-weight:700; color:var(--muted);">Master de Créditos</div>
     </div>
-    <div class="search-bar search-wrap">
-      <span class="material-icons">search</span>
-      <input id="busqueda" type="search" placeholder="Buscar por nombre, apellido o DUI..." autocomplete="off"/>
+  </header>
+
+  <!-- Contenido -->
+  <div class="container">
+    <h1><span class="material-icons" style="vertical-align:middle; margin-right:6px; color:#243b86;">credit_score</span>Master de Créditos</h1>
+
+    <div class="user-row">
+      <div class="user-pill"><span class="material-icons" style="color:#243b86;">person</span> <span id="nombre-usuario">Cargando...</span></div>
+      <div class="search-wrap">
+        <span class="material-icons">search</span>
+        <input id="busqueda" class="search-input" type="search" placeholder="Buscar por nombre, apellido o DUI..." autocomplete="off"/>
+      </div>
     </div>
+
     <div class="creditos-list" id="creditos-list"></div>
   </div>
 </body>
 </html>
+
 
 

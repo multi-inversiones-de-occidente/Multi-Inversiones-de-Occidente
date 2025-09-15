@@ -4,57 +4,185 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Ver Movimientos de Caja – Panel Gerente</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
   <style>
-    body { background: #101212; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
-    header { background: #000; padding: 1rem 0; text-align: center; font-size: 1.45rem; letter-spacing: 1px; font-weight: 700; color: #67C8F1;}
-    .container { max-width: 700px; margin: 2.5rem auto 0 auto; background: #181a1c; border-radius: 16px; box-shadow: 0 2px 22px #0008; padding: 2.2rem 1.2rem 1.7rem 1.2rem;}
-    .row-fecha { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;}
-    .fecha-label { font-size: 1.11rem; color: #8ae1fc; font-weight: 600;}
-    .fecha-btn { background: none; border: none; color: #fff; font-size: 1.25rem; cursor: pointer;}
-    .mov-card { background: #23272c; border-radius: 12px; margin-bottom: 12px; padding: 16px 18px; box-shadow: 0 1px 7px #0002;}
-    .mov-ingreso { border-left: 5px solid #13b66b;}
-    .mov-egreso { border-left: 5px solid #e74c3c;}
-    .mov-pago { border-left: 5px solid #67C8F1;}
-    .mov-title { font-weight: bold; font-size: 1.05rem; margin-bottom: 6px;}
-    .mov-sub { font-size: .98rem; color: #8ae1fc;}
-    .total-caja { margin-top: 14px; background: #101212; border-radius: 10px; text-align: center; padding: 18px; font-size: 1.32rem; font-weight: bold; color: #fff;}
-    .empty-msg { text-align:center; color:#ccc; padding: 32px 0;}
-    .btn-main {
-      width: 100%;
-      background: #13b66b;
-      color: #fff;
-      font-size: 1.11rem;
-      font-weight: bold;
-      border: none;
-      border-radius: 9px;
-      padding: 13px 0;
-      cursor: pointer;
-      margin-top: 1.4em;
-      transition: background .17s;
-      margin-bottom: 0.7em;
+    :root{
+      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --white:#ffffff; --muted:#5b6776;
+      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
+      --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
+      --radius-2xl:22px; --radius-xl:16px;
     }
-    .btn-main:active,
-    .btn-main:hover { background: #0b854c; }
-    @media (max-width:600px){.container{padding:1.2rem .3rem;}}
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0c0f14; --bg-2:#0f141b; --text:#dfe6ef; --muted:#9aa6b6;
+        --glass-bg:rgba(255,255,255,.12); --glass-brd:rgba(255,255,255,.18); --glass-shadow:0 24px 60px rgba(0,0,0,.45);
+      }
+    }
+
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      min-height:100vh;
+    }
+    .pattern{
+      position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image:
+        radial-gradient(1px 1px at 25px 25px, rgba(255,255,255,.10), transparent 40%),
+        radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.06), transparent 40%);
+      background-size:100px 100px; mix-blend-mode:soft-light; opacity:.5;
+    }
+
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
+      background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
+      border-bottom:1px solid var(--glass-brd);
+    }
+    @media (prefers-color-scheme: dark){
+      header{ background:linear-gradient(180deg, rgba(15,20,30,.75), rgba(15,20,30,.35)); }
+    }
+    .topbar{
+      max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
+    }
+    .logo-plate{
+      display:inline-flex; align-items:center; gap:10px; background:var(--glass-bg);
+      border:1px solid var(--glass-brd); padding:8px 14px; border-radius:16px;
+      box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
+    }
+    .logo-plate::after{
+      content:""; position:absolute; inset:-1px;
+      background:linear-gradient(120deg, transparent 0 35%, rgba(255,255,255,.55) 45%, transparent 55% 100%);
+      transform:translateX(-120%); animation:plateSheen 6s linear infinite; pointer-events:none;
+    }
+    @keyframes plateSheen{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
+    .logo-plate img{ height:28px; width:auto; display:block }
+    .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
+
+    .container{
+      position:relative; z-index:1;
+      max-width:900px; margin:2rem auto; padding:1.4rem;
+      background:var(--glass-bg); border:1px solid var(--glass-brd);
+      border-radius:var(--radius-2xl); box-shadow:var(--glass-shadow);
+    }
+
+    /* Encabezado de fecha (chip + botón) */
+    .row-fecha{
+      display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom:14px;
+    }
+    .fecha-chip{
+      display:inline-flex; align-items:center; gap:10px;
+      padding:10px 14px; border-radius:999px;
+      background:linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
+      border:1px solid rgba(36,59,134,.15);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+      font-weight:800; color:var(--brand-blue); letter-spacing:.2px;
+      min-height:40px;
+    }
+    .fecha-chip i{ color:var(--brand-blue); opacity:.9; }
+    .fecha-label{ white-space:nowrap; }
+
+    .fecha-btn{
+      display:inline-flex; align-items:center; justify-content:center;
+      height:40px; width:44px; border-radius:12px; border:1px solid var(--glass-brd);
+      background:var(--white); color:var(--brand-blue);
+      box-shadow:0 6px 18px rgba(10,20,40,.10), inset 0 1px 0 rgba(255,255,255,.6);
+      cursor:pointer; transition:transform .14s ease, box-shadow .2s ease;
+    }
+    .fecha-btn:hover{ transform:translateY(-1px); box-shadow:0 14px 28px rgba(10,20,40,.16); }
+
+    /* Cards de movimientos (glass) */
+    .mov-card{
+      position:relative; background:var(--white); border:1px solid var(--glass-brd);
+      border-radius:var(--radius-xl); padding:14px 14px 14px 16px;
+      margin-bottom:12px; box-shadow:0 10px 26px rgba(10,20,40,.08), inset 0 1px 0 rgba(255,255,255,.7);
+      overflow:hidden;
+    }
+    .mov-card::before{
+      content:""; position:absolute; left:0; top:0; bottom:0; width:5px; border-radius:12px 0 0 12px;
+      background:var(--brand-cel);
+    }
+    .mov-ingreso::before{ background:var(--brand-green); }
+    .mov-egreso::before{ background:#e74c3c; }
+    .mov-pago::before{ background:var(--brand-cel); }
+
+    .mov-title{ font-weight:800; color:var(--brand-blue); font-size:1.02rem; margin-bottom:2px; }
+    .mov-sub{ font-size:.98rem; color:var(--muted); }
+
+    /* Totales (panel) */
+    .total-caja{
+      margin-top:14px; padding:16px; text-align:center;
+      background:var(--white); border:1px solid var(--glass-brd); border-radius:var(--radius-xl);
+      box-shadow:0 10px 26px rgba(10,20,40,.08), inset 0 1px 0 rgba(255,255,255,.7);
+      color:var(--text);
+      font-size:1.08rem;
+    }
+    .empty-msg{ text-align:center; color:var(--muted); padding:28px 0; }
+
+    /* Botón principal (verde MI) */
+    .btn-main{
+      width:100%; margin-top:1.1em; margin-bottom:.2em;
+      border:none; cursor:pointer; border-radius:16px; padding:14px 0;
+      background:linear-gradient(90deg, var(--brand-green), #10a164);
+      color:#fff; font-size:1.08rem; font-weight:800; letter-spacing:.2px;
+      box-shadow:0 14px 30px rgba(16,161,100,.22);
+      transition:transform .14s ease, box-shadow .2s ease, filter .2s ease;
+    }
+    .btn-main:hover{ transform:translateY(-1px); box-shadow:0 18px 40px rgba(16,161,100,.28); filter:saturate(1.05); }
+    .btn-main i{ margin-right:.45rem; }
+
+    @media (max-width:600px){
+      .container{ padding:1rem; }
+      .fecha-label{ font-size:.96rem; }
+      .mov-title{ font-size:1rem; }
+      .mov-sub{ font-size:.95rem; }
+    }
   </style>
 </head>
 <body>
-  <header>Ver Movimientos de Caja – Panel Gerente</header>
+  <div class="pattern" aria-hidden="true"></div>
+
+  <header>
+    <div class="topbar">
+      <div class="logo-plate">
+        <img src="assets/logo_mi_bw.png" alt="Logo Multi Inversiones" width="140" height="40"/>
+        <strong class="brand-name">MULTI INVERSIONES</strong>
+      </div>
+      <div style="margin-left:auto; font-weight:700; color:var(--muted);">
+        Ver Movimientos de Caja – Panel Gerente
+      </div>
+    </div>
+  </header>
+
   <div class="container">
     <div class="row-fecha">
-      <span id="fecha-label" class="fecha-label"></span>
-      <button id="fecha-btn" class="fecha-btn" title="Cambiar Fecha">
-        <i class="fas fa-calendar-day"></i>
+      <div class="fecha-chip">
+        <i class="fas fa-calendar-day" aria-hidden="true"></i>
+        <span id="fecha-label" class="fecha-label"></span>
+      </div>
+      <button id="fecha-btn" class="fecha-btn" title="Cambiar fecha">
+        <i class="fas fa-pen"></i>
       </button>
     </div>
+
     <div id="movimientos-list"></div>
+
     <div class="total-caja" id="total-caja"></div>
+
     <button id="btn-imprimir-corte" class="btn-main">
-      <i class="fas fa-print"></i> Imprimir Corte de Caja
+      <i class="fas fa-print"></i> Imprimir corte de caja
     </button>
   </div>
 
+  <!-- LÓGICA: sin cambios funcionales -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, orderBy, limit, getDoc, doc as docRef } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -87,7 +215,8 @@
     let agenciaActual = "";
 
     function renderFecha() {
-      document.getElementById("fecha-label").textContent = "Fecha: " + formatFecha(selectedDate);
+      const lbl = document.getElementById("fecha-label");
+      if (lbl) lbl.textContent = "Fecha: " + formatFecha(selectedDate);
     }
 
     async function obtenerSaldoAnterior(agencia, fecha) {
@@ -130,7 +259,7 @@
       let movimientos = [];
       const correlativosSumados = new Set();
 
-      // 1. Movimientos manuales (filtrando anulados y reversiones)
+      // 1. Movimientos manuales
       const movSnap = await getDocs(
         query(
           collection(db, "movimientosCaja"),
@@ -146,7 +275,6 @@
           d.descripcion.startsWith('Reversión de pago') ||
           d.descripcion.startsWith('Reversión correlativo')
         )) return;
-        // SOLO SUMA EL PRIMER CORRELATIVO NO ANULADO
         if (d.correlativo && correlativosSumados.has(d.correlativo)) return;
         if (d.correlativo) correlativosSumados.add(d.correlativo);
         movimientos.push({
@@ -161,7 +289,7 @@
         });
       });
 
-      // 2. Pagos (NO anulados, solo de esa agencia)
+      // 2. Pagos (no anulados)
       const pagoSnap = await getDocs(
         query(
           collection(db, "pagos"),
@@ -180,7 +308,7 @@
         }
       });
 
-      // Buscar nombre y apellido de users (en bloques de 10)
+      // Buscar nombres de clientes
       let clientesData = {};
       const ids = Array.from(clienteIDSet).filter(Boolean);
       for (let i = 0; i < ids.length; i += 10) {
@@ -189,8 +317,8 @@
           try {
             const userDoc = await getDoc(docRef(db, "users", cid));
             if (userDoc.exists()) {
-              const user = userDoc.data();
-              clientesData[cid] = ((user.nombre || "") + " " + (user.apellido || "")).trim();
+              const u = userDoc.data();
+              clientesData[cid] = ((u.nombre || "") + " " + (u.apellido || "")).trim();
             }
           } catch (e) {}
         }));
@@ -198,11 +326,9 @@
 
       pagosList.forEach(data => {
         let clienteNombre = "Cliente";
-        if (data.clienteID && clientesData[data.clienteID]) {
-          clienteNombre = clientesData[data.clienteID];
-        } else if (data.nombres) {
-          clienteNombre = data.nombres;
-        }
+        if (data.clienteID && clientesData[data.clienteID]) clienteNombre = clientesData[data.clienteID];
+        else if (data.nombres) clienteNombre = data.nombres;
+
         movimientos.push({
           tipo: "Ingreso",
           descripcion: "Pago",
@@ -215,19 +341,18 @@
         });
       });
 
-      // 3. Pagos Retroactivos (abonos a valor fecha hechos ese día)
+      // 3. Pagos retroactivos (abonos valor fecha hechos ese día)
       const pagosRetroQ = await getDocs(
         query(
           collection(db, "pagos"),
-          where("sucursal", "==", agenciaActual),
           where("retroactivo", "==", true),
+          where("sucursal", "==", agenciaActual),
           where("fechaRegistro", ">=", startIso),
           where("fechaRegistro", "<=", endIso)
         )
       );
       pagosRetroQ.forEach(doc => {
         const d = doc.data();
-        // Solo agrega si NO está ya en la lista (por si un abono se registra igual)
         const yaExiste = movimientos.some(mov => mov.fecha === d.fechaRegistro && mov.monto === Number(d.montoPagado));
         if (!yaExiste && (!("anulado" in d) || !d.anulado)) {
           let clienteNombre = d.nombres || "Cliente";
@@ -245,15 +370,13 @@
       });
 
       movimientos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-      const saldoAnterior = await obtenerSaldoAnterior(agenciaActual, selectedDate);
 
-      let totalIngresos = 0.0;
-      let totalEgresos = 0.0;
+      const saldoAnterior = await obtenerSaldoAnterior(agenciaActual, selectedDate);
+      let totalIngresos = 0.0, totalEgresos = 0.0;
       movimientos.forEach(mov => {
         if (mov.tipo === "Ingreso") totalIngresos += mov.monto;
         else totalEgresos += mov.monto;
       });
-
       const total = saldoAnterior + totalIngresos - totalEgresos;
 
       if (movimientos.length === 0) {
@@ -261,46 +384,41 @@
       } else {
         listDiv.innerHTML = movimientos.map(mov => `
           <div class="mov-card ${mov.clase}">
-            <div class="mov-title">${mov.tipo} - ${mov.descripcion}</div>
-            <div class="mov-sub">Monto: $${mov.monto.toFixed(2)}</div>
-            ${mov.observaciones ? `<div class="mov-sub">Obs: ${mov.observaciones}</div>` : ""}
-            <div class="mov-sub">Usuario: ${mov.usuario}</div>
-            ${mov.cliente ? `<div class="mov-sub">Cliente: ${mov.cliente}</div>` : ""}
-            <div class="mov-sub">Hora: ${formatHora(mov.fecha)}</div>
+            <div class="mov-title">${mov.tipo} – ${mov.descripcion}</div>
+            <div class="mov-sub"><b>Monto:</b> $${mov.monto.toFixed(2)}</div>
+            ${mov.observaciones ? `<div class="mov-sub"><b>Obs:</b> ${mov.observaciones}</div>` : ""}
+            <div class="mov-sub"><b>Usuario:</b> ${mov.usuario}</div>
+            ${mov.cliente ? `<div class="mov-sub"><b>Cliente:</b> ${mov.cliente}</div>` : ""}
+            <div class="mov-sub"><b>Hora:</b> ${formatHora(mov.fecha)}</div>
           </div>
         `).join('');
       }
+
       totalDiv.innerHTML = `
-        <div style="font-size:1.12rem;font-weight:400;margin-bottom:4px;">
-          <b style="color:#2ef37a;">Saldo Anterior: $${saldoAnterior.toFixed(2)}</b>
+        <div style="margin-bottom:6px;">
+          <span style="font-weight:800; color:var(--brand-green);">Saldo anterior:</span> $${saldoAnterior.toFixed(2)}
         </div>
         <div>
-          <b style="color:#fff;">Total de Caja: $${total.toFixed(2)}</b>
+          <span style="font-weight:800; color:var(--brand-blue);">Total de caja:</span> $${total.toFixed(2)}
         </div>
       `;
     }
 
-    // Cambia la fecha por prompt DD/MM/AAAA
+    // Cambiar fecha vía prompt DD/MM/AAAA
     document.getElementById("fecha-btn").onclick = async function() {
-      const val = prompt("Ingrese la fecha en formato DD/MM/AAAA", formatFecha(selectedDate));
+      const val = prompt("Ingrese la fecha en formato DD/MM/AAAA", (function f(d){return d.toLocaleDateString('es-SV',{day:'2-digit',month:'2-digit',year:'numeric'})})(selectedDate));
       if (!val) return;
       const [d, m, y] = val.split('/');
       const parsed = new Date(`${y}-${m}-${d}T00:00:00`);
-      if (isNaN(parsed.getTime())) {
-        alert("Fecha inválida");
-        return;
-      }
+      if (isNaN(parsed.getTime())) { alert("Fecha inválida"); return; }
       selectedDate = parsed;
       renderFecha();
-      onAuthStateChanged(auth, user => {
-        if (user) cargarMovimientos(user);
-      });
+      onAuthStateChanged(auth, user => { if (user) cargarMovimientos(user); });
     };
 
-    // Inicia con el día actual local
     window.addEventListener("DOMContentLoaded", () => {
-      let localNow = new Date();
-      selectedDate = new Date(localNow.getFullYear(), localNow.getMonth(), localNow.getDate(), 0, 0, 0, 0);
+      const localNow = new Date();
+      selectedDate = new Date(localNow.getFullYear(), localNow.getMonth(), localNow.getDate(), 0,0,0,0);
       renderFecha();
     });
 
@@ -310,50 +428,53 @@
       cargarMovimientos(user);
     });
   </script>
-  <script>
-  document.getElementById("btn-imprimir-corte").onclick = function() {
-    const fecha = document.getElementById("fecha-label").textContent || '';
-    const movimientosHtml = document.getElementById("movimientos-list").innerHTML;
-    const totalHtml = document.getElementById("total-caja").innerHTML;
 
-    const printHtml = `
-      <html>
-      <head>
-        <title>Corte de Caja – Multi Inversiones</title>
-        <style>
-          body { font-family: 'Segoe UI', Arial, sans-serif; color: #222; margin: 0; background: #fff; }
-          .header-corte { text-align: center; font-size: 1.55rem; font-weight: bold; margin: 18px 0 4px 0; color: #00527c; }
-          .fecha-corte { text-align: center; margin-bottom: 12px; font-size: 1.06rem; }
-          .mov-card { border: 1px solid #eee; border-radius: 10px; margin-bottom: 8px; padding: 10px 13px; background: #fff;}
-          .mov-title { font-weight: bold; font-size: 1.01rem; margin-bottom: 3px;}
-          .mov-sub { font-size: .97rem; color: #333;}
-          .totales-corte { font-size: 1.13rem; font-weight: bold; margin: 20px 0 18px 0; text-align: center;}
-          .firmas-corte { margin-top:52px; display:flex; justify-content:space-between; }
-          .firma { width:47%; border-top:1.5px solid #222; text-align:center; padding-top:5px; font-size:1rem; }
-          @media print {
-            .mov-card, .header-corte, .totales-corte, .firma, .fecha-corte { background: #fff !important; color: #222 !important;}
-            body { background: #fff !important; color: #222 !important;}
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header-corte">CORTE DE CAJA</div>
-        <div class="fecha-corte">${fecha}</div>
-        <div>${movimientosHtml}</div>
-        <div class="totales-corte">${totalHtml}</div>
-        <div class="firmas-corte">
-          <div class="firma">Firma de Caja</div>
-          <div class="firma">Firma de Gerente</div>
-        </div>
-      </body>
-      </html>
-    `;
-    const w = window.open('', '', 'width=900,height=800');
-    w.document.write(printHtml);
-    w.document.close();
-    setTimeout(() => { w.focus(); }, 300);
-  }
+  <!-- Impresión (sin cambios de lógica) -->
+  <script>
+    document.getElementById("btn-imprimir-corte").onclick = function() {
+      const fecha = document.getElementById("fecha-label").textContent || '';
+      const movimientosHtml = document.getElementById("movimientos-list").innerHTML;
+      const totalHtml = document.getElementById("total-caja").innerHTML;
+
+      const printHtml = `
+        <html>
+        <head>
+          <title>Corte de Caja – Multi Inversiones</title>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #222; margin: 0; background: #fff; }
+            .header-corte { text-align: center; font-size: 1.55rem; font-weight: bold; margin: 18px 0 4px 0; color: #00527c; }
+            .fecha-corte { text-align: center; margin-bottom: 12px; font-size: 1.06rem; }
+            .mov-card { border: 1px solid #eee; border-radius: 10px; margin-bottom: 8px; padding: 10px 13px; background: #fff;}
+            .mov-title { font-weight: bold; font-size: 1.01rem; margin-bottom: 3px;}
+            .mov-sub { font-size: .97rem; color: #333;}
+            .totales-corte { font-size: 1.13rem; font-weight: bold; margin: 20px 0 18px 0; text-align: center;}
+            .firmas-corte { margin-top:52px; display:flex; justify-content:space-between; gap:24px; padding:0 10px; }
+            .firma { flex:1; border-top:1.5px solid #222; text-align:center; padding-top:5px; font-size:1rem; }
+            @media print {
+              .mov-card, .header-corte, .totales-corte, .firma, .fecha-corte { background: #fff !important; color: #222 !important;}
+              body { background: #fff !important; color: #222 !important;}
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header-corte">CORTE DE CAJA</div>
+          <div class="fecha-corte">${fecha}</div>
+          <div>${movimientosHtml}</div>
+          <div class="totales-corte">${totalHtml}</div>
+          <div class="firmas-corte">
+            <div class="firma">Firma de Caja</div>
+            <div class="firma">Firma de Gerente</div>
+          </div>
+        </body>
+        </html>
+      `;
+      const w = window.open('', '', 'width=900,height=800');
+      w.document.write(printHtml);
+      w.document.close();
+      setTimeout(() => { w.focus(); }, 300);
+    }
   </script>
 </body>
 </html>
+
 

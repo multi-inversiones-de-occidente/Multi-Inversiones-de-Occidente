@@ -39,12 +39,48 @@
       });
     }
 
+    // Iniciales desde correo (fallback de avatar)
+    function inicialesDesdeEmail(email){
+      const base = (email || "").split("@")[0];
+      const partes = base.split(/[.\-_]+/).filter(Boolean);
+      let ini = partes.slice(0,2).map(s=>s[0]).join("").toUpperCase();
+      if(!ini) ini = (email||"U")[0].toUpperCase();
+      return ini;
+    }
+
     window.addEventListener("DOMContentLoaded", () => {
       onAuthStateChanged(auth, user => {
         if (!user) return location.href = "login.html";
-        document.getElementById("usuario-nombre").textContent = user.email;
+
+        // Identidad visual (correo + avatar)
+        const emailEl = document.getElementById("usuario-email");
+        const h1El    = document.getElementById("usuario-nombre");
+        const imgEl   = document.getElementById("usuario-avatar");
+        const initEl  = document.getElementById("usuario-iniciales");
+
+        emailEl.textContent = user.email;
+        h1El.textContent    = user.email;     // a11y (está oculto visualmente)
+        initEl.textContent  = inicialesDesdeEmail(user.email);
+
+        // Avatar: photoURL -> assets/avatar_user.png -> iniciales
+        const fallbackSrc = "assets/avatar_user.png";
+        const usarIniciales = () => {
+          imgEl.style.display = "none";
+          initEl.style.display = "grid";
+        };
+        imgEl.onerror = () => {
+          // si falla el asset, mostrar iniciales
+          if (imgEl.dataset.fallbackTried === "1") { usarIniciales(); }
+          else {
+            imgEl.dataset.fallbackTried = "1";
+            imgEl.src = fallbackSrc;
+          }
+        };
+        if (user.photoURL) imgEl.src = user.photoURL; else imgEl.src = fallbackSrc;
+
         const uid = user.uid;
 
+        // Badges aprobadas
         suscribirBadge("badge-app-credicash", [
           where("estado","==","Aprobado"),
           where("creditLine","==","Credicash"),
@@ -137,10 +173,81 @@
       display:flex; flex-direction:column; align-items:center;
     }
 
+    /* Ocultamos visualmente el h1 pero conservamos semántica y a11y */
+    .visually-hidden{
+      position:absolute !important; clip: rect(1px, 1px, 1px, 1px);
+      padding:0; border:0; height:1px; width:1px; overflow:hidden; white-space:nowrap;
+    }
     h1{
       margin:1.2rem 0 .2rem; font-size:clamp(1.6rem, 2.4vw + 1rem, 2.6rem);
       font-weight:var(--title-weight); color:var(--brand-blue); text-align:center; letter-spacing:.2px;
     }
+
+    /* ===== Tarjeta de Identidad (avatar + correo) ===== */
+    .identity-card{
+      width:100%; max-width:900px; margin: .4rem auto 1.2rem auto;
+      display:flex; align-items:center; gap:14px; padding:10px 12px;
+      background:var(--glass-bg); border:1px solid var(--glass-brd); border-radius:22px;
+      box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
+    }
+    .identity-card::before{
+      /* halo animado muy sutil */
+      content:""; position:absolute; inset:-2px; border-radius:inherit; pointer-events:none;
+      background: conic-gradient(from 220deg,
+        rgba(103,200,241,.18), rgba(248,175,64,.16), rgba(139,209,58,.16), rgba(103,200,241,.18));
+      filter: blur(8px); opacity:.45;
+      mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+      -webkit-mask-composite: xor; mask-composite: exclude; padding:1px;
+      animation: halo 10s linear infinite;
+    }
+    @keyframes halo{ to{ transform: rotate(1turn) } }
+
+    .avatar{
+      width:64px; height:64px; padding:2px; border-radius:50%;
+      background: conic-gradient(from 210deg, var(--brand-cel), var(--brand-gold), var(--brand-green), var(--brand-cel));
+      position:relative; box-shadow: 0 8px 24px rgba(10,20,40,.15);
+      flex: 0 0 auto;
+    }
+    .avatar .inner{
+      width:100%; height:100%; border-radius:50%;
+      background: linear-gradient(180deg, #f6f9ff, #e9eef6);
+      overflow:hidden; display:grid; place-items:center;
+    }
+    .avatar img{ width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; }
+    .avatar .initials{
+      display:none; width:100%; height:100%; border-radius:50%;
+      font-weight:800; letter-spacing:.5px; color:#243b86; font-size:1.1rem;
+      background: linear-gradient(180deg, #ffffff, #ecf2fb);
+      place-items:center;
+    }
+    .avatar .status{
+      position:absolute; right:2px; bottom:2px; width:12px; height:12px; border-radius:50%;
+      background: #22c55e; border:2px solid #fff;
+      box-shadow: 0 0 0 2px rgba(34,197,94,.2);
+    }
+
+    .who{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+    .email-pill{
+      display:inline-flex; align-items:center; gap:10px; max-width:100%;
+      padding:10px 14px; border-radius:999px;
+      background: linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
+      border: 1px solid rgba(36,59,134,.15);
+      font-weight:800; color:var(--brand-blue); letter-spacing:.2px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+      position:relative; overflow:hidden;
+    }
+    .email-pill::after{
+      /* brillo deslizante */
+      content:""; position:absolute; inset:0; pointer-events:none;
+      background: linear-gradient(120deg, transparent 0 40%, rgba(255,255,255,.6) 50%, transparent 60% 100%);
+      transform: translateX(-120%); opacity:.55; mix-blend-mode: screen;
+      animation: pillSheen 8s cubic-bezier(.2,.6,.2,1) infinite;
+    }
+    @keyframes pillSheen{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
+
+    .email-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .email-icon{ color: var(--brand-blue); opacity:.8; }
+
     .mensaje-bienvenida{
       text-align:center; line-height:1.5; color:var(--muted);
       font-size:clamp(.98rem, .4vw + .86rem, 1.1rem); margin-bottom:1.8rem; max-width:720px;
@@ -207,15 +314,15 @@
     }
 
     /* Variantes de borde iónico */
-    .btn-caja::before{ background:conic-gradient(from 120deg, rgba(103,200,241,.35), rgba(19,182,107,.35), transparent 85%) }
-    .btn-mora-usuario::before{ background:conic-gradient(from 120deg, rgba(122,66,241,.35), rgba(89,51,215,.35), transparent 85%) }
-    .btn-mora-agencia::before{ background:conic-gradient(from 120deg, rgba(48,79,254,.35), rgba(92,107,192,.35), transparent 85%) }
-    .btn-pin::before{ background:conic-gradient(from 120deg, rgba(248,175,64,.45), rgba(255,167,38,.35), transparent 85%) }
-    .btn-cierre-caja::before{ background:conic-gradient(from 120deg, rgba(231,255,114,.45), rgba(19,182,107,.35), transparent 85%) }
-    .btn-master-creditos::before{ background:conic-gradient(from 120deg, rgba(96,125,139,.45), rgba(55,71,79,.35), transparent 85%) }
-    .btn-cuotas-vencer::before{ background:conic-gradient(from 120deg, rgba(248,175,64,.45), rgba(103,200,241,.35), transparent 85%) }
-    .btn-reporte::before{ background:conic-gradient(from 120deg, rgba(238,9,121,.45), rgba(255,106,0,.35), transparent 85%) }
-    .btn-revertir::before{ background:conic-gradient(from 120deg, rgba(231,76,60,.5), rgba(142,8,0,.35), transparent 85%) }
+    .btn-caja::before{ background: conic-gradient(from 120deg, rgba(103,200,241,.35), rgba(19,182,107,.35), transparent 85%) }
+    .btn-mora-usuario::before{ background: conic-gradient(from 120deg, rgba(122,66,241,.35), rgba(89,51,215,.35), transparent 85%) }
+    .btn-mora-agencia::before{ background: conic-gradient(from 120deg, rgba(48,79,254,.35), rgba(92,107,192,.35), transparent 85%) }
+    .btn-pin::before{ background: conic-gradient(from 120deg, rgba(248,175,64,.45), rgba(255,167,38,.35), transparent 85%) }
+    .btn-cierre-caja::before{ background: conic-gradient(from 120deg, rgba(231,255,114,.45), rgba(19,182,107,.35), transparent 85%) }
+    .btn-master-creditos::before{ background: conic-gradient(from 120deg, rgba(96,125,139,.45), rgba(55,71,79,.35), transparent 85%) }
+    .btn-cuotas-vencer::before{ background: conic-gradient(from 120deg, rgba(248,175,64,.45), rgba(103,200,241,.35), transparent 85%) }
+    .btn-reporte::before{ background: conic-gradient(from 120deg, rgba(238,9,121,.45), rgba(255,106,0,.35), transparent 85%) }
+    .btn-revertir::before{ background: conic-gradient(from 120deg, rgba(231,76,60,.5), rgba(142,8,0,.35), transparent 85%) }
   </style>
 </head>
 <body>
@@ -232,10 +339,28 @@
   </header>
 
   <div class="container">
-    <h1 id="usuario-nombre">Bienvenido, usuario</h1>
-    <div class="mensaje-bienvenida">
-      Acceso rápido a las funciones del gerente.<br>
-      <span style="color:var(--brand-cel); font-weight:800;">Visualiza tus solicitudes aprobadas y administra las funciones claves de Multi Inversiones.</span>
+    <!-- h1 accesible (oculto) -->
+    <h1 id="usuario-nombre" class="visually-hidden">Bienvenido, usuario</h1>
+
+    <!-- Tarjeta de identidad -->
+    <div class="identity-card">
+      <div class="avatar" aria-hidden="true">
+        <div class="inner">
+          <img id="usuario-avatar" alt="Avatar de usuario"/>
+          <div id="usuario-iniciales" class="initials">U</div>
+        </div>
+        <span class="status" title="Conectado"></span>
+      </div>
+      <div class="who">
+        <div class="email-pill" title="Usuario autenticado">
+          <i class="fa-solid fa-user email-icon" aria-hidden="true"></i>
+          <span id="usuario-email" class="email-text">usuario@correo.com</span>
+        </div>
+        <div class="mensaje-bienvenida">
+          Acceso rápido a las funciones del gerente.<br>
+          <span style="color:var(--brand-cel); font-weight:800;">Visualiza tus solicitudes aprobadas y administra las funciones claves de Multi Inversiones.</span>
+        </div>
+      </div>
     </div>
 
     <!-- ÚNICA GRILLA: TODO junto (3 por fila) -->
@@ -314,7 +439,7 @@
     </div>
   </div>
 
-  <!-- Interacciones avanzadas: tilt + ripple -->
+  <!-- Interacciones: tilt + ripple -->
   <script>
     const buttons = document.querySelectorAll('.btn-grande');
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;

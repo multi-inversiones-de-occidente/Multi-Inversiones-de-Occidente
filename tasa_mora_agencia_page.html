@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Tasa de Mora por Agencia</title>
+
+  <!-- Firebase + App -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { 
-      getFirestore, collection, query, where, getDocs, doc, getDoc 
-    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -30,23 +30,17 @@
       const n = (typeof valor === "number") ? valor : parseFloat(valor || "0");
       return n.toLocaleString("es-SV", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
     }
-
     function asNumber(v, def = 0) {
       if (typeof v === "number") return v;
       const p = parseFloat(v);
       return Number.isFinite(p) ? p : def;
     }
-
-    // Cuenta cuántas cuotas están con estado "Atrasado"
     function contarCuotasAtrasadas(amortizacion) {
       if (!Array.isArray(amortizacion)) return 0;
       return amortizacion.reduce((acc, q) => acc + (q && q.estado === "Atrasado" ? 1 : 0), 0);
     }
 
-    // Intenta resolver nombre del cliente desde el documento del crédito;
-    // si no existe, busca en `clientes/{clienteID}`
     async function resolverNombreCliente(d) {
-      // Intentos comunes dentro del doc de crédito
       const candidatos = [
         d.nombreCliente && d.apellidoCliente ? `${d.nombreCliente} ${d.apellidoCliente}` : null,
         d.clienteNombre && d.clienteApellidos ? `${d.clienteNombre} ${d.clienteApellidos}` : null,
@@ -56,7 +50,6 @@
       ].filter(Boolean);
       if (candidatos.length > 0) return candidatos[0];
 
-      // Si no hay nada en el doc, intenta por clienteID en la colección clientes
       const cid = d.clienteID || d.idCliente || d.clienteUid || d.userId || null;
       if (!cid) return "Sin nombre";
 
@@ -97,35 +90,25 @@
 
       let capAtrasado = 0;
       let carteraTotal = 0;
-
-      // Para la lista detallada
       const listaMora = [];
 
-      // Recorre créditos y computa
       for (const docCred of creditosSnap.docs) {
         const d = docCred.data();
         const idCredito = docCred.id;
-
         const estadoCredito = d.estadoCredito || "";
 
-        // Cartera total: solo si NO está "Revertido"
         if (estadoCredito !== "Revertido") {
           carteraTotal += asNumber(d.saldoActual);
         }
 
-        // ¿Tiene alguna cuota atrasada?
         const cuotasAtrasadas = contarCuotasAtrasadas(d.amortizacion);
         if (cuotasAtrasadas > 0) {
           const ca = asNumber(d.capitalAtrasado);
           capAtrasado += ca;
 
-          // Resuelve nombre del cliente
           const nombreCliente = await resolverNombreCliente(d);
-
-          // Tomamos paraPonerseAlDia si existe
           const ppad = asNumber(d.paraPonerseAlDia);
 
-          // Prepara el registro detallado
           listaMora.push({
             idCredito,
             nombreCliente,
@@ -133,19 +116,17 @@
             saldoActual: asNumber(d.saldoActual),
             capitalAtrasado: ca,
             paraPonerseAlDia: ppad,
-            cuotasAtrasadas: cuotasAtrasadas
+            cuotasAtrasadas
           });
         }
       }
 
       const moraPct = carteraTotal > 0 ? (capAtrasado / carteraTotal) * 100 : 0;
 
-      // 3) Actualiza totales en pantalla
       document.getElementById("capital-mora").textContent = formatoDinero(capAtrasado);
       document.getElementById("cartera-total").textContent = formatoDinero(carteraTotal);
       document.getElementById("pct-mora").textContent = moraPct.toFixed(2) + "%";
 
-      // 4) Pinta la tabla de detalle
       renderDetalle(listaMora);
 
       document.getElementById('loading').style.display = "none";
@@ -153,7 +134,6 @@
       document.getElementById('box-detalle').style.display = "block";
     }
 
-    // Renderiza la tabla con los créditos en mora
     function renderDetalle(items) {
       const cont = document.getElementById("detalle-body");
       cont.innerHTML = "";
@@ -161,7 +141,7 @@
       if (!items || items.length === 0) {
         cont.innerHTML = `
           <tr>
-            <td colspan="7" style="text-align:center;color:#fff9;padding:1rem;">
+            <td colspan="7" style="text-align:center;color:#555;padding:1rem;">
               No hay créditos en mora para esta agencia.
             </td>
           </tr>
@@ -171,19 +151,18 @@
         return;
       }
 
-      // Orden por capitalAtrasado desc por defecto
       items.sort((a, b) => b.capitalAtrasado - a.capitalAtrasado);
 
       for (const it of items) {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td class="td-corto">${it.idCredito}</td>
-          <td>${it.nombreCliente}</td>
-          <td>${it.estadoCredito}</td>
-          <td class="num">${formatoDinero(it.saldoActual)}</td>
-          <td class="num imp">${formatoDinero(it.capitalAtrasado)}</td>
-          <td class="num">${formatoDinero(it.paraPonerseAlDia)}</td>
-          <td class="num">${it.cuotasAtrasadas}</td>
+          <td class="mono" title="${it.idCredito}">${it.idCredito}</td>
+          <td title="${it.nombreCliente}">${it.nombreCliente}</td>
+          <td title="${it.estadoCredito}">${it.estadoCredito}</td>
+          <td class="num" title="${formatoDinero(it.saldoActual)}">${formatoDinero(it.saldoActual)}</td>
+          <td class="num imp" title="${formatoDinero(it.capitalAtrasado)}">${formatoDinero(it.capitalAtrasado)}</td>
+          <td class="num" title="${formatoDinero(it.paraPonerseAlDia)}">${formatoDinero(it.paraPonerseAlDia)}</td>
+          <td class="num" title="${it.cuotasAtrasadas}">${it.cuotasAtrasadas}</td>
         `;
         cont.appendChild(tr);
       }
@@ -191,12 +170,10 @@
       document.getElementById("total-registros").textContent = String(items.length);
       document.getElementById("btn-exportar").style.display = "inline-flex";
 
-      // Guarda en un atributo para exportación
       const tabla = document.getElementById("tabla-detalle");
       tabla.dataset.json = JSON.stringify(items);
     }
 
-    // ===== Exportar a Excel (.xlsx) con SheetJS =====
     function exportarExcel() {
       const tabla = document.getElementById("tabla-detalle");
       const raw = tabla.dataset.json ? JSON.parse(tabla.dataset.json) : [];
@@ -216,31 +193,21 @@
       ];
 
       const ws = XLSX.utils.aoa_to_sheet(ws_data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Créditos en mora");
-
-      // (Opcional) Ajustar ancho de columnas para que se vea mejor al abrir
       ws['!cols'] = [
-        { wch: 20 }, // ID
-        { wch: 28 }, // Cliente
-        { wch: 14 }, // Estado
-        { wch: 16 }, // Saldo Actual
-        { wch: 18 }, // Capital Atrasado
-        { wch: 20 }, // Para Ponerse al Día
-        { wch: 16 }  // Cuotas Atrasadas
+        { wch: 20 }, { wch: 28 }, { wch: 14 }, { wch: 16 },
+        { wch: 18 }, { wch: 20 }, { wch: 16 }
       ];
 
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Créditos en mora");
       XLSX.writeFile(wb, "creditos_en_mora.xlsx");
     }
 
-    // Eventos
     window.addEventListener("DOMContentLoaded", () => {
       onAuthStateChanged(auth, user => {
         if (!user) return location.href = "login.html";
         cargarTasaMoraAgencia(user.uid);
       });
-
-      // Cambiado para Excel
       document.getElementById("btn-exportar").addEventListener("click", exportarExcel);
     });
   </script>
@@ -248,152 +215,185 @@
   <!-- SheetJS para exportar a Excel -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
+  <!-- Iconos -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
   <style>
-    body {
-      background: radial-gradient(circle,#000,#111);
-      min-height: 100vh;
-      color: #fff;
-      font-family: Arial, sans-serif;
-      margin: 0;
+    /* ======= Estilo gráfico CLARO / GLASS como el Panel ======= */
+    :root{
+      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --muted:#5b6776;
+      --white:#ffffff; --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
+      --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
+      --radius-2xl:22px; --radius-xl:16px;
     }
-    .container {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 2.5rem 1rem 2rem 1rem;
-    }
-    h1 {
-      font-size: 2rem;
-      text-align: center;
-      margin-bottom: .7rem;
-      margin-top: 1.2rem;
-      letter-spacing: .8px;
-    }
-    .agencia-label {
-      text-align: center;
-      font-size: 1.12rem;
-      color: #67C8F1;
-      margin-bottom: 1.8rem;
-      font-weight: 600;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 1.2rem;
-    }
-    @media(min-width: 960px){
-      .grid {
-        grid-template-columns: 360px 1fr;
-        align-items: start;
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0c0f14; --bg-2:#0f141b; --text:#dfe6ef; --muted:#9aa6b6;
+        --glass-bg:rgba(255,255,255,.12); --glass-brd:rgba(255,255,255,.18); --glass-shadow:0 24px 60px rgba(0,0,0,.45);
       }
     }
-    .box {
-      background: #1a1a1a;
-      border-radius: 18px;
-      box-shadow: 0 4px 22px #13b66a2b;
-      padding: 1.7rem 1.2rem 1.7rem 1.2rem;
-      margin-bottom: 0;
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      min-height:100vh;
     }
-    .dato-mora {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #23232c;
-      border-radius: 13px;
-      padding: 1rem 1.2rem;
-      margin-bottom: 14px;
-    }
-    .dato-mora:last-child { margin-bottom: 0; }
-    .dato-mora-label {
-      font-size: 1rem;
-      color: #fff9;
-    }
-    .dato-mora-valor {
-      font-weight: bold;
-      font-size: 1.18rem;
-    }
-    .valor-mora { color: #FFD600; }
-    .valor-cartera { color: #13b66b; }
-    .valor-pct { color: #F94A4A; }
-    #loading {
-      display: none;
-      margin: 2rem 0;
-      text-align: center;
-      color: #fff;
+    .pattern{
+      position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image:
+        radial-gradient(1px 1px at 25px 25px, rgba(255,255,255,.10), transparent 40%),
+        radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.06), transparent 40%);
+      background-size:100px 100px; mix-blend-mode:soft-light; opacity:.5;
     }
 
-    /* Tabla detalle */
-    .header-detalle {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: .8rem;
-      margin-bottom: .8rem;
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
+      background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
+      border-bottom:1px solid var(--glass-brd);
     }
-    .header-detalle h2 {
-      margin: 0;
-      font-size: 1.2rem;
-      letter-spacing: .4px;
+    @media (prefers-color-scheme: dark){
+      header{ background:linear-gradient(180deg, rgba(15,20,30,.75), rgba(15,20,30,.35)); }
     }
-    .pill {
-      background: #23232c;
-      padding: .4rem .7rem;
-      border-radius: 999px;
-      font-size: .9rem;
-      color: #fff9;
+    .topbar{
+      max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
     }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: .5rem;
-      padding: .6rem .9rem;
-      border-radius: 10px;
-      background: #0e7a45;
-      color: #fff;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      transition: transform .05s ease-in-out, opacity .2s;
+    .logo-plate{
+      display:inline-flex; align-items:center; gap:10px; background:var(--glass-bg);
+      border:1px solid var(--glass-brd); padding:8px 14px; border-radius:16px;
+      box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
     }
-    .btn:hover { opacity: .95; }
-    .btn:active { transform: scale(.98); }
-    .btn.secondary { background: #2c2c36; }
+    .logo-plate::after{
+      content:""; position:absolute; inset:-1px;
+      background:linear-gradient(120deg, transparent 0 35%, rgba(255,255,255,.55) 45%, transparent 55% 100%);
+      transform:translateX(-120%); animation:plateSheen 6s linear infinite; pointer-events:none;
+    }
+    @keyframes plateSheen{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
+    .logo-plate img{ height:28px; width:auto; display:block }
+    .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      border-spacing: 0;
-      overflow: hidden;
-      border-radius: 14px;
-      background: #17171f;
+    /* Contenedor ancho */
+    .container{
+      position:relative; z-index:1;
+      max-width: min(95vw, 1400px);
+      margin: 2rem auto; padding: 1.2rem;
+      background:var(--glass-bg); border:1px solid var(--glass-brd);
+      border-radius:var(--radius-2xl); box-shadow:var(--glass-shadow);
     }
-    thead th {
-      text-align: left;
-      font-size: .85rem;
-      letter-spacing: .3px;
-      color: #b8c0ff;
-      padding: .8rem .9rem;
-      background: #1f1f28;
-      position: sticky;
-      top: 0;
-      z-index: 2;
+    h1{
+      margin: .2rem 0 .4rem; text-align:center;
+      font-size:clamp(1.2rem, .8vw + 1.2rem, 1.8rem);
+      color:var(--brand-blue); font-weight:800;
     }
-    tbody td {
-      padding: .75rem .9rem;
-      border-top: 1px solid #2a2a35;
-      font-size: .95rem;
-      color: #e6e6e6;
-      vertical-align: middle;
+    .agencia-label{
+      text-align:center; color:var(--muted); font-weight:700; margin-bottom:1.2rem;
     }
-    tbody tr:hover {
-      background: #1e1e27;
+
+    .grid{
+      display:grid; grid-template-columns: 380px 1fr; gap:1rem; align-items:start;
     }
-    .num { text-align: right; font-variant-numeric: tabular-nums; }
-    .imp { color: #ffd600; font-weight: 700; }
-    .td-corto { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    @media(max-width: 980px){ .grid{ grid-template-columns:1fr; } }
+
+    /* Cards */
+    .box{
+      background:var(--white);
+      border:1px solid var(--glass-brd);
+      border-radius:16px;
+      box-shadow:0 12px 28px rgba(10,20,40,.1), inset 0 1px 0 rgba(255,255,255,.7);
+      padding: 1rem 1rem 1.1rem 1rem;
+    }
+    .dato-mora{
+      display:flex; justify-content:space-between; align-items:center;
+      background:linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
+      border:1px solid rgba(36,59,134,.15);
+      border-radius:12px; padding:.75rem .9rem; margin-bottom:.7rem;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    }
+    .dato-mora-label{ color:var(--brand-blue); font-weight:800; }
+    .dato-mora-valor{ font-weight:900; }
+    .valor-mora{ color:#c17900; }
+    .valor-cartera{ color:#0c8a58; }
+    .valor-pct{ color:#d03838; }
+    #loading{ text-align:center; color:#7a4b00; font-weight:800; display:none; }
+
+    /* Encabezado detalle */
+    .header-detalle{ display:flex; align-items:center; justify-content:space-between; gap:.8rem; margin-bottom:.6rem; }
+    .header-detalle h2{ margin:0; font-size:1rem; color:var(--brand-blue); font-weight:900; }
+    .pill{
+      background:linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
+      border:1px solid rgba(36,59,134,.15);
+      padding:.35rem .6rem; border-radius:999px; font-size:.85rem; color:var(--text);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    }
+    .btn{
+      display:inline-flex; align-items:center; gap:.5rem;
+      padding:.6rem .9rem; border-radius:12px;
+      background:linear-gradient(90deg, var(--brand-green), #10a164);
+      color:#fff; font-weight:800; border:none; cursor:pointer;
+      box-shadow:0 14px 30px rgba(16,161,100,.18);
+    }
+    .btn i{ font-size:1rem; }
+
+    /* Tabla (ancha, sin doble línea) */
+    .table-wrap{ width:100%; overflow:auto; }
+    table#tabla-detalle{
+      width:100%;
+      min-width:1200px;               /* Aprovecha el ancho en desktop */
+      border-collapse:separate; border-spacing:0;
+      background:var(--white);
+      border:1px solid var(--glass-brd);
+      border-radius:12px; overflow:hidden;
+      box-shadow:0 8px 22px rgba(10,20,40,.08), inset 0 1px 0 rgba(255,255,255,.7);
+      table-layout:fixed;             /* Elipsis consistente */
+    }
+    table#tabla-detalle colgroup col:nth-child(1){ width:16%; }
+    table#tabla-detalle colgroup col:nth-child(2){ width:26%; }
+    table#tabla-detalle colgroup col:nth-child(3){ width:10%; }
+    table#tabla-detalle colgroup col:nth-child(4){ width:12%; }
+    table#tabla-detalle colgroup col:nth-child(5){ width:12%; }
+    table#tabla-detalle colgroup col:nth-child(6){ width:16%; }
+    table#tabla-detalle colgroup col:nth-child(7){ width:8%;  }
+
+    thead th{
+      text-align:left; font-size:.9rem; color:var(--brand-blue);
+      padding:.7rem .8rem;
+      background:linear-gradient(180deg, rgba(103,200,241,.18), rgba(103,200,241,.08));
+      font-weight:800; white-space:nowrap;
+      border-bottom:1px solid rgba(10,20,40,.08);
+    }
+    tbody td{
+      padding:.7rem .8rem; font-size:.95rem; color:var(--text);
+      border-top:1px solid rgba(10,20,40,.08);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;  /* sin doble línea */
+      vertical-align:middle;
+    }
+    tbody tr:hover{ background:rgba(103,200,241,.05); }
+    td.num{ text-align:right; }
+    td.imp{ color:#c17900; font-weight:900; }
+    td.mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
   </style>
 </head>
 <body>
+  <div class="pattern" aria-hidden="true"></div>
+
+  <header>
+    <div class="topbar">
+      <div class="logo-plate">
+        <img src="assets/logo_mi_bw.png" alt="Logo Multi Inversiones" width="140" height="40" />
+        <strong class="brand-name">MULTI INVERSIONES</strong>
+      </div>
+      <div style="margin-left:auto; font-weight:700; color:var(--muted);">
+        Tasa de Mora por Agencia
+      </div>
+    </div>
+  </header>
+
   <div class="container">
     <h1><i class="fas fa-city"></i> Tasa de Mora por Agencia</h1>
     <div class="agencia-label">
@@ -425,14 +425,18 @@
           <h2><i class="fa-solid fa-list"></i> Créditos en mora (detalle)</h2>
           <div style="display:flex;align-items:center;gap:.6rem;">
             <span class="pill">Registros: <strong id="total-registros">0</strong></span>
-            <!-- Cambiado a Excel -->
             <button class="btn" id="btn-exportar" style="display:none;">
               <i class="fa-solid fa-file-excel"></i> Exportar Excel
             </button>
           </div>
         </div>
-        <div style="overflow:auto;">
+
+        <div class="table-wrap">
           <table id="tabla-detalle">
+            <!-- Columnas con proporciones fijas para evitar saltos de línea -->
+            <colgroup>
+              <col/><col/><col/><col/><col/><col/><col/>
+            </colgroup>
             <thead>
               <tr>
                 <th>ID Crédito</th>
@@ -452,8 +456,13 @@
       </div>
     </div>
   </div>
+
+  <!-- SheetJS para exportar a Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </body>
 </html>
+
+
 
 
 

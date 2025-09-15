@@ -4,6 +4,8 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Revertir Créditos – Multi Inversiones</title>
+
+  <!-- Firebase & App -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, updateDoc, doc, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -38,7 +40,7 @@
     const alertInfo = (msg) => { alert(msg); };
     const limpiarDetalle = () => { boxDetalle().style.display = 'none'; motivoInput().value = ""; btnRevertir().disabled = true; };
 
-    // --- NUEVA FUNCIÓN DE HASH (WebCrypto API) ---
+    // Hash SHA-256
     async function sha256(str) {
       const encoder = new TextEncoder();
       const data = encoder.encode(str);
@@ -46,7 +48,7 @@
       return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
-    // Cargar info gerente
+    // Datos del gerente
     async function cargarDatosGerente(uid) {
       const snap = await getDocs(query(collection(db, "users"), where("__name__", "==", uid)));
       if (snap.empty) {
@@ -55,27 +57,28 @@
       }
       const data = snap.docs[0].data();
       agencia = data.department || '';
-      gerenteName = (data.nombre || '') + ' ' + (data.apellido || '');
+      gerenteName = ((data.nombre || '') + ' ' + (data.apellido || '')).trim();
       gerenteUid = uid;
       document.getElementById("info-agencia").textContent = agencia;
       return true;
     }
 
-    // Buscar y renderizar créditos activos de la agencia
+    // Buscar créditos por agencia (excepto Revertidos) y filtrar por término
     async function cargarCreditos(needle = "") {
       limpiarDetalle();
-      listaResultados().innerHTML = "<div style='color:#aaa;padding:12px'>Buscando...</div>";
+      listaResultados().innerHTML = "<div class='info-inline'>Buscando...</div>";
+
       const snap = await getDocs(query(
         collection(db, "creditos"),
         where("agenciaAsignada", "==", agencia),
-        where("estadoCredito", "!=", "Revertido")
+        where("estadoCredito", "!=", "Revertido") // mantengo tu filtro
       ));
+
       listaCreditos = [];
       const term = needle.trim().toLowerCase();
       snap.forEach(docSnap => {
         const d = docSnap.data();
-        // filtrar por nombre, apellido, dui, id
-        let text = (d.nombre||"") + " " + (d.apellido||"") + " " + (d.numeroDui||"") + " " + docSnap.id;
+        const text = `${d.nombre||""} ${d.apellido||""} ${d.numeroDui||""} ${docSnap.id}`;
         if (!term || text.toLowerCase().includes(term)) {
           listaCreditos.push({
             id: docSnap.id,
@@ -89,39 +92,51 @@
           });
         }
       });
+
       if (listaCreditos.length === 0) {
-        listaResultados().innerHTML = "<div style='color:#aaa;padding:14px'>No se encontraron créditos en esta agencia.</div>";
+        listaResultados().innerHTML = "<div class='info-inline'>No se encontraron créditos en esta agencia.</div>";
       } else {
         listaResultados().innerHTML = listaCreditos.map((c, idx) => `
-          <div class="card-credito" onclick="window.selectCredito(${idx})">
-            <b>${c.nombre} ${c.apellido}</b><br>
-            <span class="dato">DUI:</span> ${c.dui} <span class="dato">| Línea:</span> ${c.linea} <span class="dato">| Estado:</span> ${c.estado}
-            <div class="monto">$${Number(c.monto).toFixed(2)}</div>
-          </div>
+          <button class="card-credito" onclick="window.selectCredito(${idx})" title="Seleccionar crédito">
+            <div class="card-main">
+              <div class="titular">
+                <b>${c.nombre} ${c.apellido}</b>
+                <span class="estado">${c.estado || '—'}</span>
+              </div>
+              <div class="meta">
+                <span class="dato"><i class="fa-regular fa-id-card"></i> DUI:</span> ${c.dui || '—'}
+                <span class="sep">•</span>
+                <span class="dato"><i class="fa-solid fa-tags"></i> Línea:</span> ${c.linea || '—'}
+                <span class="sep">•</span>
+                <span class="dato mono">${c.id}</span>
+              </div>
+            </div>
+            <span class="monto">$${Number(c.monto).toFixed(2)}</span>
+          </button>
         `).join("");
       }
     }
 
-    // Mostrar detalle de crédito seleccionado
+    // Mostrar detalle seleccionado
     window.selectCredito = function(idx) {
       const c = listaCreditos[idx];
       boxDetalle().style.display = 'block';
       document.getElementById("nombre-detalle").textContent = `${c.nombre} ${c.apellido}`;
-      document.getElementById("dui-detalle").textContent = c.dui;
-      document.getElementById("linea-detalle").textContent = c.linea;
+      document.getElementById("dui-detalle").textContent = c.dui || '—';
+      document.getElementById("linea-detalle").textContent = c.linea || '—';
       document.getElementById("monto-detalle").textContent = `$${Number(c.monto).toFixed(2)}`;
       document.getElementById("id-credito").value = idx;
       motivoInput().value = "";
       btnRevertir().disabled = false;
+      document.getElementById('box-detalle').scrollIntoView({behavior:'smooth', block:'start'});
     };
 
-    // --- FUNCIÓN MEJORADA: Pedir PIN y validar contra TODOS los gerentes de la agencia ---
+    // Pedir PIN y validar contra todos los gerentes de la agencia
     async function pedirPin() {
       let pin = prompt("Por seguridad, ingresa tu PIN de gerente:");
       if (!pin) return false;
       const pinHash = await sha256(pin);
 
-      // Buscar todos los gerentes de la agencia
       const snap = await getDocs(query(
         collection(db, "users"),
         where("rol", "==", "gerente"),
@@ -131,22 +146,16 @@
         alertInfo("No se encontraron gerentes para esta agencia.");
         return false;
       }
-      // Comparar el hash con TODOS los gerentes
       let match = false;
       snap.forEach(docSnap => {
-        if ((docSnap.data().internalPassword || "") === pinHash) {
-          match = true;
-        }
+        if ((docSnap.data().internalPassword || "") === pinHash) match = true;
       });
-      if (match) {
-        return true;
-      } else {
-        alertInfo("PIN incorrecto.");
-        return false;
-      }
+      if (match) return true;
+      alertInfo("PIN incorrecto.");
+      return false;
     }
 
-    // Acción de revertir
+    // Revertir crédito
     window.revertirCredito = async function() {
       const idx = document.getElementById("id-credito").value;
       const motivo = motivoInput().value.trim();
@@ -156,6 +165,7 @@
       }
       const credito = listaCreditos[idx];
       if (!credito) return;
+
       loading().style.display = "block";
       btnRevertir().disabled = true;
 
@@ -189,7 +199,7 @@
       btnRevertir().disabled = false;
     };
 
-    // Al cargar...
+    // Init
     window.addEventListener("DOMContentLoaded", async () => {
       onAuthStateChanged(auth, async user => {
         if (!user) return location.href = "login.html";
@@ -200,76 +210,213 @@
         });
       });
     });
-
   </script>
+
+  <!-- Iconos -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
   <style>
-    body { background: radial-gradient(circle,#000,#111); min-height:100vh; color:#fff; font-family:Arial,sans-serif; margin:0; }
-    .container { max-width:670px; margin: 0 auto; padding:2.6rem 1rem 2rem 1rem;}
-    h1 { font-size:2rem; text-align:center; margin-bottom:.6rem; margin-top: 1.1rem;}
-    .label-agencia {text-align:center; color:#F8AF40; font-size:1.09rem; margin-bottom:1.2rem;}
-    .search-bar { width:100%; margin-bottom: 1.1rem;}
-    .search-bar input {
-      width:100%; padding:0.7rem 1rem; font-size:1.08rem; border-radius:13px;
-      border:none; background: #16181a; color:#fff; outline: none;
+    /* ======= Línea gráfica clara / glass ======= */
+    :root{
+      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --muted:#5b6776; --white:#ffffff;
+      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
+      --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
+      --radius:18px; --radius-lg:22px;
+      --danger-1:#ffeded; --danger-2:#ffb5ae; --danger-3:#e12d1f;
     }
-    .search-bar input::placeholder { color:#bbb; }
-    .card-credito {
-      background:#191f22; border-radius:10px; box-shadow:0 2px 9px #13b66a24;
-      padding:1.1rem 1.3rem; margin-bottom:9px; cursor:pointer; transition:background .16s;
-      position:relative;
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0c0f14; --bg-2:#0f141b; --text:#dfe6ef; --muted:#9aa6b6;
+        --glass-bg:rgba(255,255,255,.12); --glass-brd:rgba(255,255,255,.18); --glass-shadow:0 24px 60px rgba(0,0,0,.45);
+        --white:#11161d;
+      }
     }
-    .card-credito:hover { background:#213e3a; }
-    .dato { color:#67C8F1;font-size:.98rem; }
-    .monto { position:absolute; right:1.4rem; top:1.25rem; color:#13b66b;font-weight:700; }
-    #loading { display:none; text-align:center; margin:20px 0 9px 0; color:#fff; }
-    #box-detalle { display:none; background:#222227; border-radius:13px; margin-top:16px; padding:1.3rem 1.2rem 1.3rem 1.2rem;}
-    #box-detalle label { font-weight:bold; color:#F8AF40; font-size:1.07rem;}
-    #box-detalle input[type="text"], #motivo-reversion {
-      width:100%; background:#111418; color:#fff; border-radius:9px; border:none; font-size:1.08rem;
-      padding:.72rem .9rem; margin-bottom: 1.1rem;
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      min-height:100vh;
     }
-    #box-detalle input[readonly] { background:#181d20;}
-    #btn-revertir {
-      background:linear-gradient(90deg,#c0392b 70%,#8e0800 100%);
-      color:#fff; border:none; border-radius:13px; padding:0.85rem 0; font-size:1.16rem;
-      width:100%; font-weight:bold; cursor:pointer; margin-top:3px;
-      transition:background .15s;
+    .pattern{
+      position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image:
+        radial-gradient(1px 1px at 25px 25px, rgba(255,255,255,.10), transparent 40%),
+        radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.06), transparent 40%);
+      background-size:100px 100px; mix-blend-mode:soft-light; opacity:.5;
     }
-    #btn-revertir:disabled { opacity:.5; cursor:default; }
-    @media (max-width: 600px) {
-      .container { padding:1.2rem 1vw; }
-      h1 { font-size: 1.21rem;}
+
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
+      background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
+      border-bottom:1px solid var(--glass-brd);
+    }
+    .topbar{
+      max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
+    }
+    .logo-plate{
+      display:inline-flex; align-items:center; gap:10px; background:var(--glass-bg);
+      border:1px solid var(--glass-brd); padding:8px 14px; border-radius:16px;
+      box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
+    }
+    .logo-plate img{ height:28px; width:auto; display:block }
+    .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
+
+    /* Contenedor principal glass */
+    .container{
+      position:relative; z-index:1;
+      max-width: min(96vw, 980px);
+      margin: 2rem auto; padding: 1.2rem 1.1rem 1.6rem;
+      background:var(--glass-bg); border:1px solid var(--glass-brd);
+      border-radius:var(--radius-lg); box-shadow:var(--glass-shadow);
+    }
+    h1{
+      margin: .2rem 0 .3rem; text-align:center;
+      font-size:clamp(1.2rem, .8vw + 1.2rem, 1.8rem);
+      color:var(--brand-blue); font-weight:800;
+    }
+    .label-agencia{
+      text-align:center; color:var(--muted); font-weight:700; margin-bottom:1.2rem;
+    }
+
+    /* Search pill */
+    .search-bar{ width:100%; margin: .4rem 0 1rem; }
+    .search-bar input{
+      width:100%; padding: .9rem 1.1rem; font-size:1.02rem; border-radius:999px;
+      background: linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
+      border:1px solid rgba(36,59,134,.15);
+      color:var(--text); outline:none; box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    }
+    .search-bar input::placeholder{ color:var(--muted); }
+
+    .info-inline{
+      text-align:center; color:var(--muted); padding: 12px 0;
+      background:var(--white); border:1px dashed var(--glass-brd); border-radius:12px;
+    }
+
+    /* Resultado: tarjetas blancas clicables */
+    .card-credito{
+      width:100%; text-align:left; display:flex; align-items:center; justify-content:space-between;
+      gap:12px; padding:14px 16px; margin-bottom:10px; cursor:pointer;
+      background:var(--white);
+      border:1px solid var(--glass-brd); border-radius:14px;
+      box-shadow:0 10px 26px rgba(10,20,40,.10), inset 0 1px 0 rgba(255,255,255,.7);
+      transition:transform .12s ease, box-shadow .2s ease, background .2s ease;
+    }
+    .card-credito:hover{ transform:translateY(-2px); box-shadow:0 18px 40px rgba(10,20,40,.16); }
+    .card-main{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+    .titular{ display:flex; align-items:center; gap:.6rem; }
+    .titular b{ color:var(--text); font-size:1.02rem; }
+    .estado{
+      font-size:.78rem; font-weight:800; color:#5b6776;
+      background:linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
+      border:1px solid rgba(36,59,134,.15); border-radius:999px; padding:.2rem .5rem;
+    }
+    .meta{ color:var(--muted); font-size:.94rem; display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+    .dato{ color:var(--brand-blue); font-weight:800; }
+    .sep{ color:#aab3c2; }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .monto{
+      margin-left:auto; flex:0 0 auto;
+      background:linear-gradient(180deg, #d7ffe9, #c9f9e2);
+      border:1px solid rgba(19,182,107,.35);
+      color:#0c8a58; font-weight:900; padding:.35rem .6rem; border-radius:10px;
+      box-shadow: inset 0 1px 0 #fff;
+    }
+
+    /* Detalle seleccionado */
+    #box-detalle{
+      display:none; margin-top:14px; padding:14px 14px 16px;
+      background:var(--white); border:1px solid var(--glass-brd); border-radius:16px;
+      box-shadow:0 12px 28px rgba(10,20,40,.12), inset 0 1px 0 rgba(255,255,255,.7);
+    }
+    #box-detalle label{ font-weight:900; color:var(--brand-blue); font-size:1rem; }
+    .detalle-head{ color:var(--brand-blue); font-weight:800; font-size:1.05rem; margin-bottom:4px; }
+    .detalle-meta{ color:var(--muted); margin-bottom:8px; }
+    .badge{
+      display:inline-flex; align-items:center; gap:6px; padding:.25rem .6rem; border-radius:999px;
+      background:linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
+      border:1px solid rgba(36,59,134,.15); color:var(--text); font-weight:800; font-size:.9rem;
+    }
+
+    .input, textarea{
+      width:100%; background: linear-gradient(180deg, #fff, #f4f7fb);
+      border:1px solid var(--glass-brd); color:var(--text); border-radius:12px;
+      font-size:1rem; padding:.8rem .9rem; outline:none;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
+    }
+    textarea{ resize:vertical; min-height:70px; }
+
+    /* Botón Revertir */
+    #btn-revertir{
+      width:100%; margin-top:.6rem; padding:.9rem 0;
+      border:none; border-radius:12px; color:#fff; font-weight:900; font-size:1.05rem; cursor:pointer;
+      background:linear-gradient(90deg, #ff6a5f, #e12d1f);
+      box-shadow:0 14px 30px rgba(225,45,31,.22);
+      transition:transform .12s ease, box-shadow .2s ease, opacity .2s ease;
+    }
+    #btn-revertir:hover{ transform:translateY(-1px); box-shadow:0 20px 40px rgba(225,45,31,.28); }
+    #btn-revertir:disabled{ opacity:.6; cursor:not-allowed; transform:none; box-shadow:none; }
+
+    #loading{ text-align:center; color:#a86200; font-weight:800; margin-top:10px; }
+
+    @media (max-width:680px){
+      .container{ padding: 1rem .8rem 1.2rem; }
+      .meta{ font-size:.9rem; }
     }
   </style>
 </head>
 <body>
+  <div class="pattern" aria-hidden="true"></div>
+
+  <header>
+    <div class="topbar">
+      <div class="logo-plate">
+        <img src="assets/logo_mi_bw.png" alt="Logo Multi Inversiones" width="140" height="40" />
+        <strong class="brand-name">MULTI INVERSIONES</strong>
+      </div>
+      <div style="margin-left:auto; font-weight:700; color:var(--muted);">
+        Revertir Créditos
+      </div>
+    </div>
+  </header>
+
   <div class="container">
     <h1><i class="fas fa-undo"></i> Revertir Créditos</h1>
     <div class="label-agencia">
       Solo puedes revertir créditos de la agencia asignada: <span id="info-agencia">Cargando...</span>
     </div>
+
     <div class="search-bar">
-      <input id="search-credito" type="text" placeholder="Buscar por nombre, apellido, DUI o # de crédito...">
+      <input id="search-credito" type="text" placeholder="Buscar por nombre, apellido, DUI o # de crédito…">
     </div>
+
     <div id="resultados-creditos"></div>
 
     <div id="box-detalle">
       <input type="hidden" id="id-credito" value="">
-      <label>Crédito Seleccionado:</label>
-      <div style="color:#67C8F1; font-size:1.14rem; margin-bottom:3px;" id="nombre-detalle"></div>
-      <div style="margin-bottom:4px;">
-        <span class="dato">DUI:</span> <span id="dui-detalle"></span>
-        <span style="margin-left:16px;" class="dato">Línea:</span> <span id="linea-detalle"></span>
+      <label>Crédito Seleccionado</label>
+      <div class="detalle-head" id="nombre-detalle"></div>
+      <div class="detalle-meta">
+        <span class="badge"><i class="fa-regular fa-id-card"></i> DUI: <span id="dui-detalle" style="margin-left:6px"></span></span>
+        <span class="badge" style="margin-left:8px;"><i class="fa-solid fa-tags"></i> Línea: <span id="linea-detalle" style="margin-left:6px"></span></span>
+        <span class="badge" style="margin-left:8px;"><i class="fa-solid fa-dollar-sign"></i> Monto: <span id="monto-detalle" style="margin-left:6px"></span></span>
       </div>
-      <div style="margin-bottom:10px;">
-        <span class="dato">Monto:</span> <span id="monto-detalle"></span>
-      </div>
-      <textarea id="motivo-reversion" rows="2" placeholder="Motivo de reversión (obligatorio)"></textarea>
+
+      <textarea id="motivo-reversion" class="input" rows="2" placeholder="Motivo de reversión (obligatorio)"></textarea>
       <button id="btn-revertir" onclick="window.revertirCredito()">Revertir Crédito</button>
     </div>
-    <div id="loading">Procesando reversión...</div>
+
+    <div id="loading" style="display:none;">Procesando reversión...</div>
   </div>
 </body>
 </html>
+
+
 

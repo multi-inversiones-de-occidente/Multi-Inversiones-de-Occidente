@@ -45,7 +45,6 @@
         document.getElementById("usuario-nombre").textContent = user.email;
         const uid = user.uid;
 
-        // Badges de solicitudes aprobadas por línea y usuario logueado
         suscribirBadge("badge-app-credicash", [
           where("estado","==","Aprobado"),
           where("creditLine","==","Credicash"),
@@ -61,7 +60,6 @@
           where("creditLine","==","Amuebla2"),
           where("AsignacionID", "==", uid)
         ]);
-        // Badge de solicitudes de refinanciamiento
         suscribirBadge("badge-app-refinanciamiento", [
           where("estado","==","Aprobado"),
           where("tipo","==","Refinanciamiento"),
@@ -75,13 +73,12 @@
 
   <style>
     :root{
-      --bg: #0c0f14;
-      --bg-2:#0f141b;
-      --ink:#0b1220;
-      --text:#0f1b3a;
-      --text-contrast:#0b1220;
+      --bg: #f7f9fc;
+      --bg-2:#eef2f7;
+      --ink:#e7edf6;
+      --text:#0d1b2a;
       --white:#ffffff;
-      --muted:#7b889a;
+      --muted:#5b6776;
 
       /* Colores institucionales */
       --brand-blue:#243b86;  /* azul título */
@@ -90,51 +87,44 @@
       --brand-gold:#F8AF40;  /* dorado */
 
       /* Glass */
-      --glass-bg: rgba(255,255,255,.16);
-      --glass-brd: rgba(255,255,255,.28);
-      --glass-shadow: 0 10px 40px rgba(0,0,0,.35);
+      --glass-bg: rgba(255,255,255,.55);
+      --glass-brd: rgba(10,20,40,.08);
+      --glass-shadow: 0 20px 60px rgba(12,20,40,.12);
 
-      /* Tipos */
       --title-weight: 800;
-      --radius-xl: 22px;
       --radius-2xl: 28px;
     }
 
-    @media (prefers-color-scheme: light){
+    @media (prefers-color-scheme: dark){
       :root{
-        --bg:#f7f9fc;
-        --bg-2:#eef2f7;
-        --ink:#e7edf6;
-        --text:#0d1b2a;
-        --white:#ffffff;
-        --muted:#5b6776;
-
-        --glass-bg: rgba(255,255,255,.55);
-        --glass-brd: rgba(10,20,40,.08);
-        --glass-shadow: 0 20px 60px rgba(12,20,40,.12);
+        --bg:#0c0f14;
+        --bg-2:#0f141b;
+        --text:#dfe6ef;
+        --muted:#9aa6b6;
+        --glass-bg: rgba(255,255,255,.12);
+        --glass-brd: rgba(255,255,255,.18);
+        --glass-shadow: 0 24px 60px rgba(0,0,0,.45);
       }
     }
 
-    /* ====== Reset/estructura ====== */
     *{ box-sizing: border-box }
     html,body{ height:100% }
     body{
-      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
       color: var(--text);
       background:
-        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.22), transparent 60%),
-        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.16), transparent 55%),
+        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
         linear-gradient(180deg, var(--bg), var(--bg-2));
       min-height:100vh;
       -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing:grayscale;
     }
 
-    /* Fondo patrón sutil tipo Apple */
     .pattern{
       position: fixed; inset: 0; pointer-events: none; z-index: 0;
       background-image:
-        radial-gradient(1px 1px at 25px 25px, rgba(255,255,255,.12), transparent 40%),
-        radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.08), transparent 40%);
+        radial-gradient(1px 1px at 25px 25px, rgba(255,255,255,.10), transparent 40%),
+        radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.06), transparent 40%);
       background-size: 100px 100px;
       mix-blend-mode: soft-light;
       opacity: .5;
@@ -144,7 +134,7 @@
       position: sticky; top:0; z-index: 10;
       backdrop-filter: saturate(1.2) blur(10px);
       -webkit-backdrop-filter: saturate(1.2) blur(10px);
-      background: linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25)) ;
+      background: linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
       border-bottom: 1px solid var(--glass-brd);
     }
     @media (prefers-color-scheme: dark){
@@ -168,7 +158,6 @@
       isolation: isolate;
     }
     .logo-plate::after{
-      /* brillo que se desliza de izquierda a derecha suavemente */
       content:""; position:absolute; inset:-1px;
       background: linear-gradient(120deg, transparent 0 35%, rgba(255,255,255,.55) 45%, transparent 55% 100%);
       transform: translateX(-120%);
@@ -180,9 +169,7 @@
       100%{ transform: translateX(120%) }
     }
     .logo-plate img{ height: 28px; width:auto; display:block }
-    .brand-name{
-      font-weight: 800; letter-spacing:.2px; color: var(--brand-blue);
-    }
+    .brand-name{ font-weight: 800; letter-spacing:.2px; color: var(--brand-blue); }
 
     .container{
       position: relative; z-index: 1;
@@ -206,15 +193,25 @@
       max-width: 720px;
     }
 
+    /* === 3 columnas fijas por fila en escritorio === */
     .grid-botones{
       width:100%;
       display:grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      grid-template-columns: repeat(3, minmax(260px, 1fr));
       gap: 18px;
       margin-bottom: 1.8rem;
+      align-items: stretch;
+    }
+    /* 2 columnas en tablets */
+    @media (max-width: 980px){
+      .grid-botones{ grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+    }
+    /* 1 columna en móviles */
+    @media (max-width: 600px){
+      .grid-botones{ grid-template-columns: 1fr; }
     }
 
-    /* ====== Botón “pro”: glass, borde iónico, tilt, ripple y sheen ====== */
+    /* ====== Botón pro (glass + borde iónico + sheen + tilt + ripple) ====== */
     .btn-grande{
       position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
       gap:.65rem; min-height: 112px; padding: 22px 18px; text-decoration:none;
@@ -240,23 +237,20 @@
       }
     }
 
-    /* Borde iónico animado (gradiente sutil alrededor) */
     .btn-grande::before{
       content:""; position:absolute; inset:-1.5px; border-radius: inherit; z-index:0;
       background:
         conic-gradient(from 140deg,
-          rgba(103,200,241,.0),
+          rgba(103,200,241,.12),
           rgba(103,200,241,.25),
           rgba(248,175,64,.25),
           rgba(139,209,58,.25),
-          rgba(103,200,241,.0) 85%);
+          rgba(103,200,241,.12) 85%);
       filter: blur(8px); opacity:.65; transition: opacity .2s ease;
       mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
       -webkit-mask-composite: xor; mask-composite: exclude;
       padding: 1px;
     }
-
-    /* Sheen (barrido de luz sobre el botón) */
     .btn-grande::after{
       content:""; position:absolute; inset:-1px; border-radius:inherit; z-index:1; pointer-events:none;
       background: linear-gradient(130deg, transparent 0 40%, rgba(255,255,255,.55) 50%, transparent 60% 100%);
@@ -265,7 +259,6 @@
       opacity:.55;
       mix-blend-mode: screen;
     }
-
     .btn-grande:hover{
       transform: translateY(-2px) scale(1.015);
       box-shadow:
@@ -275,23 +268,19 @@
     .btn-grande:hover::after{ transform: translateX(120%) }
     .btn-grande:active{ transform: translateY(0) scale(.997) }
 
-    /* Icono flotante con leve parallax */
     .btn-grande i{
       position: relative; z-index:2;
-      font-size: 1.9rem; opacity:.95;
-      color: var(--brand-blue);
+      font-size: 1.9rem; opacity:.95; color: var(--brand-blue);
       transition: transform .2s ease, opacity .2s ease;
       transform: translateZ(20px);
     }
     .btn-grande:hover i{ transform: translateY(-2px) translateZ(20px) }
 
-    /* Texto */
     .btn-grande span.label{
       position:relative; z-index:2; text-align:center; line-height:1.25;
       transform: translateZ(18px);
     }
 
-    /* Badges */
     .badge{
       position:absolute; top: 12px; right: 12px; z-index:3;
       background: linear-gradient(180deg, #ff5a4a, #e51e10);
@@ -306,7 +295,7 @@
       50%{ transform: scale(1.06); box-shadow: 0 10px 24px rgba(229,30,16,.65) }
     }
 
-    /* Variantes de color suaves en borde iónico (sutiles y elegantes) */
+    /* Variantes de borde iónico */
     .btn-caja::before{ background: conic-gradient(from 120deg, rgba(103,200,241,.35), rgba(19,182,107,.35), transparent 85%) }
     .btn-mora-usuario::before{ background: conic-gradient(from 120deg, rgba(122,66,241,.35), rgba(89,51,215,.35), transparent 85%) }
     .btn-mora-agencia::before{ background: conic-gradient(from 120deg, rgba(48,79,254,.35), rgba(92,107,192,.35), transparent 85%) }
@@ -316,14 +305,6 @@
     .btn-cuotas-vencer::before{ background: conic-gradient(from 120deg, rgba(248,175,64,.45), rgba(103,200,241,.35), transparent 85%) }
     .btn-reporte::before{ background: conic-gradient(from 120deg, rgba(238,9,121,.45), rgba(255,106,0,.35), transparent 85%) }
     .btn-revertir::before{ background: conic-gradient(from 120deg, rgba(231,76,60,.5), rgba(142,8,0,.35), transparent 85%) }
-
-    /* Responsivo */
-    @media (max-width: 600px){
-      .container{ padding: 1.2rem 12px 2rem }
-      .grid-botones{ gap: 14px }
-      .btn-grande{ min-height: 100px; padding: 18px }
-      .btn-grande i{ font-size: 1.6rem }
-    }
   </style>
 </head>
 <body>
@@ -332,7 +313,8 @@
   <header>
     <div class="topbar">
       <div class="logo-plate">
-        <img src="assets/logo_multinversiones.png" alt="Logo Multi Inversiones" width="140" height="40" />
+        <!-- Logo actualizado -->
+        <img src="assets/logo_mi_bw.png" alt="Logo Multi Inversiones" width="140" height="40" />
         <strong class="brand-name">MULTI INVERSIONES</strong>
       </div>
       <div style="margin-left:auto; font-weight:700; color:var(--muted);">
@@ -355,19 +337,16 @@
         <span class="label">Solicitudes Aprobadas Credicash</span>
         <span id="badge-app-credicash" class="badge">0</span>
       </a>
-
       <a href="solicitudes_aprobadas_credicel_page.html" class="btn-grande btn-caja">
         <i class="fas fa-check-circle"></i>
         <span class="label">Solicitudes Aprobadas Credicel</span>
         <span id="badge-app-credicel" class="badge">0</span>
       </a>
-
       <a href="solicitudes_aprobadas_amuebla2_page.html" class="btn-grande btn-caja">
         <i class="fas fa-check-circle"></i>
         <span class="label">Solicitudes Aprobadas Amuebla2</span>
         <span id="badge-app-amuebla2" class="badge">0</span>
       </a>
-
       <a href="solicitudes_aprobadas_refinanciamiento.html" class="btn-grande btn-revertir">
         <i class="fas fa-sync-alt"></i>
         <span class="label">Solicitudes Aprobadas Refinanciamiento</span>
@@ -430,14 +409,10 @@
 
   <!-- Interacciones avanzadas: tilt + ripple -->
   <script>
-    // Tilt magnético suave y ripple a clic
     const buttons = document.querySelectorAll('.btn-grande');
-
-    // Seguridad para usuarios con reduce motion
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     buttons.forEach(btn=>{
-      // Ripple
       btn.addEventListener('pointerdown', (e)=>{
         const rect = btn.getBoundingClientRect();
         const ripple = document.createElement('span');
@@ -462,7 +437,6 @@
         setTimeout(()=>ripple.remove(), reduceMotion ? 210 : 600);
       });
 
-      // Tilt
       if (!reduceMotion){
         btn.addEventListener('pointermove', (e)=>{
           const r = btn.getBoundingClientRect();
@@ -482,6 +456,7 @@
   </script>
 </body>
 </html>
+
 
 
 

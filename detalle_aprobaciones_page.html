@@ -22,8 +22,8 @@
       measurementId: "G-H4E31XHG1Y"
     };
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
+    const db  = getFirestore(app);
+    const auth= getAuth(app);
 
     function getParam(name) {
       const params = new URLSearchParams(window.location.search);
@@ -72,13 +72,13 @@
           return;
         }
         try {
-          const asignRef = doc(db, "asignacion_de_cuota", asignacionID);
+          const asignRef  = doc(db, "asignacion_de_cuota", asignacionID);
           const asignSnap = await getDoc(asignRef);
           if (!asignSnap.exists()) throw new Error("Asignación no encontrada.");
           asignData = asignSnap.data();
 
           const solicitudID = asignData.solicitudID;
-          const solRef = doc(db, "Archivo Solicitudes", solicitudID);
+          const solRef  = doc(db, "Archivo Solicitudes", solicitudID);
           const solSnap = await getDoc(solRef);
           if (!solSnap.exists()) throw new Error("Solicitud original no encontrada.");
           solData = solSnap.data();
@@ -112,29 +112,24 @@
     }
 
     function recalcularAmortizacion(fechaBaseStr = null) {
-      const monto = Number(asignData.montoAprobado);
-      const tasaAnual = Number(asignData.tasaAnual);
-      const frecuencia = asignData.frecuenciaPago;
-      const numCuotas = Number(asignData.numeroCuotas);
-      const cuota = Number(asignData.cuota);
+      const monto       = Number(asignData.montoAprobado);
+      const tasaAnual   = Number(asignData.tasaAnual);
+      const frecuencia  = asignData.frecuenciaPago;
+      const numCuotas   = Number(asignData.numeroCuotas);
+      const cuota       = Number(asignData.cuota);
 
       const specs = {
-        "Semanal": { periodos: 52, dias: 7 },
-        "Catorcenal": { periodos: 26, dias: 14 },
-        "Quincenal": { periodos: 24, dias: 15 },
-        "Mensual": { periodos: 12, dias: 30 },
+        "Semanal":     { periodos: 52, dias: 7  },
+        "Catorcenal":  { periodos: 26, dias: 14 },
+        "Quincenal":   { periodos: 24, dias: 15 },
+        "Mensual":     { periodos: 12, dias: 30 },
       };
-      const perAno = specs[frecuencia]?.periodos ?? 52;
+      const perAno      = specs[frecuencia]?.periodos ?? 52;
       const diasPeriodo = specs[frecuencia]?.dias ?? 7;
-      const tasa = tasaAnual / perAno / 100;
+      const tasa        = tasaAnual / perAno / 100;
 
-      let fechaBase;
-      if (fechaBaseStr) {
-        fechaBase = new Date(fechaBaseStr);
-      } else {
-        fechaBase = new Date();
-        fechaBase.setHours(0,0,0,0);
-      }
+      let fechaBase = fechaBaseStr ? new Date(fechaBaseStr) : new Date();
+      fechaBase.setHours(0,0,0,0);
 
       let saldo = monto;
       let lista = [];
@@ -148,10 +143,10 @@
         lista.push({
           numeroCuota: k,
           fecha: fechaCuota.toISOString().split("T")[0],
-          cuota: cuota.toFixed(2),
+          cuota:   cuota.toFixed(2),
           interes: interes.toFixed(2),
           capital: capital.toFixed(2),
-          saldo: saldo.toFixed(2)
+          saldo:   saldo.toFixed(2)
         });
       }
       nuevaAmortizacion = lista;
@@ -159,74 +154,55 @@
 
     function renderDetalle() {
       let html = `
-        <div class="crumbs">
-          <button type="button" class="btn-ux btn-back" onclick="history.back()">
-            <i class="fa-solid fa-arrow-left"></i> Volver
-          </button>
-          <div class="crumb-title"><i class="fas fa-file-alt"></i> Detalle de Aprobaciones</div>
-        </div>
-
-        <section class="card glass">
-          <h2 class="sect-title"><i class="fa-solid fa-id-card-clip"></i> Datos del Cliente</h2>
-          <div class="info-grid">
-            <div class="info-row"><span>Nombre</span><b>${solData.nombre || '—'}</b></div>
-            <div class="info-row"><span>Apellido</span><b>${solData.apellido || '—'}</b></div>
-            <div class="info-row"><span>DUI</span><b>${solData.numeroDui || '—'}</b></div>
-            <div class="info-row"><span>Dirección</span><b>${solData.direccion || '—'}</b></div>
-            <div class="info-row"><span>Fecha Solicitud</span><b>${
-              solData.fechaSolicitud && solData.fechaSolicitud.toDate
-                ? solData.fechaSolicitud.toDate().toLocaleDateString("es-SV")
-                : (typeof solData.fechaSolicitud === 'string' ? solData.fechaSolicitud : '—')
-            }</b></div>
-          </div>
+        <section class="card">
+          <h2>Datos del Cliente</h2>
+          <div class="info-row"><span>Nombre:</span> ${solData.nombre || '—'}</div>
+          <div class="info-row"><span>Apellido:</span> ${solData.apellido || '—'}</div>
+          <div class="info-row"><span>DUI:</span> ${solData.numeroDui || '—'}</div>
+          <div class="info-row"><span>Dirección:</span> ${solData.direccion || '—'}</div>
+          <div class="info-row"><span>Fecha Solicitud:</span> ${
+            solData.fechaSolicitud && solData.fechaSolicitud.toDate
+              ? solData.fechaSolicitud.toDate().toLocaleDateString("es-SV")
+              : (typeof solData.fechaSolicitud === 'string' ? solData.fechaSolicitud : '—')
+          }</div>
         </section>
 
-        <section class="card glass">
-          <h2 class="sect-title"><i class="fa-solid fa-clipboard-list"></i> Datos de la Asignación</h2>
-          <div class="info-grid">
-            <div class="info-row"><span>Frecuencia de Pago</span><b>${asignData.frecuenciaPago || '—'}</b></div>
-            <div class="info-row"><span>Número de Cuotas</span><b>${asignData.numeroCuotas || '—'}</b></div>
-            <div class="info-row"><span>Cuota Aprobada</span><b>$${asignData.cuota || '—'}</b></div>
-            <div class="info-row"><span>Asignado a</span><b>${asignData.asignadoA || '—'}</b></div>
-            <div class="info-row"><span>Agencia</span><b>${asignData.agenciaAsignada || '—'}</b></div>
-          </div>
+        <section class="card">
+          <h2>Datos de la Asignación</h2>
+          <div class="info-row"><span>Frecuencia de Pago:</span> ${asignData.frecuenciaPago || '—'}</div>
+          <div class="info-row"><span>Número de Cuotas:</span> ${asignData.numeroCuotas || '—'}</div>
+          <div class="info-row"><span>Cuota Aprobada:</span> $${asignData.cuota || '—'}</div>
+          <div class="info-row"><span>Monto Aprobado:</span> $${asignData.montoAprobado || '—'}</div>
+          <div class="info-row"><span>Tasa Anual:</span> ${asignData.tasaAnual || '—'}%</div>
+          <div class="info-row"><span>Asignado a:</span> ${asignData.asignadoA || '—'}</div>
+          <div class="info-row"><span>Agencia:</span> ${asignData.agenciaAsignada || '—'}</div>
         </section>
       `;
 
       // --- BLOQUE DE DESEMBOLSO NETO PARA REFINANCIAMIENTO ---
       if (esRefinanciamiento && creditoAnteriorInfo) {
         html += `
-        <section class="card payout">
-          <div class="payout-main">
-            <i class="fa-solid fa-sack-dollar"></i>
-            <div>
-              <div class="payout-label">Efectivo a entregar al cliente</div>
-              <div class="payout-amount">$${desembolsoNeto.toFixed(2)}</div>
+          <section class="card payout">
+            <div class="payout-main">Efectivo a entregar al cliente: <b>$${desembolsoNeto.toFixed(2)}</b></div>
+            <div class="payout-meta">
+              Nuevo aprobado: <b>$${Number(asignData.montoAprobado).toFixed(2)}</b> •
+              Menos saldo anterior: <b>$${creditoAnteriorInfo.saldoActual.toFixed(2)}</b> •
+              Intereses pendientes: <b>$${creditoAnteriorInfo.interesActual.toFixed(2)}</b>
             </div>
-          </div>
-          <div class="payout-breakdown">
-            <span>Nuevo aprobado: <b>$${Number(asignData.montoAprobado).toFixed(2)}</b></span>
-            <span>− Saldo anterior: <b>$${creditoAnteriorInfo.saldoActual.toFixed(2)}</b></span>
-            <span>− Intereses pendientes: <b>$${creditoAnteriorInfo.interesActual.toFixed(2)}</b></span>
-          </div>
-        </section>
+          </section>
         `;
       }
 
       html += `
-        <section class="actions card glass">
-          <button class="btn-ux btn-legal" id="btn-papeleria-legal">
-            <i class="fas fa-file-alt"></i> Papelería Legal
-          </button>
-          <a class="btn-ux btn-apertura" href="apertura_credito_page.html?solicitudID=${encodeURIComponent(asignData.solicitudID)}">
-            <i class="fa-solid fa-circle-play"></i> Apertura de Crédito
-          </a>
-          <button id="btn-nueva-tabla" class="btn-ux btn-nueva-tabla">
-            <i class="fa-solid fa-calculator"></i> Generar nueva tabla de amortización
-          </button>
-        </section>
+        <div class="actions">
+          <button class="btn-legal" id="btn-papeleria-legal"><i class="fas fa-file-alt"></i> Papelería Legal</button>
+          <a class="btn-apertura" href="apertura_credito_page.html?solicitudID=${encodeURIComponent(asignData.solicitudID)}">Apertura de Crédito</a>
+        </div>
 
-        <section id="amort-table-div" class="card glass subtle"></section>
+        <section class="card">
+          <button id="btn-nueva-tabla" class="btn-nueva-tabla">Generar nueva tabla de amortización</button>
+          <div id="amort-table-div" class="amort"></div>
+        </section>
 
         <section class="card note">
           <b>IMPORTANTE:</b> Esta tabla se genera usando la fecha actual.
@@ -241,23 +217,25 @@
 
       document.getElementById('detalle-contenido').innerHTML = html;
 
-      // Recalcular tabla
+      // Generar nueva tabla
       document.getElementById("btn-nueva-tabla").onclick = function () {
         recalcularAmortizacion();
         if (asignacionID && nuevaAmortizacion.length > 0) {
           localStorage.setItem('amortizacion_temp_' + asignacionID, JSON.stringify(nuevaAmortizacion));
         }
-        let tabla = `<h2 class="sect-title"><i class="fa-solid fa-table"></i> Tabla de Amortización (RECALCULADA)</h2>
-        <div style="overflow-x:auto;"><table class="table-pro"><thead>
-          <tr>
-            <th>N°</th>
-            <th>Fecha</th>
-            <th>Cuota</th>
-            <th>Interés</th>
-            <th>Capital</th>
-            <th>Saldo</th>
-          </tr></thead><tbody>
-        `;
+        let tabla = `<h3>Tabla de Amortización (RECALCULADA)</h3>
+        <div style="overflow-x:auto;"><table class="tab">
+          <thead>
+            <tr>
+              <th>N°</th>
+              <th>Fecha</th>
+              <th>Cuota</th>
+              <th>Interés</th>
+              <th>Capital</th>
+              <th>Saldo</th>
+            </tr>
+          </thead>
+          <tbody>`;
         for (const row of nuevaAmortizacion) {
           tabla += `<tr>
             <td>${row.numeroCuota}</td>
@@ -272,7 +250,7 @@
         document.getElementById("amort-table-div").innerHTML = tabla;
       };
 
-      // Validación para papelería legal (bloqueo si no está aperturado)
+      // Validación para Papelería Legal con modal
       setTimeout(() => {
         const btnPapeleria = document.getElementById('btn-papeleria-legal');
         if (btnPapeleria) {
@@ -304,15 +282,15 @@
 
   <style>
     :root{
-      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --muted:#5b6776;
-      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
+      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --muted:#5b6776; --white:#fff;
+      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#32D47B; --brand-gold:#F8AF40;
       --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
-      --radius-2xl:28px;
+      --radius-2xl: 22px;
     }
     @media (prefers-color-scheme: dark){
       :root{
         --bg:#0c0f14; --bg-2:#0f141b; --text:#dfe6ef; --muted:#9aa6b6;
-        --glass-bg:rgba(255,255,255,.12); --glass-brd:rgba(255,255,255,.18); --glass-shadow:0 24px 60px rgba(0,0,0,.45);
+        --glass-bg:rgba(255,255,255,.10); --glass-brd:rgba(255,255,255,.16); --glass-shadow:0 24px 60px rgba(0,0,0,.45);
       }
     }
 
@@ -328,6 +306,7 @@
       -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
       min-height:100vh;
     }
+
     .pattern{
       position:fixed; inset:0; pointer-events:none; z-index:0;
       background-image:
@@ -336,7 +315,6 @@
       background-size:100px 100px; mix-blend-mode:soft-light; opacity:.5;
     }
 
-    /* Header glass */
     header{
       position:sticky; top:0; z-index:10;
       backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
@@ -346,8 +324,9 @@
     @media (prefers-color-scheme: dark){
       header{ background:linear-gradient(180deg, rgba(15,20,30,.75), rgba(15,20,30,.35)); }
     }
+
     .topbar{
-      max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
+      max-width: 980px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
     }
     .logo-plate{
       display:inline-flex; align-items:center; gap:10px; background:var(--glass-bg); border:1px solid var(--glass-brd);
@@ -363,119 +342,114 @@
     .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
 
     .container{
-      position:relative; z-index:1; max-width:1100px; margin:0 auto; padding:2rem 16px 3rem;
+      position:relative; z-index:1;
+      max-width: 980px; margin: 1.6rem auto 2.2rem auto; padding: 0 16px 24px;
     }
 
-    /* Breadcrumb + título */
-    .crumbs{ display:flex; align-items:center; gap:12px; margin: 8px auto 16px; max-width:900px; }
-    .crumb-title{ font-weight:800; color:var(--brand-blue); letter-spacing:.2px; }
-    .btn-back{
-      background:radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,.75), rgba(255,255,255,.35) 40%, rgba(255,255,255,.2) 100%);
-      border:1px solid var(--glass-brd);
-      box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 8px 24px rgba(10,20,40,.12);
-      color:var(--brand-blue);
+    h1{
+      margin: 1.1rem 0 1rem; text-align:center;
+      font-size: clamp(1.4rem, 2.1vw + 1rem, 2.1rem);
+      color: var(--brand-blue); font-weight: 800;
     }
-    .btn-back i{ margin-right:6px }
 
-    /* Cards */
+    /* Tarjetas base */
     .card{
-      max-width:900px; margin: 0 auto 18px; border-radius:22px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-brd);
+      border-radius: var(--radius-2xl);
+      box-shadow: var(--glass-shadow);
+      padding: 16px 18px;
+      margin: 14px 0;
     }
-    .glass{
-      background:var(--glass-bg); border:1px solid var(--glass-brd); box-shadow:var(--glass-shadow); padding:18px 16px;
-      position:relative; overflow:hidden; isolation:isolate;
-    }
-    .glass.subtle{ padding:14px 12px; }
-    .payout{
-      background:linear-gradient(180deg, #fff5cf, #ffeaa1);
-      border:1px solid rgba(248,175,64,.45);
-      color:#2b2b2b; padding:18px; box-shadow: 0 12px 28px rgba(248,175,64,.2);
-    }
-    .payout-main{ display:flex; align-items:center; gap:12px; }
-    .payout-main i{ font-size:1.6rem; color:#bd8a0c }
-    .payout-label{ font-weight:800; letter-spacing:.2px }
-    .payout-amount{ font-weight:900; font-size:1.6rem; color:#1f2937 }
-    .payout-breakdown{ display:flex; gap:12px; flex-wrap:wrap; margin-top:8px; font-size:.95rem; color:#5a4b22 }
-
-    .sect-title{
-      color:var(--brand-blue); font-weight:900; letter-spacing:.2px; margin:0 0 10px 0; display:flex; align-items:center; gap:8px;
+    .card h2{
+      margin: 0 0 8px 0;
+      font-size: 1.05rem;
+      color: var(--brand-blue);
+      letter-spacing:.3px;
     }
 
-    .info-grid{
-      display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px 14px;
-    }
-    .info-row{
-      display:flex; align-items:center; justify-content:space-between; gap:10px;
-      background: linear-gradient(180deg, rgba(36,59,134,.06), rgba(103,200,241,.06));
-      border:1px solid rgba(36,59,134,.12); border-radius:12px; padding:10px 12px;
-    }
-    .info-row span{ color:var(--muted); font-weight:700 }
-    .info-row b{ color:var(--text) }
+    .info-row{ margin:.38em 0; font-size:1.02rem; }
+    .info-row span{ color: var(--brand-gold); font-weight:800; margin-right:8px; }
 
-    /* Botones UX pro (glass + borde iónico + ripple + tilt) */
-    .btn-ux{
-      position:relative; display:inline-flex; align-items:center; justify-content:center; gap:.55rem;
-      min-height:44px; padding:12px 16px; border-radius:16px; font-weight:800; text-decoration:none; cursor:pointer; user-select:none;
-      border:1px solid var(--glass-brd); color:var(--text); background:radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,.65), rgba(255,255,255,.32) 40%, rgba(255,255,255,.18) 100%);
-      box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 8px 24px rgba(10,20,40,.12), 0 2px 6px rgba(10,20,40,.06);
-      overflow:hidden; outline:none; transition:transform .14s ease, box-shadow .2s ease;
-      will-change: transform;
-    }
-    .btn-ux::before{
-      content:""; position:absolute; inset:-1.5px; border-radius:inherit; z-index:0;
-      background:conic-gradient(from 140deg, rgba(103,200,241,.12), rgba(103,200,241,.25), rgba(248,175,64,.25), rgba(19,182,107,.25), rgba(103,200,241,.12) 85%);
-      filter:blur(8px); opacity:.65;
-      mask:linear-gradient(#000,#000) content-box, linear-gradient(#000,#000); -webkit-mask-composite:xor; mask-composite:exclude; padding:1px;
-    }
-    .btn-ux:hover{ transform: translateY(-1px) scale(1.01); box-shadow:0 18px 45px rgba(10,20,40,.18), 0 6px 16px rgba(10,20,40,.12) }
-    .btn-ux i{ color:var(--brand-blue) }
+    /* Payout (refinanciamiento) */
+    .payout{ background: linear-gradient(180deg, #fff7d6, #ffeaa8); color:#2a2a2a; border-color: #ffe08a; }
+    .payout-main{ font-size:1.16rem; font-weight:900; }
+    .payout-main b{ color:#0c3c2b; }
+    .payout-meta{ margin-top:6px; font-size:.95rem; color:#925a00; }
 
-    .actions{ display:flex; flex-wrap:wrap; gap:10px }
-
-    .btn-legal{ color:var(--brand-blue) }
-    .btn-apertura{ background: linear-gradient(90deg, var(--brand-green), #11a563); color:#fff; border:none }
-    .btn-apertura i{ color:#fff }
-    .btn-nueva-tabla{ background: linear-gradient(90deg, var(--brand-gold), #ffd56a); border:none; color:#1f2937 }
-    .btn-nueva-tabla i{ color:#1f2937 }
-
-    /* Tabla pro */
-    .table-pro{
-      width:100%; border-collapse:collapse; background:rgba(255,255,255,.5); border-radius:14px; overflow:hidden;
+    /* Botones */
+    .actions{ display:flex; gap:12px; flex-wrap:wrap; margin: 12px 0; }
+    .btn-legal, .btn-apertura{
+      padding: 12px 16px; border-radius:12px; border:none; cursor:pointer; text-decoration:none;
+      font-weight:800; letter-spacing:.2px; display:inline-flex; align-items:center; gap:10px;
     }
-    .table-pro thead th{
-      background: linear-gradient(180deg, rgba(36,59,134,.12), rgba(103,200,241,.1));
-      color:var(--brand-blue); font-weight:900; padding:12px 10px; border-bottom:1px solid rgba(36,59,134,.15);
-    }
-    .table-pro td{ padding:10px 8px; border-bottom:1px solid rgba(36,59,134,.08); }
-    .table-pro tr:hover{ background: rgba(103,200,241,.08) }
+    .btn-legal{ background:#253045; color:#F8AF40; }
+    .btn-legal:hover{ background:#3a4a6a; color:#fff; }
+    .btn-apertura{ background:#13b66b; color:#fff; }
+    .btn-apertura:hover{ background:#0a8a5a; }
 
-    /* Notas e indicadores */
+    .btn-nueva-tabla{
+      background:#f5af19; color:#181818; font-weight:900; font-size:1.02rem;
+      border-radius:10px; border:none; padding:10px 18px; cursor:pointer;
+    }
+    .btn-nueva-tabla:hover{ background:#ffce42; }
+
+    /* Tabla amortización */
+    .amort{ margin-top:12px; }
+    .tab{ width:100%; border-collapse: collapse; }
+    .tab th, .tab td{ padding:.7em .6em; text-align:left; border-bottom:1px solid rgba(10,20,40,.12); }
+    .tab thead th{ background:#253045; color:var(--brand-cel); border-bottom:none; }
+
+    /* Notas – FIX para que no se salga de la card */
     .note{
-      background: #213d4b; color:#fff; border:1px solid rgba(103,200,241,.25);
+      background:#213d4b;
+      color:#fff;
+      border:1px solid rgba(103,200,241,.25);
+      border-radius:22px;
+      padding:14px 16px;
+      font-size:.95rem;
+      line-height:1.5;
+      overflow:hidden;
+      word-break: break-word;
+      overflow-wrap:anywhere;
+      hyphens:auto;
     }
-    .note b{ color: var(--brand-gold) }
-    .note ul{ margin:8px 0 0 19px }
+    .note b{
+      display:inline-block;
+      color: var(--brand-gold);
+      font-size:.9rem;
+      letter-spacing:.3px;
+      margin-bottom:6px;
+      background:rgba(248,175,64,.15);
+      padding:4px 8px;
+      border-radius:8px;
+    }
+    .note ul{ margin:8px 0 0 16px; padding-left:0; }
+    .note li{ margin:4px 0; }
 
-    .error { color:#f55; font-size:1.13rem; padding:24px 0; text-align:center;}
+    .error{ color:#f55; font-size:1.06rem; padding:24px 0; text-align:center; }
 
     /* Modal */
-    #modal-bloqueo {
-      display: none; position: fixed; z-index: 1000; top: 0; left: 0; width: 100vw; height: 100vh;
-      background: rgba(17,18,26,0.88); align-items: center; justify-content: center;
+    #modal-bloqueo{
+      display:none; position:fixed; z-index:1000; inset:0;
+      background:rgba(17,18,26,.88); align-items:center; justify-content:center;
     }
-    .modal-box {
-      background: #222a2c; padding: 42px 28px; border-radius: 18px; max-width: 340px; text-align: center; box-shadow: 0 8px 32px #000b;
+    .modal-box{
+      background:#222a2c; padding:42px 28px; border-radius:18px; max-width:340px;
+      text-align:center; box-shadow: 0 8px 32px #000b; color:#fff;
     }
-    .modal-box i { font-size:2.4em;color:#f55;margin-bottom:8px;}
-    .modal-box h3 { color:#F8AF40;font-weight:900;}
-    .modal-box p {margin:16px 0 12px 0;color:#fff;font-size:1.08em;}
-    .modal-box button {
-      background:#f55;border:none;color:#fff; font-weight:700;padding:9px 30px; border-radius:10px;font-size:1.07em; cursor:pointer;
+    .modal-box i{ font-size:2.4em; color:#f55; margin-bottom:8px; }
+    .modal-box h3{ color:#F8AF40; font-weight:900; margin: 0 0 8px; }
+    .modal-box p{ margin:0 0 16px; font-size:1.05rem; }
+    .modal-box button{
+      background:#f55; border:none; color:#fff; font-weight:800; padding:9px 30px;
+      border-radius:10px; font-size:1.02rem; cursor:pointer;
     }
 
-    @media (max-width:900px){
-      .card{ margin:0 8px 16px }
-      .crumbs{ margin:8px 8px 16px }
+    @media (max-width:800px){
+      .container{ padding: 0 10px 18px; }
+      h1{ font-size:1.4rem; }
+      .note{ font-size:.9rem; }
     }
   </style>
 </head>
@@ -485,18 +459,17 @@
   <header>
     <div class="topbar">
       <div class="logo-plate">
-        <img src="assets/logo_mi_bw.png" alt="Logo Multi Inversiones" width="140" height="40" />
+        <img src="assets/logo_mi_bw.png" alt="Logo Multi Inversiones" />
         <strong class="brand-name">MULTI INVERSIONES</strong>
       </div>
-      <div style="margin-left:auto; font-weight:800; color:var(--muted);">Detalle de Aprobaciones</div>
+      <div style="margin-left:auto; font-weight:700; color:var(--muted);">Detalle de Aprobaciones</div>
     </div>
   </header>
 
   <div class="container">
+    <h1><i class="fas fa-file-alt"></i> Detalle de Aprobaciones</h1>
     <div id="detalle-contenido">
-      <div class="card glass" style="max-width:900px; margin: 12px auto; text-align:center; color:#6b7280;">
-        Cargando información...
-      </div>
+      <div class="card" style="text-align:center;color:#8593a3;">Cargando información...</div>
     </div>
   </div>
 
@@ -505,59 +478,12 @@
     <div class="modal-box">
       <i class="fas fa-ban"></i>
       <h3>¡Acceso bloqueado!</h3>
-      <p>
-        No puedes generar la papelería legal.<br>
-        <b>Primero debes aperturar el crédito.</b>
-      </p>
+      <p>No puedes generar la papelería legal.<br><b>Primero debes aperturar el crédito.</b></p>
       <button onclick="document.getElementById('modal-bloqueo').style.display='none'">Cerrar</button>
     </div>
   </div>
-
-  <!-- Interacciones (ripple + tilt) para .btn-ux -->
-  <script>
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const bindUX = (root = document) => {
-      const btns = root.querySelectorAll('.btn-ux');
-      btns.forEach(btn=>{
-        // Ripple
-        btn.addEventListener('pointerdown', e=>{
-          const rect = btn.getBoundingClientRect();
-          const ripple = document.createElement('span');
-          const x = e.clientX - rect.left, y = e.clientY - rect.top;
-          const max = Math.max(rect.width, rect.height);
-          Object.assign(ripple.style, {
-            position:'absolute', left:`${x}px`, top:`${y}px`,
-            width:`${max*1.2}px`, height:`${max*1.2}px`,
-            borderRadius:'50%', transform:'translate(-50%, -50%)',
-            background:'radial-gradient(circle, rgba(255,255,255,.45), rgba(255,255,255,0) 60%)',
-            pointerEvents:'none', opacity:'0.85', zIndex:'1'
-          });
-          ripple.animate(
-            [{opacity:.85, transform:'translate(-50%, -50%) scale(0.2)'},
-             {opacity:0,   transform:'translate(-50%, -50%) scale(1.1)'}],
-            {duration: reduceMotion ? 200 : 550, easing:'ease-out'}
-          );
-          btn.appendChild(ripple);
-          setTimeout(()=>ripple.remove(), reduceMotion ? 210 : 600);
-        });
-
-        // Tilt
-        if (!reduceMotion){
-          btn.addEventListener('pointermove', e=>{
-            const r = btn.getBoundingClientRect();
-            const cx = r.left + r.width/2, cy = r.top + r.height/2;
-            const dx = (e.clientX - cx) / (r.width/2);
-            const dy = (e.clientY - cy) / (r.height/2);
-            const rotateX = (-dy * 5).toFixed(2);
-            const rotateY = ( dx * 6).toFixed(2);
-            btn.style.transform = `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-1px) scale(1.01)`;
-          });
-          btn.addEventListener('pointerleave', ()=>{ btn.style.transform = ''; });
-        }
-      });
-    };
-    bindUX(document);
-  </script>
 </body>
 </html>
+
+
 

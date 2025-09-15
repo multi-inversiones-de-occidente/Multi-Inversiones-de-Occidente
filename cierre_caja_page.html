@@ -4,6 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Cierre de Caja – Panel Gerente</title>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import {
@@ -301,7 +302,7 @@
         snapStr.forEach(docMov => pushMovimiento(docMov, coll));
       }
 
-      // 2) Pagos (ingresos) – como ya lo tenías
+      // 2) Pagos (ingresos)
       const pagosSnap = await getDocs(
         query(
           collection(db, "pagos"),
@@ -368,14 +369,14 @@
       // Render tabla
       if (movimientosDelDia.length === 0) {
         document.getElementById("tabla-movs").innerHTML =
-          `<tr><td colspan="6" style="text-align:center;color:#fff6">No hay movimientos para este día.</td></tr>`;
+          `<tr><td colspan="6" style="text-align:center;color:#555">No hay movimientos para este día.</td></tr>`;
       } else {
         document.getElementById("tabla-movs").innerHTML =
           movimientosDelDia.map(m =>
             `<tr>
               <td>${m.tipo || ""}</td>
               <td>${m.descripcion || ""}</td>
-              <td>${formatMoney(m.monto || 0)}</td>
+              <td class="num">${formatMoney(m.monto || 0)}</td>
               <td>${m.usuario || ""}</td>
               <td>${formatFechaHoraCompact(m.fecha)}</td>
             </tr>`
@@ -385,18 +386,18 @@
       // Saldo proyectado
       const saldoFinalProyectado = saldoInicial + totalIngresos - totalEgresos;
 
-      // === NUEVO: si ya existe un cierre para esa fecha, mostrar ese saldo; de lo contrario, el proyectado ===
+      // Si ya existe un cierre para esa fecha, mostrar ese saldo; de lo contrario, el proyectado
       const saldoCierreExistente = await obtenerSaldoCierreSiExiste(agenciaActual, fecha);
       const saldoParaMostrar = (saldoCierreExistente !== null && !isNaN(Number(saldoCierreExistente)))
         ? Number(saldoCierreExistente)
         : saldoFinalProyectado;
 
       document.getElementById("totales").innerHTML =
-        `<div style="margin-top:18px;text-align:right">
-          <b style="color:#55e2c1">Saldo Inicial: ${formatMoney(saldoInicial)}</b><br>
-          <b style="color:#2EF37A">Total Ingresos: ${formatMoney(totalIngresos)}</b><br>
-          <b style="color:#F8AF40">Total Egresos: ${formatMoney(totalEgresos)}</b><br>
-          <b style="color:#FFD600">Saldo de Caja (al cierre): ${formatMoney(saldoParaMostrar)}</b>
+        `<div class="totals">
+          <div class="pill"><span>Saldo Inicial</span><b>${formatMoney(saldoInicial)}</b></div>
+          <div class="pill green"><span>Total Ingresos</span><b>${formatMoney(totalIngresos)}</b></div>
+          <div class="pill gold"><span>Total Egresos</span><b>${formatMoney(totalEgresos)}</b></div>
+          <div class="pill focus"><span>Saldo de Caja (al cierre)</span><b>${formatMoney(saldoParaMostrar)}</b></div>
         </div>`;
     }
 
@@ -476,50 +477,198 @@
     window.cerrarCajaDelDia = cerrarCajaDelDia;
   </script>
 
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
   <style>
-    body { margin:0; font-family: Arial,sans-serif; background:#11102a; color:#fff; min-height:100vh;}
-    header { width:100%; background:#221a3a; padding:1.2rem 0 1.1rem; text-align:center; font-size:1.44rem; font-weight:700; letter-spacing:.5px; color:#fff; margin-bottom:1.2rem;}
-    .main-card { margin:54px auto 0; background:#1a1a26; border-radius:19px; max-width:540px; padding:2.2rem 2.2rem 2.8rem; box-shadow:0 8px 38px #0a013377; display:flex; flex-direction:column;}
-    label{margin-bottom:5px; font-weight:500;}
-    select,option,input{font-size:1.08rem; background:#191834; color:#fff; border-radius:6px; border:1px solid #4e3b71; padding:.59rem .7rem; margin-bottom:10px;}
-    button{width:100%; background:#a787f4; color:#fff; font-weight:700; border:none; border-radius:8px; padding:1rem 0; margin-top:20px; font-size:1.1rem; cursor:pointer; transition:background .15s;}
-    button:hover{background:#5e38a3;}
-    .scroll-table-wrap{width:100%; overflow-x:auto; margin-top:1.3rem; border-radius:10px; background:#181828; box-shadow:0 3px 13px #0002;}
-    .table-movs{width:100%; min-width:580px; border-collapse:collapse; font-size:.99rem; background:#181828;}
-    .table-movs th,.table-movs td{padding:.62em .8em; white-space:nowrap; text-align:left;}
-    .table-movs th{background:#2c234a; color:#fff; font-weight:700; position:sticky; top:0; z-index:2;}
-    .table-movs td{border-bottom:1px solid #212146; color:#fff;}
-    .table-movs tr:last-child td{border-bottom:none;}
-    #totales{margin-top:10px; text-align:right;}
-    @media (max-width:630px){ .main-card{padding:1rem .3rem 2rem; max-width:99vw;} .table-movs{font-size:.95rem;} .scroll-table-wrap{min-width:0;} }
+    /* ===== Línea gráfica clara (glass) ===== */
+    :root{
+      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --muted:#5b6776; --white:#ffffff;
+      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
+      --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
+      --radius:18px; --radius-lg:22px;
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0c0f14; --bg-2:#0f141b; --text:#dfe6ef; --muted:#9aa6b6;
+        --glass-bg:rgba(255,255,255,.12); --glass-brd:rgba(255,255,255,.18); --glass-shadow:0 24px 60px rgba(0,0,0,.45);
+        --white:#11161d;
+      }
+    }
+
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      min-height:100vh;
+    }
+    .pattern{
+      position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image:
+        radial-gradient(1px 1px at 25px 25px, rgba(255,255,255,.10), transparent 40%),
+        radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.06), transparent 40%);
+      background-size:100px 100px; mix-blend-mode:soft-light; opacity:.5;
+    }
+
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
+      background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
+      border-bottom:1px solid var(--glass-brd);
+    }
+    .topbar{
+      max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
+    }
+    .logo-plate{
+      display:inline-flex; align-items:center; gap:10px; background:var(--glass-bg);
+      border:1px solid var(--glass-brd); padding:8px 14px; border-radius:16px;
+      box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
+    }
+    .logo-plate img{ height:28px; width:auto; display:block }
+    .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
+
+    /* ===== Container ===== */
+    .container{
+      position:relative; z-index:1;
+      max-width:min(96vw, 1100px);
+      margin: 2.2rem auto; padding: 1.4rem 1.2rem 1.8rem;
+      background:var(--glass-bg); border:1px solid var(--glass-brd);
+      border-radius:var(--radius-lg); box-shadow:var(--glass-shadow);
+    }
+    h1{
+      margin:.2rem 0 1rem; text-align:center;
+      font-size:clamp(1.2rem, .8vw + 1.2rem, 1.9rem);
+      color:var(--brand-blue); font-weight:800;
+    }
+
+    .subtop{
+      display:flex; gap:10px; align-items:center; justify-content:center; color:var(--muted); font-weight:700; margin-bottom:1rem;
+    }
+    .badge{
+      display:inline-flex; align-items:center; gap:8px; padding:.35rem .7rem; border-radius:999px;
+      background: linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
+      border:1px solid rgba(36,59,134,.15); color:var(--text);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+      font-weight:800;
+    }
+
+    .controls{
+      display:flex; gap:12px; align-items:center; justify-content:center; flex-wrap:wrap; margin-bottom:1rem;
+    }
+    label{ font-weight:800; color:var(--brand-blue); }
+    select{
+      min-width:240px; font-size:1rem; padding:.7rem 1rem; border-radius:12px;
+      border:1px solid rgba(36,59,134,.15);
+      background: linear-gradient(180deg, #fff, #f3f7fb);
+      color:var(--text); outline:none; box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
+    }
+
+    /* ===== Table ===== */
+    .scroll-table-wrap{
+      width:100%; overflow:auto; border-radius:14px;
+      background:var(--white); border:1px solid var(--glass-brd); box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    }
+    table{
+      width:100%; border-collapse:collapse; border-spacing:0; background:transparent;
+      font-size:.98rem;
+    }
+    thead th{
+      text-align:left; padding:.85rem .9rem; font-size:.86rem; letter-spacing:.3px;
+      color:#5361c6; background:linear-gradient(180deg, #f6f8ff, #edf1ff);
+      position:sticky; top:0; z-index:2; border-bottom:1px solid #dfe6ff;
+    }
+    tbody td{
+      padding:.75rem .9rem; border-top:1px solid #edf1f6; color:var(--text); white-space:nowrap;
+    }
+    tbody tr:hover{ background: #f7fbff; }
+    .num{ text-align:right; font-variant-numeric: tabular-nums; }
+
+    /* ===== Totales ===== */
+    .totals{
+      display:grid; grid-template-columns: repeat(2, minmax(220px,1fr)); gap:10px;
+      margin: 14px 0 8px;
+    }
+    @media (max-width:720px){ .totals{ grid-template-columns:1fr; } }
+    .pill{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      background:var(--white); border:1px solid var(--glass-brd); border-radius:12px;
+      padding:.8rem 1rem; box-shadow:var(--glass-shadow);
+    }
+    .pill span{ color:var(--muted); font-weight:700; }
+    .pill b{ color:#0d1b2a; }
+    .pill.green b{ color:#0c8a58; }
+    .pill.gold b{ color:#c27b00; }
+    .pill.focus{ background:linear-gradient(180deg,#fff8e8,#fff); border-color:#ffe3a6; }
+    .pill.focus b{ color:#9a6d00; }
+
+    /* ===== Botón ===== */
+    .btn-main{
+      width:100%; margin-top:12px; padding:1rem 0; border:none; border-radius:12px;
+      background: linear-gradient(90deg, #67C8F1, #243b86);
+      color:#fff; font-weight:900; font-size:1.05rem; cursor:pointer;
+      box-shadow:0 14px 28px rgba(36,59,134,.25);
+      transition:transform .12s ease, box-shadow .2s ease, opacity .2s ease;
+    }
+    .btn-main:hover{ transform:translateY(-1px); box-shadow:0 18px 36px rgba(36,59,134,.3); }
+
   </style>
 </head>
 <body>
-  <header>Cierre de Caja – Panel Gerente</header>
-  <div class="main-card">
-    <div><b>Gerente:</b> <span id="gerente-nombre">Cargando...</span></div>
-    <div style="margin-top:20px;margin-bottom:8px;">
-      <label>Selecciona un día pendiente de cierre:</label><br>
+  <div class="pattern" aria-hidden="true"></div>
+
+  <header>
+    <div class="topbar">
+      <div class="logo-plate">
+        <img src="assets/logo_mi_bw.png" alt="Logo Multi Inversiones" width="140" height="40" />
+        <strong class="brand-name">MULTI INVERSIONES</strong>
+      </div>
+      <div style="margin-left:auto; font-weight:700; color:var(--muted);">
+        Cierre de Caja (Arqueo Diario)
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <h1><i class="fa-solid fa-lock"></i> Cierre de Caja – Panel Gerente</h1>
+
+    <div class="subtop">
+      <span class="badge"><i class="fa-solid fa-user-tie"></i> Gerente: <span id="gerente-nombre" style="margin-left:6px">Cargando...</span></span>
+    </div>
+
+    <div class="controls">
+      <label for="select-fecha">Selecciona un día pendiente de cierre:</label>
       <select id="select-fecha"></select>
     </div>
-    <div>
-      <b style="color:#fff">Movimientos del día</b>
-      <div class="scroll-table-wrap">
-        <table class="table-movs">
-          <thead>
-            <tr>
-              <th>Tipo</th><th>Descripción</th><th>Monto</th><th>Usuario</th><th>Fecha</th>
-            </tr>
-          </thead>
-          <tbody id="tabla-movs"></tbody>
-        </table>
-      </div>
-      <div id="totales"></div>
-      <button onclick="cerrarCajaDelDia()">Cerrar Caja del Día Seleccionado</button>
+
+    <div class="scroll-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Descripción</th>
+            <th class="num">Monto</th>
+            <th>Usuario</th>
+            <th>Fecha</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-movs"></tbody>
+      </table>
     </div>
+
+    <div id="totales"></div>
+
+    <button class="btn-main" onclick="cerrarCajaDelDia()">
+      <i class="fa-solid fa-check-circle"></i> Cerrar Caja del Día Seleccionado
+    </button>
   </div>
 </body>
 </html>
+
 
 
 

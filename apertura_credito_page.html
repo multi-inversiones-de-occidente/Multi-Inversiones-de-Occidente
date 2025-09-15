@@ -5,6 +5,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Apertura de Crédito – Multi Inversiones</title>
+
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
@@ -32,12 +33,13 @@
     let guardando = false;
     let solicitudID = null;
     let asignacionAperturada = false;
-    // Refinanciamiento: variables nuevas
+
+    // Refinanciamiento
     let esRefinanciamiento = false;
     let desembolsoNeto = null;
     let creditoAnteriorInfo = null;
 
-    // Utilidad para obtener parámetros GET
+    // Parámetro GET
     function getQueryParam(key) {
       return new URLSearchParams(window.location.search).get(key);
     }
@@ -55,7 +57,6 @@
       const numCuotas = Number(asignacionData.numeroCuotas);
       const cuota = Number(asignacionData.cuota);
 
-      // Frecuencias
       const specs = {
         "Semanal": { periodos: 52, dias: 7 },
         "Catorcenal": { periodos: 26, dias: 14 },
@@ -66,7 +67,7 @@
       const diasPeriodo = specs[frecuencia]?.dias ?? 7;
       const tasa = tasaAnual / perAno / 100;
 
-      let fechaBase = new Date(); // hoy, limpia hora
+      let fechaBase = new Date();
       fechaBase.setHours(0,0,0,0);
 
       let saldo = monto;
@@ -93,7 +94,7 @@
       return lista;
     }
 
-    // Buscar crédito anterior ACTIVO del cliente para refinanciamiento
+    // Crédito anterior ACTIVO para refinanciamiento
     async function buscarCreditoAnterior(clienteID) {
       const creditosRef = collection(db, "creditos");
       const q = query(
@@ -103,7 +104,6 @@
       );
       const creditosSnap = await getDocs(q);
       if (creditosSnap.empty) return null;
-      // Solo toma el primero (regla: 1 crédito activo)
       const creditoAnteriorDoc = creditosSnap.docs[0];
       const d = creditoAnteriorDoc.data();
       return {
@@ -114,7 +114,7 @@
       };
     }
 
-    // Mostrar info y controles
+    // Render de la página
     function renderMain() {
       if (!solicitudData) {
         setLoading("Solicitud no encontrada");
@@ -122,13 +122,14 @@
       }
 
       let html = `
-        <div style="margin-bottom: 22px;">
-          <label style="color:#aaa;font-size:14px;">Línea de Crédito</label>
-          <input type="text" value="${solicitudData.creditLine ?? ''}" disabled style="width:100%;padding:8px;margin-top:3px;border-radius:8px;background:#191919;color:#fff;border:1px solid #222;font-size:16px;">
+        <div class="field">
+          <label>Línea de Crédito</label>
+          <input type="text" value="${solicitudData.creditLine ?? ''}" disabled class="input"/>
         </div>
+
         <div class="info-row">Nombre: ${solicitudData.nombre ?? ''}</div>
         <div class="info-row">Apellido: ${solicitudData.apellido ?? ''}</div>
-        <div class="info-row">Monto Solicitado: $${solicitudData.montoAprobado ?? ''}</div>
+        <div class="info-row">Monto Solicitado: $${(solicitudData.montoAprobado ?? '').toString()}</div>
       `;
 
       if (!asignacionData) {
@@ -141,27 +142,27 @@
         `;
       }
 
-      // --- BLOQUE DE DESEMBOLSO NETO PARA REFINANCIAMIENTO ---
-      if (esRefinanciamiento && creditoAnteriorInfo) {
+      // Bloque desembolso neto (refinanciamiento)
+      if (asignacionData && esRefinanciamiento && creditoAnteriorInfo) {
         html += `
-        <div style="padding:18px;background:#ffd840;border-radius:12px;color:#2d2d2d;font-size:1.3em;font-weight:bold;margin:22px 0 10px 0;">
-          Efectivo a entregar al cliente: $${desembolsoNeto.toFixed(2)}<br>
-          <span style="font-size:.82em;color:#df9900">
-            (Nuevo aprobado: $${Number(asignacionData.montoAprobado).toFixed(2)}<br>
-            Menos saldo anterior: $${creditoAnteriorInfo.saldoActual.toFixed(2)}<br>
-            Menos intereses pendientes: $${creditoAnteriorInfo.interesActual.toFixed(2)})
-          </span>
-        </div>
+          <div class="neto-box">
+            Efectivo a entregar al cliente: $${desembolsoNeto.toFixed(2)}<br>
+            <span class="neto-sub">
+              (Nuevo aprobado: $${Number(asignacionData.montoAprobado).toFixed(2)}<br>
+              Menos saldo anterior: $${creditoAnteriorInfo.saldoActual.toFixed(2)}<br>
+              Menos intereses pendientes: $${creditoAnteriorInfo.interesActual.toFixed(2)})
+            </span>
+          </div>
         `;
       }
 
-      // Tabla de amortización nueva (si hay asignación)
+      // Tabla amortización
       if (asignacionData) {
         amortizacion = recalcularAmortizacion();
         html += `
-          <div style="margin:35px 0 7px 0;font-weight:bold;font-size:18px;color:#fff;">Tabla de Amortización (al día de hoy):</div>
-          <div style="overflow-x:auto;">
-            <table style="min-width:700px;background:#191919;">
+          <div class="amort-title">Tabla de Amortización (al día de hoy):</div>
+          <div class="table-wrap">
+            <table class="tabla">
               <thead>
                 <tr>
                   <th>N°</th>
@@ -188,9 +189,13 @@
               </tbody>
             </table>
           </div>
-          <div style="margin-top:14px;padding:10px;background:#213d4b;color:#F8AF40;border-radius:10px;font-size:1em;">
-            Esta tabla de amortización está calculada <b>al día de la apertura del crédito</b>.<br>
-            Si la apertura es posterior a la asignación, las fechas y valores reflejan el día exacto de apertura.
+
+          <div class="nota-importante">
+            <b>IMPORTANTE:</b> Esta tabla de amortización está calculada <b>al día de la apertura del crédito</b>.
+            <ul>
+              <li>La PRIMERA cuota se agenda N días después de hoy (hoy + período).</li>
+              <li>Si la apertura es posterior a la asignación, las fechas y valores reflejan el día exacto de apertura.</li>
+            </ul>
           </div>
         `;
       } else {
@@ -199,19 +204,19 @@
 
       html += `
         <div style="margin:30px 0 15px 0;">
-          <button id="guardar-credito-btn" ${guardando || !asignacionData || asignacionAperturada ? "disabled" : ""} style="background:#13b66b;border:none;color:#fff;font-weight:bold;padding:15px 0;width:100%;font-size:17px;border-radius:10px;cursor:pointer;">
+          <button id="guardar-credito-btn" ${guardando || !asignacionData || asignacionAperturada ? "disabled" : ""} class="btn-guardar">
             ${guardando ? "Guardando..." : (asignacionAperturada ? "Ya aperturado" : "Guardar Crédito")}
           </button>
         </div>
       `;
 
       if (asignacionAperturada) {
-        html += `<div style="color:#f55;text-align:center;font-weight:bold;font-size:1.1em;">Este crédito ya fue aperturado y no puede ser guardado nuevamente.</div>`;
+        html += `<div class="msg-aperturado">Este crédito ya fue aperturado y no puede ser guardado nuevamente.</div>`;
       }
 
       document.getElementById('main-content').innerHTML = html;
 
-      // Event listener para guardar
+      // Guardar crédito
       const btn = document.getElementById("guardar-credito-btn");
       if (btn && !asignacionAperturada) {
         btn.addEventListener("click", async () => {
@@ -239,7 +244,7 @@
         if (!solSnap.exists()) throw new Error("Solicitud no encontrada");
         solicitudData = solSnap.data();
 
-        // Asignación (solo una)
+        // Asignación (una)
         const asignSnap = await getDocs(
           query(
             collection(db, "asignacion_de_cuota"),
@@ -256,9 +261,9 @@
           asignacionAperturada = false;
         }
 
-        // --- LÓGICA DE REFINANCIAMIENTO ---
+        // Refinanciamiento
         esRefinanciamiento = (solicitudData.creditLine || "").toLowerCase().includes("refinanciamiento");
-        if (esRefinanciamiento && solicitudData.clienteID) {
+        if (asignacionData && esRefinanciamiento && solicitudData.clienteID) {
           creditoAnteriorInfo = await buscarCreditoAnterior(solicitudData.clienteID);
           if (creditoAnteriorInfo) {
             desembolsoNeto = Number(asignacionData.montoAprobado) - creditoAnteriorInfo.saldoActual - creditoAnteriorInfo.interesActual;
@@ -268,7 +273,6 @@
             creditoAnteriorInfo = {saldoActual: 0, interesActual: 0};
           }
         }
-        // --- Fin lógica refinanciamiento ---
 
         renderMain();
       } catch (e) {
@@ -276,9 +280,8 @@
       }
     }
 
-    // GUARDAR CRÉDITO (con lógica refinanciamiento)
+    // Guardar crédito (incluye refinanciamiento)
     async function guardarCredito() {
-      // SEGURIDAD: Verifica de nuevo antes de guardar
       if (asignacionAperturada) {
         alert("Este crédito ya fue aperturado. No puede volver a guardarse.");
         return;
@@ -287,6 +290,7 @@
         alert("No hay datos completos para guardar el crédito.");
         return;
       }
+
       const montoAprobado = Number(asignacionData.montoAprobado) || 0;
       const frecuenciaPago = asignacionData.frecuenciaPago || "";
       const numeroCuotas = Number(asignacionData.numeroCuotas) || 0;
@@ -303,7 +307,7 @@
       const fechaInicio = new Date().toISOString();
       const fechaUltimoCalculoIntereses = fechaInicio;
 
-      // --- Para refinanciamiento: prepara update para el crédito anterior ---
+      // id de crédito anterior si aplica
       let creditoAnteriorID = null;
       if (esRefinanciamiento && creditoAnteriorInfo && creditoAnteriorInfo.id) {
         creditoAnteriorID = creditoAnteriorInfo.id;
@@ -336,10 +340,10 @@
           asignadoA: asignadoNombre,
           agenciaAsignada: agenciaAsignada,
           fechaUltimoCalculoIntereses: fechaUltimoCalculoIntereses,
-          amortizacion: amortizacion // La tabla nueva generada
+          amortizacion: amortizacion
         });
 
-        // === NUEVO: Marca la asignación como aperturada ===
+        // Marca asignación como aperturada
         if (asignacionData._docId) {
           await updateDoc(doc(db, "asignacion_de_cuota", asignacionData._docId), {
             creditoAperturado: true,
@@ -347,7 +351,7 @@
           });
         }
 
-        // === Lógica de refinanciamiento: marca anterior como Pagado ===
+        // Refinanciamiento: cierra crédito anterior
         if (esRefinanciamiento && creditoAnteriorID) {
           await updateDoc(doc(db, "creditos", creditoAnteriorID), {
             estadoCredito: "Pagado",
@@ -356,7 +360,6 @@
         }
 
         alert("Crédito guardado correctamente.");
-        // CAMBIO CLAVE: Redirigir a la página correcta
         window.location.href = "detalle_aprobaciones_page.html?id=" + asignacionData._docId;
       } catch (e) {
         alert("Error guardando crédito: " + (e.message || e));
@@ -374,9 +377,14 @@
       });
     });
   </script>
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
   <style>
+    /* ======= Estilo gráfico consistente (oscuro) ======= */
     body {
-      background: #101212;
+      background: #111;
       color: #fff;
       font-family: 'Segoe UI', Arial, sans-serif;
       min-height: 100vh;
@@ -386,18 +394,18 @@
       background: #000;
       padding: 1rem 0;
       text-align: center;
-      font-size: 1.45rem;
+      font-size: 1.5rem;
       letter-spacing: 1px;
       font-weight: 700;
       color: #67C8F1;
     }
     .container {
-      max-width: 660px;
-      margin: 2.5rem auto 0 auto;
-      background: #191919;
+      max-width: 720px;
+      margin: 2.2rem auto 0 auto;
+      background: #181818;
       border-radius: 18px;
       box-shadow: 0 2px 25px #0005;
-      padding: 2.3rem 2.2rem;
+      padding: 2.5rem 2.3rem;
       min-height: 320px;
     }
     h1 {
@@ -407,46 +415,138 @@
       font-weight: bold;
       text-align: center;
     }
-    .info-row {
-      margin-bottom: 10px;
-      color: #eaeaea;
-      font-size: 16px;
+
+    /* Campos */
+    .field { margin-bottom: 22px; }
+    .field label {
+      color: #aaa; font-size: 14px; display:block; margin-bottom: 6px;
     }
-    table {
+    .input {
+      width: 100%; padding: 10px 12px; border-radius: 10px;
+      background: #191919; color: #fff; border: 1px solid #222; font-size: 16px;
+      outline: none;
+    }
+
+    .info-row { margin-bottom: 10px; color: #eaeaea; font-size: 16px; }
+
+    /* Nota importante (no se desborda) */
+    .nota-importante{
+      margin-top:14px;
+      padding:12px 14px;
+      background:#213d4b;
+      color:#F8AF40;
+      border-radius:10px;
+      font-size:.95rem;
+      line-height:1.5;
+      overflow:hidden;
+      word-break: break-word;
+      overflow-wrap:anywhere;
+      hyphens:auto;
+    }
+    .nota-importante b{
+      display:inline-block;
+      color:#F8AF40;
+      font-weight:900;
+      font-size:.92rem;
+      background:rgba(248,175,64,.15);
+      padding:3px 8px;
+      border-radius:6px;
+      margin-bottom:6px;
+    }
+    .nota-importante ul{
+      margin:8px 0 0 19px; padding-left:0; color:#fff;
+    }
+    .nota-importante li{ margin:4px 0; }
+
+    /* Bloque de desembolso neto */
+    .neto-box{
+      padding:18px;
+      background:#ffd840;
+      border-radius:12px;
+      color:#2d2d2d;
+      font-size:1.15em;
+      font-weight:bold;
+      margin:22px 0 10px 0;
+    }
+    .neto-sub{ font-size:.86em; color:#df9900 }
+
+    /* Tabla */
+    .table-wrap { overflow-x:auto; }
+    .tabla {
       width: 100%;
       border-collapse: collapse;
       margin-top: 6px;
-      background: #181818;
+      background: #191919;
+      min-width: 700px;
     }
-    th, td {
+    .tabla th, .tabla td {
       padding: 0.7rem .7rem;
       border-bottom: 1px solid #222;
       text-align: left;
       font-size: 1rem;
     }
-    th {
+    .tabla th {
       background: #222a2c;
       color: #67C8F1;
       font-weight: 700;
       font-size: 1.05rem;
     }
-    tr:hover { background: #232c31; }
+    .tabla tr:hover { background: #232c31; }
+    .amort-title{
+      margin: 35px 0 7px 0;
+      font-weight: bold;
+      font-size: 18px;
+      color: #fff;
+    }
+
+    /* Botón Guardar (estilo marca) */
+    .btn-guardar{
+      background:#13b66b;
+      border:none;
+      color:#fff;
+      font-weight:bold;
+      padding:15px 0;
+      width:100%;
+      font-size:17px;
+      border-radius:12px;
+      cursor:pointer;
+      box-shadow: 0 6px 18px rgba(19,182,107,.25);
+      transition: transform .15s ease, box-shadow .2s ease, background .2s ease;
+    }
+    .btn-guardar:hover{
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(19,182,107,.35);
+      background:#10a061;
+    }
+    .btn-guardar:disabled{
+      opacity:.6; cursor:not-allowed; transform:none; box-shadow:none;
+    }
+
+    .msg-aperturado{
+      color:#f55;
+      text-align:center;
+      font-weight:bold;
+      font-size:1.05em;
+    }
+
     @media (max-width:750px) {
-      .container { padding: 1.2rem 0.7rem; }
-      h1 { font-size: 1.25rem; }
+      .container { padding: 1.3rem 0.9rem; }
+      h1 { font-size: 1.35rem; }
       .info-row { font-size: 15px;}
-      table { min-width:600px;}
+      .nota-importante{ font-size:.9rem; }
     }
   </style>
 </head>
 <body>
   <header>Apertura de Crédito</header>
+
   <div class="container">
-    <h1>Apertura de Crédito</h1>
+    <h1><i class="fas fa-unlock"></i> Apertura de Crédito</h1>
     <div id="main-content" style="min-height:240px;">Cargando...</div>
   </div>
 </body>
 </html>
+
 
 
 

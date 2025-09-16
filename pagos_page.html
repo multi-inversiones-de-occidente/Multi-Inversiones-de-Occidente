@@ -5,59 +5,282 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Recepción de Pagos – Multi Inversiones</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
   <style>
-    body { background: #101212; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
-    header { background: #000; padding: 1rem 0; text-align: center; font-size: 1.45rem; letter-spacing: 1px; font-weight: 700; color: #67C8F1;}
-    .container { max-width: 600px; margin: 2.5rem auto 0 auto; background: #191919; border-radius: 18px; box-shadow: 0 2px 25px #0005; padding: 2.3rem 2.2rem; min-height: 320px;}
-    .agencia-row { background: #222c2b; padding: 10px 18px 10px 15px; border-radius: 9px; margin-bottom: 17px; font-size: 1.1rem; font-weight: 600; color: #F8AF40; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 7px #0003;}
-    .agencia-row i { color: #67C8F1; font-size: 1.18rem;}
-    .searchbar { margin-bottom: 20px; display: flex; align-items: center; gap: 8px;}
-    .searchbar input { flex: 1; background: #212223; padding: 10px 12px; border-radius: 9px; border: 1px solid #333; color: #fff; font-size: 1rem;}
-    .cliente-card { background: #232c31; border-radius: 12px; margin-bottom: 13px; padding: 16px 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 12px #0004;}
-    .cliente-info { font-size: 1rem; color: #fff;}
-    .cliente-dui { font-size: 0.98rem; color: #8ae1fc; margin-top: 2px;}
-    .estado-mora { color: #FFD166; font-weight: 600; font-size: 0.96rem; display: flex; align-items: center; gap: 5px;}
-    .btn-pagar { background: #13b66b; color: #fff; border: none; padding: 11px 24px; border-radius: 9px; font-size: 1.02rem; font-weight: bold; cursor: pointer; transition: background .18s; margin-left: 15px;}
-    .btn-pagar:active, .btn-pagar:hover { background: #0b854c; }
-    .modal-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #111c; z-index: 9998; display: flex; align-items: center; justify-content: center;}
-    .modal { background: #fff; color: #1d2125; border-radius: 15px; box-shadow: 0 6px 38px #0008; padding: 30px 26px 26px 26px; max-width: 350px; width: 95%; z-index: 9999; position: relative; text-align: left; font-size: 1rem; animation: showmodal .18s;}
-    @keyframes showmodal { from { transform: scale(.93); opacity:.6;} to {transform:none;opacity:1;} }
-    .modal-title { font-size: 1.22rem; font-weight: bold; margin-bottom: 6px; color: #1d2125;}
-    .modal-sub { color: #6a7d8a; font-size: 1rem; margin-bottom: 19px;}
-    .modal-row { margin-bottom: 18px; }
-    .input-group { display: flex; align-items: center; background: #f5f8fb; border-radius: 8px; padding-left: 10px; border: 1px solid #dedede;}
-    .input-group span { color: #13b66b; font-size: 1.15rem; font-weight: bold; margin-right: 5px;}
-    .input-group input { border: none; background: transparent; padding: 10px 6px 10px 0; color: #222; font-size: 1.12rem; outline: none; width: 100%; }
-    .modal-btns { display: flex; gap: 13px; margin-top: 10px; justify-content: flex-end;}
-    .modal-btn-cancel { background: #e74c3c; color: #fff; border: none; padding: 10px 18px; border-radius: 7px; cursor: pointer; font-weight: bold; transition: background .17s;}
-    .modal-btn-cancel:hover { background: #bb2c1a; }
-    .modal-btn-pay { background: #13b66b; color: #fff; border: none; padding: 10px 22px; border-radius: 7px; cursor: pointer; font-weight: bold; transition: background .16s;}
-    .modal-btn-pay:disabled { opacity: .45; cursor: not-allowed;}
-    .modal-btn-pay:hover:not(:disabled) { background: #0b854c; }
-    .modal-error { color: #e74c3c; font-size: 0.98rem; margin-bottom: 7px;}
+    /* ====== NUEVA LÍNEA GRÁFICA (mismas variables/estética) ====== */
+    :root{
+      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --white:#ffffff; --muted:#5b6776;
+      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
+      --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
+      --radius-2xl:24px;
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0c0f14; --bg-2:#0f141b; --text:#dfe6ef; --muted:#9aa6b6;
+        --glass-bg:rgba(255,255,255,.10); --glass-brd:rgba(255,255,255,.18); --glass-shadow:0 24px 60px rgba(0,0,0,.45);
+      }
+    }
+
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      min-height:100vh;
+    }
+    .pattern{
+      position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image:
+        radial-gradient(1px 1px at 25px 25px, rgba(255,255,255,.10), transparent 40%),
+        radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.06), transparent 40%);
+      background-size:100px 100px; mix-blend-mode:soft-light; opacity:.5;
+    }
+
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
+      background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
+      border-bottom:1px solid var(--glass-brd);
+    }
+    @media (prefers-color-scheme: dark){
+      header{ background:linear-gradient(180deg, rgba(15,20,30,.75), rgba(15,20,30,.35)); }
+    }
+    .topbar{
+      max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
+    }
+    .logo-plate{
+      display:inline-flex; align-items:center; gap:10px; background:var(--glass-bg); border:1px solid var(--glass-brd);
+      padding:8px 14px; border-radius:16px; box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
+    }
+    .logo-plate::after{
+      content:""; position:absolute; inset:-1px;
+      background:linear-gradient(120deg, transparent 0 35%, rgba(255,255,255,.55) 45%, transparent 55% 100%);
+      transform:translateX(-120%); animation:plateSheen 6s linear infinite; pointer-events:none;
+    }
+    @keyframes plateSheen{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
+    .logo-plate img{ height:28px; width:auto; display:block }
+    .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
+    .page-name{ margin-left:auto; font-weight:700; color:var(--muted); }
+
+    .container{
+      position:relative; z-index:1; max-width:900px; margin:0 auto; padding:2.2rem 16px 3rem;
+      display:flex; flex-direction:column; align-items:center;
+    }
+
+    .visually-hidden{
+      position:absolute !important; clip: rect(1px, 1px, 1px, 1px);
+      padding:0; border:0; height:1px; width:1px; overflow:hidden; white-space:nowrap;
+    }
+
+    /* ===== Tarjeta de Identidad (usuario logueado) ===== */
+    .identity-card{
+      width:100%; max-width:900px; margin: .2rem auto 1.2rem auto;
+      display:flex; align-items:center; gap:14px; padding:10px 12px;
+      background:var(--glass-bg); border:1px solid var(--glass-brd); border-radius:22px;
+      box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
+    }
+    .identity-card::before{
+      content:""; position:absolute; inset:-2px; border-radius:inherit; pointer-events:none;
+      background: conic-gradient(from 220deg,
+        rgba(103,200,241,.18), rgba(248,175,64,.16), rgba(19,182,107,.16), rgba(103,200,241,.18));
+      filter: blur(8px); opacity:.45;
+      mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+      -webkit-mask-composite: xor; mask-composite: exclude; padding:1px;
+      animation: halo 10s linear infinite;
+    }
+    @keyframes halo{ to{ transform: rotate(1turn) } }
+
+    .avatar{
+      width:60px; height:60px; padding:2px; border-radius:50%;
+      background: conic-gradient(from 210deg, var(--brand-cel), var(--brand-gold), var(--brand-green), var(--brand-cel));
+      position:relative; box-shadow: 0 8px 24px rgba(10,20,40,.15);
+      flex: 0 0 auto;
+    }
+    .avatar .inner{
+      width:100%; height:100%; border-radius:50%;
+      background: linear-gradient(180deg, #f6f9ff, #e9eef6);
+      overflow:hidden; display:grid; place-items:center;
+    }
+    .avatar img{ width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; }
+    .avatar .initials{
+      display:none; width:100%; height:100%; border-radius:50%;
+      font-weight:800; letter-spacing:.5px; color:#243b86; font-size:1.05rem;
+      background: linear-gradient(180deg, #ffffff, #ecf2fb);
+      place-items:center;
+    }
+    .avatar .status{
+      position:absolute; right:2px; bottom:2px; width:12px; height:12px; border-radius:50%;
+      background:#22c55e; border:2px solid #fff; box-shadow: 0 0 0 2px rgba(34,197,94,.2);
+    }
+    .who{ display:flex; flex-direction:column; gap:6px; min-width:0; width:100%; }
+    .email-pill{
+      display:inline-flex; align-items:center; gap:10px; max-width:100%;
+      padding:10px 14px; border-radius:999px;
+      background: linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
+      border: 1px solid rgba(36,59,134,.15);
+      font-weight:800; color:var(--brand-blue); letter-spacing:.2px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+      position:relative; overflow:hidden;
+    }
+    .email-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .email-icon{ color: var(--brand-blue); opacity:.85; }
+
+    /* ===== Banda agencia + búsqueda ===== */
+    .agencia-row{
+      width:100%; max-width:900px;
+      background: rgba(103,200,241,.12);
+      border:1px solid rgba(103,200,241,.25);
+      color:#0f6aa0; font-weight:700; letter-spacing:.2px;
+      padding:10px 14px; border-radius:14px; margin: 6px 0 16px 0;
+      display:flex; align-items:center; gap:10px;
+    }
+    .agencia-row i{ color:#0f6aa0 }
+
+    .searchbar{
+      width:100%; max-width:900px;
+      display:flex; align-items:center; gap:10px; margin-bottom:16px;
+      background:var(--glass-bg); border:1px solid var(--glass-brd); border-radius:18px; padding:10px 14px;
+      box-shadow:var(--glass-shadow);
+    }
+    .searchbar i{ color:var(--muted) }
+    .searchbar input{
+      flex:1; background:transparent; border:none; outline:none; color:var(--text);
+      font-size:1.05rem; padding:8px 4px;
+    }
+
+    /* ===== Listado de clientes ===== */
+    #clientes-list{ width:100%; max-width:900px; }
+    .cliente-card{
+      background:radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,.65), rgba(255,255,255,.28) 40%, rgba(255,255,255,.18) 100%);
+      border:1px solid var(--glass-brd);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 8px 24px rgba(10,20,40,.12), 0 2px 6px rgba(10,20,40,.06);
+      color:var(--text);
+      border-radius:var(--radius-2xl);
+      margin-bottom:14px; padding:16px 18px;
+      display:flex; justify-content:space-between; align-items:center; gap:14px;
+      transition:transform .12s ease, box-shadow .2s ease, background .2s ease;
+    }
+    .cliente-card:hover{ transform: translateY(-2px); box-shadow:0 18px 45px rgba(10,20,40,.18), 0 6px 16px rgba(10,20,40,.12); }
+    .cliente-info b{ font-size:1.07rem }
+    .cliente-dui{ color:#3e92cc; margin-top:4px; font-weight:700 }
+    .estado-mora{ color:#F08C00; font-weight:800; display:inline-flex; align-items:center; gap:6px; margin-left:8px; }
+
+    .btn-pagar{
+      background: linear-gradient(90deg, var(--brand-green) 0%, #0b854c 100%);
+      color:#fff; border:none; padding:10px 18px; border-radius:12px;
+      font-size:.98rem; font-weight:800; cursor:pointer; transition: transform .12s ease, box-shadow .2s ease, background .2s ease;
+      display:inline-flex; align-items:center; gap:8px;
+    }
+    .btn-pagar:hover{ transform:translateY(-1px); box-shadow:0 8px 18px rgba(19,182,107,.35) }
+
+    /* ===== Modal ===== */
+    .modal-bg{ position: fixed; inset:0; background: rgba(8,12,20,.55); z-index: 50; display: grid; place-items:center; padding: 14px; }
+    .modal{
+      width: 100%; max-width: 420px; color: var(--text);
+      background: radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,.92), rgba(255,255,255,.78) 40%, rgba(255,255,255,.72) 100%);
+      border:1px solid var(--glass-brd); border-radius:20px; box-shadow: var(--glass-shadow);
+      padding: 22px 18px 16px 18px; position: relative; animation: showmodal .18s ease-out;
+    }
+    @keyframes showmodal { from { transform: translateY(6px) scale(.98); opacity:.6;} to {transform:none;opacity:1;} }
+    .modal-title{ font-size:1.18rem; font-weight:800; margin-bottom:6px; color:var(--brand-blue); display:flex; align-items:center; gap:8px; }
+    .modal-sub{ color:var(--muted); margin-bottom:16px; }
+    .modal-row{ margin-bottom:16px; }
+    .input-group{
+      display:flex; align-items:center; background: rgba(36,59,134,.06);
+      border:1px solid rgba(36,59,134,.18); border-radius:12px; padding-left:10px;
+    }
+    .input-group span{ color: var(--brand-green); font-size:1.15rem; font-weight:800; margin-right:6px; }
+    .input-group input{ border:none; background:transparent; padding:11px 10px; color:var(--text); font-size:1.12rem; outline:none; width:100%; }
+    .modal-btns{ display:flex; gap:10px; justify-content:flex-end; margin-top:10px; }
+    .modal-btn-cancel{
+      background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%); color:#fff;
+      border:none; padding:10px 16px; border-radius:10px; cursor:pointer; font-weight:800;
+    }
+    .modal-btn-pay{
+      background: linear-gradient(90deg, var(--brand-green) 0%, #0b854c 100%); color:#fff;
+      border:none; padding:10px 18px; border-radius:10px; cursor:pointer; font-weight:800;
+    }
+    .modal-btn-pay:disabled{ opacity:.5; cursor:not-allowed }
+    .modal-error{ color:#e74c3c; font-weight:700; }
+
+    /* util */
+    .w-100{ width:100% }
   </style>
 </head>
 <body>
-  <header>Recepción de Pagos</header>
+  <div class="pattern" aria-hidden="true"></div>
+
+  <!-- Topbar -->
+  <header>
+    <div class="topbar">
+      <div class="logo-plate">
+        <img src="assets/logo_mi_bw.png" alt="Logo" width="140" height="40"/>
+        <strong class="brand-name">MULTI INVERSIONES DE OCCIDENTE</strong>
+      </div>
+      <div class="page-name">Recepción de Pagos</div>
+    </div>
+  </header>
+
   <div class="container">
+    <!-- h1 accesible -->
+    <h1 class="visually-hidden">Recepción de Pagos</h1>
+
+    <!-- Tarjeta de identidad (usuario logueado) -->
+    <div class="identity-card">
+      <div class="avatar" aria-hidden="true">
+        <div class="inner">
+          <img id="usuario-avatar" alt="Avatar de usuario"/>
+          <div id="usuario-iniciales" class="initials">U</div>
+        </div>
+        <span class="status" title="Conectado"></span>
+      </div>
+      <div class="who">
+        <div class="email-pill" title="Usuario autenticado">
+          <i class="fa-solid fa-user email-icon" aria-hidden="true"></i>
+          <span id="usuario-email" class="email-text">usuario@correo.com</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agencia -->
     <div class="agencia-row" id="agencia-row" style="display:none;">
       <i class="fas fa-building"></i>
       <span id="agencia-nombre"></span>
     </div>
+
+    <!-- Buscador -->
     <div class="searchbar">
       <i class="fas fa-search"></i>
       <input id="buscador" type="text" placeholder="Buscar por nombre o DUI..."/>
     </div>
-    <div id="clientes-list"></div>
+
+    <!-- Listado -->
+    <div id="clientes-list" class="w-100"></div>
   </div>
+
   <div id="modal-root"></div>
 
-  <!-- Firebase & lógica -->
+  <!-- ==================== Firebase & lógica (sin cambios funcionales) ==================== -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, doc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
+    // Helpers UI (solo visual)
+    function inicialesDesdeEmail(email){
+      const base = (email || "").split("@")[0];
+      const partes = base.split(/[.\-_]+/).filter(Boolean);
+      let ini = partes.slice(0,2).map(s=>s[0]).join("").toUpperCase();
+      if(!ini) ini = (email||"U")[0].toUpperCase();
+      return ini;
+    }
+
+    // Exponer funciones exactas requeridas por tu lógica
     window.firebaseAddDoc = async function(collectionName, data) {
       const col = collection(db, collectionName);
       return await addDoc(col, data);
@@ -89,6 +312,22 @@
             window.location.href = "login.html";
             return;
           }
+
+          // ====== SOLO VISUAL: avatar / iniciales / email en la tarjeta
+          const emailEl = document.getElementById("usuario-email");
+          const imgEl   = document.getElementById("usuario-avatar");
+          const initEl  = document.getElementById("usuario-iniciales");
+          emailEl.textContent = user.email;
+          initEl.textContent  = inicialesDesdeEmail(user.email);
+          const fallbackSrc = "assets/avatar_user.png";
+          const usarIniciales = () => { imgEl.style.display = "none"; initEl.style.display = "grid"; };
+          imgEl.onerror = () => {
+            if (imgEl.dataset.fallbackTried === "1") usarIniciales();
+            else { imgEl.dataset.fallbackTried = "1"; imgEl.src = fallbackSrc; }
+          };
+          if (user.photoURL) imgEl.src = user.photoURL; else imgEl.src = fallbackSrc;
+          // ====== FIN visual
+
           const usersRef = collection(db, "users");
           const q = query(usersRef, where("__name__", "==", user.uid));
           const snap = await getDocs(q);
@@ -98,7 +337,7 @@
             const agenciaRow = document.getElementById('agencia-row');
             const agenciaNombre = document.getElementById('agencia-nombre');
             if (userDepartment) {
-              agenciaNombre.textContent = userDepartment;
+              agenciaNombre.textContent = `Agencia asignada: ${userDepartment}`;
               agenciaRow.style.display = '';
             } else {
               agenciaRow.style.display = 'none';
@@ -122,17 +361,10 @@
         return;
       }
       if (!userDepartment) {
-        clientesList.innerHTML = `<div style="color:#ccc;text-align:center;padding:34px 0;">No se detectó agencia asignada a tu usuario.</div>`;
+        clientesList.innerHTML = `<div style="color:#9aa6b6;text-align:center;padding:34px 0;">No se detectó agencia asignada a tu usuario.</div>`;
         return;
       }
-      // Incluye créditos en mora (excepto Pagado o Anulado)
-      const estadosPermitidos = [
-        "Activo",
-        "Mora Temprana",
-        "Mora Moderada",
-        "Mora Severa",
-        "Riesgo Alto"
-      ];
+      const estadosPermitidos = ["Activo","Mora Temprana","Mora Moderada","Mora Severa","Riesgo Alto"];
       const creditosRef = collection(db, "creditos");
       const q = query(creditosRef, where("estadoCredito", "in", estadosPermitidos), where("agenciaAsignada", "==", userDepartment));
       const snap = await getDocs(q);
@@ -145,7 +377,7 @@
         }
       });
       if (!clientes.length) {
-        clientesList.innerHTML = `<div style="color:#ccc;text-align:center;padding:34px 0;">No se encontraron clientes para tu agencia.</div>`;
+        clientesList.innerHTML = `<div style="color:#9aa6b6;text-align:center;padding:34px 0;">No se encontraron clientes para tu agencia.</div>`;
         return;
       }
       clientesList.innerHTML = clientes.map(cliente => `
@@ -155,14 +387,14 @@
               <b>${cliente.nombre}</b>
               ${cliente.estadoCredito !== "Activo"
                 ? `<span class="estado-mora" title="Estado: ${cliente.estadoCredito}">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    ${cliente.estadoCredito}
-                  </span>`
-                : ""}
+                    <i class="fas fa-exclamation-triangle"></i>${cliente.estadoCredito}
+                  </span>` : ""}
             </div>
             <div class="cliente-dui">DUI: ${cliente.numeroDui}</div>
           </div>
-          <button class="btn-pagar" data-id="${cliente.id}" data-nombre="${cliente.nombre}" data-dui="${cliente.numeroDui}"><i class="fas fa-dollar-sign"></i> Pagar</button>
+          <button class="btn-pagar" data-id="${cliente.id}" data-nombre="${cliente.nombre}" data-dui="${cliente.numeroDui}">
+            <i class="fas fa-dollar-sign"></i> Pagar
+          </button>
         </div>
       `).join('');
       document.querySelectorAll('.btn-pagar').forEach(btn => {
@@ -188,13 +420,11 @@
           <div class="modal-bg" onclick="event.target===this && (${closeModal.toString()})();">
             <div class="modal">
               <div class="modal-title">
-                <i class="fas fa-coins" style="color:#13b66b;"></i> Pago a ${cliente.nombre}
+                <i class="fas fa-coins" style="color:var(--brand-green);"></i> Pago a ${cliente.nombre}
               </div>
-              <div class="modal-sub">
-                <i class="fas fa-id-card"></i> DUI: <b>${cliente.numeroDui}</b>
-              </div>
+              <div class="modal-sub"><i class="fas fa-id-card"></i> DUI: <b>${cliente.numeroDui}</b></div>
               <div class="modal-row">
-                <label for="monto-input" style="font-weight:600;margin-bottom:2px;display:block;">Monto a pagar</label>
+                <label for="monto-input" style="font-weight:700;margin-bottom:6px;display:block;color:var(--brand-blue);">Monto a pagar</label>
                 <div class="input-group">
                   <span>$</span>
                   <input id="monto-input" type="number" min="0" step="0.01" placeholder="0.00" value="${monto}" autocomplete="off" autofocus/>
@@ -215,9 +445,7 @@
           if (isNaN(montoNum) || montoNum <= 0) {
             errorMsg = "Ingresa un monto válido mayor a $0.00";
             render();
-            setTimeout(() => {
-              document.getElementById("monto-input").focus();
-            }, 50);
+            setTimeout(() => { document.getElementById("monto-input").focus(); }, 50);
             return;
           }
           realizarPago(cliente, montoNum);
@@ -230,7 +458,7 @@
       render();
     }
 
-    // === LÓGICA DE PAGO ADAPTADA: suma, marca multas pagadas y respeta todo lo tuyo ===
+    // ======== LÓGICA DE PAGO (sin cambios funcionales) ========
     async function realizarPago(cliente, montoNum) {
       try {
         const user = auth.currentUser;
@@ -264,44 +492,33 @@
 
         let restante = montoNum;
         let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
-        const tolerancia = 0.10; // Tolerancia de centavos
+        const tolerancia = 0.10;
 
-        // 1. MULTAS: Suma todas las NO PAGADAS
+        // Multas
         let multasNoPagadas = historialMultas.filter(m => !m.estadoCuota || m.estadoCuota === "No Pagada");
-        let multasPendientes = multasNoPagadas.reduce((acc, m) => acc + (parseFloat(m.monto) || 0), 0);
-
-        // Paga primero las multas NO PAGADAS
-        let pagadoEnMultas = 0;
         let nuevasMultasHistorial = historialMultas.map(m => ({...m}));
-        if (restante > 0 && multasPendientes > 0) {
+        if (restante > 0 && multasNoPagadas.length > 0) {
           for (let i = 0; i < nuevasMultasHistorial.length; i++) {
             let multa = nuevasMultasHistorial[i];
             if (!multa.estadoCuota || multa.estadoCuota === "No Pagada") {
               let pagar = Math.min(restante, parseFloat(multa.monto) || 0);
               if (pagar > 0) {
-                pagadoEnMultas += pagar;
+                pagoMultas += pagar;
                 restante -= pagar;
-                // Si se pagó toda la multa, márcala como Pagada
-                if (Math.abs(pagar - parseFloat(multa.monto)) < 0.01) {
-                  multa.estadoCuota = "Pagada";
-                }
-                // Si se pagó parcialmente (raro pero posible), se deja "No Pagada"
+                if (Math.abs(pagar - parseFloat(multa.monto)) < 0.01) multa.estadoCuota = "Pagada";
                 if (restante <= 0) break;
               }
             }
           }
         }
-        pagoMultas = pagadoEnMultas;
         multasAcumuladas = nuevasMultasHistorial.filter(m => !m.estadoCuota || m.estadoCuota === "No Pagada")
           .reduce((acc, m) => acc + (parseFloat(m.monto) || 0), 0);
 
-        // 2. INTERES CORRIDO (interesActual, solo a la fecha)
+        // Interés
         let interesPagadoHoy = Math.min(interesActual, restante);
         restante -= interesPagadoHoy;
         pagoInteres += interesPagadoHoy;
         interesActual -= interesPagadoHoy;
-
-        // Aplica ese interesPagadoHoy al montoPagadoInteres de la primera cuota pendiente de capital
         for (let i = 0; i < amortizacion.length; i++) {
           let cuota = amortizacion[i];
           if ((parseFloat(cuota.montoPagado) || 0) < parseFloat(cuota.capital)) {
@@ -310,7 +527,7 @@
           }
         }
 
-        // 3. CAPITAL: Reparte el resto a capital de las cuotas desde la más próxima
+        // Capital
         for (let i = 0; i < amortizacion.length && restante > 0; i++) {
           let cuota = amortizacion[i];
           let capitalPendiente = parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0);
@@ -324,21 +541,13 @@
           }
         }
 
-        // 4. ACTUALIZAR ESTADOS DE CUOTAS (¡CORREGIDO!)
+        // Estados de cuotas
         for (let i = 0; i < amortizacion.length; i++) {
           let cuota = amortizacion[i];
-          if (
-            (parseFloat(cuota.montoPagado) || 0) + tolerancia >= (parseFloat(cuota.capital) || 0)
-          ) {
+          if ((parseFloat(cuota.montoPagado) || 0) + tolerancia >= (parseFloat(cuota.capital) || 0)) {
             cuota.estado = "Pagada";
-            // CORRECCIÓN: Solo asigna fecha si antes no la tenía
-            if (!cuota.fechaPagoReal) {
-              cuota.fechaPagoReal = fechaPago;
-            }
-          } else if (
-            ((parseFloat(cuota.montoPagadoInteres) || 0) > 0) ||
-            ((parseFloat(cuota.montoPagado) || 0) > 0)
-          ) {
+            if (!cuota.fechaPagoReal) cuota.fechaPagoReal = fechaPago;
+          } else if (((parseFloat(cuota.montoPagadoInteres) || 0) > 0) || ((parseFloat(cuota.montoPagado) || 0) > 0)) {
             cuota.estado = "Parcial";
             cuota.fechaPagoReal = null;
           } else {
@@ -347,12 +556,11 @@
           }
         }
 
-        // 5. RECALCULAR paraPonerseAlDia
+        // Recalcular al día
         paraPonerseAlDia = 0;
         let capitalAtrasado = 0;
         for (let i = 0; i < amortizacion.length; i++) {
           let cuota = amortizacion[i];
-          // Si es vencida y no pagada, falta pagar algo
           const fechaCuota = new Date(cuota.fecha);
           if (fechaCuota < ahora && cuota.estado !== "Pagada") {
             let faltaCapital = Math.max(0, parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0));
@@ -361,13 +569,12 @@
             capitalAtrasado += faltaCapital;
           }
         }
-        // Si está todo pagado, paraPonerseAlDia queda 0
         if (paraPonerseAlDia < 0.01) paraPonerseAlDia = 0;
 
         saldoActual = amortizacion
           .reduce((acc, cuota) => acc + Math.max(0, parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0)), 0);
 
-        // REGISTRO DEL PAGO
+        // Registro del pago
         const correlativo = Math.floor(Math.random() * 90000) + 10000;
         const correlativoStr = correlativo.toString().padStart(5, '0');
         await window.firebaseAddDoc("pagos", {
@@ -390,7 +597,6 @@
           paraPonerseAlDiaAntes: (parseFloat(creditoData.paraPonerseAlDia) || 0).toFixed(2)
         });
 
-        // CAMBIO: Si el saldo es cero, pon Pagado; si no, revisa si debe volver a Activo
         let nuevoEstado = saldoActual == 0 ? "Pagado" : creditoData.estadoCredito;
         if (nuevoEstado !== "Pagado" && paraPonerseAlDia == 0 && capitalAtrasado == 0 && multasAcumuladas == 0) {
           nuevoEstado = "Activo";
@@ -406,7 +612,7 @@
           fechaUltimoCalculoIntereses: fechaPago,
           estadoCredito: nuevoEstado,
           amortizacion: amortizacion,
-          historialMultas: nuevasMultasHistorial // ← Aquí se actualiza el historial con "Pagada"
+          historialMultas: nuevasMultasHistorial
         });
 
         window.location.href = `ticket_page.html?correlativo=${correlativoStr}` +
@@ -435,6 +641,7 @@
   </script>
 </body>
 </html>
+
 
 
 

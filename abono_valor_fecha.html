@@ -290,25 +290,19 @@
       let cursorISO = inicioISO;
 
       for (const p of pagos) {
-        // Devengo hasta este pago
         const dias = diasMedioAbierto(cursorISO, p.fechaPago);
         if (dias > 0 && principal > 0) {
           interesPendiente += principal * tasa * dias;
         }
 
-        // Cubre interés devengado con lo pagado a interés
         let pagoInt = p.pagoInteres;
         const cubreInt = Math.min(interesPendiente, pagoInt);
         interesPendiente -= cubreInt;
         pagoInt -= cubreInt;
 
-        // Excedente etiquetado como interés se trata como capital (blindaje)
         let pagoCap = p.pagoCapital + Math.max(0, pagoInt);
-
-        // Bajar capital
         principal = Math.max(0, principal - pagoCap);
 
-        // Si el doc trae 'saldoRestante', alineamos
         if (p.saldoRestante != null && !Number.isNaN(p.saldoRestante)) {
           principal = Math.max(0, p.saldoRestante);
         }
@@ -316,18 +310,55 @@
         cursorISO = p.fechaPago;
       }
 
-      // Tramo final hasta la fecha seleccionada
       const fechaISO = new Date(fechaAbonoYMD + "T23:59:59").toISOString();
       const diasFinal = diasMedioAbierto(cursorISO, fechaISO);
       if (diasFinal > 0 && principal > 0) {
         interesPendiente += principal * tasa * diasFinal;
       }
 
-      // Redondeo y clamps
       interesPendiente = Math.max(0, Number(interesPendiente.toFixed(2)));
       principal = Math.max(0, Number(principal.toFixed(2)));
 
       return { interesPendiente, principalAlCorte: principal };
+    }
+
+    // ------------------ FIX: helpers de priorización ------------------
+    // Ordena cronológicamente la amortización por fecha
+    function ordenarAmortizacionPorFecha(amortizacion) {
+      amortizacion.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    }
+
+    // Cubre TODO el interés de cuotas vencidas (≤ fechaAbono) antes de capital/futuras
+    function cubrirInteresVencidasPrimero(amortizacion, fechaAbonoYMD, refAbono, refPagoInteres) {
+      const fechaCorte = new Date(fechaAbonoYMD + "T23:59:59");
+      for (let i = 0; i < amortizacion.length && refAbono.value > 0; i++) {
+        const c = amortizacion[i];
+        const f = new Date(c.fecha);
+        if (f <= fechaCorte) {
+          const interesCuota = parseFloat(c.interes || 0);
+          const pagadoInt    = parseFloat(c.montoPagadoInteres || 0);
+          const pendienteInt = +(interesCuota - pagadoInt).toFixed(2);
+          if (pendienteInt > 0) {
+            const apli = Math.min(pendienteInt, refAbono.value);
+            c.montoPagadoInteres = +(pagadoInt + apli).toFixed(2);
+            refPagoInteres.value = +(refPagoInteres.value + apli).toFixed(2);
+            refAbono.value       = +(refAbono.value - apli).toFixed(2);
+          }
+        }
+      }
+    }
+
+    function existeInteresVencido(amortizacion, fechaAbonoYMD) {
+      const fechaCorte = new Date(fechaAbonoYMD + "T23:59:59");
+      return amortizacion.some(c => {
+        const f = new Date(c.fecha);
+        if (f <= fechaCorte) {
+          const interesCuota = parseFloat(c.interes || 0);
+          const pagadoInt    = parseFloat(c.montoPagadoInteres || 0);
+          return +(interesCuota - pagadoInt).toFixed(2) > 0;
+        }
+        return false;
+      });
     }
 
     // ------------------ SUBMIT ------------------
@@ -353,6 +384,9 @@
       let amortizacion = Array.isArray(creditoSeleccionado.amortizacion) ? JSON.parse(JSON.stringify(creditoSeleccionado.amortizacion)) : [];
       const fechaAbonoYMD = fechaSeleccionada;
       let fechaAbono = new Date(fechaAbonoYMD + "T23:59:59");
+
+      // FIX: asegurar orden cronológico
+      ordenarAmortizacionPorFecha(amortizacion);
 
       // 0) Calcular interés pendiente real a la fecha
       const { interesPendiente, principalAlCorte } = await interesPendienteAFecha(db, creditoSeleccionado, fechaAbonoYMD);
@@ -386,7 +420,6 @@
       // 2) INTERÉS REAL: pagar primero y reflejarlo en amortización
       let interesAPagar = Math.min(abonoRestante, interesPendiente);
       if (interesAPagar > 0) {
-        // 2.1 Distribuir interés pagado en cuotas (≤ fechaAbono, luego futuras)
         let restanteInt = interesAPagar;
 
         // a) cuotas vencidas (fecha <= abono)
@@ -404,24 +437,39 @@
             }
           }
         }
-        // b) si aún sobra, aplicar a las futuras (para cuadrar tabla)
-        for (let i = 0; i < amortizacion.length && restanteInt > 0; i++) {
-          const c = amortizacion[i];
-          const f = new Date(c.fecha);
-          if (f > fechaAbono) {
-            if (typeof c.montoPagadoInteres !== "number") c.montoPagadoInteres = parseFloat(c.montoPagadoInteres || 0);
-            const interesCuota = parseFloat(c.interes || 0);
-            const pendiente = Math.max(0, interesCuota - c.montoPagadoInteres);
-            if (pendiente > 0) {
-              const apli = Math.min(pendiente, restanteInt);
-              c.montoPagadoInteres = Number((c.montoPagadoInteres + apli).toFixed(2));
-              restanteInt -= apli;
+        // b) si aún sobra, aplicar a las futuras (para cuadrar tabla) — OJO: solo si no existe interés vencido pendiente
+        if (restanteInt > 0) {
+          const hayIntVencido = existeInteresVencido(amortizacion, fechaAbonoYMD);
+          if (!hayIntVencido) {
+            for (let i = 0; i < amortizacion.length && restanteInt > 0; i++) {
+              const c = amortizacion[i];
+              const f = new Date(c.fecha);
+              if (f > fechaAbono) {
+                if (typeof c.montoPagadoInteres !== "number") c.montoPagadoInteres = parseFloat(c.montoPagadoInteres || 0);
+                const interesCuota = parseFloat(c.interes || 0);
+                const pendiente = Math.max(0, interesCuota - c.montoPagadoInteres);
+                if (pendiente > 0) {
+                  const apli = Math.min(pendiente, restanteInt);
+                  c.montoPagadoInteres = Number((c.montoPagadoInteres + apli).toFixed(2));
+                  restanteInt -= apli;
+                }
+              }
             }
           }
         }
 
-        pagoInteres += interesAPagar;
-        abonoRestante -= interesAPagar;
+        const aplicadoInteres = interesAPagar - Math.max(0, restanteInt);
+        pagoInteres += aplicadoInteres;
+        abonoRestante -= aplicadoInteres;
+      }
+
+      // FIX: barredora — asegura que TODAS las vencidas queden sin interés pendiente
+      {
+        const refAbono = { value: abonoRestante };
+        const refInt   = { value: pagoInteres };
+        cubrirInteresVencidasPrimero(amortizacion, fechaAbonoYMD, refAbono, refInt);
+        abonoRestante = refAbono.value;
+        pagoInteres   = refInt.value;
       }
 
       // 3) CAPITAL: primero cuotas vencidas (fecha <= abono), luego futuras
@@ -434,34 +482,45 @@
           if (typeof cuota.montoPagado !== "number") cuota.montoPagado = parseFloat(cuota.montoPagado || 0);
           if (typeof cuota.montoPagadoInteres !== "number") cuota.montoPagadoInteres = parseFloat(cuota.montoPagadoInteres || 0);
 
-          let capitalCuota = parseFloat(cuota.capital || 0);
-          let interesCuota = parseFloat(cuota.interes || 0);
+          // FIX: antes de capital, garantizar interés en cero en esta vencida
+          {
+            const interesCuota = parseFloat(cuota.interes || 0);
+            const pagInt       = parseFloat(cuota.montoPagadoInteres || 0);
+            const intPend      = Number((interesCuota - pagInt).toFixed(2));
+            if (intPend > 0 && abonoRestante > 0) {
+              const apli = Math.min(intPend, abonoRestante);
+              cuota.montoPagadoInteres = Number((pagInt + apli).toFixed(2));
+              pagoInteres              = Number((pagoInteres + apli).toFixed(2));
+              abonoRestante            = Number((abonoRestante - apli).toFixed(2));
+            }
+          }
 
-          // capital pendiente
+          let capitalCuota = parseFloat(cuota.capital || 0);
           let pendienteCapital = Math.max(0, capitalCuota - cuota.montoPagado);
-          if (pendienteCapital > 0) {
+          if (pendienteCapital > 0 && abonoRestante > 0) {
             const apli = Math.min(pendienteCapital, abonoRestante);
             cuota.montoPagado = Number((cuota.montoPagado + apli).toFixed(2));
             pagoCapital += apli;
-            abonoRestante -= apli;
+            abonoRestante = Number((abonoRestante - apli).toFixed(2));
           }
 
           // Estado de cuota:
-          const capitalOk = Math.abs(cuota.montoPagado - capitalCuota) < 0.01;
-          const interesOk = Math.abs(cuota.montoPagadoInteres - interesCuota) < 0.01;
+          const EPS = 0.01;
+          const capitalOk = Math.abs((cuota.montoPagado || 0) - capitalCuota) < EPS;
+          const interesOk = Math.abs((cuota.montoPagadoInteres || 0) - parseFloat(cuota.interes || 0)) < EPS;
           if (capitalOk && interesOk) {
             cuota.estado = "Pagada";
             cuota.fechaPagoReal = fechaAbonoYMD;
-          } else if (cuota.montoPagado > 0 || cuota.montoPagadoInteres > 0) {
-            // si tiene algo pagado pero no completa
-            cuota.estado = (fechaCuota < new Date() ? "Atrasada" : "Parcial");
+          } else if ((cuota.montoPagado > 0 || cuota.montoPagadoInteres > 0)) {
+            const hoy = new Date(); hoy.setHours(0,0,0,0);
+            cuota.estado = (fechaCuota < hoy ? "Atrasada" : "Parcial");
             cuota.fechaPagoReal = null;
           }
         }
       }
 
-      // FUTURAS
-      if (abonoRestante > 0) {
+      // FUTURAS (solo si NO queda interés vencido pendiente)
+      if (abonoRestante > 0 && !existeInteresVencido(amortizacion, fechaAbonoYMD)) {
         for (let j = 0; j < amortizacion.length && abonoRestante > 0; j++) {
           let cuotaSig = amortizacion[j];
           let fechaCuota = new Date(cuotaSig.fecha);
@@ -469,14 +528,19 @@
             if (typeof cuotaSig.montoPagado !== "number") cuotaSig.montoPagado = parseFloat(cuotaSig.montoPagado || 0);
             if (typeof cuotaSig.montoPagadoInteres !== "number") cuotaSig.montoPagadoInteres = parseFloat(cuotaSig.montoPagadoInteres || 0);
 
+            // Por política: en futuras aquí ya no tocamos interés (solo capital),
+            // pues el interés futuro se devengará con el tiempo real.
             let capitalCuota = parseFloat(cuotaSig.capital || 0);
             let pendienteCapital = Math.max(0, capitalCuota - cuotaSig.montoPagado);
             if (pendienteCapital > 0) {
               const apli = Math.min(pendienteCapital, abonoRestante);
               cuotaSig.montoPagado = Number((cuotaSig.montoPagado + apli).toFixed(2));
               pagoCapital += apli;
-              abonoRestante -= apli;
-              if (Math.abs(cuotaSig.montoPagado - capitalCuota) < 0.01) {
+              abonoRestante = Number((abonoRestante - apli).toFixed(2));
+              const EPS = 0.01;
+              const capitalOk = Math.abs(cuotaSig.montoPagado - capitalCuota) < EPS;
+              const interesOk = Math.abs((cuotaSig.montoPagadoInteres || 0) - parseFloat(cuotaSig.interes || 0)) < EPS;
+              if (capitalOk && interesOk) {
                 cuotaSig.estado = "Pagada";
                 cuotaSig.fechaPagoReal = fechaAbonoYMD;
               } else if (cuotaSig.montoPagado > 0) {
@@ -489,7 +553,6 @@
       }
 
       // 4) CÁLCULO FINAL DE TOTALES Y ESTADOS
-      // Saldo pendiente (suma de capital no pagado)
       let saldoPendiente = amortizacion
         .filter(c => c.estado !== "Pagada")
         .reduce((acc, c) => {
@@ -499,20 +562,17 @@
         }, 0);
       saldoPendiente = Number(saldoPendiente.toFixed(2));
 
-      // Multas pendientes
       let multasAcumuladasFinal = historialMultasActualizado
         .filter(m => m.estadoCuota === "No Pagada" && parseFloat(m.monto) > 0.01)
         .reduce((acc, m) => acc + parseFloat(m.monto || 0), 0);
       multasAcumuladasFinal = Number(multasAcumuladasFinal.toFixed(2));
 
-      // Cuotas atrasadas a HOY
       let cuotasAtrasadasFinal = amortizacion.filter(c => {
         const f = new Date(c.fecha);
         const hoy = new Date(); hoy.setHours(0,0,0,0);
         return f < hoy && c.estado !== "Pagada";
       }).length;
 
-      // Capital atrasado (cuotas con fecha < hoy no pagadas)
       let capitalAtrasado = amortizacion.filter(c => {
         const f = new Date(c.fecha);
         const hoy = new Date(); hoy.setHours(0,0,0,0);
@@ -524,21 +584,16 @@
       }, 0);
       capitalAtrasado = Number(capitalAtrasado.toFixed(2));
 
-      // Interés pendiente que NO se alcanzó a cubrir con el abono
       const interesPendientePost = Math.max(0, Number((interesPendiente - pagoInteres).toFixed(2)));
 
-      // Interés desde fecha de abono hasta HOY sobre el NUEVO saldo
       const fechaHoy = new Date();
       const diasPost = Math.max(0, diasEntreFechasSinHora(fechaAbonoYMD, fechaHoy));
       const interesDesdeAbonoAHoy = Number((saldoPendiente * tasaDiaria * diasPost).toFixed(2));
 
-      // Interés actual total a HOY
       const interesActual = Number((interesPendientePost + interesDesdeAbonoAHoy).toFixed(2));
 
-      // Para ponerse al día
       const paraPonerseAlDiaFinal = Number((capitalAtrasado + multasAcumuladasFinal + interesActual).toFixed(2));
 
-      // Estado del crédito
       const nuevoEstadoCredito = (cuotasAtrasadasFinal === 0 && multasAcumuladasFinal === 0) ? "Activo" : "Mora Temprana";
 
       // --- BLINDAJE DE CORRELATIVO ---
@@ -614,6 +669,7 @@
   </script>
 </body>
 </html>
+
 
 
 

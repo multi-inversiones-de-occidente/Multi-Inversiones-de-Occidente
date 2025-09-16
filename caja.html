@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -8,7 +8,7 @@
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, onSnapshot, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -24,7 +24,7 @@
     const db   = getFirestore(app);
     const auth = getAuth(app);
 
-    // === Utilidades para identidad (avatar/iniciales) ===
+    // Iniciales desde correo (fallback de avatar)
     function inicialesDesdeEmail(email){
       const base = (email || "").split("@")[0];
       const partes = base.split(/[.\-_]+/).filter(Boolean);
@@ -33,18 +33,66 @@
       return ini;
     }
 
-    // === Suscripción a badges (mantiene tu lógica/colección) ===
-    function suscribirBadge(idBadge, filtros=[]) {
-      const q = query(collection(db, "Archivo Solicitudes"), ...filtros);
-      onSnapshot(q, snap => {
-        const el = document.getElementById(idBadge);
+    // Actualiza los cuatro badges con animación
+    function actualizarBadges({credicash=0, credicel=0, amuebla2=0, refi=0}){
+      const map = {
+        "badge-app-credicash": credicash,
+        "badge-app-credicel": credicel,
+        "badge-app-amuebla2": amuebla2,
+        "badge-app-refinanciamiento": refi
+      };
+      Object.entries(map).forEach(([id,val])=>{
+        const el = document.getElementById(id);
         if(!el) return;
-        el.textContent = snap.docs.length;
+        el.textContent = val;
         el.classList.add('badge-pulse');
-      }, err => {
-        console.error("Error en Archivo Solicitudes", err);
-        const el = document.getElementById(idBadge);
-        if(el) el.textContent = "!";
+      });
+    }
+
+    // === Conteo correcto por JOIN: asignacion_de_cuota -> Archivo Solicitudes (estado Aprobado) ===
+    function suscribirBadgesJoin(uid){
+      const qAsig = query(
+        collection(db, "asignacion_de_cuota"),
+        where("AsignacionID","==", uid),
+        where("respuestaCliente","==","Aceptado")
+      );
+
+      onSnapshot(qAsig, async (snap)=>{
+        const ids = new Set();
+        snap.forEach(d=>{
+          const a = d.data();
+          if (a && a.solicitudID) ids.add(a.solicitudID);
+        });
+
+        if (ids.size === 0){
+          actualizarBadges({credicash:0, credicel:0, amuebla2:0, refi:0});
+          return;
+        }
+
+        const contadores = {credicash:0, credicel:0, amuebla2:0, refi:0};
+
+        await Promise.all([...ids].map(async sid=>{
+          try{
+            const sref = doc(db, "Archivo Solicitudes", sid);
+            const ssnap = await getDoc(sref);
+            if (!ssnap.exists()) return;
+            const s = ssnap.data();
+            if (s.estado !== "Aprobado") return;
+
+            const linea = (s.creditLine || s.tipo || "").trim();
+            if (linea === "Credicash") contadores.credicash++;
+            else if (linea === "Credicel") contadores.credicel++;
+            else if (linea === "Amuebla2") contadores.amuebla2++;
+            else if (linea === "Refinanciamiento") contadores.refi++;
+          }catch(_e){ /* ignorar individuales */ }
+        }));
+
+        actualizarBadges(contadores);
+      }, (_err)=>{
+        ["badge-app-credicash","badge-app-credicel","badge-app-amuebla2","badge-app-refinanciamiento"].forEach(id=>{
+          const el = document.getElementById(id);
+          if(el) el.textContent = "!";
+        });
       });
     }
 
@@ -52,14 +100,14 @@
       onAuthStateChanged(auth, user => {
         if (!user) return location.href = "login.html";
 
-        // Identidad visual (correo + avatar/iniciales)
+        // Identidad visual (correo + avatar + iniciales)
         const emailEl = document.getElementById("usuario-email");
         const h1El    = document.getElementById("usuario-nombre");
         const imgEl   = document.getElementById("usuario-avatar");
         const initEl  = document.getElementById("usuario-iniciales");
 
         emailEl.textContent = user.email;
-        h1El.textContent    = user.email; // a11y (oculto)
+        h1El.textContent    = user.email;     // a11y (oculto)
         initEl.textContent  = inicialesDesdeEmail(user.email);
 
         const fallbackSrc = "assets/avatar_user.png";
@@ -70,29 +118,8 @@
         };
         if (user.photoURL) imgEl.src = user.photoURL; else imgEl.src = fallbackSrc;
 
-        const uid = user.uid;
-
-        // Badges SOLO aprobadas y asignadas a este usuario (se mantiene tu filtro/colección)
-        suscribirBadge("badge-app-credicash", [
-          where("estado","==","Aprobado"),
-          where("creditLine","==","Credicash"),
-          where("AsignacionID", "==", uid)
-        ]);
-        suscribirBadge("badge-app-credicel", [
-          where("estado","==","Aprobado"),
-          where("creditLine","==","Credicel"),
-          where("AsignacionID", "==", uid)
-        ]);
-        suscribirBadge("badge-app-refinanciamiento", [
-          where("estado","==","Aprobado"),
-          where("creditLine","==","Refinanciamiento"),
-          where("AsignacionID", "==", uid)
-        ]);
-        suscribirBadge("badge-app-amuebla2", [
-          where("estado","==","Aprobado"),
-          where("creditLine","==","Amuebla2"),
-          where("AsignacionID", "==", uid)
-        ]);
+        // Suscribir badges con el mismo JOIN del panel de gerente
+        suscribirBadgesJoin(user.uid);
       });
     });
   </script>
@@ -102,7 +129,7 @@
   <style>
     :root{
       --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --white:#ffffff; --muted:#5b6776;
-      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
+      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#8bd13a; --brand-gold:#F8AF40;
       --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
       --title-weight:800; --radius-2xl:28px;
     }
@@ -112,6 +139,7 @@
         --glass-bg:rgba(255,255,255,.12); --glass-brd:rgba(255,255,255,.18); --glass-shadow:0 24px 60px rgba(0,0,0,.45);
       }
     }
+
     *{ box-sizing:border-box }
     html,body{ height:100% }
     body{
@@ -124,6 +152,7 @@
       -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
       min-height:100vh;
     }
+
     .pattern{
       position:fixed; inset:0; pointer-events:none; z-index:0;
       background-image:
@@ -132,7 +161,6 @@
       background-size:100px 100px; mix-blend-mode:soft-light; opacity:.5;
     }
 
-    /* Header glassy */
     header{
       position:sticky; top:0; z-index:10;
       backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
@@ -142,6 +170,7 @@
     @media (prefers-color-scheme: dark){
       header{ background:linear-gradient(180deg, rgba(15,20,30,.75), rgba(15,20,30,.35)); }
     }
+
     .topbar{
       max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
     }
@@ -157,21 +186,24 @@
     @keyframes plateSheen{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
     .logo-plate img{ height:28px; width:auto; display:block }
     .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
-    .topbar-title{ margin-left:auto; font-weight:700; color:var(--muted); }
 
-    /* Container */
     .container{
       position:relative; z-index:1; max-width:1100px; margin:0 auto; padding:2.2rem 16px 3rem;
       display:flex; flex-direction:column; align-items:center;
     }
+
     .visually-hidden{
       position:absolute !important; clip: rect(1px, 1px, 1px, 1px);
       padding:0; border:0; height:1px; width:1px; overflow:hidden; white-space:nowrap;
     }
+    h1{
+      margin:1.2rem 0 .2rem; font-size:clamp(1.6rem, 2.4vw + 1rem, 2.6rem);
+      font-weight:var(--title-weight); color:var(--brand-blue); text-align:center; letter-spacing:.2px;
+    }
 
-    /* Identity card */
+    /* ===== Tarjeta de Identidad (avatar + correo) ===== */
     .identity-card{
-      width:100%; max-width:900px; margin:.4rem auto 1.2rem auto;
+      width:100%; max-width:900px; margin: .4rem auto 1.2rem auto;
       display:flex; align-items:center; gap:14px; padding:10px 12px;
       background:var(--glass-bg); border:1px solid var(--glass-brd); border-radius:22px;
       box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
@@ -179,7 +211,7 @@
     .identity-card::before{
       content:""; position:absolute; inset:-2px; border-radius:inherit; pointer-events:none;
       background: conic-gradient(from 220deg,
-        rgba(103,200,241,.18), rgba(248,175,64,.16), rgba(19,182,107,.16), rgba(103,200,241,.18));
+        rgba(103,200,241,.18), rgba(248,175,64,.16), rgba(139,209,58,.16), rgba(103,200,241,.18));
       filter: blur(8px); opacity:.45;
       mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
       -webkit-mask-composite: xor; mask-composite: exclude; padding:1px;
@@ -210,6 +242,7 @@
       background: #22c55e; border:2px solid #fff;
       box-shadow: 0 0 0 2px rgba(34,197,94,.2);
     }
+
     .who{ display:flex; flex-direction:column; gap:6px; min-width:0; }
     .email-pill{
       display:inline-flex; align-items:center; gap:10px; max-width:100%;
@@ -227,6 +260,7 @@
       animation: pillSheen 8s cubic-bezier(.2,.6,.2,1) infinite;
     }
     @keyframes pillSheen{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
+
     .email-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .email-icon{ color: var(--brand-blue); opacity:.8; }
 
@@ -235,7 +269,7 @@
       font-size:clamp(.98rem, .4vw + .86rem, 1.1rem); margin-bottom:1.8rem; max-width:720px;
     }
 
-    /* Grid de botones (mantenemos tus rutas/funciones) */
+    /* === GRILLA 3 por fila === */
     .grid-botones{
       width:100%;
       display:grid;
@@ -245,7 +279,7 @@
     @media (max-width:980px){ .grid-botones{ grid-template-columns:repeat(2, minmax(220px,1fr)); } }
     @media (max-width:600px){ .grid-botones{ grid-template-columns:1fr; } }
 
-    /* Botón premium */
+    /* ===== Botón pro ===== */
     .btn-grande{
       position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
       gap:.65rem; min-height:112px; padding:22px 18px; text-decoration:none;
@@ -263,7 +297,7 @@
     }
     .btn-grande::before{
       content:""; position:absolute; inset:-1.5px; border-radius:inherit; z-index:0;
-      background:conic-gradient(from 140deg, rgba(103,200,241,.12), rgba(103,200,241,.25), rgba(248,175,64,.25), rgba(19,182,107,.25), rgba(103,200,241,.12) 85%);
+      background:conic-gradient(from 140deg, rgba(103,200,241,.12), rgba(103,200,241,.25), rgba(248,175,64,.25), rgba(139,209,58,.25), rgba(103,200,241,.12) 85%);
       filter:blur(8px); opacity:.65; transition:opacity .2s ease;
       mask:linear-gradient(#000,#000) content-box, linear-gradient(#000,#000); -webkit-mask-composite:xor; mask-composite:exclude; padding:1px;
     }
@@ -275,6 +309,7 @@
     .btn-grande:hover{ transform:translateY(-2px) scale(1.015); box-shadow:0 18px 45px rgba(10,20,40,.18), 0 6px 16px rgba(10,20,40,.12); }
     .btn-grande:hover::after{ transform:translateX(120%) }
     .btn-grande:active{ transform:translateY(0) scale(.997) }
+
     .btn-grande i{
       position:relative; z-index:2; font-size:1.9rem; opacity:.95; color:var(--brand-blue);
       transition:transform .2s ease, opacity .2s ease; transform:translateZ(20px);
@@ -282,7 +317,6 @@
     .btn-grande:hover i{ transform:translateY(-2px) translateZ(20px) }
     .btn-grande span.label{ position:relative; z-index:2; text-align:center; line-height:1.25; transform:translateZ(18px); }
 
-    /* Badge */
     .badge{
       position:absolute; top:12px; right:12px; z-index:3;
       background:linear-gradient(180deg, #ff5a4a, #e51e10); color:#fff; width:28px; height:28px;
@@ -295,23 +329,17 @@
       50%{ transform:scale(1.06); box-shadow:0 10px 24px rgba(229,30,16,.65) }
     }
 
-    /* Variantes de borde iónico por tipo */
+    /* Variantes de borde iónico */
     .btn-caja::before{ background: conic-gradient(from 120deg, rgba(103,200,241,.35), rgba(19,182,107,.35), transparent 85%) }
+    .btn-mora-usuario::before{ background: conic-gradient(from 120deg, rgba(122,66,241,.35), rgba(89,51,215,.35), transparent 85%) }
+    .btn-mora-agencia::before{ background: conic-gradient(from 120deg, rgba(48,79,254,.35), rgba(92,107,192,.35), transparent 85%) }
+    .btn-pin::before{ background: conic-gradient(from 120deg, rgba(248,175,64,.45), rgba(255,167,38,.35), transparent 85%) }
+    .btn-cierre-caja::before{ background: conic-gradient(from 120deg, rgba(231,255,114,.45), rgba(19,182,107,.35), transparent 85%) }
+    .btn-master-creditos::before{ background: conic-gradient(from 120deg, rgba(96,125,139,.45), rgba(55,71,79,.35), transparent 85%) }
+    .btn-cuotas-vencer::before{ background: conic-gradient(from 120deg, rgba(248,175,64,.45), rgba(103,200,241,.35), transparent 85%) }
     .btn-reporte::before{ background: conic-gradient(from 120deg, rgba(238,9,121,.45), rgba(255,106,0,.35), transparent 85%) }
     .btn-revertir::before{ background: conic-gradient(from 120deg, rgba(231,76,60,.5), rgba(142,8,0,.35), transparent 85%) }
     .btn-reimprimir::before{ background: conic-gradient(from 120deg, rgba(248,175,64,.45), rgba(255,214,0,.35), transparent 85%) }
-
-    /* Títulos */
-    h1{
-      margin:1.2rem 0 .2rem; font-size:clamp(1.6rem, 2.4vw + 1rem, 2.6rem);
-      font-weight:var(--title-weight); color:var(--brand-blue); text-align:center; letter-spacing:.2px;
-    }
-    .mensaje-bienvenida{ margin-top:.2rem; }
-
-    /* Responsive tweaks */
-    @media (max-width:600px){
-      .mensaje-bienvenida{ margin-bottom:1.2rem; }
-    }
   </style>
 </head>
 <body>
@@ -320,15 +348,15 @@
   <header>
     <div class="topbar">
       <div class="logo-plate">
-        <img src="assets/logo_mi_bw.png" alt="Logo" width="140" height="40" />
+        <img src="assets/logo_mi_bw.png" alt="Logo " width="140" height="40" />
         <strong class="brand-name">MULTI INVERSIONES DE OCCIDENTE</strong>
       </div>
-      <div class="topbar-title">Panel de Caja</div>
+      <div style="margin-left:auto; font-weight:700; color:var(--muted);">Panel de Caja</div>
     </div>
   </header>
 
   <div class="container">
-    <!-- h1 accesible (oculto visualmente) -->
+    <!-- h1 accesible (oculto) -->
     <h1 id="usuario-nombre" class="visually-hidden">Bienvenido, usuario</h1>
 
     <!-- Tarjeta de identidad -->
@@ -352,7 +380,7 @@
       </div>
     </div>
 
-    <!-- Botones (se mantienen tus rutas/funciones) -->
+    <!-- BOTONES -->
     <div class="grid-botones">
       <!-- Aprobadas con badges -->
       <a href="solicitudes_aprobadas_credicash_page.html" class="btn-grande btn-caja">
@@ -365,8 +393,8 @@
         <span class="label">Solicitudes Aprobadas Credicel</span>
         <span id="badge-app-credicel" class="badge">0</span>
       </a>
-      <a href="solicitudes_aprobadas_refinanciamiento.html" class="btn-grande btn-caja">
-        <i class="fas fa-check-circle"></i>
+      <a href="solicitudes_aprobadas_refinanciamiento.html" class="btn-grande btn-revertir">
+        <i class="fas fa-sync-alt"></i>
         <span class="label">Solicitudes Aprobadas Refinanciamiento</span>
         <span id="badge-app-refinanciamiento" class="badge">0</span>
       </a>
@@ -381,7 +409,7 @@
         <i class="fas fa-money-bill-wave"></i>
         <span class="label">Recepción de Pagos</span>
       </a>
-      <a href="recuperacion.html" class="btn-grande btn-caja">
+      <a href="recuperacion.html" class="btn-grande btn-reporte">
         <i class="fas fa-hand-holding-usd"></i>
         <span class="label">Recuperación (Intereses)</span>
       </a>
@@ -393,8 +421,6 @@
         <i class="fas fa-list-alt"></i>
         <span class="label">Ver Movimientos de Caja</span>
       </a>
-
-      <!-- Reimpresión / Reversión -->
       <a href="reimpresion_tickets_page.html" class="btn-grande btn-reimprimir">
         <i class="fas fa-print"></i>
         <span class="label">Ver/Reimprimir Recibos</span>
@@ -403,14 +429,12 @@
         <i class="fas fa-undo"></i>
         <span class="label">Revertir Pagos</span>
       </a>
-
-      <!-- Otros accesos -->
-      <a href="master_creditos_page.html" class="btn-grande btn-caja">
+      <a href="master_creditos_page.html" class="btn-grande btn-master-creditos">
         <i class="fas fa-database"></i>
         <span class="label">Master de Créditos</span>
       </a>
-      <a href="cuotas_por_vencer_page.html" class="btn-grande btn-caja">
-        <i class="fas fa-hourglass-half"></i>
+      <a href="cuotas_por_vencer_page.html" class="btn-grande btn-cuotas-vencer">
+        <i class="fa-solid fa-hourglass-half"></i>
         <span class="label">Cuotas por Vencer</span>
       </a>
       <a href="reporte_page.html" class="btn-grande btn-reporte">
@@ -420,7 +444,7 @@
     </div>
   </div>
 
-  <!-- Interacciones: ripple + tilt -->
+  <!-- Interacciones: tilt + ripple -->
   <script>
     const buttons = document.querySelectorAll('.btn-grande');
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -465,6 +489,7 @@
   </script>
 </body>
 </html>
+
 
 
 

@@ -452,6 +452,26 @@
       .tabla-estado { min-width: 550px; font-size: 0.93rem;}
       .resumen-box { font-size: .95rem;}
     }
+
+    /* ===== SOLO PARA IMPRESIÓN ===== */
+    @media print {
+      /* Ocultar cuadro de búsqueda, menú predictivo y botón imprimir */
+      .busqueda-row,
+      #opciones-busqueda,
+      .btn-imprimir { 
+        display: none !important; 
+      }
+
+      /* Opcional: fondo blanco y sin sombras para una impresión limpia */
+      body { background: #fff !important; color: #000 !important; }
+      .container { background: #fff !important; box-shadow: none !important; }
+      .tabla-estado { background: #fff !important; }
+      .tabla-estado th { color: #000 !important; background: #eee !important; }
+      .tabla-estado td { color: #000 !important; }
+
+      /* Ajustar márgenes de página si lo deseas */
+      @page { margin: 12mm; }
+    }
   </style>
 </head>
 <body>
@@ -473,4 +493,6 @@
   </div>
 </body>
 </html>
+
+
 

@@ -1,9 +1,10 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Panel de Caja – Multi Inversiones</title>
+
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
@@ -23,284 +24,447 @@
     const db   = getFirestore(app);
     const auth = getAuth(app);
 
-    // Función para suscribir el badge con todos los filtros requeridos
+    // === Utilidades para identidad (avatar/iniciales) ===
+    function inicialesDesdeEmail(email){
+      const base = (email || "").split("@")[0];
+      const partes = base.split(/[.\-_]+/).filter(Boolean);
+      let ini = partes.slice(0,2).map(s=>s[0]).join("").toUpperCase();
+      if(!ini) ini = (email||"U")[0].toUpperCase();
+      return ini;
+    }
+
+    // === Suscripción a badges (mantiene tu lógica/colección) ===
     function suscribirBadge(idBadge, filtros=[]) {
       const q = query(collection(db, "Archivo Solicitudes"), ...filtros);
       onSnapshot(q, snap => {
-        document.getElementById(idBadge).textContent = snap.docs.length;
+        const el = document.getElementById(idBadge);
+        if(!el) return;
+        el.textContent = snap.docs.length;
+        el.classList.add('badge-pulse');
       }, err => {
         console.error("Error en Archivo Solicitudes", err);
-        document.getElementById(idBadge).textContent = "!";
+        const el = document.getElementById(idBadge);
+        if(el) el.textContent = "!";
       });
     }
 
     window.addEventListener("DOMContentLoaded", () => {
       onAuthStateChanged(auth, user => {
         if (!user) return location.href = "login.html";
-        document.getElementById("usuario-nombre").textContent = user.email;
+
+        // Identidad visual (correo + avatar/iniciales)
+        const emailEl = document.getElementById("usuario-email");
+        const h1El    = document.getElementById("usuario-nombre");
+        const imgEl   = document.getElementById("usuario-avatar");
+        const initEl  = document.getElementById("usuario-iniciales");
+
+        emailEl.textContent = user.email;
+        h1El.textContent    = user.email; // a11y (oculto)
+        initEl.textContent  = inicialesDesdeEmail(user.email);
+
+        const fallbackSrc = "assets/avatar_user.png";
+        const usarIniciales = () => { imgEl.style.display = "none"; initEl.style.display = "grid"; };
+        imgEl.onerror = () => {
+          if (imgEl.dataset.fallbackTried === "1") usarIniciales();
+          else { imgEl.dataset.fallbackTried = "1"; imgEl.src = fallbackSrc; }
+        };
+        if (user.photoURL) imgEl.src = user.photoURL; else imgEl.src = fallbackSrc;
+
         const uid = user.uid;
 
-        // Filtros SOLO las solicitudes aprobadas y asignadas a este usuario:
-        suscribirBadge(
-          "badge-app-credicash",
-          [
-            where("estado","==","Aprobado"),
-            where("creditLine","==","Credicash"),
-            where("AsignacionID", "==", uid)
-          ]
-        );
-        suscribirBadge(
-          "badge-app-credicel",
-          [
-            where("estado","==","Aprobado"),
-            where("creditLine","==","Credicel"),
-            where("AsignacionID", "==", uid)
-          ]
-        );
-        // NUEVO: Badge para Refinanciamiento
-        suscribirBadge(
-          "badge-app-refinanciamiento",
-          [
-            where("estado","==","Aprobado"),
-            where("creditLine","==","Refinanciamiento"),
-            where("AsignacionID", "==", uid)
-          ]
-        );
-        suscribirBadge(
-          "badge-app-amuebla2",
-          [
-            where("estado","==","Aprobado"),
-            where("creditLine","==","Amuebla2"),
-            where("AsignacionID", "==", uid)
-          ]
-        );
+        // Badges SOLO aprobadas y asignadas a este usuario (se mantiene tu filtro/colección)
+        suscribirBadge("badge-app-credicash", [
+          where("estado","==","Aprobado"),
+          where("creditLine","==","Credicash"),
+          where("AsignacionID", "==", uid)
+        ]);
+        suscribirBadge("badge-app-credicel", [
+          where("estado","==","Aprobado"),
+          where("creditLine","==","Credicel"),
+          where("AsignacionID", "==", uid)
+        ]);
+        suscribirBadge("badge-app-refinanciamiento", [
+          where("estado","==","Aprobado"),
+          where("creditLine","==","Refinanciamiento"),
+          where("AsignacionID", "==", uid)
+        ]);
+        suscribirBadge("badge-app-amuebla2", [
+          where("estado","==","Aprobado"),
+          where("creditLine","==","Amuebla2"),
+          where("AsignacionID", "==", uid)
+        ]);
       });
     });
   </script>
 
-  <!-- Estilos modernos y homogéneos -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
   <style>
-    body {
-      margin:0; font-family:Arial,sans-serif;
-      background: radial-gradient(circle,#000,#111);
-      color:#fff;
-      min-height: 100vh;
+    :root{
+      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --white:#ffffff; --muted:#5b6776;
+      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
+      --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
+      --title-weight:800; --radius-2xl:28px;
     }
-    header {
-      background:#000; padding:1rem; text-align:center;
-      font-size:1.5rem; letter-spacing:1px;
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0c0f14; --bg-2:#0f141b; --text:#dfe6ef; --muted:#9aa6b6;
+        --glass-bg:rgba(255,255,255,.12); --glass-brd:rgba(255,255,255,.18); --glass-shadow:0 24px 60px rgba(0,0,0,.45);
+      }
     }
-    .container {
-      max-width:900px; margin:0 auto; padding:2.5rem 1rem 2rem 1rem;
-      display: flex; flex-direction: column; align-items: center;
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      min-height:100vh;
     }
-    h1 { 
-      margin:1rem 0 0.2rem 0; 
-      font-size:2.3rem;
-      font-weight:800;
-      letter-spacing:.5px;
-      text-align:center;
+    .pattern{
+      position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image:
+        radial-gradient(1px 1px at 25px 25px, rgba(255,255,255,.10), transparent 40%),
+        radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.06), transparent 40%);
+      background-size:100px 100px; mix-blend-mode:soft-light; opacity:.5;
     }
-    .mensaje-bienvenida {
-      font-size:1.12rem;
-      color:#F8AF40;
-      margin-bottom: 2.4rem;
-      margin-top: 0.4rem;
-      font-weight:600;
-      text-align:center;
-      line-height:1.38;
-      max-width: 600px;
+
+    /* Header glassy */
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
+      background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
+      border-bottom:1px solid var(--glass-brd);
     }
-    .grid-botones {
+    @media (prefers-color-scheme: dark){
+      header{ background:linear-gradient(180deg, rgba(15,20,30,.75), rgba(15,20,30,.35)); }
+    }
+    .topbar{
+      max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
+    }
+    .logo-plate{
+      display:inline-flex; align-items:center; gap:10px; background:var(--glass-bg); border:1px solid var(--glass-brd);
+      padding:8px 14px; border-radius:16px; box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
+    }
+    .logo-plate::after{
+      content:""; position:absolute; inset:-1px;
+      background:linear-gradient(120deg, transparent 0 35%, rgba(255,255,255,.55) 45%, transparent 55% 100%);
+      transform:translateX(-120%); animation:plateSheen 6s linear infinite; pointer-events:none;
+    }
+    @keyframes plateSheen{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
+    .logo-plate img{ height:28px; width:auto; display:block }
+    .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
+    .topbar-title{ margin-left:auto; font-weight:700; color:var(--muted); }
+
+    /* Container */
+    .container{
+      position:relative; z-index:1; max-width:1100px; margin:0 auto; padding:2.2rem 16px 3rem;
+      display:flex; flex-direction:column; align-items:center;
+    }
+    .visually-hidden{
+      position:absolute !important; clip: rect(1px, 1px, 1px, 1px);
+      padding:0; border:0; height:1px; width:1px; overflow:hidden; white-space:nowrap;
+    }
+
+    /* Identity card */
+    .identity-card{
+      width:100%; max-width:900px; margin:.4rem auto 1.2rem auto;
+      display:flex; align-items:center; gap:14px; padding:10px 12px;
+      background:var(--glass-bg); border:1px solid var(--glass-brd); border-radius:22px;
+      box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
+    }
+    .identity-card::before{
+      content:""; position:absolute; inset:-2px; border-radius:inherit; pointer-events:none;
+      background: conic-gradient(from 220deg,
+        rgba(103,200,241,.18), rgba(248,175,64,.16), rgba(19,182,107,.16), rgba(103,200,241,.18));
+      filter: blur(8px); opacity:.45;
+      mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+      -webkit-mask-composite: xor; mask-composite: exclude; padding:1px;
+      animation: halo 10s linear infinite;
+    }
+    @keyframes halo{ to{ transform: rotate(1turn) } }
+
+    .avatar{
+      width:64px; height:64px; padding:2px; border-radius:50%;
+      background: conic-gradient(from 210deg, var(--brand-cel), var(--brand-gold), var(--brand-green), var(--brand-cel));
+      position:relative; box-shadow: 0 8px 24px rgba(10,20,40,.15);
+      flex: 0 0 auto;
+    }
+    .avatar .inner{
+      width:100%; height:100%; border-radius:50%;
+      background: linear-gradient(180deg, #f6f9ff, #e9eef6);
+      overflow:hidden; display:grid; place-items:center;
+    }
+    .avatar img{ width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; }
+    .avatar .initials{
+      display:none; width:100%; height:100%; border-radius:50%;
+      font-weight:800; letter-spacing:.5px; color:#243b86; font-size:1.1rem;
+      background: linear-gradient(180deg, #ffffff, #ecf2fb);
+      place-items:center;
+    }
+    .avatar .status{
+      position:absolute; right:2px; bottom:2px; width:12px; height:12px; border-radius:50%;
+      background: #22c55e; border:2px solid #fff;
+      box-shadow: 0 0 0 2px rgba(34,197,94,.2);
+    }
+    .who{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+    .email-pill{
+      display:inline-flex; align-items:center; gap:10px; max-width:100%;
+      padding:10px 14px; border-radius:999px;
+      background: linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
+      border: 1px solid rgba(36,59,134,.15);
+      font-weight:800; color:var(--brand-blue); letter-spacing:.2px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+      position:relative; overflow:hidden;
+    }
+    .email-pill::after{
+      content:""; position:absolute; inset:0; pointer-events:none;
+      background: linear-gradient(120deg, transparent 0 40%, rgba(255,255,255,.6) 50%, transparent 60% 100%);
+      transform: translateX(-120%); opacity:.55; mix-blend-mode: screen;
+      animation: pillSheen 8s cubic-bezier(.2,.6,.2,1) infinite;
+    }
+    @keyframes pillSheen{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
+    .email-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .email-icon{ color: var(--brand-blue); opacity:.8; }
+
+    .mensaje-bienvenida{
+      text-align:center; line-height:1.5; color:var(--muted);
+      font-size:clamp(.98rem, .4vw + .86rem, 1.1rem); margin-bottom:1.8rem; max-width:720px;
+    }
+
+    /* Grid de botones (mantenemos tus rutas/funciones) */
+    .grid-botones{
       width:100%;
       display:grid;
-      grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
-      gap:1.55rem;
-      margin-bottom:2.2rem;
+      grid-template-columns: repeat(3, minmax(260px, 1fr));
+      gap:18px; margin-bottom:1.8rem; align-items:stretch;
     }
-    .btn-grande {
-      background: linear-gradient(90deg, #67C8F1 0%, #13b66b 100%);
-      color: #212121;
-      font-weight: bold;
-      font-size: 1.16rem;
-      border: none;
-      border-radius: 18px;
-      box-shadow: 0 4px 22px #13b66a2b;
-      padding: 2rem 1.2rem 2rem 1.2rem;
-      text-align: center;
-      cursor: pointer;
-      transition: background .19s, color .19s, transform .15s;
-      position: relative;
-      outline: none;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: .7rem;
-      min-width:0;
-      user-select: none;
-      text-decoration: none;
+    @media (max-width:980px){ .grid-botones{ grid-template-columns:repeat(2, minmax(220px,1fr)); } }
+    @media (max-width:600px){ .grid-botones{ grid-template-columns:1fr; } }
+
+    /* Botón premium */
+    .btn-grande{
+      position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:.65rem; min-height:112px; padding:22px 18px; text-decoration:none;
+      color:var(--text); font-weight:700; font-size:1.06rem; border-radius:var(--radius-2xl);
+      background:radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,.65), rgba(255,255,255,.32) 40%, rgba(255,255,255,.18) 100%);
+      border:1px solid var(--glass-brd);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 8px 24px rgba(10,20,40,.12), 0 2px 6px rgba(10,20,40,.06);
+      overflow:hidden; outline:none; user-select:none; transform-style:preserve-3d; transition:transform .14s ease, box-shadow .2s ease, background .2s ease; will-change:transform; isolation:isolate;
     }
-    .btn-grande:active,
-    .btn-grande:hover {
-      background: linear-gradient(90deg, #13b66b 70%, #67C8F1 100%);
-      color: #222;
-      transform: scale(1.03);
-      box-shadow: 0 8px 26px #0a644188;
-      text-decoration: none;
+    @media (prefers-color-scheme: dark){
+      .btn-grande{
+        background:radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,.09), rgba(255,255,255,.06) 40%, rgba(255,255,255,.04) 100%);
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 10px 30px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.35);
+      }
     }
-    .btn-grande i {
-      font-size: 2.2rem;
-      margin-bottom: 9px;
-      color: #212121;
-      opacity: .89;
-      transition: color .15s;
+    .btn-grande::before{
+      content:""; position:absolute; inset:-1.5px; border-radius:inherit; z-index:0;
+      background:conic-gradient(from 140deg, rgba(103,200,241,.12), rgba(103,200,241,.25), rgba(248,175,64,.25), rgba(19,182,107,.25), rgba(103,200,241,.12) 85%);
+      filter:blur(8px); opacity:.65; transition:opacity .2s ease;
+      mask:linear-gradient(#000,#000) content-box, linear-gradient(#000,#000); -webkit-mask-composite:xor; mask-composite:exclude; padding:1px;
     }
-    .btn-grande:hover i { color: #0c7451; }
-    .btn-grande .badge {
-      position: absolute; top: 14px; right: 15px;
-      background:#e74c3c; color:#fff;
-      width:28px; height:28px; border-radius:50%;
-      display:flex; align-items:center; justify-content:center;
-      font-size:.85rem; font-weight:700;
-      box-shadow:0 1px 8px #0002;
+    .btn-grande::after{
+      content:""; position:absolute; inset:-1px; border-radius:inherit; z-index:1; pointer-events:none;
+      background:linear-gradient(130deg, transparent 0 40%, rgba(255,255,255,.55) 50%, transparent 60% 100%);
+      transform:translateX(-120%); transition:transform .6s cubic-bezier(.2,.6,.2,1); opacity:.55; mix-blend-mode:screen;
     }
-    /* Botón de revertir pagos estilo rojo */
-    .btn-revertir {
-      background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%);
-      color: #fff !important;
+    .btn-grande:hover{ transform:translateY(-2px) scale(1.015); box-shadow:0 18px 45px rgba(10,20,40,.18), 0 6px 16px rgba(10,20,40,.12); }
+    .btn-grande:hover::after{ transform:translateX(120%) }
+    .btn-grande:active{ transform:translateY(0) scale(.997) }
+    .btn-grande i{
+      position:relative; z-index:2; font-size:1.9rem; opacity:.95; color:var(--brand-blue);
+      transition:transform .2s ease, opacity .2s ease; transform:translateZ(20px);
     }
-    .btn-revertir:active,
-    .btn-revertir:hover {
-      background: linear-gradient(90deg, #c0392b 70%, #8e0800 100%);
-      color: #fff !important;
-      box-shadow: 0 8px 26px #800a0a88;
+    .btn-grande:hover i{ transform:translateY(-2px) translateZ(20px) }
+    .btn-grande span.label{ position:relative; z-index:2; text-align:center; line-height:1.25; transform:translateZ(18px); }
+
+    /* Badge */
+    .badge{
+      position:absolute; top:12px; right:12px; z-index:3;
+      background:linear-gradient(180deg, #ff5a4a, #e51e10); color:#fff; width:28px; height:28px;
+      display:grid; place-items:center; border-radius:50%; font-size:.85rem; font-weight:800;
+      box-shadow:0 6px 18px rgba(229,30,16,.45); border:1px solid rgba(255,255,255,.35);
     }
-    .btn-revertir i {
-      color: #fff !important;
-      opacity: 1;
+    .badge-pulse{ animation:pulse 2s infinite }
+    @keyframes pulse{
+      0%,100%{ transform:scale(1); box-shadow:0 6px 18px rgba(229,30,16,.45) }
+      50%{ transform:scale(1.06); box-shadow:0 10px 24px rgba(229,30,16,.65) }
     }
-    /* Nuevo botón de reimpresión */
-    .btn-reimprimir {
-      background: linear-gradient(90deg, #F8AF40 0%, #FFD600 100%);
-      color: #232323 !important;
-      font-weight: bold;
+
+    /* Variantes de borde iónico por tipo */
+    .btn-caja::before{ background: conic-gradient(from 120deg, rgba(103,200,241,.35), rgba(19,182,107,.35), transparent 85%) }
+    .btn-reporte::before{ background: conic-gradient(from 120deg, rgba(238,9,121,.45), rgba(255,106,0,.35), transparent 85%) }
+    .btn-revertir::before{ background: conic-gradient(from 120deg, rgba(231,76,60,.5), rgba(142,8,0,.35), transparent 85%) }
+    .btn-reimprimir::before{ background: conic-gradient(from 120deg, rgba(248,175,64,.45), rgba(255,214,0,.35), transparent 85%) }
+
+    /* Títulos */
+    h1{
+      margin:1.2rem 0 .2rem; font-size:clamp(1.6rem, 2.4vw + 1rem, 2.6rem);
+      font-weight:var(--title-weight); color:var(--brand-blue); text-align:center; letter-spacing:.2px;
     }
-    .btn-reimprimir:active,
-    .btn-reimprimir:hover {
-      background: linear-gradient(90deg, #FFD600 60%, #F8AF40 100%);
-      color: #232323 !important;
-      box-shadow: 0 8px 26px #FFD60055;
-    }
-    .btn-reimprimir i {
-      color: #232323 !important;
-      opacity: 1;
-    }
-    /* Botón de reportes gerenciales (nuevo) */
-    .btn-reporte {
-      background: linear-gradient(90deg, #ee0979 0%, #ff6a00 100%);
-      color: #fff !important;
-    }
-    .btn-reporte:active,
-    .btn-reporte:hover {
-      background: linear-gradient(90deg, #ff6a00 60%, #ee0979 100%);
-      color: #fff !important;
-      box-shadow: 0 8px 26px #ee097955;
-    }
-    .btn-reporte i { color: #fff; opacity: 0.95;}
-    @media (max-width: 600px) {
-      .container { padding:1.2rem 1vw; }
-      h1 { font-size: 1.23rem;}
-      .mensaje-bienvenida { font-size: .99rem; }
-      .grid-botones { gap:1rem; }
-      .btn-grande { padding: 1.3rem 0.6rem 1.3rem 0.6rem; font-size: .97rem;}
-      .btn-grande i { font-size:1.4rem; }
+    .mensaje-bienvenida{ margin-top:.2rem; }
+
+    /* Responsive tweaks */
+    @media (max-width:600px){
+      .mensaje-bienvenida{ margin-bottom:1.2rem; }
     }
   </style>
 </head>
 <body>
+  <div class="pattern" aria-hidden="true"></div>
 
-  <header>Panel de Caja</header>
+  <header>
+    <div class="topbar">
+      <div class="logo-plate">
+        <img src="assets/logo_mi_bw.png" alt="Logo" width="140" height="40" />
+        <strong class="brand-name">MULTI INVERSIONES DE OCCIDENTE</strong>
+      </div>
+      <div class="topbar-title">Panel de Caja</div>
+    </div>
+  </header>
 
   <div class="container">
-    <h1 id="usuario-nombre">Bienvenido, usuario</h1>
-    <div class="mensaje-bienvenida">
-      ¡Accede rápidamente a todas las funciones de Caja!<br>
-      <span style="color:#67C8F1;font-weight:700;">Gestiona pagos, movimientos y solicitudes aprobadas de forma eficiente y segura.</span>
+    <!-- h1 accesible (oculto visualmente) -->
+    <h1 id="usuario-nombre" class="visually-hidden">Bienvenido, usuario</h1>
+
+    <!-- Tarjeta de identidad -->
+    <div class="identity-card">
+      <div class="avatar" aria-hidden="true">
+        <div class="inner">
+          <img id="usuario-avatar" alt="Avatar de usuario"/>
+          <div id="usuario-iniciales" class="initials">U</div>
+        </div>
+        <span class="status" title="Conectado"></span>
+      </div>
+      <div class="who">
+        <div class="email-pill" title="Usuario autenticado">
+          <i class="fa-solid fa-user email-icon" aria-hidden="true"></i>
+          <span id="usuario-email" class="email-text">usuario@correo.com</span>
+        </div>
+        <div class="mensaje-bienvenida">
+          ¡Accede rápidamente a todas las funciones de Caja!<br>
+          <span style="color:var(--brand-cel); font-weight:800;">Gestiona pagos, movimientos y solicitudes aprobadas de forma eficiente y segura.</span>
+        </div>
+      </div>
     </div>
 
+    <!-- Botones (se mantienen tus rutas/funciones) -->
     <div class="grid-botones">
-      <a href="solicitudes_aprobadas_credicash_page.html" class="btn-grande">
+      <!-- Aprobadas con badges -->
+      <a href="solicitudes_aprobadas_credicash_page.html" class="btn-grande btn-caja">
         <i class="fas fa-check-circle"></i>
-        Solicitudes Aprobadas Credicash
+        <span class="label">Solicitudes Aprobadas Credicash</span>
         <span id="badge-app-credicash" class="badge">0</span>
       </a>
-      <a href="solicitudes_aprobadas_credicel_page.html" class="btn-grande">
+      <a href="solicitudes_aprobadas_credicel_page.html" class="btn-grande btn-caja">
         <i class="fas fa-check-circle"></i>
-        Solicitudes Aprobadas Credicel
+        <span class="label">Solicitudes Aprobadas Credicel</span>
         <span id="badge-app-credicel" class="badge">0</span>
       </a>
-      <!-- NUEVO BOTÓN DE REFINANCIAMIENTO -->
-      <a href="solicitudes_aprobadas_refinanciamiento.html" class="btn-grande">
+      <a href="solicitudes_aprobadas_refinanciamiento.html" class="btn-grande btn-caja">
         <i class="fas fa-check-circle"></i>
-        Solicitudes Aprobadas Refinanciamiento
+        <span class="label">Solicitudes Aprobadas Refinanciamiento</span>
         <span id="badge-app-refinanciamiento" class="badge">0</span>
       </a>
-      <a href="solicitudes_aprobadas_amuebla2_page.html" class="btn-grande">
+      <a href="solicitudes_aprobadas_amuebla2_page.html" class="btn-grande btn-caja">
         <i class="fas fa-check-circle"></i>
-        Solicitudes Aprobadas Amuebla2
+        <span class="label">Solicitudes Aprobadas Amuebla2</span>
         <span id="badge-app-amuebla2" class="badge">0</span>
       </a>
 
-      <a href="pagos_page.html" class="btn-grande">
+      <!-- Acciones de caja -->
+      <a href="pagos_page.html" class="btn-grande btn-caja">
         <i class="fas fa-money-bill-wave"></i>
-        Recepción de Pagos
+        <span class="label">Recepción de Pagos</span>
       </a>
-
-      <!-- NUEVO: Botón a la página de Recuperación -->
-      <a href="recuperacion.html" class="btn-grande">
+      <a href="recuperacion.html" class="btn-grande btn-caja">
         <i class="fas fa-hand-holding-usd"></i>
-        Recuperación (Intereses)
+        <span class="label">Recuperación (Intereses)</span>
+      </a>
+      <a href="movimientos_caja_page.html" class="btn-grande btn-caja">
+        <i class="fas fa-exchange-alt"></i>
+        <span class="label">Movimientos de Caja</span>
+      </a>
+      <a href="ver_movimientos_caja_page.html" class="btn-grande btn-caja">
+        <i class="fas fa-list-alt"></i>
+        <span class="label">Ver Movimientos de Caja</span>
       </a>
 
-      <a href="movimientos_caja_page.html" class="btn-grande">
-        <i class="fas fa-exchange-alt"></i>
-        Movimientos de Caja
-      </a>
-      <a href="ver_movimientos_caja_page.html" class="btn-grande">
-        <i class="fas fa-list-alt"></i>
-        Ver Movimientos de Caja
-      </a>
-      <!-- NUEVO BOTÓN DE REIMPRESIÓN -->
+      <!-- Reimpresión / Reversión -->
       <a href="reimpresion_tickets_page.html" class="btn-grande btn-reimprimir">
         <i class="fas fa-print"></i>
-        Ver/Reimprimir Recibos
+        <span class="label">Ver/Reimprimir Recibos</span>
       </a>
-      <!-- BOTÓN DE REVERTIR PAGOS -->
       <a href="revertir_pagos_page.html" class="btn-grande btn-revertir">
         <i class="fas fa-undo"></i>
-        Revertir Pagos
+        <span class="label">Revertir Pagos</span>
       </a>
-      <!-- NUEVO: Master de Créditos -->
-      <a href="master_creditos_page.html" class="btn-grande">
+
+      <!-- Otros accesos -->
+      <a href="master_creditos_page.html" class="btn-grande btn-caja">
         <i class="fas fa-database"></i>
-        Master de Créditos
+        <span class="label">Master de Créditos</span>
       </a>
-      <!-- NUEVO: Cuotas por Vencer -->
-      <a href="cuotas_por_vencer_page.html" class="btn-grande">
+      <a href="cuotas_por_vencer_page.html" class="btn-grande btn-caja">
         <i class="fas fa-hourglass-half"></i>
-        Cuotas por Vencer
+        <span class="label">Cuotas por Vencer</span>
       </a>
-      <!-- NUEVO BOTÓN DE REPORTES GERENCIALES -->
       <a href="reporte_page.html" class="btn-grande btn-reporte">
         <i class="fas fa-chart-bar"></i>
-        Reportes Gerenciales
+        <span class="label">Reportes Gerenciales</span>
       </a>
     </div>
   </div>
+
+  <!-- Interacciones: ripple + tilt -->
+  <script>
+    const buttons = document.querySelectorAll('.btn-grande');
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    buttons.forEach(btn=>{
+      // Ripple
+      btn.addEventListener('pointerdown', (e)=>{
+        const rect = btn.getBoundingClientRect();
+        const ripple = document.createElement('span');
+        const x = e.clientX - rect.left, y = e.clientY - rect.top;
+        const max = Math.max(rect.width, rect.height);
+        Object.assign(ripple.style, {
+          position:'absolute', left:`${x}px`, top:`${y}px`,
+          width:`${max*1.2}px`, height:`${max*1.2}px`,
+          borderRadius:'50%', transform:'translate(-50%, -50%)',
+          background:'radial-gradient(circle, rgba(255,255,255,.45), rgba(255,255,255,0) 60%)',
+          pointerEvents:'none', opacity:'0.85', zIndex:'1'
+        });
+        ripple.animate(
+          [{opacity:.85, transform:'translate(-50%, -50%) scale(0.2)'},
+           {opacity:0,   transform:'translate(-50%, -50%) scale(1.1)'}],
+          {duration: reduceMotion ? 200 : 550, easing:'ease-out'}
+        );
+        btn.appendChild(ripple);
+        setTimeout(()=>ripple.remove(), reduceMotion ? 210 : 600);
+      });
+
+      // Tilt magnético
+      if (!reduceMotion){
+        btn.addEventListener('pointermove', (e)=>{
+          const r = btn.getBoundingClientRect();
+          const cx = r.left + r.width/2, cy = r.top + r.height/2;
+          const dx = (e.clientX - cx) / (r.width/2);
+          const dy = (e.clientY - cy) / (r.height/2);
+          const rotateX = (-dy * 5).toFixed(2);
+          const rotateY = ( dx * 6).toFixed(2);
+          btn.style.transform = `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-2px) scale(1.01)`;
+        });
+        btn.addEventListener('pointerleave', ()=>{ btn.style.transform = ''; });
+      }
+    });
+  </script>
 </body>
 </html>
-
 
 
 

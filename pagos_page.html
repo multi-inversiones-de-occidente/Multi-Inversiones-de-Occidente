@@ -72,6 +72,7 @@
       display:flex; flex-direction:column; align-items:center;
     }
 
+    .visualmente-oculto,
     .visually-hidden{
       position:absolute !important; clip: rect(1px, 1px, 1px, 1px);
       padding:0; border:0; height:1px; width:1px; overflow:hidden; white-space:nowrap;
@@ -181,21 +182,28 @@
     /* ===== Modal ===== */
     .modal-bg{ position: fixed; inset:0; background: rgba(8,12,20,.55); z-index: 50; display: grid; place-items:center; padding: 14px; }
     .modal{
-      width: 100%; max-width: 420px; color: var(--text);
+      width: 100%; max-width: 460px; color: var(--text);
       background: radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,.92), rgba(255,255,255,.78) 40%, rgba(255,255,255,.72) 100%);
       border:1px solid var(--glass-brd); border-radius:20px; box-shadow: var(--glass-shadow);
       padding: 22px 18px 16px 18px; position: relative; animation: showmodal .18s ease-out;
     }
     @keyframes showmodal { from { transform: translateY(6px) scale(.98); opacity:.6;} to {transform:none;opacity:1;} }
     .modal-title{ font-size:1.18rem; font-weight:800; margin-bottom:6px; color:var(--brand-blue); display:flex; align-items:center; gap:8px; }
-    .modal-sub{ color:var(--muted); margin-bottom:16px; }
-    .modal-row{ margin-bottom:16px; }
+    .modal-sub{ color:var(--muted); margin-bottom:12px; }
+    .modal-row{ margin-bottom:12px; }
     .input-group{
       display:flex; align-items:center; background: rgba(36,59,134,.06);
       border:1px solid rgba(36,59,134,.18); border-radius:12px; padding-left:10px;
     }
     .input-group span{ color: var(--brand-green); font-size:1.15rem; font-weight:800; margin-right:6px; }
     .input-group input{ border:none; background:transparent; padding:11px 10px; color:var(--text); font-size:1.12rem; outline:none; width:100%; }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px; font-weight:800;
+      background:linear-gradient(180deg, rgba(19,182,107,.12), rgba(19,182,107,.06));
+      border:1px solid rgba(19,182,107,.25);
+      color:#065f46; padding:8px 12px; border-radius:999px;
+    }
+    .pill i{ color:#0b854c }
     .modal-btns{ display:flex; gap:10px; justify-content:flex-end; margin-top:10px; }
     .modal-btn-cancel{
       background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%); color:#fff;
@@ -207,8 +215,7 @@
     }
     .modal-btn-pay:disabled{ opacity:.5; cursor:not-allowed }
     .modal-error{ color:#e74c3c; font-weight:700; }
-
-    /* util */
+    .muted{ color:var(--muted); font-size:.92rem }
     .w-100{ width:100% }
   </style>
 </head>
@@ -227,10 +234,9 @@
   </header>
 
   <div class="container">
-    <!-- h1 accesible -->
     <h1 class="visually-hidden">Recepción de Pagos</h1>
 
-    <!-- Tarjeta de identidad (usuario logueado) -->
+    <!-- Tarjeta de identidad -->
     <div class="identity-card">
       <div class="avatar" aria-hidden="true">
         <div class="inner">
@@ -265,13 +271,21 @@
 
   <div id="modal-root"></div>
 
-  <!-- ==================== Firebase & lógica (sin cambios funcionales) ==================== -->
+  <!-- ==================== Firebase & lógica ==================== -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, doc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
-    // Helpers UI (solo visual)
+    /* ===== Helpers numéricos/fecha (robustos) ===== */
+    const EPS = 1e-6;    // precisión
+    const TOL = 0.01;    // tolerancia centavos
+    const nowISO = () => new Date().toISOString();
+    function n(x){ const v = parseFloat(x); return Number.isFinite(v) ? v : 0; }
+    function need(x){ return Math.max(0, n(x)); }
+    function add(a,b){ return n(a) + n(b); }
+
+    /* ===== UI helpers ===== */
     function inicialesDesdeEmail(email){
       const base = (email || "").split("@")[0];
       const partes = base.split(/[.\-_]+/).filter(Boolean);
@@ -280,16 +294,7 @@
       return ini;
     }
 
-    // Exponer funciones exactas requeridas por tu lógica
-    window.firebaseAddDoc = async function(collectionName, data) {
-      const col = collection(db, collectionName);
-      return await addDoc(col, data);
-    };
-    window.firebaseUpdateDoc = async function(collectionName, docId, data) {
-      const docRef = doc(db, collectionName, docId);
-      await updateDoc(docRef, data);
-    };
-
+    /* ===== Firebase init ===== */
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -303,47 +308,57 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
+    /* ===== Wrappers Firestore ===== */
+    window.firebaseAddDoc = async function(collectionName, data) {
+      return await addDoc(collection(db, collectionName), data);
+    };
+    window.firebaseUpdateDoc = async function(collectionName, docId, data) {
+      const ref = doc(db, collectionName, docId);
+      await updateDoc(ref, data);
+    };
+
+    /* ===== Estado usuario/agencia ===== */
     let userDepartment = null;
+    let userNameForTicket = "Sin Nombre";
+
+    function setUserCard(user){
+      const emailEl = document.getElementById("usuario-email");
+      const imgEl   = document.getElementById("usuario-avatar");
+      const initEl  = document.getElementById("usuario-iniciales");
+      emailEl.textContent = user?.email || "usuario@correo.com";
+      initEl.textContent  = inicialesDesdeEmail(user?.email || "U");
+      const fallbackSrc = "assets/avatar_user.png";
+      const usarIniciales = () => { imgEl.style.display = "none"; initEl.style.display = "grid"; };
+      imgEl.onerror = () => {
+        if (imgEl.dataset.fallbackTried === "1") usarIniciales();
+        else { imgEl.dataset.fallbackTried = "1"; imgEl.src = fallbackSrc; }
+      };
+      if (user?.photoURL) imgEl.src = user.photoURL; else imgEl.src = fallbackSrc;
+    }
 
     function obtenerAgenciaUsuario() {
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         onAuthStateChanged(auth, async user => {
-          if (!user) {
-            window.location.href = "login.html";
-            return;
-          }
-
-          // ====== SOLO VISUAL: avatar / iniciales / email en la tarjeta
-          const emailEl = document.getElementById("usuario-email");
-          const imgEl   = document.getElementById("usuario-avatar");
-          const initEl  = document.getElementById("usuario-iniciales");
-          emailEl.textContent = user.email;
-          initEl.textContent  = inicialesDesdeEmail(user.email);
-          const fallbackSrc = "assets/avatar_user.png";
-          const usarIniciales = () => { imgEl.style.display = "none"; initEl.style.display = "grid"; };
-          imgEl.onerror = () => {
-            if (imgEl.dataset.fallbackTried === "1") usarIniciales();
-            else { imgEl.dataset.fallbackTried = "1"; imgEl.src = fallbackSrc; }
-          };
-          if (user.photoURL) imgEl.src = user.photoURL; else imgEl.src = fallbackSrc;
-          // ====== FIN visual
-
-          const usersRef = collection(db, "users");
-          const q = query(usersRef, where("__name__", "==", user.uid));
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            const data = snap.docs[0].data();
-            userDepartment = data.department || null;
-            const agenciaRow = document.getElementById('agencia-row');
-            const agenciaNombre = document.getElementById('agencia-nombre');
-            if (userDepartment) {
-              agenciaNombre.textContent = `Agencia asignada: ${userDepartment}`;
-              agenciaRow.style.display = '';
+          if (!user) { window.location.href = "login.html"; return; }
+          setUserCard(user);
+          try{
+            const snap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
+            if (!snap.empty) {
+              const data = snap.docs[0].data();
+              userDepartment = data.department || null;
+              userNameForTicket = data.nombre_autorizacion || data.nombre || "Sin Nombre";
+              const agenciaRow = document.getElementById('agencia-row');
+              const agenciaNombre = document.getElementById('agencia-nombre');
+              if (userDepartment) { agenciaNombre.textContent = `Agencia asignada: ${userDepartment}`; agenciaRow.style.display = ''; }
+              else { agenciaRow.style.display = 'none'; }
+              resolve(userDepartment);
             } else {
-              agenciaRow.style.display = 'none';
+              userDepartment = null;
+              document.getElementById('agencia-row').style.display = 'none';
+              resolve(null);
             }
-            resolve(userDepartment);
-          } else {
+          }catch(err){
+            console.error("Error obteniendo agencia:", err);
             userDepartment = null;
             document.getElementById('agencia-row').style.display = 'none';
             resolve(null);
@@ -352,66 +367,84 @@
       });
     }
 
+    async function fetchCreditoById(creditoId){
+      const snap = await getDocs(query(collection(db, "creditos"), where("__name__", "==", creditoId)));
+      if (snap.empty) throw new Error("Crédito no encontrado.");
+      const d = snap.docs[0];
+      return { id: d.id, data: d.data() };
+    }
+
+    /* ===== Búsqueda/listado ===== */
     async function buscarClientes(term) {
       const clientesList = document.getElementById("clientes-list");
       clientesList.innerHTML = "Cargando...";
-      let clientes = [];
-      if (!term.trim()) {
-        clientesList.innerHTML = "";
-        return;
-      }
+      if (!term.trim()) { clientesList.innerHTML = ""; return; }
       if (!userDepartment) {
         clientesList.innerHTML = `<div style="color:#9aa6b6;text-align:center;padding:34px 0;">No se detectó agencia asignada a tu usuario.</div>`;
         return;
       }
-      const estadosPermitidos = ["Activo","Mora Temprana","Mora Moderada","Mora Severa","Riesgo Alto"];
-      const creditosRef = collection(db, "creditos");
-      const q = query(creditosRef, where("estadoCredito", "in", estadosPermitidos), where("agenciaAsignada", "==", userDepartment));
-      const snap = await getDocs(q);
-      snap.forEach(docSnap => {
-        const d = docSnap.data();
-        const nombre = (d.nombre || '').toLowerCase();
-        const dui = (d.numeroDui || '').toLowerCase();
-        if (nombre.includes(term.toLowerCase()) || dui.includes(term.toLowerCase())) {
-          clientes.push({ id: docSnap.id, ...d });
+      try{
+        const estadosPermitidos = ["Activo","Mora Temprana","Mora Moderada","Mora Severa","Riesgo Alto"];
+        const q = query(collection(db, "creditos"),
+                        where("estadoCredito", "in", estadosPermitidos),
+                        where("agenciaAsignada", "==", userDepartment));
+        const snap = await getDocs(q);
+        const clientes = [];
+        snap.forEach(s => {
+          const d = s.data();
+          const nombre = (d.nombre || '').toLowerCase();
+          const dui = (d.numeroDui || '').toLowerCase();
+          if (nombre.includes(term.toLowerCase()) || dui.includes(term.toLowerCase())) {
+            clientes.push({ id: s.id, ...d });
+          }
+        });
+        if (!clientes.length) {
+          clientesList.innerHTML = `<div style="color:#9aa6b6;text-align:center;padding:34px 0;">No se encontraron clientes para tu agencia.</div>`;
+          return;
         }
-      });
-      if (!clientes.length) {
-        clientesList.innerHTML = `<div style="color:#9aa6b6;text-align:center;padding:34px 0;">No se encontraron clientes para tu agencia.</div>`;
-        return;
-      }
-      clientesList.innerHTML = clientes.map(cliente => `
-        <div class="cliente-card">
-          <div>
-            <div class="cliente-info">
-              <b>${cliente.nombre}</b>
-              ${cliente.estadoCredito !== "Activo"
-                ? `<span class="estado-mora" title="Estado: ${cliente.estadoCredito}">
-                    <i class="fas fa-exclamation-triangle"></i>${cliente.estadoCredito}
-                  </span>` : ""}
+        clientesList.innerHTML = clientes.map(c => `
+          <div class="cliente-card">
+            <div>
+              <div class="cliente-info">
+                <b>${c.nombre}</b>
+                ${c.estadoCredito !== "Activo"
+                  ? `<span class="estado-mora" title="Estado: ${c.estadoCredito}">
+                      <i class="fas fa-exclamation-triangle"></i>${c.estadoCredito}
+                    </span>` : ""}
+              </div>
+              <div class="cliente-dui">DUI: ${c.numeroDui}</div>
+              <div class="muted">Saldo: $${need(c.saldoActual).toFixed(2)}</div>
             </div>
-            <div class="cliente-dui">DUI: ${cliente.numeroDui}</div>
+            <button class="btn-pagar" data-id="${c.id}" data-nombre="${c.nombre}" data-dui="${c.numeroDui}">
+              <i class="fas fa-dollar-sign"></i> Pagar
+            </button>
           </div>
-          <button class="btn-pagar" data-id="${cliente.id}" data-nombre="${cliente.nombre}" data-dui="${cliente.numeroDui}">
-            <i class="fas fa-dollar-sign"></i> Pagar
-          </button>
-        </div>
-      `).join('');
-      document.querySelectorAll('.btn-pagar').forEach(btn => {
-        btn.onclick = function() {
-          mostrarDialogoPago({
-            id: btn.getAttribute('data-id'),
-            nombre: btn.getAttribute('data-nombre'),
-            numeroDui: btn.getAttribute('data-dui')
-          });
-        };
-      });
+        `).join('');
+        document.querySelectorAll('.btn-pagar').forEach(btn => {
+          btn.onclick = async function() {
+            try{
+              const id = btn.getAttribute('data-id');
+              const nombre = btn.getAttribute('data-nombre');
+              const numeroDui = btn.getAttribute('data-dui');
+              const { data } = await fetchCreditoById(id);
+              mostrarDialogoPago({ id, nombre, numeroDui }, data);
+            }catch(err){
+              alert("No se pudo cargar el crédito: " + err.message);
+            }
+          };
+        });
+      }catch(err){
+        console.error(err);
+        clientesList.innerHTML = `<div style="color:#e74c3c;text-align:center;padding:34px 0;">Error buscando clientes: ${err.message}</div>`;
+      }
     }
 
-    function mostrarDialogoPago(cliente) {
-      let modalRoot = document.getElementById("modal-root");
+    /* ===== Modal de pago: muestra paraPonerseAlDia ===== */
+    function mostrarDialogoPago(cliente, creditoData) {
+      const modalRoot = document.getElementById("modal-root");
       let monto = "";
       let errorMsg = "";
+      const ppald = need(creditoData?.paraPonerseAlDia);
 
       function closeModal() { modalRoot.innerHTML = ""; }
 
@@ -423,14 +456,24 @@
                 <i class="fas fa-coins" style="color:var(--brand-green);"></i> Pago a ${cliente.nombre}
               </div>
               <div class="modal-sub"><i class="fas fa-id-card"></i> DUI: <b>${cliente.numeroDui}</b></div>
+
+              <div class="modal-row">
+                <span class="pill" title="Monto para quedar al día (hoy)">
+                  <i class="fa-solid fa-circle-check"></i> Para ponerse al día: <span>&nbsp;$${ppald.toFixed(2)}</span>
+                </span>
+              </div>
+
               <div class="modal-row">
                 <label for="monto-input" style="font-weight:700;margin-bottom:6px;display:block;color:var(--brand-blue);">Monto a pagar</label>
                 <div class="input-group">
                   <span>$</span>
                   <input id="monto-input" type="number" min="0" step="0.01" placeholder="0.00" value="${monto}" autocomplete="off" autofocus/>
                 </div>
+                <div class="muted" style="margin-top:6px;">Orden: Multas → Interés (devengado) → Capital.</div>
               </div>
+
               ${errorMsg ? `<div class="modal-error">${errorMsg}</div>` : ""}
+
               <div class="modal-btns">
                 <button class="modal-btn-cancel" id="cancelar-pago">Cancelar</button>
                 <button class="modal-btn-pay" id="pagar-btn">Pagar</button>
@@ -439,175 +482,265 @@
           </div>
         `;
         document.getElementById("cancelar-pago").onclick = closeModal;
-        document.getElementById("pagar-btn").onclick = () => {
+        document.getElementById("pagar-btn").onclick = async () => {
           const montoValue = document.getElementById("monto-input").value.trim();
-          const montoNum = parseFloat(montoValue);
-          if (isNaN(montoNum) || montoNum <= 0) {
+          const montoNum = n(montoValue);
+          if (!(montoValue.length) || !Number.isFinite(montoNum) || montoNum <= 0) {
             errorMsg = "Ingresa un monto válido mayor a $0.00";
-            render();
-            setTimeout(() => { document.getElementById("monto-input").focus(); }, 50);
+            render(); setTimeout(() => { document.getElementById("monto-input").focus(); }, 50);
             return;
           }
-          realizarPago(cliente, montoNum);
-          closeModal();
+          try{
+            await realizarPago(cliente, montoNum);
+            closeModal();
+          }catch(err){
+            alert("Error al realizar el pago: " + err.message);
+          }
         };
-        document.getElementById("monto-input").onkeydown = e => {
-          if (e.key === "Enter") document.getElementById("pagar-btn").click();
-        };
+        const inp = document.getElementById("monto-input");
+        inp.onkeydown = e => { if (e.key === "Enter") document.getElementById("pagar-btn").click(); };
+        setTimeout(() => inp?.focus(), 0);
       }
       render();
     }
 
-    // ======== LÓGICA DE PAGO (sin cambios funcionales) ========
+    /* ===== LÓGICA DE PAGO alineada con MIO ===== */
     async function realizarPago(cliente, montoNum) {
-      try {
+      const fechaPago = nowISO();
+      const ahora = new Date(fechaPago);
+
+      try{
         const user = auth.currentUser;
-        const usersRef = collection(db, "users");
-        const userSnap = await getDocs(query(usersRef, where("__name__", "==", user.uid)));
-        const userData = userSnap.docs[0].data();
-        const cajeroNombre = userData.nombre_autorizacion || userData.nombre || "Sin Nombre";
-        const sucursal = userData.department || "N/A";
-        const fechaPago = new Date().toISOString();
-        const ahora = new Date(fechaPago);
+        if(!user) throw new Error("Sesión inválida. Inicia sesión.");
+        const userSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
+        const userData = userSnap?.docs?.[0]?.data() || {};
+        const cajeroNombre = userData.nombre_autorizacion || userData.nombre || userNameForTicket || "Sin Nombre";
+        const sucursal = userData.department || userDepartment || "N/A";
 
-        const creditoSnap = await getDocs(query(collection(db, "creditos"), where("__name__", "==", cliente.id)));
-        if (creditoSnap.empty) throw new Error("Crédito no encontrado.");
-        const creditoData = creditoSnap.docs[0].data();
+        // Cargar crédito
+        const { data: creditoData } = await fetchCreditoById(cliente.id);
 
-        let saldoActual = parseFloat(creditoData.saldoActual || 0);
-        let interesActual = parseFloat(creditoData.interesActual || 0);
-        let multasAcumuladas = parseFloat(creditoData.multasAcumuladas || 0);
-        let paraPonerseAlDia = parseFloat(creditoData.paraPonerseAlDia || 0);
+        // Normalización
+        let saldoActual = need(creditoData.saldoActual);
+        let interesActual = need(creditoData.interesActual);
+        let multasAcumuladas = need(creditoData.multasAcumuladas);
+        let paraPonerseAlDia = need(creditoData.paraPonerseAlDia);
 
-        let amortizacion = Array.isArray(creditoData.amortizacion) ? creditoData.amortizacion : [];
-        amortizacion = amortizacion.map((cuota) => ({
-          ...cuota,
-          estado: cuota.estado || "Pendiente",
-          montoPagado: typeof cuota.montoPagado === "number" ? cuota.montoPagado : 0,
-          montoPagadoInteres: typeof cuota.montoPagadoInteres === "number" ? cuota.montoPagadoInteres : 0,
-          fechaPagoReal: cuota.fechaPagoReal || null
+        let amortizacion = Array.isArray(creditoData.amortizacion) ? JSON.parse(JSON.stringify(creditoData.amortizacion)) : [];
+        amortizacion = amortizacion.map(c => ({
+          ...c,
+          capital: n(c.capital),
+          interes: n(c.interes),
+          saldo: n(c.saldo),
+          montoPagado: n(c.montoPagado),
+          montoPagadoInteres: n(c.montoPagadoInteres),
+          interesReservado: n(c.interesReservado), // NUEVO: bolsillo por cuota (no cuenta para estado)
+          estado: c.estado || "Pendiente",
+          fechaPagoReal: c.fechaPagoReal || null
         }));
 
         let historialMultas = Array.isArray(creditoData.historialMultas) ? JSON.parse(JSON.stringify(creditoData.historialMultas)) : [];
 
-        let restante = montoNum;
+        let restante = need(montoNum);
         let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
-        const tolerancia = 0.10;
 
-        // Multas
-        let multasNoPagadas = historialMultas.filter(m => !m.estadoCuota || m.estadoCuota === "No Pagada");
+        /* === 1) MULTAS primero === */
         let nuevasMultasHistorial = historialMultas.map(m => ({...m}));
-        if (restante > 0 && multasNoPagadas.length > 0) {
-          for (let i = 0; i < nuevasMultasHistorial.length; i++) {
-            let multa = nuevasMultasHistorial[i];
-            if (!multa.estadoCuota || multa.estadoCuota === "No Pagada") {
-              let pagar = Math.min(restante, parseFloat(multa.monto) || 0);
-              if (pagar > 0) {
-                pagoMultas += pagar;
-                restante -= pagar;
-                if (Math.abs(pagar - parseFloat(multa.monto)) < 0.01) multa.estadoCuota = "Pagada";
-                if (restante <= 0) break;
-              }
+        if (restante > EPS && nuevasMultasHistorial.length) {
+          for (let i = 0; i < nuevasMultasHistorial.length && restante > EPS; i++) {
+            const multa = nuevasMultasHistorial[i];
+            const esNoPag = !multa.estadoCuota || multa.estadoCuota === "No Pagada";
+            const fechaOk = multa.fecha ? (new Date(multa.fecha) <= ahora) : true;
+            if (!esNoPag || !fechaOk) continue;
+
+            const montoMulta = need(multa.monto);
+            if (montoMulta <= EPS) { multa.estadoCuota = "Pagada"; continue; }
+
+            const pagar = Math.min(restante, montoMulta);
+            if (pagar > EPS) {
+              pagoMultas = add(pagoMultas, pagar);
+              restante = need(restante - pagar);
+              if (Math.abs(pagar - montoMulta) <= TOL) multa.estadoCuota = "Pagada";
             }
           }
         }
-        multasAcumuladas = nuevasMultasHistorial.filter(m => !m.estadoCuota || m.estadoCuota === "No Pagada")
-          .reduce((acc, m) => acc + (parseFloat(m.monto) || 0), 0);
+        multasAcumuladas = nuevasMultasHistorial
+          .filter(m => !m.estadoCuota || m.estadoCuota === "No Pagada")
+          .reduce((acc, m) => acc + need(m.monto), 0);
 
-        // Interés
-        let interesPagadoHoy = Math.min(interesActual, restante);
-        restante -= interesPagadoHoy;
-        pagoInteres += interesPagadoHoy;
-        interesActual -= interesPagadoHoy;
-        for (let i = 0; i < amortizacion.length; i++) {
-          let cuota = amortizacion[i];
-          if ((parseFloat(cuota.montoPagado) || 0) < parseFloat(cuota.capital)) {
-            cuota.montoPagadoInteres = (parseFloat(cuota.montoPagadoInteres) || 0) + interesPagadoHoy;
-            break;
+        /* === 2) INTERÉS (desde interesActual) === */
+        // Tomamos del pago lo devengado global
+        let interesPendienteGlobal = need(interesActual);
+        let interesQueEntra = Math.min(restante, interesPendienteGlobal);
+        interesPendienteGlobal = need(interesPendienteGlobal - interesQueEntra);
+        restante = need(restante - interesQueEntra);
+        pagoInteres = add(pagoInteres, interesQueEntra);
+
+        // Mapeo a cuotas vencidas: primero "pintar" hasta plan en orden cronológico,
+        // luego, si sigue sobrando del devengo de hoy, ponerlo como interesReservado por cuota (proporcional).
+        function asignarInteresPorCuotaSinGlobal(amort, interesAPagar, ahoraISO){
+          let restanteInt = need(interesAPagar);
+          let aplicadoAPlan = 0;
+          let reservadoPorCuotas = 0;
+          const ah = new Date(ahoraISO);
+
+          const vencidasIdx = amort
+            .map((c, i) => ({i, c}))
+            .filter(x => new Date(x.c.fecha) <= ah)
+            .map(x => x.i);
+
+          // 1) Pintar hasta el plan en orden
+          for (let k = 0; k < vencidasIdx.length && restanteInt > EPS; k++){
+            const idx = vencidasIdx[k];
+            const c = amort[idx];
+            const faltaPlan = Math.max(0, need(c.interes) - need(c.montoPagadoInteres));
+            if (faltaPlan <= EPS) continue;
+            const aPintar = Math.min(faltaPlan, restanteInt);
+            if (aPintar > EPS){
+              c.montoPagadoInteres = add(c.montoPagadoInteres, aPintar);
+              aplicadoAPlan = add(aplicadoAPlan, aPintar);
+              restanteInt = need(restanteInt - aPintar);
+            }
+          }
+
+          // 2) Reservar sobrante por cuota vencida, proporcional a capital pendiente (no cuenta para estado)
+          if (restanteInt > EPS && vencidasIdx.length > 0){
+            let totalPeso = vencidasIdx.reduce((acc, idx) => {
+              const c = amort[idx];
+              const capPend = Math.max(0, need(c.capital) - need(c.montoPagado));
+              return acc + (capPend > EPS ? capPend : 1);
+            }, 0) || 1;
+
+            let acumulado = 0;
+            for (let k = 0; k < vencidasIdx.length; k++){
+              const idx = vencidasIdx[k];
+              const c = amort[idx];
+              const capPend = Math.max(0, need(c.capital) - need(c.montoPagado));
+              const peso = (capPend > EPS ? capPend : 1) / totalPeso;
+              // reparto redondeado a 2 decimales
+              let aReservar = +(restanteInt * peso).toFixed(2);
+              if (k === vencidasIdx.length - 1){
+                // Última cuota: ajusta por redondeo
+                aReservar = +(restanteInt - acumulado).toFixed(2);
+              }
+              if (aReservar > EPS){
+                c.interesReservado = add(c.interesReservado, aReservar);
+                reservadoPorCuotas = add(reservadoPorCuotas, aReservar);
+                acumulado = add(acumulado, aReservar);
+              }
+            }
+            restanteInt = 0;
+          }
+
+          return {
+            aplicadoAPlan: +aplicadoAPlan.toFixed(2),
+            reservadoPorCuotas: +reservadoPorCuotas.toFixed(2)
+          };
+        }
+
+        asignarInteresPorCuotaSinGlobal(amortizacion, interesQueEntra, fechaPago);
+
+        // Actualiza interesActual remanente (global)
+        interesActual = interesPendienteGlobal;
+
+        /* === 3) CAPITAL (resta directa del saldoActual) === */
+        if (restante > EPS) {
+          for (let i = 0; i < amortizacion.length && restante > EPS; i++) {
+            const c = amortizacion[i];
+
+            // Para bloquear prepago de futuras, descomenta la siguiente línea:
+            // if (new Date(c.fecha) > ahora) break;
+
+            const faltaCap = need(c.capital) - need(c.montoPagado);
+            if (faltaCap <= EPS) continue;
+
+            const abono = Math.min(restante, faltaCap);
+            if (abono > EPS){
+              c.montoPagado = add(c.montoPagado, abono);
+              pagoCapital = add(pagoCapital, abono);
+
+              // Regla MIO: SaldoActual disminuye solo con capital
+              saldoActual = need(saldoActual - abono);
+              if (saldoActual < 0) saldoActual = 0;
+
+              restante = need(restante - abono);
+            }
           }
         }
 
-        // Capital
-        for (let i = 0; i < amortizacion.length && restante > 0; i++) {
-          let cuota = amortizacion[i];
-          let capitalPendiente = parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0);
-          if (capitalPendiente > 0) {
-            let abonoCapital = Math.min(restante, capitalPendiente);
-            cuota.montoPagado += abonoCapital;
-            pagoCapital += abonoCapital;
-            saldoActual -= abonoCapital;
-            if (saldoActual < 0) saldoActual = 0;
-            restante -= abonoCapital;
-          }
-        }
-
-        // Estados de cuotas
+        /* === 4) Estados por cuota (sin contar interesReservado) === */
         for (let i = 0; i < amortizacion.length; i++) {
-          let cuota = amortizacion[i];
-          if ((parseFloat(cuota.montoPagado) || 0) + tolerancia >= (parseFloat(cuota.capital) || 0)) {
-            cuota.estado = "Pagada";
-            if (!cuota.fechaPagoReal) cuota.fechaPagoReal = fechaPago;
-          } else if (((parseFloat(cuota.montoPagadoInteres) || 0) > 0) || ((parseFloat(cuota.montoPagado) || 0) > 0)) {
-            cuota.estado = "Parcial";
-            cuota.fechaPagoReal = null;
+          const c = amortizacion[i];
+          const capOk = need(c.montoPagado) + TOL >= need(c.capital);
+          const intOk = need(c.montoPagadoInteres) + TOL >= need(c.interes); // NO incluye interesReservado
+          if (capOk && intOk) {
+            c.estado = "Pagada";
+            if (!c.fechaPagoReal) c.fechaPagoReal = fechaPago;
+          } else if (need(c.montoPagado) > EPS || need(c.montoPagadoInteres) > EPS) {
+            c.estado = "Parcial";
+            c.fechaPagoReal = null;
           } else {
-            cuota.estado = "Pendiente";
-            cuota.fechaPagoReal = null;
+            c.estado = "Pendiente";
+            c.fechaPagoReal = null;
           }
         }
 
-        // Recalcular al día
+        /* === 5) paraPonerseAlDia & capitalAtrasado (solo vencidas no pagadas) === */
         paraPonerseAlDia = 0;
         let capitalAtrasado = 0;
         for (let i = 0; i < amortizacion.length; i++) {
-          let cuota = amortizacion[i];
-          const fechaCuota = new Date(cuota.fecha);
-          if (fechaCuota < ahora && cuota.estado !== "Pagada") {
-            let faltaCapital = Math.max(0, parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0));
-            let faltaInteres = Math.max(0, parseFloat(cuota.interes || 0) - (parseFloat(cuota.montoPagadoInteres) || 0));
-            paraPonerseAlDia += faltaCapital + faltaInteres;
-            capitalAtrasado += faltaCapital;
+          const c = amortizacion[i];
+          const vencida = new Date(c.fecha) < ahora;
+          if (vencida && c.estado !== "Pagada") {
+            const faltaCap = Math.max(0, need(c.capital) - need(c.montoPagado));
+            const faltaInt = Math.max(0, need(c.interes) - need(c.montoPagadoInteres));
+            paraPonerseAlDia += faltaCap + faltaInt;
+            capitalAtrasado += faltaCap;
           }
         }
-        if (paraPonerseAlDia < 0.01) paraPonerseAlDia = 0;
+        if (paraPonerseAlDia < TOL) paraPonerseAlDia = 0;
+        capitalAtrasado = +capitalAtrasado.toFixed(2);
 
-        saldoActual = amortizacion
-          .reduce((acc, cuota) => acc + Math.max(0, parseFloat(cuota.capital || 0) - (parseFloat(cuota.montoPagado) || 0)), 0);
+        /* === 6) Estado del crédito === */
+        let nuevoEstado = (saldoActual <= EPS) ? "Pagado" : (creditoData.estadoCredito || "Activo");
+        if (nuevoEstado !== "Pagado" && paraPonerseAlDia === 0 && capitalAtrasado === 0 && multasAcumuladas === 0) {
+          nuevoEstado = "Activo";
+        } else if (paraPonerseAlDia > 0 && nuevoEstado === "Activo") {
+          nuevoEstado = "Mora Temprana";
+        }
 
-        // Registro del pago
+        /* === 7) Guardar pago (numéricos) === */
         const correlativo = Math.floor(Math.random() * 90000) + 10000;
-        const correlativoStr = correlativo.toString().padStart(5, '0');
+        const correlativoStr = String(correlativo).padStart(5, '0');
+
         await window.firebaseAddDoc("pagos", {
           clienteID: creditoData.clienteID,
           creditoID: cliente.id,
           nombres: creditoData.nombre,
           apellido: creditoData.apellido || "",
           numeroDui: creditoData.numeroDui || "",
-          montoPagado: montoNum,
+          montoPagado: +montoNum,
           fechaPago: fechaPago,
-          pagoMultas: (parseFloat(pagoMultas) || 0).toFixed(2),
-          pagoInteres: (parseFloat(pagoInteres) || 0).toFixed(2),
-          pagoCapital: (parseFloat(pagoCapital) || 0).toFixed(2),
-          saldoRestante: (parseFloat(saldoActual) || 0).toFixed(2),
+          pagoMultas: +pagoMultas.toFixed(2),
+          pagoInteres: +pagoInteres.toFixed(2),
+          pagoCapital: +pagoCapital.toFixed(2),
+          saldoRestante: +saldoActual.toFixed(2),
           cajeroID: user.uid,
           cajeroNombre: cajeroNombre,
           sucursal: sucursal,
           correlativo: correlativoStr,
           timestamp: new Date(),
-          paraPonerseAlDiaAntes: (parseFloat(creditoData.paraPonerseAlDia) || 0).toFixed(2)
+          paraPonerseAlDiaAntes: +need(creditoData.paraPonerseAlDia).toFixed(2)
         });
 
-        let nuevoEstado = saldoActual == 0 ? "Pagado" : creditoData.estadoCredito;
-        if (nuevoEstado !== "Pagado" && paraPonerseAlDia == 0 && capitalAtrasado == 0 && multasAcumuladas == 0) {
-          nuevoEstado = "Activo";
-        }
-
+        /* === 8) Persistir crédito (todo numérico) === */
         await window.firebaseUpdateDoc("creditos", cliente.id, {
-          saldoActual: (parseFloat(saldoActual) || 0).toFixed(2),
-          interesActual: interesActual.toFixed(2),
-          capitalAtrasado: (parseFloat(capitalAtrasado) || 0).toFixed(2),
-          paraPonerseAlDia: (parseFloat(paraPonerseAlDia) || 0).toFixed(2),
-          multasAcumuladas: (parseFloat(multasAcumuladas) || 0).toFixed(2),
+          saldoActual: +saldoActual,
+          interesActual: +interesActual,
+          // OJO: NO hay interesPagadoNoMapeado global
+          capitalAtrasado: +capitalAtrasado,
+          paraPonerseAlDia: +paraPonerseAlDia,
+          multasAcumuladas: +multasAcumuladas,
           ultimaActualizacion: fechaPago,
           fechaUltimoCalculoIntereses: fechaPago,
           estadoCredito: nuevoEstado,
@@ -615,23 +748,27 @@
           historialMultas: nuevasMultasHistorial
         });
 
-        window.location.href = `ticket_page.html?correlativo=${correlativoStr}` +
+        // Ticket (formateo solo para mostrar)
+        const url = `ticket_page.html?correlativo=${encodeURIComponent(correlativoStr)}` +
           `&cliente=${encodeURIComponent(creditoData.nombre)}` +
           `&apellido=${encodeURIComponent(creditoData.apellido || '')}` +
           `&numeroDui=${encodeURIComponent(creditoData.numeroDui || '')}` +
-          `&monto=${montoNum.toFixed(2)}` +
+          `&monto=${encodeURIComponent(montoNum.toFixed(2))}` +
           `&agencia=${encodeURIComponent(sucursal)}` +
           `&fecha=${encodeURIComponent(fechaPago)}` +
-          `&pagoCapital=${(parseFloat(pagoCapital)||0).toFixed(2)}` +
-          `&pagoInteres=${(parseFloat(pagoInteres)||0).toFixed(2)}` +
-          `&pagoMultas=${(parseFloat(pagoMultas)||0).toFixed(2)}` +
-          `&saldoRestante=${(parseFloat(saldoActual)||0).toFixed(2)}`;
+          `&pagoCapital=${encodeURIComponent(pagoCapital.toFixed(2))}` +
+          `&pagoInteres=${encodeURIComponent(pagoInteres.toFixed(2))}` +
+          `&pagoMultas=${encodeURIComponent(pagoMultas.toFixed(2))}` +
+          `&saldoRestante=${encodeURIComponent(saldoActual.toFixed(2))}`;
+        window.location.href = url;
 
-      } catch (e) {
-        alert("Error al realizar el pago: " + e.message);
+      }catch(e){
+        console.error(e);
+        alert("Error al realizar el pago: " + (e?.message || e));
       }
     }
 
+    /* ===== Inicio ===== */
     window.addEventListener("DOMContentLoaded", async () => {
       await obtenerAgenciaUsuario();
       document.getElementById("buscador").addEventListener("input", e => {
@@ -641,6 +778,7 @@
   </script>
 </body>
 </html>
+
 
 
 

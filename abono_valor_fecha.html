@@ -212,7 +212,7 @@
     }
 
     // =========================
-    // Carga de créditos (arreglo visible para búsqueda)
+    // Carga de créditos (para búsqueda)
     // =========================
     onAuthStateChanged(auth, async user=>{
       if(!user) return location.href="login.html";
@@ -221,7 +221,7 @@
       const docUser = await getDoc(doc(db,"users", user.uid));
       userAgencia = docUser.exists() && docUser.data().department ? docUser.data().department : "";
 
-      // ⚠️ Evitamos '!=' para no romper el listado; filtramos Revertido en cliente
+      // Evitamos '!='; filtramos Revertido en cliente
       const qy = query(collection(db,"creditos"), where("agenciaAsignada","==", userAgencia));
       const snap = await getDocs(qy);
       creditosAgencia = snap.docs
@@ -521,16 +521,21 @@
         abonoRestante = round2(abonoRestante - aplicadoInteres);
       }
 
-      // Candado adicional: barredora para dejar CERO interés vencido
+      // Candado adicional: NO exceder el interés realmente acumulado.
+      // Solo permitir "barredora" si aún queda interés real por cubrir.
       {
-        const refAbono = { value: abonoRestante };
-        const refInt   = { value: pagoInteres };
-        cubrirInteresVencidasPrimero(amortizacion, fechaAbonoYMD, refAbono, refInt);
-        abonoRestante = refAbono.value;
-        pagoInteres   = refInt.value;
+        const extraIntBudget = round2(Math.max(0, interesPendiente - pagoInteres));
+        if (extraIntBudget > 0) {
+          const refAbono = { value: Math.min(abonoRestante, extraIntBudget) }; // tope: interés real restante
+          const refInt   = { value: 0 };
+          cubrirInteresVencidasPrimero(amortizacion, fechaAbonoYMD, refAbono, refInt);
+          pagoInteres   = round2(pagoInteres + refInt.value);
+          abonoRestante = round2(abonoRestante - refInt.value);
+        }
+        // Si extraIntBudget == 0, todo lo restante va a CAPITAL
       }
 
-      // 3) CAPITAL: solo después de dejar interés vencido en 0
+      // 3) CAPITAL: solo después de dejar interés vencido en 0 (real)
       // VENCIDAS
       for (let i=0; i<amortizacion.length && abonoRestante>0; i++){
         let cuota = amortizacion[i];
@@ -560,8 +565,8 @@
           }
 
           const EPS=0.01;
-          const capitalOk = Math.abs(cuota.montoPagado - capitalCuota) < EPS;
-          const interesOk = Math.abs(cuota.montoPagadoInteres - interesCuota) < EPS;
+          const capitalOk = Math.abs(round2(cuota.montoPagado) - round2(capitalCuota)) < EPS;
+          const interesOk = Math.abs(round2(cuota.montoPagadoInteres) - round2(interesCuota)) < EPS;
           if (capitalOk && interesOk){
             cuota.estado = "Pagada";
             cuota.fechaPagoReal = fechaAbonoYMD;
@@ -590,8 +595,8 @@
               pagoCapital = round2(pagoCapital + apli);
               abonoRestante = round2(abonoRestante - apli);
               const EPS=0.01;
-              const capitalOk = Math.abs(cuotaSig.montoPagado - capitalCuota) < EPS;
-              const interesOk = Math.abs(cuotaSig.montoPagadoInteres - num(cuotaSig.interes,0)) < EPS;
+              const capitalOk = Math.abs(round2(cuotaSig.montoPagado) - round2(capitalCuota)) < EPS;
+              const interesOk = Math.abs(round2(cuotaSig.montoPagadoInteres) - round2(num(cuotaSig.interes,0))) < EPS;
               if (capitalOk && interesOk){
                 cuotaSig.estado = "Pagada";
                 cuotaSig.fechaPagoReal = fechaAbonoYMD;
@@ -605,7 +610,7 @@
       }
 
       // 4) TOTALES + interesActual blindado
-      // ✅ saldoActual exclusivamente desde la amortización (centavos) para evitar desfases
+      // saldoActual exclusivamente desde la amortización (centavos) para evitar desfases
       let saldoPendiente = round2(saldoDesdeAmortizacion(amortizacion));
 
       let multasAcumuladasFinal = round2(
@@ -717,6 +722,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 

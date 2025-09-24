@@ -5,224 +5,60 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Recepción de Pagos – Multi Inversiones</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
   <style>
-    /* ====== NUEVA LÍNEA GRÁFICA (mismas variables/estética) ====== */
-    :root{
-      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --white:#ffffff; --muted:#5b6776;
-      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
-      --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
-      --radius-2xl:24px;
-    }
-    @media (prefers-color-scheme: dark){
-      :root{
-        --bg:#0c0f14; --bg-2:#0f141b; --text:#dfe6ef; --muted:#9aa6b6;
-        --glass-bg:rgba(255,255,255,.10); --glass-brd:rgba(255,255,255,.18); --glass-shadow:0 24px 60px rgba(0,0,0,.45);
-      }
-    }
-
-    *{ box-sizing:border-box }
-    html,body{ height:100% }
-    body{
-      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
-      color:var(--text);
-      background:
-        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
-        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
-        linear-gradient(180deg, var(--bg), var(--bg-2));
-      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
-      min-height:100vh;
-    }
-    .pattern{
-      position:fixed; inset:0; pointer-events:none; z-index:0;
-      background-image:
-        radial-gradient(1px 1px at 25px 25px, rgba(255,255,255,.10), transparent 40%),
-        radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.06), transparent 40%);
-      background-size:100px 100px; mix-blend-mode:soft-light; opacity:.5;
-    }
-
-    header{
-      position:sticky; top:0; z-index:10;
-      backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
-      background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
-      border-bottom:1px solid var(--glass-brd);
-    }
-    @media (prefers-color-scheme: dark){
-      header{ background:linear-gradient(180deg, rgba(15,20,30,.75), rgba(15,20,30,.35)); }
-    }
-    .topbar{
-      max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
-    }
-    .logo-plate{
-      display:inline-flex; align-items:center; gap:10px; background:var(--glass-bg); border:1px solid var(--glass-brd);
-      padding:8px 14px; border-radius:16px; box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
-    }
-    .logo-plate::after{
-      content:""; position:absolute; inset:-1px;
-      background:linear-gradient(120deg, transparent 0 35%, rgba(255,255,255,.55) 45%, transparent 55% 100%);
-      transform:translateX(-120%); animation:plateSheen 6s linear infinite; pointer-events:none;
-    }
-    @keyframes plateSheen{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
-    .logo-plate img{ height:28px; width:auto; display:block }
-    .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
-    .page-name{ margin-left:auto; font-weight:700; color:var(--muted); }
-
-    .container{
-      position:relative; z-index:1; max-width:900px; margin:0 auto; padding:2.2rem 16px 3rem;
-      display:flex; flex-direction:column; align-items:center;
-    }
-
-    .visualmente-oculto,
-    .visually-hidden{
-      position:absolute !important; clip: rect(1px, 1px, 1px, 1px);
-      padding:0; border:0; height:1px; width:1px; overflow:hidden; white-space:nowrap;
-    }
-
-    /* ===== Tarjeta de Identidad (usuario logueado) ===== */
-    .identity-card{
-      width:100%; max-width:900px; margin: .2rem auto 1.2rem auto;
-      display:flex; align-items:center; gap:14px; padding:10px 12px;
-      background:var(--glass-bg); border:1px solid var(--glass-brd); border-radius:22px;
-      box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
-    }
-    .identity-card::before{
-      content:""; position:absolute; inset:-2px; border-radius:inherit; pointer-events:none;
-      background: conic-gradient(from 220deg,
-        rgba(103,200,241,.18), rgba(248,175,64,.16), rgba(19,182,107,.16), rgba(103,200,241,.18));
-      filter: blur(8px); opacity:.45;
-      mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
-      -webkit-mask-composite: xor; mask-composite: exclude; padding:1px;
-      animation: halo 10s linear infinite;
-    }
-    @keyframes halo{ to{ transform: rotate(1turn) } }
-
-    .avatar{
-      width:60px; height:60px; padding:2px; border-radius:50%;
-      background: conic-gradient(from 210deg, var(--brand-cel), var(--brand-gold), var(--brand-green), var(--brand-cel));
-      position:relative; box-shadow: 0 8px 24px rgba(10,20,40,.15);
-      flex: 0 0 auto;
-    }
-    .avatar .inner{
-      width:100%; height:100%; border-radius:50%;
-      background: linear-gradient(180deg, #f6f9ff, #e9eef6);
-      overflow:hidden; display:grid; place-items:center;
-    }
-    .avatar img{ width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; }
-    .avatar .initials{
-      display:none; width:100%; height:100%; border-radius:50%;
-      font-weight:800; letter-spacing:.5px; color:#243b86; font-size:1.05rem;
-      background: linear-gradient(180deg, #ffffff, #ecf2fb);
-      place-items:center;
-    }
-    .avatar .status{
-      position:absolute; right:2px; bottom:2px; width:12px; height:12px; border-radius:50%;
-      background:#22c55e; border:2px solid #fff; box-shadow: 0 0 0 2px rgba(34,197,94,.2);
-    }
-    .who{ display:flex; flex-direction:column; gap:6px; min-width:0; width:100%; }
-    .email-pill{
-      display:inline-flex; align-items:center; gap:10px; max-width:100%;
-      padding:10px 14px; border-radius:999px;
-      background: linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
-      border: 1px solid rgba(36,59,134,.15);
-      font-weight:800; color:var(--brand-blue); letter-spacing:.2px;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
-      position:relative; overflow:hidden;
-    }
-    .email-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .email-icon{ color: var(--brand-blue); opacity:.85; }
-
-    /* ===== Banda agencia + búsqueda ===== */
-    .agencia-row{
-      width:100%; max-width:900px;
-      background: rgba(103,200,241,.12);
-      border:1px solid rgba(103,200,241,.25);
-      color:#0f6aa0; font-weight:700; letter-spacing:.2px;
-      padding:10px 14px; border-radius:14px; margin: 6px 0 16px 0;
-      display:flex; align-items:center; gap:10px;
-    }
-    .agencia-row i{ color:#0f6aa0 }
-
-    .searchbar{
-      width:100%; max-width:900px;
-      display:flex; align-items:center; gap:10px; margin-bottom:16px;
-      background:var(--glass-bg); border:1px solid var(--glass-brd); border-radius:18px; padding:10px 14px;
-      box-shadow:var(--glass-shadow);
-    }
-    .searchbar i{ color:var(--muted) }
-    .searchbar input{
-      flex:1; background:transparent; border:none; outline:none; color:var(--text);
-      font-size:1.05rem; padding:8px 4px;
-    }
-
-    /* ===== Listado de clientes ===== */
-    #clientes-list{ width:100%; max-width:900px; }
-    .cliente-card{
-      background:radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,.65), rgba(255,255,255,.28) 40%, rgba(255,255,255,.18) 100%);
-      border:1px solid var(--glass-brd);
-      box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 8px 24px rgba(10,20,40,.12), 0 2px 6px rgba(10,20,40,.06);
-      color:var(--text);
-      border-radius:var(--radius-2xl);
-      margin-bottom:14px; padding:16px 18px;
-      display:flex; justify-content:space-between; align-items:center; gap:14px;
-      transition:transform .12s ease, box-shadow .2s ease, background .2s ease;
-    }
-    .cliente-card:hover{ transform: translateY(-2px); box-shadow:0 18px 45px rgba(10,20,40,.18), 0 6px 16px rgba(10,20,40,.12); }
-    .cliente-info b{ font-size:1.07rem }
-    .cliente-dui{ color:#3e92cc; margin-top:4px; font-weight:700 }
-    .estado-mora{ color:#F08C00; font-weight:800; display:inline-flex; align-items:center; gap:6px; margin-left:8px; }
-
-    .btn-pagar{
-      background: linear-gradient(90deg, var(--brand-green) 0%, #0b854c 100%);
-      color:#fff; border:none; padding:10px 18px; border-radius:12px;
-      font-size:.98rem; font-weight:800; cursor:pointer; transition: transform .12s ease, box-shadow .2s ease, background .2s ease;
-      display:inline-flex; align-items:center; gap:8px;
-    }
-    .btn-pagar:hover{ transform:translateY(-1px); box-shadow:0 8px 18px rgba(19,182,107,.35) }
-
-    /* ===== Modal ===== */
-    .modal-bg{ position: fixed; inset:0; background: rgba(8,12,20,.55); z-index: 50; display: grid; place-items:center; padding: 14px; }
-    .modal{
-      width: 100%; max-width: 460px; color: var(--text);
-      background: radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,.92), rgba(255,255,255,.78) 40%, rgba(255,255,255,.72) 100%);
-      border:1px solid var(--glass-brd); border-radius:20px; box-shadow: var(--glass-shadow);
-      padding: 22px 18px 16px 18px; position: relative; animation: showmodal .18s ease-out;
-    }
-    @keyframes showmodal { from { transform: translateY(6px) scale(.98); opacity:.6;} to {transform:none;opacity:1;} }
-    .modal-title{ font-size:1.18rem; font-weight:800; margin-bottom:6px; color:var(--brand-blue); display:flex; align-items:center; gap:8px; }
-    .modal-sub{ color:var(--muted); margin-bottom:12px; }
-    .modal-row{ margin-bottom:12px; }
-    .input-group{
-      display:flex; align-items:center; background: rgba(36,59,134,.06);
-      border:1px solid rgba(36,59,134,.18); border-radius:12px; padding-left:10px;
-    }
-    .input-group span{ color: var(--brand-green); font-size:1.15rem; font-weight:800; margin-right:6px; }
-    .input-group input{ border:none; background:transparent; padding:11px 10px; color:var(--text); font-size:1.12rem; outline:none; width:100%; }
-    .pill{
-      display:inline-flex; align-items:center; gap:8px; font-weight:800;
-      background:linear-gradient(180deg, rgba(19,182,107,.12), rgba(19,182,107,.06));
-      border:1px solid rgba(19,182,107,.25);
-      color:#065f46; padding:8px 12px; border-radius:999px;
-    }
-    .pill i{ color:#0b854c }
-    .modal-btns{ display:flex; gap:10px; justify-content:flex-end; margin-top:10px; }
-    .modal-btn-cancel{
-      background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%); color:#fff;
-      border:none; padding:10px 16px; border-radius:10px; cursor:pointer; font-weight:800;
-    }
-    .modal-btn-pay{
-      background: linear-gradient(90deg, var(--brand-green) 0%, #0b854c 100%); color:#fff;
-      border:none; padding:10px 18px; border-radius:10px; cursor:pointer; font-weight:800;
-    }
-    .modal-btn-pay:disabled{ opacity:.5; cursor:not-allowed }
-    .modal-error{ color:#e74c3c; font-weight:700; }
-    .muted{ color:var(--muted); font-size:.92rem }
-    .w-100{ width:100% }
+    /* (estilos idénticos a la versión previa) */
+    :root{--bg:#f7f9fc;--bg-2:#eef2f7;--text:#0d1b2a;--white:#ffffff;--muted:#5b6776;--brand-blue:#243b86;--brand-cel:#67C8F1;--brand-green:#13b66b;--brand-gold:#F8AF40;--glass-bg:rgba(255,255,255,.55);--glass-brd:rgba(10,20,40,.08);--glass-shadow:0 20px 60px rgba(12,20,40,.12);--radius-2xl:24px}
+    @media (prefers-color-scheme: dark){:root{--bg:#0c0f14;--bg-2:#0f141b;--text:#dfe6ef;--muted:#9aa6b6;--glass-bg:rgba(255,255,255,.10);--glass-brd:rgba(255,255,255,.18);--glass-shadow:0 24px 60px rgba(0,0,0,.45)}}
+    *{box-sizing:border-box}html,body{height:100%}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;color:var(--text);background:radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),linear-gradient(180deg, var(--bg), var(--bg-2));-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;min-height:100vh}
+    .pattern{position:fixed;inset:0;pointer-events:none;z-index:0;background-image:radial-gradient(1px 1px at 25px 25px, rgba(255,255,255,.10), transparent 40%),radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.06), transparent 40%);background-size:100px 100px;mix-blend-mode:soft-light;opacity:.5}
+    header{position:sticky;top:0;z-index:10;backdrop-filter:saturate(1.2) blur(10px);-webkit-backdrop-filter:saturate(1.2) blur(10px);background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));border-bottom:1px solid var(--glass-brd)}
+    @media (prefers-color-scheme: dark){header{background:linear-gradient(180deg, rgba(15,20,30,.75), rgba(15,20,30,.35))}}
+    .topbar{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:14px;padding:.8rem 16px}
+    .logo-plate{display:inline-flex;align-items:center;gap:10px;background:var(--glass-bg);border:1px solid var(--glass-brd);padding:8px 14px;border-radius:16px;box-shadow:var(--glass-shadow);position:relative;overflow:hidden;isolation:isolate}
+    .logo-plate::after{content:"";position:absolute;inset:-1px;background:linear-gradient(120deg, transparent 0 35%, rgba(255,255,255,.55) 45%, transparent 55% 100%);transform:translateX(-120%);animation:plateSheen 6s linear infinite;pointer-events:none}
+    @keyframes plateSheen{0%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
+    .logo-plate img{height:28px;width:auto;display:block}.brand-name{font-weight:800;letter-spacing:.2px;color:var(--brand-blue)}.page-name{margin-left:auto;font-weight:700;color:var(--muted)}
+    .container{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:2.2rem 16px 3rem;display:flex;flex-direction:column;align-items:center}
+    .visualmente-oculto,.visually-hidden{position:absolute !important;clip:rect(1px,1px,1px,1px);padding:0;border:0;height:1px;width:1px;overflow:hidden;white-space:nowrap}
+    .identity-card{width:100%;max-width:900px;margin:.2rem auto 1.2rem auto;display:flex;align-items:center;gap:14px;padding:10px 12px;background:var(--glass-bg);border:1px solid var(--glass-brd);border-radius:22px;box-shadow:var(--glass-shadow);position:relative;overflow:hidden;isolation:isolate}
+    .identity-card::before{content:"";position:absolute;inset:-2px;border-radius:inherit;pointer-events:none;background:conic-gradient(from 220deg, rgba(103,200,241,.18), rgba(248,175,64,.16), rgba(19,182,107,.16), rgba(103,200,241,.18));filter:blur(8px);opacity:.45;mask:linear-gradient(#000,#000) content-box,linear-gradient(#000,#000);-webkit-mask-composite:xor;mask-composite:exclude;padding:1px;animation:halo 10s linear infinite}
+    @keyframes halo{to{transform:rotate(1turn)}}
+    .avatar{width:60px;height:60px;padding:2px;border-radius:50%;background:conic-gradient(from 210deg, var(--brand-cel), var(--brand-gold), var(--brand-green), var(--brand-cel));position:relative;box-shadow:0 8px 24px rgba(10,20,40,.15);flex:0 0 auto}
+    .avatar .inner{width:100%;height:100%;border-radius:50%;background:linear-gradient(180deg,#f6f9ff,#e9eef6);overflow:hidden;display:grid;place-items:center}
+    .avatar img{width:100%;height:100%;object-fit:cover;display:block;border-radius:50%}
+    .avatar .initials{display:none;width:100%;height:100%;border-radius:50%;font-weight:800;letter-spacing:.5px;color:#243b86;font-size:1.05rem;background:linear-gradient(180deg,#fff,#ecf2fb);place-items:center}
+    .avatar .status{position:absolute;right:2px;bottom:2px;width:12px;height:12px;border-radius:50%;background:#22c55e;border:2px solid #fff;box-shadow:0 0 0 2px rgba(34,197,94,.2)}
+    .who{display:flex;flex-direction:column;gap:6px;min-width:0;width:100%}
+    .email-pill{display:inline-flex;align-items:center;gap:10px;max-width:100%;padding:10px 14px;border-radius:999px;background:linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));border:1px solid rgba(36,59,134,.15);font-weight:800;color:var(--brand-blue);letter-spacing:.2px;box-shadow:inset 0 1px 0 rgba(255,255,255,.7);position:relative;overflow:hidden}
+    .email-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.email-icon{color:var(--brand-blue);opacity:.85}
+    .agencia-row{width:100%;max-width:900px;background:rgba(103,200,241,.12);border:1px solid rgba(103,200,241,.25);color:#0f6aa0;font-weight:700;letter-spacing:.2px;padding:10px 14px;border-radius:14px;margin:6px 0 16px 0;display:flex;align-items:center;gap:10px}
+    .agencia-row i{color:#0f6aa0}
+    .searchbar{width:100%;max-width:900px;display:flex;align-items:center;gap:10px;margin-bottom:16px;background:var(--glass-bg);border:1px solid var(--glass-brd);border-radius:18px;padding:10px 14px;box-shadow:var(--glass-shadow)}
+    .searchbar i{color:var(--muted)}.searchbar input{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:1.05rem;padding:8px 4px}
+    #clientes-list{width:100%;max-width:900px}
+    .cliente-card{background:radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,.65), rgba(255,255,255,.28) 40%, rgba(255,255,255,.18) 100%);border:1px solid var(--glass-brd);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 8px 24px rgba(10,20,40,.12),0 2px 6px rgba(10,20,40,.06);color:var(--text);border-radius:var(--radius-2xl);margin-bottom:14px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:14px;transition:transform .12s ease, box-shadow .2s ease, background .2s ease}
+    .cliente-card:hover{transform:translateY(-2px);box-shadow:0 18px 45px rgba(10,20,40,.18),0 6px 16px rgba(10,20,40,.12)}
+    .cliente-info b{font-size:1.07rem}.cliente-dui{color:#3e92cc;margin-top:4px;font-weight:700}.estado-mora{color:#F08C00;font-weight:800;display:inline-flex;align-items:center;gap:6px;margin-left:8px}
+    .btn-pagar{background:linear-gradient(90deg,var(--brand-green) 0%,#0b854c 100%);color:#fff;border:none;padding:10px 18px;border-radius:12px;font-size:.98rem;font-weight:800;cursor:pointer;transition: transform .12s ease, box-shadow .2s ease, background .2s ease;display:inline-flex;align-items:center;gap:8px}
+    .btn-pagar:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(19,182,107,.35)}
+    .modal-bg{position:fixed;inset:0;background:rgba(8,12,20,.55);z-index:50;display:grid;place-items:center;padding:14px}
+    .modal{width:100%;max-width:460px;color:var(--text);background:radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,.92), rgba(255,255,255,.78) 40%, rgba(255,255,255,.72) 100%);border:1px solid var(--glass-brd);border-radius:20px;box-shadow:var(--glass-shadow);padding:22px 18px 16px 18px;position:relative;animation:showmodal .18s ease-out}
+    @keyframes showmodal{from{transform:translateY(6px) scale(.98);opacity:.6}to{transform:none;opacity:1}}
+    .modal-title{font-size:1.18rem;font-weight:800;margin-bottom:6px;color:var(--brand-blue);display:flex;align-items:center;gap:8px}
+    .modal-sub{color:var(--muted);margin-bottom:12px}.modal-row{margin-bottom:12px}
+    .input-group{display:flex;align-items:center;background:rgba(36,59,134,.06);border:1px solid rgba(36,59,134,.18);border-radius:12px;padding-left:10px}
+    .input-group span{color:var(--brand-green);font-size:1.15rem;font-weight:800;margin-right:6px}
+    .input-group input{border:none;background:transparent;padding:11px 10px;color:var(--text);font-size:1.12rem;outline:none;width:100%}
+    .pill{display:inline-flex;align-items:center;gap:8px;font-weight:800;background:linear-gradient(180deg, rgba(19,182,107,.12), rgba(19,182,107,.06));border:1px solid rgba(19,182,107,.25);color:#065f46;padding:8px 12px;border-radius:999px}
+    .pill i{color:#0b854c}.modal-btns{display:flex;gap:10px;justify-content:flex-end;margin-top:10px}
+    .modal-btn-cancel{background:linear-gradient(90deg,#e74c3c 0%,#8e0800 100%);color:#fff;border:none;padding:10px 16px;border-radius:10px;cursor:pointer;font-weight:800}
+    .modal-btn-pay{background:linear-gradient(90deg,var(--brand-green) 0%,#0b854c 100%);color:#fff;border:none;padding:10px 18px;border-radius:10px;cursor:pointer;font-weight:800}
+    .modal-btn-pay:disabled{opacity:.5;cursor:not-allowed}.modal-error{color:#e74c3c;font-weight:700}.muted{color:var(--muted);font-size:.92rem}.w-100{width:100%}
   </style>
 </head>
 <body>
   <div class="pattern" aria-hidden="true"></div>
-
-  <!-- Topbar -->
   <header>
     <div class="topbar">
       <div class="logo-plate">
@@ -236,7 +72,6 @@
   <div class="container">
     <h1 class="visually-hidden">Recepción de Pagos</h1>
 
-    <!-- Tarjeta de identidad -->
     <div class="identity-card">
       <div class="avatar" aria-hidden="true">
         <div class="inner">
@@ -253,41 +88,51 @@
       </div>
     </div>
 
-    <!-- Agencia -->
     <div class="agencia-row" id="agencia-row" style="display:none;">
       <i class="fas fa-building"></i>
       <span id="agencia-nombre"></span>
     </div>
 
-    <!-- Buscador -->
     <div class="searchbar">
       <i class="fas fa-search"></i>
       <input id="buscador" type="text" placeholder="Buscar por nombre o DUI..."/>
     </div>
 
-    <!-- Listado -->
     <div id="clientes-list" class="w-100"></div>
   </div>
 
   <div id="modal-root"></div>
 
-  <!-- ==================== Firebase & lógica ==================== -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, doc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
-    /* ===== Helpers numéricos/fecha (robustos) ===== */
-    const EPS = 1e-6;    // precisión
-    const TOL = 0.01;    // tolerancia centavos
+    /* ===== Helpers ===== */
+    const EPS = 1e-6, TOL = 0.01;
     const nowISO = () => new Date().toISOString();
-    function n(x){ const v = parseFloat(x); return Number.isFinite(v) ? v : 0; }
-    function need(x){ return Math.max(0, n(x)); }
-    function add(a,b){ return n(a) + n(b); }
+    const n = x => { const v = parseFloat(x); return Number.isFinite(v)?v:0; };
+    const need = x => Math.max(0, n(x));
+    const add = (a,b)=> n(a)+n(b);
+    const round2 = v => Math.round((v+Number.EPSILON)*100)/100;
 
-    /* ===== UI helpers ===== */
+    function saldoDesdeAmortizacion(amort){
+      let cents = 0;
+      for(const c of (amort||[])){
+        const cap = Math.round(need(c.capital)*100);
+        const pag = Math.round(need(c.montoPagado)*100);
+        const pend = Math.max(0, cap-pag);
+        cents += pend;
+      }
+      return cents/100;
+    }
+    function ordenarAmortizacionPorFecha(amort){
+      amort.sort((a,b)=> new Date(a.fecha) - new Date(b.fecha));
+    }
+
+    /* ===== UI ===== */
     function inicialesDesdeEmail(email){
-      const base = (email || "").split("@")[0];
+      const base = (email||"").split("@")[0];
       const partes = base.split(/[.\-_]+/).filter(Boolean);
       let ini = partes.slice(0,2).map(s=>s[0]).join("").toUpperCase();
       if(!ini) ini = (email||"U")[0].toUpperCase();
@@ -296,30 +141,24 @@
 
     /* ===== Firebase init ===== */
     const firebaseConfig = {
-      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
-      authDomain: "multinversiones-38e13.firebaseapp.com",
-      projectId: "multinversiones-38e13",
-      storageBucket: "multinversiones-38e13.appspot.com",
-      messagingSenderId: "380001917078",
-      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
-      measurementId: "G-H4E31XHG1Y"
+      apiKey:"AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain:"multinversiones-38e13.firebaseapp.com",
+      projectId:"multinversiones-38e13",
+      storageBucket:"multinversiones-38e13.appspot.com",
+      messagingSenderId:"380001917078",
+      appId:"1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId:"G-H4E31XHG1Y"
     };
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    /* ===== Wrappers Firestore ===== */
-    window.firebaseAddDoc = async function(collectionName, data) {
-      return await addDoc(collection(db, collectionName), data);
-    };
-    window.firebaseUpdateDoc = async function(collectionName, docId, data) {
-      const ref = doc(db, collectionName, docId);
-      await updateDoc(ref, data);
-    };
+    /* ===== Wrappers ===== */
+    window.firebaseAddDoc = async (collectionName, data)=> addDoc(collection(db, collectionName), data);
+    window.firebaseUpdateDoc = async (collectionName, docId, data)=> updateDoc(doc(db, collectionName, docId), data);
 
-    /* ===== Estado usuario/agencia ===== */
-    let userDepartment = null;
-    let userNameForTicket = "Sin Nombre";
+    /* ===== Estado user ===== */
+    let userDepartment = null, userNameForTicket = "Sin Nombre";
 
     function setUserCard(user){
       const emailEl = document.getElementById("usuario-email");
@@ -328,12 +167,9 @@
       emailEl.textContent = user?.email || "usuario@correo.com";
       initEl.textContent  = inicialesDesdeEmail(user?.email || "U");
       const fallbackSrc = "assets/avatar_user.png";
-      const usarIniciales = () => { imgEl.style.display = "none"; initEl.style.display = "grid"; };
-      imgEl.onerror = () => {
-        if (imgEl.dataset.fallbackTried === "1") usarIniciales();
-        else { imgEl.dataset.fallbackTried = "1"; imgEl.src = fallbackSrc; }
-      };
-      if (user?.photoURL) imgEl.src = user.photoURL; else imgEl.src = fallbackSrc;
+      const usarIniciales = () => { imgEl.style.display="none"; initEl.style.display="grid"; };
+      imgEl.onerror = () => { if (imgEl.dataset.fallbackTried==="1") usarIniciales(); else { imgEl.dataset.fallbackTried="1"; imgEl.src=fallbackSrc; } };
+      imgEl.src = user?.photoURL || fallbackSrc;
     }
 
     function obtenerAgenciaUsuario() {
@@ -374,7 +210,7 @@
       return { id: d.id, data: d.data() };
     }
 
-    /* ===== Búsqueda/listado ===== */
+    /* ===== Listado ===== */
     async function buscarClientes(term) {
       const clientesList = document.getElementById("clientes-list");
       clientesList.innerHTML = "Cargando...";
@@ -439,11 +275,10 @@
       }
     }
 
-    /* ===== Modal de pago: muestra paraPonerseAlDia ===== */
+    /* ===== Modal ===== */
     function mostrarDialogoPago(cliente, creditoData) {
       const modalRoot = document.getElementById("modal-root");
-      let monto = "";
-      let errorMsg = "";
+      let monto = "", errorMsg = "";
       const ppald = need(creditoData?.paraPonerseAlDia);
 
       function closeModal() { modalRoot.innerHTML = ""; }
@@ -469,7 +304,7 @@
                   <span>$</span>
                   <input id="monto-input" type="number" min="0" step="0.01" placeholder="0.00" value="${monto}" autocomplete="off" autofocus/>
                 </div>
-                <div class="muted" style="margin-top:6px;">Orden: Multas → Interés (devengado) → Capital.</div>
+                <div class="muted" style="margin-top:6px;">Orden: Multas → Interés vencido (por plan) → Interés devengado de hoy → Capital.</div>
               </div>
 
               ${errorMsg ? `<div class="modal-error">${errorMsg}</div>` : ""}
@@ -504,7 +339,29 @@
       render();
     }
 
-    /* ===== LÓGICA DE PAGO alineada con MIO ===== */
+    /* ===== Lógica Pago Día a Día (con anticipo “congelado”) ===== */
+
+    // NUEVO: pintar interesActual a próximas cuotas (>= hoy), sin exceder el interés base de cada una.
+    function asignarInteresActualAProximasCuotas(amort, interesAPagar, ahora){
+      let restante = round2(need(interesAPagar));
+      let aplicado = 0;
+      for (let i=0; i<amort.length && restante > EPS; i++){
+        const c = amort[i];
+        const f = new Date(c.fecha);
+        if (f < ahora) continue; // solo próximas
+        const intBase = (c.interesExigible != null ? need(c.interesExigible) : need(c.interes));
+        const falta = Math.max(0, intBase - need(c.montoPagadoInteres));
+        if (falta <= EPS) continue;
+        const apli = Math.min(falta, restante);
+        if (apli > EPS){
+          c.montoPagadoInteres = round2(add(c.montoPagadoInteres, apli));
+          aplicado = round2(aplicado + apli);
+          restante = round2(restante - apli);
+        }
+      }
+      return aplicado; // cuánto del interesActual quedó pintado en cuotas
+    }
+
     async function realizarPago(cliente, montoNum) {
       const fechaPago = nowISO();
       const ahora = new Date(fechaPago);
@@ -517,34 +374,34 @@
         const cajeroNombre = userData.nombre_autorizacion || userData.nombre || userNameForTicket || "Sin Nombre";
         const sucursal = userData.department || userDepartment || "N/A";
 
-        // Cargar crédito
         const { data: creditoData } = await fetchCreditoById(cliente.id);
 
-        // Normalización
+        // Normalización (incluye interesExigible si ya existía)
         let saldoActual = need(creditoData.saldoActual);
-        let interesActual = need(creditoData.interesActual);
+        let interesActual = need(creditoData.interesActual); // devengado global al momento
         let multasAcumuladas = need(creditoData.multasAcumuladas);
         let paraPonerseAlDia = need(creditoData.paraPonerseAlDia);
 
         let amortizacion = Array.isArray(creditoData.amortizacion) ? JSON.parse(JSON.stringify(creditoData.amortizacion)) : [];
-        amortizacion = amortizacion.map(c => ({
-          ...c,
-          capital: n(c.capital),
-          interes: n(c.interes),
-          saldo: n(c.saldo),
-          montoPagado: n(c.montoPagado),
-          montoPagadoInteres: n(c.montoPagadoInteres),
-          interesReservado: n(c.interesReservado), // NUEVO: bolsillo por cuota (no cuenta para estado)
-          estado: c.estado || "Pendiente",
-          fechaPagoReal: c.fechaPagoReal || null
-        }));
+        amortizacion = amortizacion.map(c => {
+          const item = {
+            ...c,
+            capital: n(c.capital), interes: n(c.interes), saldo: n(c.saldo),
+            montoPagado: n(c.montoPagado), montoPagadoInteres: n(c.montoPagadoInteres),
+            estado: c.estado || "Pendiente",
+            fechaPagoReal: c.fechaPagoReal || null
+          };
+          if (c.interesExigible != null) item.interesExigible = n(c.interesExigible);
+          return item;
+        });
+        ordenarAmortizacionPorFecha(amortizacion);
 
         let historialMultas = Array.isArray(creditoData.historialMultas) ? JSON.parse(JSON.stringify(creditoData.historialMultas)) : [];
 
         let restante = need(montoNum);
         let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
 
-        /* === 1) MULTAS primero === */
+        /* 1) MULTAS exigibles */
         let nuevasMultasHistorial = historialMultas.map(m => ({...m}));
         if (restante > EPS && nuevasMultasHistorial.length) {
           for (let i = 0; i < nuevasMultasHistorial.length && restante > EPS; i++) {
@@ -552,10 +409,8 @@
             const esNoPag = !multa.estadoCuota || multa.estadoCuota === "No Pagada";
             const fechaOk = multa.fecha ? (new Date(multa.fecha) <= ahora) : true;
             if (!esNoPag || !fechaOk) continue;
-
             const montoMulta = need(multa.monto);
             if (montoMulta <= EPS) { multa.estadoCuota = "Pagada"; continue; }
-
             const pagar = Math.min(restante, montoMulta);
             if (pagar > EPS) {
               pagoMultas = add(pagoMultas, pagar);
@@ -568,111 +423,81 @@
           .filter(m => !m.estadoCuota || m.estadoCuota === "No Pagada")
           .reduce((acc, m) => acc + need(m.monto), 0);
 
-        /* === 2) INTERÉS (desde interesActual) === */
-        // Tomamos del pago lo devengado global
-        let interesPendienteGlobal = need(interesActual);
-        let interesQueEntra = Math.min(restante, interesPendienteGlobal);
-        interesPendienteGlobal = need(interesPendienteGlobal - interesQueEntra);
-        restante = need(restante - interesQueEntra);
-        pagoInteres = add(pagoInteres, interesQueEntra);
-
-        // Mapeo a cuotas vencidas: primero "pintar" hasta plan en orden cronológico,
-        // luego, si sigue sobrando del devengo de hoy, ponerlo como interesReservado por cuota (proporcional).
-        function asignarInteresPorCuotaSinGlobal(amort, interesAPagar, ahoraISO){
-          let restanteInt = need(interesAPagar);
-          let aplicadoAPlan = 0;
-          let reservadoPorCuotas = 0;
-          const ah = new Date(ahoraISO);
-
-          const vencidasIdx = amort
-            .map((c, i) => ({i, c}))
-            .filter(x => new Date(x.c.fecha) <= ah)
-            .map(x => x.i);
-
-          // 1) Pintar hasta el plan en orden
-          for (let k = 0; k < vencidasIdx.length && restanteInt > EPS; k++){
-            const idx = vencidasIdx[k];
-            const c = amort[idx];
-            const faltaPlan = Math.max(0, need(c.interes) - need(c.montoPagadoInteres));
-            if (faltaPlan <= EPS) continue;
-            const aPintar = Math.min(faltaPlan, restanteInt);
-            if (aPintar > EPS){
-              c.montoPagadoInteres = add(c.montoPagadoInteres, aPintar);
-              aplicadoAPlan = add(aplicadoAPlan, aPintar);
-              restanteInt = need(restanteInt - aPintar);
-            }
+        /* 2) INTERÉS de plan vencido (cuotas con fecha <= hoy) usando base = interesExigible||interes */
+        for (let i = 0; i < amortizacion.length && restante > EPS; i++){
+          const c = amortizacion[i];
+          if (new Date(c.fecha) > ahora) break;
+          const intBase = (c.interesExigible != null ? need(c.interesExigible) : need(c.interes));
+          const faltaInt = Math.max(0, intBase - need(c.montoPagadoInteres));
+          if (faltaInt <= EPS) continue;
+          const apli = Math.min(faltaInt, restante);
+          if (apli > EPS){
+            c.montoPagadoInteres = add(c.montoPagadoInteres, apli);
+            pagoInteres = add(pagoInteres, apli);
+            restante = need(restante - apli);
           }
-
-          // 2) Reservar sobrante por cuota vencida, proporcional a capital pendiente (no cuenta para estado)
-          if (restanteInt > EPS && vencidasIdx.length > 0){
-            let totalPeso = vencidasIdx.reduce((acc, idx) => {
-              const c = amort[idx];
-              const capPend = Math.max(0, need(c.capital) - need(c.montoPagado));
-              return acc + (capPend > EPS ? capPend : 1);
-            }, 0) || 1;
-
-            let acumulado = 0;
-            for (let k = 0; k < vencidasIdx.length; k++){
-              const idx = vencidasIdx[k];
-              const c = amort[idx];
-              const capPend = Math.max(0, need(c.capital) - need(c.montoPagado));
-              const peso = (capPend > EPS ? capPend : 1) / totalPeso;
-              // reparto redondeado a 2 decimales
-              let aReservar = +(restanteInt * peso).toFixed(2);
-              if (k === vencidasIdx.length - 1){
-                // Última cuota: ajusta por redondeo
-                aReservar = +(restanteInt - acumulado).toFixed(2);
-              }
-              if (aReservar > EPS){
-                c.interesReservado = add(c.interesReservado, aReservar);
-                reservadoPorCuotas = add(reservadoPorCuotas, aReservar);
-                acumulado = add(acumulado, aReservar);
-              }
-            }
-            restanteInt = 0;
-          }
-
-          return {
-            aplicadoAPlan: +aplicadoAPlan.toFixed(2),
-            reservadoPorCuotas: +reservadoPorCuotas.toFixed(2)
-          };
         }
 
-        asignarInteresPorCuotaSinGlobal(amortizacion, interesQueEntra, fechaPago);
+        /* 3) INTERÉS devengado hoy (interesActual) → pintar a próximas cuotas */
+        if (restante > EPS && interesActual > EPS){
+          const aInt = Math.min(restante, interesActual);
+          // Pintar a próximas cuotas
+          const pintado = asignarInteresActualAProximasCuotas(amortizacion, aInt, ahora);
+          // Ajustes globales
+          interesActual = need(interesActual - pintado);
+          pagoInteres = add(pagoInteres, pintado);
+          restante = need(restante - pintado);
+        }
 
-        // Actualiza interesActual remanente (global)
-        interesActual = interesPendienteGlobal;
-
-        /* === 3) CAPITAL (resta directa del saldoActual) === */
-        if (restante > EPS) {
-          for (let i = 0; i < amortizacion.length && restante > EPS; i++) {
+        /* 4) CAPITAL: primero vencidas/HOY; luego futuras si no hay interés de plan pendiente */
+        if (restante > EPS){
+          // a) vencidas/HOY
+          for (let i = 0; i < amortizacion.length && restante > EPS; i++){
             const c = amortizacion[i];
-
-            // Para bloquear prepago de futuras, descomenta la siguiente línea:
-            // if (new Date(c.fecha) > ahora) break;
-
-            const faltaCap = need(c.capital) - need(c.montoPagado);
+            if (new Date(c.fecha) > ahora) break;
+            const faltaCap = Math.max(0, need(c.capital) - need(c.montoPagado));
             if (faltaCap <= EPS) continue;
-
-            const abono = Math.min(restante, faltaCap);
-            if (abono > EPS){
-              c.montoPagado = add(c.montoPagado, abono);
-              pagoCapital = add(pagoCapital, abono);
-
-              // Regla MIO: SaldoActual disminuye solo con capital
-              saldoActual = need(saldoActual - abono);
-              if (saldoActual < 0) saldoActual = 0;
-
-              restante = need(restante - abono);
+            const apli = Math.min(faltaCap, restante);
+            c.montoPagado = add(c.montoPagado, apli);
+            pagoCapital = add(pagoCapital, apli);
+            restante = need(restante - apli);
+          }
+          // b) futuras (si ya no queda interés de plan vencido)
+          const hayIntPlanPend = amortizacion.some(c => (new Date(c.fecha) <= ahora) &&
+            ((c.interesExigible != null ? need(c.interesExigible) : need(c.interes)) - need(c.montoPagadoInteres) > TOL));
+          if (restante > EPS && !hayIntPlanPend){
+            for (let i = 0; i < amortizacion.length && restante > EPS; i++){
+              const c = amortizacion[i];
+              if (new Date(c.fecha) <= ahora) continue;
+              const faltaCap = Math.max(0, need(c.capital) - need(c.montoPagado));
+              if (faltaCap <= EPS) continue;
+              const apli = Math.min(faltaCap, restante);
+              c.montoPagado = add(c.montoPagado, apli);
+              pagoCapital = add(pagoCapital, apli);
+              restante = need(restante - apli);
             }
           }
         }
 
-        /* === 4) Estados por cuota (sin contar interesReservado) === */
+        /* 4.b) NUEVO: cierre anticipado de cuotas futuras (congela interesExigible) */
+        for (let i=0; i<amortizacion.length; i++){
+          const c = amortizacion[i];
+          const f = new Date(c.fecha);
+          const capOk = need(c.montoPagado) + TOL >= need(c.capital);
+          if (f > ahora && capOk){
+            // congela el interés exigible de esa cuota al devengado pagado a hoy
+            if (c.interesExigible == null){
+              c.interesExigible = round2(need(c.montoPagadoInteres)); // p.ej. 12.13 en tu caso
+            }
+          }
+        }
+
+        /* 5) Estados por cuota (usa base interesExigible||interes) */
         for (let i = 0; i < amortizacion.length; i++) {
           const c = amortizacion[i];
+          const intBase = (c.interesExigible != null ? need(c.interesExigible) : need(c.interes));
           const capOk = need(c.montoPagado) + TOL >= need(c.capital);
-          const intOk = need(c.montoPagadoInteres) + TOL >= need(c.interes); // NO incluye interesReservado
+          const intOk = need(c.montoPagadoInteres) + TOL >= intBase;
           if (capOk && intOk) {
             c.estado = "Pagada";
             if (!c.fechaPagoReal) c.fechaPagoReal = fechaPago;
@@ -685,31 +510,33 @@
           }
         }
 
-        /* === 5) paraPonerseAlDia & capitalAtrasado (solo vencidas no pagadas) === */
-        paraPonerseAlDia = 0;
+        /* 6) Métricas globales */
+        saldoActual = round2(saldoDesdeAmortizacion(amortizacion));
+
         let capitalAtrasado = 0;
-        for (let i = 0; i < amortizacion.length; i++) {
+        let interesPlanVencidoPend = 0;
+        for (let i = 0; i < amortizacion.length; i++){
           const c = amortizacion[i];
           const vencida = new Date(c.fecha) < ahora;
-          if (vencida && c.estado !== "Pagada") {
-            const faltaCap = Math.max(0, need(c.capital) - need(c.montoPagado));
-            const faltaInt = Math.max(0, need(c.interes) - need(c.montoPagadoInteres));
-            paraPonerseAlDia += faltaCap + faltaInt;
-            capitalAtrasado += faltaCap;
+          if (vencida && c.estado !== "Pagada"){
+            const intBase = (c.interesExigible != null ? need(c.interesExigible) : need(c.interes));
+            capitalAtrasado += Math.max(0, need(c.capital) - need(c.montoPagado));
+            interesPlanVencidoPend += Math.max(0, intBase - need(c.montoPagadoInteres));
           }
         }
-        if (paraPonerseAlDia < TOL) paraPonerseAlDia = 0;
-        capitalAtrasado = +capitalAtrasado.toFixed(2);
+        capitalAtrasado = round2(capitalAtrasado);
+        interesPlanVencidoPend = round2(interesPlanVencidoPend);
 
-        /* === 6) Estado del crédito === */
+        paraPonerseAlDia = round2(capitalAtrasado + interesPlanVencidoPend + multasAcumuladas + interesActual);
+
         let nuevoEstado = (saldoActual <= EPS) ? "Pagado" : (creditoData.estadoCredito || "Activo");
-        if (nuevoEstado !== "Pagado" && paraPonerseAlDia === 0 && capitalAtrasado === 0 && multasAcumuladas === 0) {
+        if (nuevoEstado !== "Pagado" && paraPonerseAlDia === 0 && multasAcumuladas === 0) {
           nuevoEstado = "Activo";
         } else if (paraPonerseAlDia > 0 && nuevoEstado === "Activo") {
           nuevoEstado = "Mora Temprana";
         }
 
-        /* === 7) Guardar pago (numéricos) === */
+        /* 7) Guardar pago */
         const correlativo = Math.floor(Math.random() * 90000) + 10000;
         const correlativoStr = String(correlativo).padStart(5, '0');
 
@@ -719,28 +546,27 @@
           nombres: creditoData.nombre,
           apellido: creditoData.apellido || "",
           numeroDui: creditoData.numeroDui || "",
-          montoPagado: +montoNum,
+          montoPagado: +round2(montoNum),
           fechaPago: fechaPago,
-          pagoMultas: +pagoMultas.toFixed(2),
-          pagoInteres: +pagoInteres.toFixed(2),
-          pagoCapital: +pagoCapital.toFixed(2),
-          saldoRestante: +saldoActual.toFixed(2),
+          pagoMultas: +round2(pagoMultas),
+          pagoInteres: +round2(pagoInteres),
+          pagoCapital: +round2(pagoCapital),
+          saldoRestante: +round2(saldoActual),
           cajeroID: user.uid,
           cajeroNombre: cajeroNombre,
           sucursal: sucursal,
           correlativo: correlativoStr,
           timestamp: new Date(),
-          paraPonerseAlDiaAntes: +need(creditoData.paraPonerseAlDia).toFixed(2)
+          paraPonerseAlDiaAntes: +round2(need(creditoData.paraPonerseAlDia))
         });
 
-        /* === 8) Persistir crédito (todo numérico) === */
+        /* 8) Persistir crédito (incluye interesExigible en amortización si se creó) */
         await window.firebaseUpdateDoc("creditos", cliente.id, {
-          saldoActual: +saldoActual,
-          interesActual: +interesActual,
-          // OJO: NO hay interesPagadoNoMapeado global
-          capitalAtrasado: +capitalAtrasado,
-          paraPonerseAlDia: +paraPonerseAlDia,
-          multasAcumuladas: +multasAcumuladas,
+          saldoActual: +round2(saldoActual),
+          interesActual: +round2(interesActual),
+          capitalAtrasado: +round2(capitalAtrasado),
+          paraPonerseAlDia: +round2(paraPonerseAlDia),
+          multasAcumuladas: +round2(multasAcumuladas),
           ultimaActualizacion: fechaPago,
           fechaUltimoCalculoIntereses: fechaPago,
           estadoCredito: nuevoEstado,
@@ -748,18 +574,18 @@
           historialMultas: nuevasMultasHistorial
         });
 
-        // Ticket (formateo solo para mostrar)
+        // Ticket
         const url = `ticket_page.html?correlativo=${encodeURIComponent(correlativoStr)}` +
           `&cliente=${encodeURIComponent(creditoData.nombre)}` +
           `&apellido=${encodeURIComponent(creditoData.apellido || '')}` +
           `&numeroDui=${encodeURIComponent(creditoData.numeroDui || '')}` +
-          `&monto=${encodeURIComponent(montoNum.toFixed(2))}` +
+          `&monto=${encodeURIComponent(round2(montoNum).toFixed(2))}` +
           `&agencia=${encodeURIComponent(sucursal)}` +
           `&fecha=${encodeURIComponent(fechaPago)}` +
-          `&pagoCapital=${encodeURIComponent(pagoCapital.toFixed(2))}` +
-          `&pagoInteres=${encodeURIComponent(pagoInteres.toFixed(2))}` +
-          `&pagoMultas=${encodeURIComponent(pagoMultas.toFixed(2))}` +
-          `&saldoRestante=${encodeURIComponent(saldoActual.toFixed(2))}`;
+          `&pagoCapital=${encodeURIComponent(round2(pagoCapital).toFixed(2))}` +
+          `&pagoInteres=${encodeURIComponent(round2(pagoInteres).toFixed(2))}` +
+          `&pagoMultas=${encodeURIComponent(round2(pagoMultas).toFixed(2))}` +
+          `&saldoRestante=${encodeURIComponent(round2(saldoActual).toFixed(2))}`;
         window.location.href = url;
 
       }catch(e){
@@ -778,14 +604,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-

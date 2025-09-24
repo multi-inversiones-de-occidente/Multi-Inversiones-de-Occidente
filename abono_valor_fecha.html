@@ -105,6 +105,18 @@
     }
     function round2(v){ return Math.round((v + Number.EPSILON)*100)/100; }
 
+    // ✅ NUEVO: saldo actual desde amortización en centavos (para exactitud)
+    function saldoDesdeAmortizacion(amortizacion){
+      let totalCents = 0;
+      for (const c of (amortizacion || [])) {
+        const capC = Math.round(num(c.capital, 0) * 100);
+        const pagC = Math.round(num(c.montoPagado, 0) * 100);
+        const pendC = Math.max(0, capC - pagC);
+        totalCents += pendC;
+      }
+      return totalCents / 100;
+    }
+
     function normalizeDailyRate(credito){
       let td = num(credito.tasaDiariaCredito, 0);
       if (td <= 0 || td >= 0.02){
@@ -571,14 +583,8 @@
       }
 
       // 4) TOTALES + interesActual blindado
-      let saldoPendiente = round2(
-        amortizacion.filter(c=> c.estado !== "Pagada")
-          .reduce((acc,c)=>{
-            const cap = num(c.capital,0);
-            const pag = num(c.montoPagado,0);
-            return acc + Math.max(0, cap - pag);
-          }, 0)
-      );
+      // ✅ saldoActual exclusivamente desde la amortización (centavos) para evitar desfases
+      let saldoPendiente = round2(saldoDesdeAmortizacion(amortizacion));
 
       let multasAcumuladasFinal = round2(
         (historialMultasActualizado || [])
@@ -608,6 +614,7 @@
 
       const fechaHoy = atLocalMidnight(new Date());
       const diasPost = diasEntreFechasSinHora(fechaAbonoYMD, fechaHoy);
+      const tasaDiaria = normalizeDailyRate(creditoSeleccionado);
       const interesDesdeAbonoAHoy = round2(saldoPendiente * tasaDiaria * diasPost);
 
       let interesActual = round2(interesPendientePost + interesDesdeAbonoAHoy);
@@ -688,5 +695,6 @@
   </script>
 </body>
 </html>
+
 
 

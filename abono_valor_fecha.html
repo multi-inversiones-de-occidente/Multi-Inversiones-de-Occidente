@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
@@ -105,7 +105,7 @@
     }
     function round2(v){ return Math.round((v + Number.EPSILON)*100)/100; }
 
-    // ✅ NUEVO: saldo actual desde amortización en centavos (para exactitud)
+    // ✅ saldo actual desde amortización en centavos (para exactitud)
     function saldoDesdeAmortizacion(amortizacion){
       let totalCents = 0;
       for (const c of (amortizacion || [])) {
@@ -211,32 +211,54 @@
       });
     }
 
+    // =========================
+    // Carga de créditos (arreglo visible para búsqueda)
+    // =========================
     onAuthStateChanged(auth, async user=>{
       if(!user) return location.href="login.html";
       usuarioActual = user.displayName || user.email || "Usuario desconocido";
       userId = user.uid;
       const docUser = await getDoc(doc(db,"users", user.uid));
       userAgencia = docUser.exists() && docUser.data().department ? docUser.data().department : "";
-      const qy = query(collection(db,"creditos"),
-        where("agenciaAsignada","==", userAgencia),
-        where("estadoCredito","!=", "Revertido"));
+
+      // ⚠️ Evitamos '!=' para no romper el listado; filtramos Revertido en cliente
+      const qy = query(collection(db,"creditos"), where("agenciaAsignada","==", userAgencia));
       const snap = await getDocs(qy);
-      creditosAgencia = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+      creditosAgencia = snap.docs
+        .map(d=>({ id:d.id, ...d.data() }))
+        .filter(c => (c.estadoCredito || "").toString().trim().toLowerCase() !== "revertido");
     });
 
+    // =========================
+    // Búsqueda por nombre o DUI (robusta)
+    // =========================
     document.getElementById("busqueda").addEventListener("input", ()=>{
-      const queryTxt = document.getElementById("busqueda").value.toLowerCase();
+      const raw = document.getElementById("busqueda").value || "";
+      const queryTxt = raw.toLowerCase().trim();
+      const queryDui = raw.replace(/[^0-9]/g,""); // solo dígitos
+
       const listaDiv = document.getElementById("lista-creditos");
       listaDiv.innerHTML = "";
-      if (!queryTxt) return;
-      const filtrados = creditosAgencia.filter(credito =>
-        (credito.nombre && credito.nombre.toLowerCase().includes(queryTxt)) ||
-        (credito.numeroDui && credito.numeroDui.includes(queryTxt))
-      );
+      if (!queryTxt && !queryDui) return;
+
+      const filtrados = creditosAgencia.filter(credito => {
+        const nombre = (credito.nombre || credito.nombres || credito.clienteNombre || "").toString().toLowerCase();
+        const duiDoc = (credito.numeroDui || "").toString();
+        const duiClean = duiDoc.replace(/[^0-9]/g,"");
+
+        const matchNombre = queryTxt ? nombre.includes(queryTxt) : false;
+        const matchDui    = queryDui ? duiClean.includes(queryDui) : false;
+        return matchNombre || matchDui;
+      });
+
       filtrados.forEach(credito=>{
+        const nombre = (credito.nombre || credito.nombres || credito.clienteNombre || "—");
+        const dui = (credito.numeroDui || "").toString();
+        const saldo = Number(credito.saldoActual || 0).toFixed(2);
+
         const div = document.createElement("div");
         div.className = "list-group-item";
-        div.textContent = `${credito.nombre} — DUI: ${credito.numeroDui} — Saldo: $${Number(credito.saldoActual || 0).toFixed(2)}`;
+        div.textContent = `${nombre} — DUI: ${dui} — Saldo: $${saldo}`;
         div.onclick = (event)=> seleccionarCredito(credito, event);
         listaDiv.appendChild(div);
       });
@@ -614,11 +636,11 @@
 
       const fechaHoy = atLocalMidnight(new Date());
       const diasPost = diasEntreFechasSinHora(fechaAbonoYMD, fechaHoy);
-      const tasaDiaria = normalizeDailyRate(creditoSeleccionado);
-      const interesDesdeAbonoAHoy = round2(saldoPendiente * tasaDiaria * diasPost);
+      const tasaDiaria2 = normalizeDailyRate(creditoSeleccionado);
+      const interesDesdeAbonoAHoy = round2(saldoPendiente * tasaDiaria2 * diasPost);
 
       let interesActual = round2(interesPendientePost + interesDesdeAbonoAHoy);
-      const limiteHoy = round2(saldoPendiente * tasaDiaria * 122); // ~4 meses
+      const limiteHoy = round2(saldoPendiente * tasaDiaria2 * 122); // ~4 meses
       if (interesActual > limiteHoy) interesActual = limiteHoy;
 
       const paraPonerseAlDiaFinal = round2(capitalAtrasado + multasAcumuladasFinal + interesActual);

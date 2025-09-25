@@ -3,47 +3,115 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Revertir Pago – Multi Inversiones</title>
+  <title>Reversión – Multi Inversiones</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body { background: #101212; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
-    header { background: #000; padding: 1rem 0; text-align: center; font-size: 1.45rem; letter-spacing: 1px; font-weight: 700; color: #F8AF40;}
-    .container { max-width: 480px; margin: 2.2rem auto 0 auto; background: #1b1c1e; border-radius: 16px; box-shadow: 0 2px 22px #0008; padding: 2.2rem 1.6rem 1.7rem 1.6rem;}
-    .icon-main { color: #F8AF40; font-size: 48px; text-align: center; width: 100%; display: block; margin-bottom: 0.2em;}
-    .titulo { font-size: 2rem; color: #F8AF40; font-weight: bold; margin-bottom: .3em; text-align: center;}
-    .desc { color: #e6e6e6; font-size: 1.05rem; text-align: center; margin-bottom: 1.7em;}
-    .input-main, .input-motivo { width: 100%; background: #23272c; color: #fff; border: 1.7px solid #3c3f43; border-radius: 10px; font-size: 1.12rem; padding: 12px 14px; margin-bottom: 0.95em; outline: none; box-sizing: border-box;}
-    .input-motivo { min-height: 56px; resize: vertical;}
-    .btn-main { width: 100%; background: #F8AF40; color: #1a1813; border: none; border-radius: 9px; font-size: 1.12rem; font-weight: 600; padding: 13px 0; cursor: pointer; margin-bottom: 1.25em; transition: background .16s;}
-    .btn-main:active, .btn-main:hover { background: #e6891e;}
-    .card-pago { background: #fff; color: #181818; border-radius: 13px; margin-top: 17px; padding: 21px 19px 15px 19px; box-shadow: 0 2px 12px #0004; font-size: 1.03rem;}
-    .btn-revertir { width: 100%; background: #e74c3c; color: #fff; border: none; border-radius: 9px; font-size: 1.08rem; font-weight: 600; padding: 13px 0; cursor: pointer; margin-top: 14px; transition: background .15s; display: flex; align-items: center; justify-content: center; gap:8px;}
-    .btn-revertir[disabled] { background: #a89e99; cursor: not-allowed; opacity: .55;}
-    .spinner { display:inline-block; width:20px; height:20px; border-radius:50%; border:3px solid #fff3; border-top:3px solid #fff; animation:spin 1s linear infinite;}
+    /* ====== ESTILO BLANCO / GLASS ====== */
+    :root{
+      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --white:#ffffff; --muted:#5b6776;
+      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
+      --glass-bg:rgba(255,255,255,.70); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
+      --radius-2xl:22px;
+    }
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      min-height:100vh;
+    }
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(1.1) blur(10px); -webkit-backdrop-filter:saturate(1.1) blur(10px);
+      background:linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.45));
+      border-bottom:1px solid var(--glass-brd);
+    }
+    .topbar{ max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px; }
+    .brand{ display:flex; align-items:center; gap:10px; }
+    .brand i{ color:var(--brand-gold); font-size:1.25rem }
+    .brand b{ color:var(--brand-blue); letter-spacing:.2px }
+    .page{ margin-left:auto; color:var(--muted); font-weight:800 }
+    .container{ position:relative; z-index:1; max-width:960px; margin:0 auto; padding:2rem 16px 3rem; }
+    .panel{
+      background:var(--glass-bg); border:1px solid var(--glass-brd); border-radius:var(--radius-2xl);
+      box-shadow:var(--glass-shadow); padding:18px 16px; margin-bottom:18px;
+    }
+    .title{ display:flex; align-items:center; gap:10px; font-weight:900; color:var(--brand-blue); margin-bottom:6px; }
+    .subtitle{ color:var(--muted); margin:0 0 12px 30px; }
+    .row{ display:flex; gap:10px; align-items:center; margin-top:8px; }
+    .input{ flex:1; background:#fff; border:1px solid #dbe1ea; border-radius:10px; padding:12px 12px; font-size:1.05rem; outline:none; }
+    .btn{
+      background: linear-gradient(90deg, var(--brand-blue) 0%, #16265c 100%);
+      color:#fff; border:none; padding:11px 14px; border-radius:10px; cursor:pointer; font-weight:800; display:inline-flex; gap:8px; align-items:center;
+    }
+    .btn:hover{ filter:brightness(1.05) }
+    .card{
+      background:#fff; border:1px solid #e7ebf3; border-radius:14px; padding:16px; margin-top:12px; box-shadow:0 8px 24px rgba(10,20,40,.08);
+    }
+    .k{ color:#6b7482 }
+    .val b{ color:#0b3b85 }
+    .btn-danger{
+      background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%);
+      color:#fff; border:none; padding:12px 16px; border-radius:10px; cursor:pointer; font-weight:900; width:100%;
+      display:flex; align-items:center; justify-content:center; gap:8px; margin-top:10px;
+    }
+    .btn-danger[disabled]{ opacity:.55; cursor:not-allowed }
+    .textarea{ width:100%; min-height:64px; resize:vertical; background:#fafcff; border:1px solid #dbe1ea; border-radius:10px; padding:10px; font-size:1rem; }
+    .split{ display:grid; grid-template-columns:1fr; gap:16px; }
+    @media (min-width:860px){ .split{ grid-template-columns:1fr 1fr; } }
+    .spinner { display:inline-block; width:18px; height:18px; border-radius:50%; border:3px solid #fff6; border-top:3px solid #fff; animation:spin 1s linear infinite;}
     @keyframes spin {100%{transform:rotate(360deg);}}
-    .modal-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #181e21cc; z-index: 9998; display: flex; align-items: center; justify-content: center;}
-    .modal { background: #fff; color: #222; border-radius: 15px; box-shadow: 0 6px 38px #0008; padding: 26px 23px 20px 23px; max-width: 360px; width: 95%; z-index: 9999; position: relative; text-align: left; font-size: 1rem; animation: showmodal .18s;}
-    @keyframes showmodal { from { transform: scale(.93); opacity:.6;} to {transform:none;opacity:1;} }
-    .modal label {font-weight: bold;}
-    .modal input, .modal textarea { width: 100%; background: #f5f8fb; border: 1.2px solid #dadada; color: #111; font-size: 1.12rem; padding: 11px 10px; margin-bottom: 12px; border-radius: 8px; outline: none; box-sizing: border-box;}
-    .modal-btns { display: flex; gap: 13px; margin-top: 8px; justify-content: flex-end;}
-    .modal-btn-cancel { background: #e74c3c; color: #fff; border: none; padding: 9px 16px; border-radius: 7px; cursor: pointer; font-weight: bold; transition: background .17s;}
-    .modal-btn-ok { background: #F8AF40; color: #1a1813; border: none; padding: 9px 18px; border-radius: 7px; cursor: pointer; font-weight: bold; transition: background .17s;}
-    .modal-error { color: #d30013; font-size: 0.99rem; margin-bottom: 9px; font-weight: 500;}
-    @media (max-width:600px) {.container{padding:1.3rem .6rem;}}
+    /* Modal */
+    .modal-bg { position: fixed; inset:0; background: #0b1020bb; z-index: 9998; display:flex; align-items:center; justify-content:center; padding:14px;}
+    .modal{ background:#fff; color:#222; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.35); padding:22px 18px; width:100%; max-width:380px; }
+    .modal .hd{ font-weight:900; color:#0f2a6a; margin-bottom:10px; display:flex; gap:8px; align-items:center }
+    .modal .btns{ display:flex; gap:12px; justify-content:flex-end; margin-top:8px }
+    .modal .btn-cancel{ background:#e74c3c; color:#fff; border:none; padding:9px 16px; border-radius:8px; font-weight:800; cursor:pointer }
+    .modal .btn-ok{ background:#F8AF40; color:#1a1813; border:none; padding:9px 18px; border-radius:8px; font-weight:800; cursor:pointer }
+    .error{ color:#c0392b; font-weight:700; margin-top:6px }
   </style>
 </head>
 <body>
-  <header>Revertir Pago</header>
+  <header>
+    <div class="topbar">
+      <div class="brand">
+        <i class="fas fa-rotate-left"></i>
+        <b>MULTI INVERSIONES DE OCCIDENTE</b>
+      </div>
+      <div class="page">Reversión</div>
+    </div>
+  </header>
+
   <div class="container">
-    <span class="icon-main"><i class="fas fa-undo"></i></span>
-    <div class="titulo">Reversión de Pagos</div>
-    <div class="desc">Ingresa el número de ticket del pago a reversar.<br><b>Solo el gerente puede autorizar la reversión.</b></div>
 
-    <input id="correlativo" class="input-main" type="number" placeholder="Correlativo de Ticket" maxlength="8" autocomplete="off"/>
-    <button id="buscar-btn" class="btn-main"><i class="fas fa-search"></i> Buscar Pago</button>
+    <div class="split">
+      <!-- ===== BLOQUE 1: Reversión de Pagos ===== -->
+      <section class="panel">
+        <div class="title"><i class="fas fa-receipt"></i> Reversión de Pagos</div>
+        <p class="subtitle">Ingresa el número de ticket del pago a reversar. <b>Sólo el gerente puede autorizar.</b></p>
+        <div class="row">
+          <input id="correlativo" class="input" type="number" placeholder="Correlativo de Ticket" autocomplete="off"/>
+          <button id="buscar-btn" class="btn"><i class="fas fa-search"></i> Buscar</button>
+        </div>
+        <div id="pago-card"></div>
+      </section>
 
-    <div id="pago-card"></div>
+      <!-- ===== BLOQUE 2: Reversión de Movimientos de Caja ===== -->
+      <section class="panel">
+        <div class="title"><i class="fas fa-cash-register"></i> Reversión de Movimiento de Caja</div>
+        <p class="subtitle">Reversa un movimiento de caja. <b>Requiere PIN de gerente.</b></p>
+        <div class="row">
+          <input id="correlativo-mov" class="input" type="number" placeholder="Correlativo de Movimiento" autocomplete="off"/>
+          <button id="buscar-btn-mov" class="btn"><i class="fas fa-search"></i> Buscar</button>
+        </div>
+        <div id="mov-card"></div>
+      </section>
+    </div>
   </div>
 
   <div id="modal-root"></div>
@@ -56,6 +124,7 @@
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
+    /* ===== Firebase ===== */
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -69,8 +138,12 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    let pagoDoc = null, pagoData = null, userId = null, agenciaActual = "";
+    /* ===== Estado ===== */
+    let userId = null, agenciaActual = "";
+    let pagoDoc = null, pagoData = null;
+    let movDoc = null, movData = null;
 
+    /* ===== Util ===== */
     async function obtenerAgencia(user) {
       const snap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
       if (!snap.empty) {
@@ -78,143 +151,156 @@
       }
     }
 
-    // ----- PIN GERENTE -----
-    function showGerentePinDialog() {
-      return new Promise((resolve) => {
-        let modalRoot = document.getElementById("modal-root");
-        let errorMsg = "";
-        let done = false;
+    function showCard(containerId, html){ document.getElementById(containerId).innerHTML = html; }
 
-        async function onOk() {
-          const pinValue = document.getElementById("gerente-pin-input").value.trim();
-          if (!pinValue) { errorMsg = "Debes ingresar el PIN del gerente."; render(); return; }
-          const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pinValue));
+    function confirmPINGerente() {
+      return new Promise((resolve) => {
+        const root = document.getElementById("modal-root");
+        let error = "";
+
+        async function onOk(){
+          const pin = document.getElementById("gerente-pin-input").value.trim();
+          if (!pin){ error = "Debes ingresar el PIN del gerente."; render(); return; }
+          const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
           const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
           const q = query(collection(db, "users"), where("rol", "==", "gerente"));
           const snap = await getDocs(q);
-          if (snap.empty) { errorMsg = "No hay gerente configurado."; render(); return; }
-          let valido = false;
-          snap.forEach(gerente => {
-            if (gerente.data().internalPassword === hashHex) valido = true;
-          });
-          if (valido) close(true);
-          else { errorMsg = "PIN incorrecto"; render(); }
+          if (snap.empty){ error = "No hay gerente configurado."; render(); return; }
+          let ok = false;
+          snap.forEach(g => { if (g.data().internalPassword === hashHex) ok = true; });
+          if (ok) { root.innerHTML=""; resolve(true); }
+          else { error = "PIN incorrecto."; render(); }
         }
-        function close(result=false){ if (done) return; done = true; modalRoot.innerHTML=""; resolve(result); }
+        function cancel(){ root.innerHTML=""; resolve(false); }
+
         function render(){
-          modalRoot.innerHTML = `
+          root.innerHTML = `
             <div class="modal-bg">
               <div class="modal">
+                <div class="hd"><i class="fas fa-user-shield"></i> Autorización Gerente</div>
                 <label>PIN del gerente</label>
                 <input type="password" id="gerente-pin-input" maxlength="10" autocomplete="off" placeholder="PIN"/>
-                ${errorMsg ? `<div class="modal-error">${errorMsg}</div>` : ""}
-                <div class="modal-btns">
-                  <button class="modal-btn-cancel" id="cancelar-pin">Cancelar</button>
-                  <button class="modal-btn-ok" id="autorizar-pin">Autorizar</button>
+                ${error ? `<div class="error">${error}</div>` : ""}
+                <div class="btns">
+                  <button class="btn-cancel" id="cancel-pin">Cancelar</button>
+                  <button class="btn-ok" id="ok-pin">Autorizar</button>
                 </div>
               </div>
             </div>`;
-          document.getElementById("cancelar-pin").onclick = () => close(false);
-          document.getElementById("autorizar-pin").onclick = onOk;
+          document.getElementById("cancel-pin").onclick = cancel;
+          document.getElementById("ok-pin").onclick = onOk;
           document.getElementById("gerente-pin-input").onkeydown = e => { if (e.key === "Enter") onOk(); };
-          setTimeout(()=>document.getElementById("gerente-pin-input").focus(), 30);
+          setTimeout(()=>document.getElementById("gerente-pin-input").focus(), 40);
         }
         render();
       });
     }
 
-    function showInfoCard(html){
-      const card = document.getElementById("pago-card");
-      card.innerHTML = html;
+    function success(msg){
+      const root = document.getElementById("modal-root");
+      root.innerHTML = `
+        <div class="modal-bg">
+          <div class="modal">
+            <div class="hd" style="color:#1c7c36"><i class="fas fa-check-circle"></i> ¡Reversión exitosa!</div>
+            <div style="margin:6px 0 10px;">${msg}</div>
+            <div class="btns">
+              <button class="btn-ok" id="ok">OK</button>
+            </div>
+          </div>
+        </div>`;
+      document.getElementById("ok").onclick = () => {
+        root.innerHTML = "";
+        showCard("pago-card", ""); showCard("mov-card", "");
+        document.getElementById("correlativo").value = "";
+        document.getElementById("correlativo-mov").value = "";
+      };
     }
 
-    function renderPagoInfo() {
+    /* ===== Buscar Pago por correlativo (número o string) y por agencia ===== */
+    async function buscarPago(){
+      showCard("pago-card", "");
+      const input = document.getElementById("correlativo");
+      const raw = input.value.trim();
+      if (!raw) return;
+
+      const btn = document.getElementById("buscar-btn");
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Buscando...';
+
+      if (!agenciaActual) await obtenerAgencia({ uid: userId });
+
+      // 1) número
+      let q1 = query(collection(db, "pagos"), where("correlativo","==", Number(raw)), where("sucursal","==", agenciaActual));
+      let s1 = await getDocs(q1);
+      // 2) string si no hubo match
+      if (s1.empty){
+        q1 = query(collection(db, "pagos"), where("correlativo","==", raw), where("sucursal","==", agenciaActual));
+        s1 = await getDocs(q1);
+      }
+
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Buscar';
+
+      if (s1.empty){
+        showCard("pago-card", `<div class="card"><b style="color:#c0392b">No se encontró el pago.</b></div>`);
+        return;
+      }
+      pagoDoc = s1.docs[0];
+      pagoData = pagoDoc.data();
+      renderPagoCard();
+    }
+
+    function renderPagoCard(){
       if (!pagoData) return;
       const detalleMulta = (pagoData.pagoMultas ?? pagoData.pagoMulta ?? 0);
-      showInfoCard(`
-        <div class="card-pago">
-          <div><b>Ticket:</b> ${pagoData.correlativo}</div>
-          <div><b>Cliente:</b> ${pagoData.nombres}</div>
-          <div><b>Agencia:</b> ${pagoData.sucursal}</div>
-          <div><b>Cajero:</b> ${pagoData.cajeroNombre || "-"}</div>
-          <div><b>Monto pagado:</b> $${parseFloat(pagoData.montoPagado).toFixed(2)}</div>
-          <div><b>Fecha de pago:</b> ${pagoData.fechaPago ? pagoData.fechaPago.replace("T"," ").substring(0,16) : ""}</div>
-          <div style="margin-top:10px;">
-            <b>Detalle:</b><br>
-            <span style="color:#0c8028;"><b>↳ Capital:</b> $${parseFloat(pagoData.pagoCapital || 0).toFixed(2)}</span><br>
-            <span style="color:#1873ad;"><b>↳ Interés:</b> $${parseFloat(pagoData.pagoInteres || 0).toFixed(2)}</span><br>
-            <span style="color:#b1440e;"><b>↳ Multas:</b> $${parseFloat(detalleMulta).toFixed(2)}</span><br>
-            <span><b>↳ Saldo restante:</b> $${parseFloat(pagoData.saldoRestante || 0).toFixed(2)}</span>
+      showCard("pago-card", `
+        <div class="card">
+          <div class="row" style="justify-content:space-between">
+            <div class="k">Ticket</div>
+            <div class="val"><b>${pagoData.correlativo}</b></div>
           </div>
-          <label for="motivo" style="margin-top:16px;">Motivo de reversión (obligatorio):</label>
-          <textarea id="motivo" class="input-motivo" maxlength="120"></textarea>
-          <button class="btn-revertir" id="revertir-btn"><i class="fas fa-undo"></i> Revertir Pago</button>
+          <div class="row" style="justify-content:space-between">
+            <div class="k">Cliente</div>
+            <div class="val">${pagoData.nombres || '-'}</div>
+          </div>
+          <div class="row" style="justify-content:space-between">
+            <div class="k">Agencia</div>
+            <div class="val">${pagoData.sucursal || '-'}</div>
+          </div>
+          <div class="row" style="justify-content:space-between">
+            <div class="k">Cajero</div>
+            <div class="val">${pagoData.cajeroNombre || '-'}</div>
+          </div>
+          <div class="row" style="justify-content:space-between">
+            <div class="k">Fecha</div>
+            <div class="val">${pagoData.fechaPago ? pagoData.fechaPago.replace("T"," ").substring(0,16) : ""}</div>
+          </div>
+          <hr style="border:none;border-top:1px dashed #dfe5ef;margin:10px 0;">
+          <div class="row" style="justify-content:space-between"><div class="k">Capital</div><div class="val">$${(+pagoData.pagoCapital||0).toFixed(2)}</div></div>
+          <div class="row" style="justify-content:space-between"><div class="k">Interés</div><div class="val">$${(+pagoData.pagoInteres||0).toFixed(2)}</div></div>
+          <div class="row" style="justify-content:space-between"><div class="k">Multas</div><div class="val">$${(+detalleMulta||0).toFixed(2)}</div></div>
+          <div class="row" style="justify-content:space-between"><div class="k">Saldo restante</div><div class="val">$${(+pagoData.saldoRestante||0).toFixed(2)}</div></div>
+
+          <label style="display:block;margin:12px 0 6px;font-weight:800;">Motivo de reversión (obligatorio)</label>
+          <textarea id="motivo" class="textarea" maxlength="150"></textarea>
+          <button id="revertir-btn" class="btn-danger"><i class="fas fa-undo"></i> Revertir Pago</button>
         </div>
       `);
       document.getElementById("revertir-btn").onclick = revertirPago;
     }
 
-    // ----- Buscar pago por correlativo (número o string), limitado a agencia del usuario -----
-    async function buscarPago() {
-      showInfoCard("");
-      const correlativoRaw = document.getElementById("correlativo").value.trim();
-      if (!correlativoRaw) return;
-
-      const btn = document.getElementById("buscar-btn");
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Buscando...';
-
-      if (!agenciaActual) await obtenerAgencia({ uid: userId });
-
-      // 1) número
-      let pagosQ = query(
-        collection(db, "pagos"),
-        where("correlativo", "==", Number(correlativoRaw)),
-        where("sucursal", "==", agenciaActual)
-      );
-      let pagosSnap = await getDocs(pagosQ);
-
-      // 2) string
-      if (pagosSnap.empty) {
-        pagosQ = query(
-          collection(db, "pagos"),
-          where("correlativo", "==", correlativoRaw),
-          where("sucursal", "==", agenciaActual)
-        );
-        pagosSnap = await getDocs(pagosQ);
-      }
-
-      btn.disabled = false;
-      btn.innerHTML = '<i class="fas fa-search"></i> Buscar Pago';
-
-      if (pagosSnap.empty) {
-        showInfoCard(`<div style="color:#d30013;font-weight:bold;text-align:center;padding:22px;">No se encontró ningún pago con ese correlativo</div>`);
-        return;
-      }
-      pagoDoc = pagosSnap.docs[0];
-      pagoData = pagoDoc.data();
-
-      renderPagoInfo();
-    }
-
-    // ----- REVERSIÓN: Solo último pago, usa snapshot de reversionPago y BORRA el pago -----
-    async function revertirPago() {
-      try {
+    /* ===== Revertir Pago (solo el ÚLTIMO, usando snapshot) ===== */
+    async function revertirPago(){
+      try{
         if (!pagoData) return;
         const motivo = document.getElementById("motivo").value.trim();
-        if (!motivo) {
-          document.getElementById("motivo").style.borderColor = "#d30013";
-          document.getElementById("motivo").focus();
-          return;
-        }
+        if (!motivo){ document.getElementById("motivo").focus(); return; }
+
+        const ok = await confirmPINGerente();
+        if (!ok) return;
+
         const btn = document.getElementById("revertir-btn");
-        btn.disabled = true;
-        btn.innerHTML = `<span class="spinner"></span> Revirtiendo...`;
+        btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Revirtiendo...';
 
-        const autorizado = await showGerentePinDialog();
-        if (!autorizado) { btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago'; return; }
-
-        // 1) Verificar que sea el ÚLTIMO pago del crédito (por correlativo monotónico)
+        // (1) Verificar que es el ÚLTIMO pago del crédito (correlativo desc)
         const ultQ = query(
           collection(db, "pagos"),
           where("creditoID", "==", pagoData.creditoID),
@@ -222,61 +308,46 @@
           limit(1)
         );
         const ultSnap = await getDocs(ultQ);
-        if (ultSnap.empty || ultSnap.docs[0].id !== pagoDoc.id) {
-          btn.disabled = false;
-          btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
+        if (ultSnap.empty || ultSnap.docs[0].id !== pagoDoc.id){
+          btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
           alert("Solo puedes revertir el último pago realizado para este crédito.");
           return;
         }
 
-        // 2) Buscar snapshot en reversionPago por correlativo
+        // (2) Traer snapshot por correlativo de reversionPago
         let revSnap = await getDocs(query(collection(db,"reversionPago"), where("correlativo","==", Number(pagoData.correlativo))));
-        if (revSnap.empty) {
-          // intentar como string
+        if (revSnap.empty){
           revSnap = await getDocs(query(collection(db,"reversionPago"), where("correlativo","==", String(pagoData.correlativo))));
         }
-        if (revSnap.empty) {
-          btn.disabled = false;
-          btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
+        if (revSnap.empty){
+          btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
           alert("No se encontró el respaldo previo (reversionPago) para este correlativo.");
           return;
         }
-        // Si existieran varios (no debería), tomo el más reciente
         let revDoc = revSnap.docs[0];
-        revSnap.forEach(d => { if (d.createTime?.toMillis && d.createTime.toMillis() > revDoc.createTime.toMillis()) revDoc = d; });
         const revData = revDoc.data();
 
-        // Validaciones cruzadas
-        if (!revData.creditoID || revData.creditoID !== pagoData.creditoID) {
-          btn.disabled = false;
-          btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
+        if (!revData.creditoID || revData.creditoID !== pagoData.creditoID){
+          btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
           alert("El respaldo encontrado no corresponde a este crédito.");
           return;
         }
-        if (!revData.snapshot || typeof revData.snapshot !== "object") {
-          btn.disabled = false;
-          btn.innerHTML = `<i class="fas fa-undo"></i> Revertir Pago`;
-          alert("El snapshot del crédito está incompleto o inválido.");
+        if (!revData.snapshot || typeof revData.snapshot !== "object"){
+          btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
+          alert("El snapshot del crédito está incompleto.");
           return;
         }
 
-        // 3) Restaurar EXACTO el crédito y eliminar el pago – en un batch atómico
+        // (3) Restaurar EXACTO el crédito y BORRAR el pago en un batch
         const batch = writeBatch(db);
         const creditoRef = doc(db, "creditos", pagoData.creditoID);
         const pagoRef = doc(db, "pagos", pagoDoc.id);
-
-        // Restaurar el documento del crédito EXACTAMENTE como estaba (sin merge)
-        batch.set(creditoRef, revData.snapshot, { merge: false });
-
-        // Borrar el pago
-        batch.delete(pagoRef);
-
-        // (Opcional) Marcar el snapshot como usado (no lo borramos, sirve de auditoría)
         const revRef = doc(db, "reversionPago", revDoc.id);
-        batch.set(revRef, { usado: true, usadoAt: new Date().toISOString(), motivo, userId }, { merge: true });
-
-        // (Opcional) Guardar log de reversión
         const logRef = doc(collection(db, "reversionesPagos"));
+
+        batch.set(creditoRef, revData.snapshot, { merge:false }); // tal cual
+        batch.delete(pagoRef);                                     // borrar pago
+        batch.set(revRef, { usado:true, usadoAt:new Date().toISOString(), motivo, userId }, { merge:true });
         batch.set(logRef, {
           correlativo: pagoData.correlativo,
           creditoID: pagoData.creditoID,
@@ -287,45 +358,148 @@
             pagoInteres: pagoData.pagoInteres || 0,
             pagoMultas: pagoData.pagoMultas ?? pagoData.pagoMulta ?? 0
           },
-          motivo,
-          agencia: pagoData.sucursal || "",
-          revertidoPor: userId,
-          revertidoAt: new Date().toISOString()
+          motivo, agencia: pagoData.sucursal || "",
+          revertidoPor: userId, revertidoAt: new Date().toISOString()
         });
 
         await batch.commit();
 
-        // UI success
-        document.getElementById("modal-root").innerHTML = `
-          <div class="modal-bg">
-            <div class="modal">
-              <div style="font-size:1.13rem;color:#18bb18;font-weight:bold;margin-bottom:6px;"><i class="fas fa-check-circle"></i> ¡Reversión exitosa!</div>
-              <div>El pago ${pagoData.correlativo} fue revertido y el crédito quedó exactamente como estaba antes del pago.</div>
-              <div class="modal-btns"><button class="modal-btn-ok" id="ok-success">OK</button></div>
-            </div>
-          </div>`;
-        document.getElementById("ok-success").onclick = () => {
-          document.getElementById("modal-root").innerHTML = "";
-          document.getElementById("pago-card").innerHTML = "";
-          document.getElementById("correlativo").value = "";
-        };
+        success(`El pago ${pagoData.correlativo} fue revertido y el crédito quedó exactamente como antes del pago.`);
 
-      } catch (e) {
-        console.error("Error en revertirPago:", e);
-        alert("Ocurrió un error: " + (e.message || e));
+      }catch(e){
+        console.error("revertirPago:", e);
+        alert("Error al revertir el pago: " + (e.message || e));
         const btn = document.getElementById("revertir-btn");
-        if (btn) { btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago'; }
+        if (btn){ btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago'; }
       }
     }
 
+    /* ===== Buscar Movimiento de Caja ===== */
+    async function buscarMovimiento(){
+      showCard("mov-card", "");
+      const raw = document.getElementById("correlativo-mov").value.trim();
+      if (!raw) return;
+      const btn = document.getElementById("buscar-btn-mov");
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Buscando...';
+
+      if (!agenciaActual) await obtenerAgencia({ uid: userId });
+
+      // 1) número
+      let q1 = query(collection(db, "movimientosCaja"), where("correlativo","==", Number(raw)), where("agencia","==", agenciaActual));
+      let s1 = await getDocs(q1);
+      // 2) string
+      if (s1.empty){
+        q1 = query(collection(db, "movimientosCaja"), where("correlativo","==", raw), where("agencia","==", agenciaActual));
+        s1 = await getDocs(q1);
+      }
+
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Buscar';
+
+      if (s1.empty){
+        showCard("mov-card", `<div class="card"><b style="color:#c0392b">No se encontró el movimiento.</b></div>`);
+        return;
+      }
+      movDoc = s1.docs[0];
+      movData = movDoc.data();
+      renderMovCard();
+    }
+
+    function renderMovCard(){
+      if (!movData) return;
+      showCard("mov-card", `
+        <div class="card">
+          <div class="row" style="justify-content:space-between">
+            <div class="k">Correlativo</div><div class="val"><b>${movData.correlativo}</b></div>
+          </div>
+          <div class="row" style="justify-content:space-between">
+            <div class="k">Tipo</div><div class="val">${movData.tipo || '-'}</div>
+          </div>
+          <div class="row" style="justify-content:space-between">
+            <div class="k">Descripción</div><div class="val">${movData.descripcion || '-'}</div>
+          </div>
+          <div class="row" style="justify-content:space-between">
+            <div class="k">Agencia</div><div class="val">${movData.agencia || '-'}</div>
+          </div>
+          <div class="row" style="justify-content:space-between">
+            <div class="k">Usuario</div><div class="val">${movData.usuario || '-'}</div>
+          </div>
+          <div class="row" style="justify-content:space-between">
+            <div class="k">Monto</div><div class="val">$${(+movData.monto||0).toFixed(2)}</div>
+          </div>
+          <div class="row" style="justify-content:space-between">
+            <div class="k">Fecha</div><div class="val">${movData.fecha ? String(movData.fecha).replace("T"," ").substring(0,16) : ""}</div>
+          </div>
+
+          <label style="display:block;margin:12px 0 6px;font-weight:800;">Motivo de reversión (obligatorio)</label>
+          <textarea id="motivo-mov" class="textarea" maxlength="150"></textarea>
+          <button id="revertir-btn-mov" class="btn-danger"><i class="fas fa-undo"></i> Revertir Movimiento</button>
+        </div>
+      `);
+      document.getElementById("revertir-btn-mov").onclick = revertirMovimiento;
+    }
+
+    /* ===== Revertir Movimiento de Caja (como lo tenías) ===== */
+    async function revertirMovimiento(){
+      try{
+        if (!movData) return;
+        const motivo = document.getElementById("motivo-mov").value.trim();
+        if (!motivo){ document.getElementById("motivo-mov").focus(); return; }
+
+        const ok = await confirmPINGerente();
+        if (!ok) return;
+
+        const btn = document.getElementById("revertir-btn-mov");
+        btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Revirtiendo...';
+
+        // Marcar anulado y crear asiento compensatorio opuesto
+        const batch = writeBatch(db);
+        const movRef = doc(db, "movimientosCaja", movDoc.id);
+
+        batch.set(movRef, {
+          anulado: true,
+          fechaReversion: new Date().toISOString(),
+          usuarioReversion: userId,
+          motivoReversion: motivo
+        }, { merge:true });
+
+        // Movimiento compensatorio
+        const nuevoTipo = (movData.tipo === "Ingreso") ? "Egreso" : "Ingreso";
+        const compRef = doc(collection(db, "movimientosCaja"));
+        batch.set(compRef, {
+          correlativo: Math.floor(Math.random() * 1000000), // si tienes contador propio cámbialo aquí
+          tipo: nuevoTipo,
+          descripcion: `Reversión correlativo ${movData.correlativo}`,
+          agencia: movData.agencia,
+          usuario: userId,
+          monto: (movData.monto || 0) * -1,
+          fecha: new Date().toISOString(),
+          observaciones: motivo,
+          anulado: false
+        });
+
+        await batch.commit();
+        success(`El movimiento ${movData.correlativo} fue reversado correctamente.`);
+
+      }catch(e){
+        console.error("revertirMovimiento:", e);
+        alert("Error al revertir el movimiento: " + (e.message || e));
+        const btn = document.getElementById("revertir-btn-mov");
+        if (btn){ btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Movimiento'; }
+      }
+    }
+
+    /* ===== Auth ===== */
     onAuthStateChanged(auth, async user => {
       if (!user) return location.href = "login.html";
       userId = user.uid;
       await obtenerAgencia(user);
     });
 
+    /* ===== Eventos ===== */
     document.getElementById("buscar-btn").onclick = buscarPago;
     document.getElementById("correlativo").onkeydown = e => { if (e.key === "Enter") buscarPago(); };
+    document.getElementById("buscar-btn-mov").onclick = buscarMovimiento;
+    document.getElementById("correlativo-mov").onkeydown = e => { if (e.key === "Enter") buscarMovimiento(); };
   </script>
 </body>
 </html>

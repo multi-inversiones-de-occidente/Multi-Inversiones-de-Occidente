@@ -88,7 +88,6 @@
   </header>
 
   <div class="container">
-
     <div class="split">
       <!-- ===== BLOQUE 1: Reversión de Pagos ===== -->
       <section class="panel">
@@ -150,14 +149,12 @@
         agenciaActual = snap.docs[0].data().department || snap.docs[0].data().agencia || "";
       }
     }
-
-    function showCard(containerId, html){ document.getElementById(containerId).innerHTML = html; }
+    function showCard(id, html){ document.getElementById(id).innerHTML = html; }
 
     function confirmPINGerente() {
       return new Promise((resolve) => {
         const root = document.getElementById("modal-root");
         let error = "";
-
         async function onOk(){
           const pin = document.getElementById("gerente-pin-input").value.trim();
           if (!pin){ error = "Debes ingresar el PIN del gerente."; render(); return; }
@@ -171,8 +168,7 @@
           if (ok) { root.innerHTML=""; resolve(true); }
           else { error = "PIN incorrecto."; render(); }
         }
-        function cancel(){ root.innerHTML=""; resolve(false); }
-
+        function cancel(){ document.getElementById("modal-root").innerHTML = ""; resolve(false); }
         function render(){
           root.innerHTML = `
             <div class="modal-bg">
@@ -216,11 +212,24 @@
       };
     }
 
-    /* ===== Buscar Pago por correlativo (número o string) y por agencia ===== */
+    function toDate(val){
+      if (!val) return null;
+      if (val instanceof Date) return val;
+      if (typeof val === 'string' || typeof val === 'number') return new Date(val);
+      if (val && typeof val.toDate === 'function') return val.toDate();
+      if (val?.seconds && typeof val.seconds === 'number') return new Date(val.seconds * 1000);
+      return new Date(val);
+    }
+    function startOfDayLocal(val){
+      const d = toDate(val) || new Date();
+      d.setHours(0,0,0,0);
+      return d;
+    }
+
+    /* ===== Buscar Pago ===== */
     async function buscarPago(){
       showCard("pago-card", "");
-      const input = document.getElementById("correlativo");
-      const raw = input.value.trim();
+      const raw = document.getElementById("correlativo").value.trim();
       if (!raw) return;
 
       const btn = document.getElementById("buscar-btn");
@@ -231,7 +240,7 @@
       // 1) número
       let q1 = query(collection(db, "pagos"), where("correlativo","==", Number(raw)), where("sucursal","==", agenciaActual));
       let s1 = await getDocs(q1);
-      // 2) string si no hubo match
+      // 2) string
       if (s1.empty){
         q1 = query(collection(db, "pagos"), where("correlativo","==", raw), where("sucursal","==", agenciaActual));
         s1 = await getDocs(q1);
@@ -253,26 +262,11 @@
       const detalleMulta = (pagoData.pagoMultas ?? pagoData.pagoMulta ?? 0);
       showCard("pago-card", `
         <div class="card">
-          <div class="row" style="justify-content:space-between">
-            <div class="k">Ticket</div>
-            <div class="val"><b>${pagoData.correlativo}</b></div>
-          </div>
-          <div class="row" style="justify-content:space-between">
-            <div class="k">Cliente</div>
-            <div class="val">${pagoData.nombres || '-'}</div>
-          </div>
-          <div class="row" style="justify-content:space-between">
-            <div class="k">Agencia</div>
-            <div class="val">${pagoData.sucursal || '-'}</div>
-          </div>
-          <div class="row" style="justify-content:space-between">
-            <div class="k">Cajero</div>
-            <div class="val">${pagoData.cajeroNombre || '-'}</div>
-          </div>
-          <div class="row" style="justify-content:space-between">
-            <div class="k">Fecha</div>
-            <div class="val">${pagoData.fechaPago ? pagoData.fechaPago.replace("T"," ").substring(0,16) : ""}</div>
-          </div>
+          <div class="row" style="justify-content:space-between"><div class="k">Ticket</div><div class="val"><b>${pagoData.correlativo}</b></div></div>
+          <div class="row" style="justify-content:space-between"><div class="k">Cliente</div><div class="val">${pagoData.nombres || '-'}</div></div>
+          <div class="row" style="justify-content:space-between"><div class="k">Agencia</div><div class="val">${pagoData.sucursal || '-'}</div></div>
+          <div class="row" style="justify-content:space-between"><div class="k">Cajero</div><div class="val">${pagoData.cajeroNombre || '-'}</div></div>
+          <div class="row" style="justify-content:space-between"><div class="k">Fecha</div><div class="val">${pagoData.fechaPago ? pagoData.fechaPago.replace("T"," ").substring(0,16) : ""}</div></div>
           <hr style="border:none;border-top:1px dashed #dfe5ef;margin:10px 0;">
           <div class="row" style="justify-content:space-between"><div class="k">Capital</div><div class="val">$${(+pagoData.pagoCapital||0).toFixed(2)}</div></div>
           <div class="row" style="justify-content:space-between"><div class="k">Interés</div><div class="val">$${(+pagoData.pagoInteres||0).toFixed(2)}</div></div>
@@ -287,7 +281,7 @@
       document.getElementById("revertir-btn").onclick = revertirPago;
     }
 
-    /* ===== Revertir Pago (solo el ÚLTIMO, usando snapshot) ===== */
+    /* ===== Revertir Pago (ÚLTIMO pago, snapshot + catch-ups) ===== */
     async function revertirPago(){
       try{
         if (!pagoData) return;
@@ -300,7 +294,7 @@
         const btn = document.getElementById("revertir-btn");
         btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Revirtiendo...';
 
-        // (1) Verificar que es el ÚLTIMO pago del crédito (correlativo desc)
+        // (1) Validar que es el último pago
         const ultQ = query(
           collection(db, "pagos"),
           where("creditoID", "==", pagoData.creditoID),
@@ -314,7 +308,7 @@
           return;
         }
 
-        // (2) Traer snapshot por correlativo de reversionPago
+        // (2) Traer snapshot guardado en reversionPago por correlativo
         let revSnap = await getDocs(query(collection(db,"reversionPago"), where("correlativo","==", Number(pagoData.correlativo))));
         if (revSnap.empty){
           revSnap = await getDocs(query(collection(db,"reversionPago"), where("correlativo","==", String(pagoData.correlativo))));
@@ -324,9 +318,8 @@
           alert("No se encontró el respaldo previo (reversionPago) para este correlativo.");
           return;
         }
-        let revDoc = revSnap.docs[0];
+        const revDoc = revSnap.docs[0];
         const revData = revDoc.data();
-
         if (!revData.creditoID || revData.creditoID !== pagoData.creditoID){
           btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
           alert("El respaldo encontrado no corresponde a este crédito.");
@@ -338,15 +331,102 @@
           return;
         }
 
-        // (3) Restaurar EXACTO el crédito y BORRAR el pago en un batch
-        const batch = writeBatch(db);
+        // (3) Cargar crédito actual para preservar multas nuevas
         const creditoRef = doc(db, "creditos", pagoData.creditoID);
+        const creditoNowSnap = await getDoc(creditoRef);
+        const creditoNow = creditoNowSnap.exists() ? creditoNowSnap.data() : {};
+
+        // ====== Catch-up de interés (al día) ======
+        const todayStart = startOfDayLocal(new Date());
+
+        const baseCandidates = [];
+        if (pagoData.fechaPago) baseCandidates.push(startOfDayLocal(pagoData.fechaPago));
+        if (revData.snapshot?.fechaUltimoCalculoIntereses) baseCandidates.push(startOfDayLocal(revData.snapshot.fechaUltimoCalculoIntereses));
+        if (!baseCandidates.length && revData.snapshot?.fechaInicio) baseCandidates.push(startOfDayLocal(revData.snapshot.fechaInicio));
+        const base = baseCandidates.length ? new Date(Math.max(...baseCandidates.map(x=>x.getTime()))) : todayStart;
+
+        const MS = 86400000;
+        const days = Math.max(0, Math.floor((todayStart.getTime() - base.getTime()) / MS));
+
+        let td = parseFloat(revData.snapshot.tasaDiariaCredito);
+        if (!Number.isFinite(td) || td <= 0){
+          const an = parseFloat(revData.snapshot.tasaAnualCredito || 0);
+          td = an ? (an / 365) / 100 : 0;
+        }
+
+        const saldoSnap = parseFloat(revData.snapshot.saldoActual || 0);
+        const interesPrevio = parseFloat(revData.snapshot.interesActual || 0);
+        const interesNuevo = +(interesPrevio + (days > 0 ? saldoSnap * td * days : 0)).toFixed(2);
+
+        // ====== Merge de MULTAS: snapshot + multas que existan ahora pero no antes ======
+        const keyMulta = (m) => {
+          const tipo = (m.tipo || "").trim();
+          const cuota = (m.cuotaNumero != null) ? String(m.cuotaNumero) : "";
+          const fecha = (m.fecha || "").toString().slice(0,10);
+          const monto = Number(m.monto || 0).toFixed(2);
+          return `${tipo}|${cuota}|${fecha}|${monto}`;
+        };
+        const snapHM = Array.isArray(revData.snapshot.historialMultas) ? [...revData.snapshot.historialMultas] : [];
+        const nowHM  = Array.isArray(creditoNow.historialMultas) ? creditoNow.historialMultas.filter(Boolean) : [];
+        const seen = new Set(snapHM.map(keyMulta));
+        const mergedHM = [...snapHM];
+        for (const m of nowHM) {
+          const k = keyMulta(m);
+          if (!seen.has(k)) { mergedHM.push(m); seen.add(k); }
+        }
+        const multasAjustadas = +mergedHM.reduce((acc, m) => {
+          const estado = m.estadoCuota || "No Pagada";
+          if (estado === "No Pagada" || !m.estadoCuota) return acc + (parseFloat(m.monto) || 0);
+          return acc;
+        }, 0).toFixed(2);
+
+        // ====== Catch-up de CAPITAL: saldo/capitalAtrasado/cuotasAtrasadas desde amortización ======
+        const EPS = 1e-6;
+        const amort = Array.isArray(revData.snapshot.amortizacion) ? revData.snapshot.amortizacion : [];
+        let saldoNowCents = 0, capAtrNowCents = 0, cuotasAtrasadasNow = 0;
+
+        for (const c of amort) {
+          const cap = parseFloat(c.capital || 0);
+          const pag = parseFloat(c.montoPagado || 0);
+          const falta = Math.max(0, cap - pag);
+          saldoNowCents += Math.round(falta * 100);
+
+          const fC = startOfDayLocal(toDate(c.fecha));
+          if (fC < todayStart && falta > EPS) {
+            capAtrNowCents += Math.round(falta * 100);
+            cuotasAtrasadasNow++;
+          }
+        }
+        const saldoNow = +(saldoNowCents / 100).toFixed(2);
+        const capitalAtrasadoNow = +(capAtrNowCents / 100).toFixed(2);
+
+        // ====== KPIs al día ======
+        const ppdNuevo = +(interesNuevo + capitalAtrasadoNow + Math.max(0, multasAjustadas)).toFixed(2);
+        let estadoCreditoNow = (saldoNow <= EPS) ? "Pagado" : (cuotasAtrasadasNow > 0 ? "Mora Temprana" : "Activo");
+
+        // ====== Snapshot final a restaurar (sin tocar amortización ni estados por cuota) ======
+        const snapshotToRestore = {
+          ...revData.snapshot,
+          interesActual: interesNuevo,
+          fechaUltimoCalculoIntereses: todayStart,
+          historialMultas: mergedHM,
+          multasAcumuladas: multasAjustadas,
+          saldoActual: saldoNow,
+          capitalAtrasado: capitalAtrasadoNow,
+          cuotasAtrasadas: cuotasAtrasadasNow,
+          paraPonerseAlDia: ppdNuevo,
+          estadoCredito: estadoCreditoNow,
+          ultimaActualizacion: new Date().toISOString()
+        };
+
+        // (4) Commit en batch: set crédito exacto + catch-ups, borrar pago, marcar backup usado, log
+        const batch = writeBatch(db);
         const pagoRef = doc(db, "pagos", pagoDoc.id);
         const revRef = doc(db, "reversionPago", revDoc.id);
         const logRef = doc(collection(db, "reversionesPagos"));
 
-        batch.set(creditoRef, revData.snapshot, { merge:false }); // tal cual
-        batch.delete(pagoRef);                                     // borrar pago
+        batch.set(creditoRef, snapshotToRestore, { merge:false });
+        batch.delete(pagoRef);
         batch.set(revRef, { usado:true, usadoAt:new Date().toISOString(), motivo, userId }, { merge:true });
         batch.set(logRef, {
           correlativo: pagoData.correlativo,
@@ -363,8 +443,7 @@
         });
 
         await batch.commit();
-
-        success(`El pago ${pagoData.correlativo} fue revertido y el crédito quedó exactamente como antes del pago.`);
+        success(`El pago ${pagoData.correlativo} fue revertido, el crédito quedó como antes y los agregados (interés, capital vencido y multas) se actualizaron al día.`);
 
       }catch(e){
         console.error("revertirPago:", e);
@@ -374,7 +453,7 @@
       }
     }
 
-    /* ===== Buscar Movimiento de Caja ===== */
+    /* ===== Buscar / Revertir Movimiento de Caja ===== */
     async function buscarMovimiento(){
       showCard("mov-card", "");
       const raw = document.getElementById("correlativo-mov").value.trim();
@@ -384,10 +463,8 @@
 
       if (!agenciaActual) await obtenerAgencia({ uid: userId });
 
-      // 1) número
       let q1 = query(collection(db, "movimientosCaja"), where("correlativo","==", Number(raw)), where("agencia","==", agenciaActual));
       let s1 = await getDocs(q1);
-      // 2) string
       if (s1.empty){
         q1 = query(collection(db, "movimientosCaja"), where("correlativo","==", raw), where("agencia","==", agenciaActual));
         s1 = await getDocs(q1);
@@ -408,27 +485,13 @@
       if (!movData) return;
       showCard("mov-card", `
         <div class="card">
-          <div class="row" style="justify-content:space-between">
-            <div class="k">Correlativo</div><div class="val"><b>${movData.correlativo}</b></div>
-          </div>
-          <div class="row" style="justify-content:space-between">
-            <div class="k">Tipo</div><div class="val">${movData.tipo || '-'}</div>
-          </div>
-          <div class="row" style="justify-content:space-between">
-            <div class="k">Descripción</div><div class="val">${movData.descripcion || '-'}</div>
-          </div>
-          <div class="row" style="justify-content:space-between">
-            <div class="k">Agencia</div><div class="val">${movData.agencia || '-'}</div>
-          </div>
-          <div class="row" style="justify-content:space-between">
-            <div class="k">Usuario</div><div class="val">${movData.usuario || '-'}</div>
-          </div>
-          <div class="row" style="justify-content:space-between">
-            <div class="k">Monto</div><div class="val">$${(+movData.monto||0).toFixed(2)}</div>
-          </div>
-          <div class="row" style="justify-content:space-between">
-            <div class="k">Fecha</div><div class="val">${movData.fecha ? String(movData.fecha).replace("T"," ").substring(0,16) : ""}</div>
-          </div>
+          <div class="row" style="justify-content:space-between"><div class="k">Correlativo</div><div class="val"><b>${movData.correlativo}</b></div></div>
+          <div class="row" style="justify-content:space-between"><div class="k">Tipo</div><div class="val">${movData.tipo || '-'}</div></div>
+          <div class="row" style="justify-content:space-between"><div class="k">Descripción</div><div class="val">${movData.descripcion || '-'}</div></div>
+          <div class="row" style="justify-content:space-between"><div class="k">Agencia</div><div class="val">${movData.agencia || '-'}</div></div>
+          <div class="row" style="justify-content:space-between"><div class="k">Usuario</div><div class="val">${movData.usuario || '-'}</div></div>
+          <div class="row" style="justify-content:space-between"><div class="k">Monto</div><div class="val">$${(+movData.monto||0).toFixed(2)}</div></div>
+          <div class="row" style="justify-content:space-between"><div class="k">Fecha</div><div class="val">${movData.fecha ? String(movData.fecha).replace("T"," ").substring(0,16) : ""}</div></div>
 
           <label style="display:block;margin:12px 0 6px;font-weight:800;">Motivo de reversión (obligatorio)</label>
           <textarea id="motivo-mov" class="textarea" maxlength="150"></textarea>
@@ -438,7 +501,6 @@
       document.getElementById("revertir-btn-mov").onclick = revertirMovimiento;
     }
 
-    /* ===== Revertir Movimiento de Caja (como lo tenías) ===== */
     async function revertirMovimiento(){
       try{
         if (!movData) return;
@@ -451,7 +513,6 @@
         const btn = document.getElementById("revertir-btn-mov");
         btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Revirtiendo...';
 
-        // Marcar anulado y crear asiento compensatorio opuesto
         const batch = writeBatch(db);
         const movRef = doc(db, "movimientosCaja", movDoc.id);
 
@@ -462,11 +523,10 @@
           motivoReversion: motivo
         }, { merge:true });
 
-        // Movimiento compensatorio
         const nuevoTipo = (movData.tipo === "Ingreso") ? "Egreso" : "Ingreso";
         const compRef = doc(collection(db, "movimientosCaja"));
         batch.set(compRef, {
-          correlativo: Math.floor(Math.random() * 1000000), // si tienes contador propio cámbialo aquí
+          correlativo: Math.floor(Math.random() * 1000000), // reemplázalo si usas correlativo secuencial
           tipo: nuevoTipo,
           descripcion: `Reversión correlativo ${movData.correlativo}`,
           agencia: movData.agencia,
@@ -479,7 +539,6 @@
 
         await batch.commit();
         success(`El movimiento ${movData.correlativo} fue reversado correctamente.`);
-
       }catch(e){
         console.error("revertirMovimiento:", e);
         alert("Error al revertir el movimiento: " + (e.message || e));
@@ -503,5 +562,6 @@
   </script>
 </body>
 </html>
+
 
 

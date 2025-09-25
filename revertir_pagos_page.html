@@ -228,6 +228,17 @@
     const toCents = (v)=> Math.round((parseFloat(v||0)+Number.EPSILON)*100);
     const fromCents = (c)=> (c/100).toFixed(2);
 
+    /* === NUEVO: medianoche exacta de El Salvador (UTC-6) para una fecha dada (default: hoy) === */
+    function svStartOfDay(date = new Date()){
+      // Tomamos YYYY-MM-DD de la fecha en zona America/El_Salvador
+      const ymd = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/El_Salvador',
+        year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(date); // "YYYY-MM-DD"
+      // Medianoche local ES (UTC-6) equivale a 06:00:00.000Z
+      return new Date(`${ymd}T06:00:00.000Z`);
+    }
+
     /* ===== Buscar Pago ===== */
     async function buscarPago(){
       showCard("pago-card", "");
@@ -338,7 +349,7 @@
         const creditoNowSnap = await getDoc(creditoRef);
         const creditoNow = creditoNowSnap.exists() ? creditoNowSnap.data() : {};
 
-        // ====== Catch-up de INTERÉS “al día” sobre el snapshot (sin tocar fechaUltimoCalculoIntereses) ======
+        // ====== Catch-up de INTERÉS “al día” sobre el snapshot (sin tocar lógica previa) ======
         const todayStart = startOfDayLocal(new Date());
         const bases = [];
         if (pagoData.fechaPago) bases.push(startOfDayLocal(pagoData.fechaPago));
@@ -373,7 +384,7 @@
         const saldoSnapCents = Math.max(0, principalCents - capPagadoCents);
 
         const interesPrevioCents = toCentsSafe(revData.snapshot.interesActual || 0);
-        const interesPeriodoCents = Math.max(0, Math.round(saldoSnapCents * td * days / 1)); // saldo en cents * tasa * días (resultado en cents)
+        const interesPeriodoCents = Math.max(0, Math.round(saldoSnapCents * td * days / 1));
         const interesNuevoCents = interesPrevioCents + interesPeriodoCents;
         const interesNuevo = (interesNuevoCents/100).toFixed(2);
 
@@ -412,13 +423,16 @@
           }
         }
 
-        const saldoNow = (saldoSnapCents/100).toFixed(2);                 // principal − capital pagado (sin drift)
+        const saldoNow = (saldoSnapCents/100).toFixed(2);
         const capitalAtrasadoNow = (capAtrNowCents/100).toFixed(2);
         const multasAjustadas = (multasAjustadasCents/100).toFixed(2);
         const ppdNuevo = ((interesNuevoCents + capAtrNowCents + multasAjustadasCents)/100).toFixed(2);
         let estadoCreditoNow = (saldoSnapCents === 0) ? "Pagado" : (cuotasAtrasadasNow > 0 ? "Mora Temprana" : "Activo");
 
-        // ====== Snapshot final a restaurar (NO tocamos fechaUltimoCalculoIntereses) ======
+        /* ====== ÚNICO CAMBIO IMPORTANTE: setear fechaUltimoCalculoIntereses EXACTA (medianoche ES) ====== */
+        const fechaULCI = svStartOfDay(new Date()); // p.ej. "25 de septiembre de 2025, 12:00:00 a.m. UTC-6" en consola
+
+        // ====== Snapshot final a restaurar ======
         const snapshotToRestore = {
           ...revData.snapshot,
           interesActual: parseFloat(interesNuevo),
@@ -429,6 +443,7 @@
           cuotasAtrasadas: cuotasAtrasadasNow,
           paraPonerseAlDia: parseFloat(ppdNuevo),
           estadoCredito: estadoCreditoNow,
+          fechaUltimoCalculoIntereses: fechaULCI,      // <<<<<<<< AQUÍ
           ultimaActualizacion: new Date().toISOString()
         };
 
@@ -456,7 +471,7 @@
         });
 
         await batch.commit();
-        success(`El pago ${pagoData.correlativo} fue revertido; el crédito quedó igual que antes del pago y los agregados (interés, capital vencido, multas) quedaron al día, sin desfaces de centavos.`);
+        success(`El pago ${pagoData.correlativo} fue revertido; el crédito quedó igual que antes del pago y los agregados (interés, capital vencido, multas) quedaron al día. Se fijó fechaUltimoCalculoIntereses a la medianoche local (UTC-6) para que el cron sume 1 día mañana.`);
 
       }catch(e){
         console.error("revertirPago:", e);
@@ -575,6 +590,7 @@
   </script>
 </body>
 </html>
+
 
 
 

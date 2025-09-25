@@ -119,7 +119,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import {
       getFirestore, collection, query, where, getDocs, doc, getDoc,
-      setDoc, deleteDoc, orderBy, limit, writeBatch, addDoc
+      orderBy, limit, writeBatch
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
@@ -283,7 +283,7 @@
       document.getElementById("revertir-btn").onclick = revertirPago;
     }
 
-    /* ===== Revertir Pago (ÚLTIMO pago por fecha, snapshot + catch-ups) ===== */
+    /* ===== Revertir Pago (ÚLTIMO por fecha, snapshot + catch-ups) ===== */
     async function revertirPago(){
       try{
         if (!pagoData) return;
@@ -296,7 +296,7 @@
         const btn = document.getElementById("revertir-btn");
         btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Revirtiendo...';
 
-        // (1) Validar que ES el último pago por fechaPago
+        // (1) Validar último pago por fechaPago
         const ultQ = query(
           collection(db, "pagos"),
           where("creditoID", "==", pagoData.creditoID),
@@ -334,11 +334,11 @@
         }
 
         // (3) Cargar crédito actual para preservar multas nuevas
-        const creditoRef = doc(db, "creditos", pagoData.creditoID);
+        const creditoRef = doc(db, "creditos", pagoData.creditoID);  // <<— declarada UNA sola vez
         const creditoNowSnap = await getDoc(creditoRef);
         const creditoNow = creditoNowSnap.exists() ? creditoNowSnap.data() : {};
 
-        // ====== Catch-up de INTERÉS “al día” sobre el snapshot ======
+        // ====== Catch-up de INTERÉS “al día” sobre el snapshot (sin tocar fechaUltimoCalculoIntereses) ======
         const todayStart = startOfDayLocal(new Date());
         const bases = [];
         if (pagoData.fechaPago) bases.push(startOfDayLocal(pagoData.fechaPago));
@@ -355,25 +355,29 @@
           td = an ? (an / 365) / 100 : 0;
         }
 
+        const toCentsSafe = (v)=> Math.round((parseFloat(v||0)+Number.EPSILON)*100);
+
         const principalCents =
           Number.isFinite(revData.snapshot?.montoAprobado)
-            ? toCents(revData.snapshot.montoAprobado)
-            : (revData.snapshot?.saldoInicial ? toCents(revData.snapshot.saldoInicial) : 0);
+            ? toCentsSafe(revData.snapshot.montoAprobado)
+            : (revData.snapshot?.saldoInicial ? toCentsSafe(revData.snapshot.saldoInicial) : 0);
 
-        // Capital ya pagado hasta el snapshot (topeado a capital de cada cuota)
+        // Capital ya pagado hasta el snapshot (tope a capital por cuota)
         const amortSnap = Array.isArray(revData.snapshot.amortizacion) ? revData.snapshot.amortizacion : [];
         let capPagadoCents = 0;
         for (const c of amortSnap){
-          const capC = toCents(c.capital || 0);
-          const pagC = toCents(c.montoPagado || 0);
-          capPagadoCents += Math.min(capC, Math.max(0, pagC));
+          const capC = toCentsSafe(c.capital || 0);
+          const pagC = Math.min(capC, Math.max(0, toCentsSafe(c.montoPagado || 0)));
+          capPagadoCents += pagC;
         }
         const saldoSnapCents = Math.max(0, principalCents - capPagadoCents);
-        const interesPrevioCents = toCents(revData.snapshot.interesActual || 0);
-        const interesNuevoCents = interesPrevioCents + Math.max(0, Math.round((saldoSnapCents/100) * td * days * 100));
-        const interesNuevo = fromCents(interesNuevoCents);
 
-        // ====== Merge de MULTAS: snapshot + las nuevas que existan ahora ======
+        const interesPrevioCents = toCentsSafe(revData.snapshot.interesActual || 0);
+        const interesPeriodoCents = Math.max(0, Math.round(saldoSnapCents * td * days / 1)); // saldo en cents * tasa * días (resultado en cents)
+        const interesNuevoCents = interesPrevioCents + interesPeriodoCents;
+        const interesNuevo = (interesNuevoCents/100).toFixed(2);
+
+        // ====== Merge de MULTAS: snapshot + las nuevas que existan ahora (evita duplicados exactos) ======
         const keyMulta = (m) => {
           const tipo = (m.tipo || "").trim();
           const cuota = (m.cuotaNumero != null) ? String(m.cuotaNumero) : "";
@@ -391,15 +395,15 @@
         }
         const multasAjustadasCents = mergedHM.reduce((acc, m) => {
           const estado = m.estadoCuota || "No Pagada";
-          if (estado === "No Pagada" || !m.estadoCuota) return acc + toCents(m.monto || 0);
+          if (estado === "No Pagada" || !m.estadoCuota) return acc + toCentsSafe(m.monto || 0);
           return acc;
         }, 0);
 
         // ====== CAPITAL vencido y KPIs con fechas del snapshot ======
         let capAtrNowCents = 0, cuotasAtrasadasNow = 0;
         for (const c of amortSnap){
-          const capC = toCents(c.capital || 0);
-          const pagC = Math.min(capC, Math.max(0, toCents(c.montoPagado || 0)));
+          const capC = toCentsSafe(c.capital || 0);
+          const pagC = Math.min(capC, Math.max(0, toCentsSafe(c.montoPagado || 0)));
           const faltaC = Math.max(0, capC - pagC);
           const fC = startOfDayLocal(toDate(c.fecha));
           if (fC < todayStart && faltaC > 0){
@@ -408,12 +412,10 @@
           }
         }
 
-        const saldoNow = fromCents(saldoSnapCents);                 // <=== sin drift, base = principal - capital pagado
-        const capitalAtrasadoNow = fromCents(capAtrNowCents);
-        const multasAjustadas = fromCents(multasAjustadasCents);
-        const ppdNuevo = fromCents(
-          interesNuevoCents + capAtrNowCents + multasAjustadasCents
-        );
+        const saldoNow = (saldoSnapCents/100).toFixed(2);                 // principal − capital pagado (sin drift)
+        const capitalAtrasadoNow = (capAtrNowCents/100).toFixed(2);
+        const multasAjustadas = (multasAjustadasCents/100).toFixed(2);
+        const ppdNuevo = ((interesNuevoCents + capAtrNowCents + multasAjustadasCents)/100).toFixed(2);
         let estadoCreditoNow = (saldoSnapCents === 0) ? "Pagado" : (cuotasAtrasadasNow > 0 ? "Mora Temprana" : "Activo");
 
         // ====== Snapshot final a restaurar (NO tocamos fechaUltimoCalculoIntereses) ======
@@ -435,7 +437,6 @@
         const pagoRef = doc(db, "pagos", pagoDoc.id);
         const revRef = doc(db, "reversionPago", revDoc.id);
         const logRef = doc(collection(db, "reversionesPagos"));
-        const creditoRef = doc(db, "creditos", pagoData.creditoID);
 
         batch.set(creditoRef, snapshotToRestore, { merge:false });
         batch.delete(pagoRef);
@@ -455,7 +456,7 @@
         });
 
         await batch.commit();
-        success(`El pago ${pagoData.correlativo} fue revertido, el crédito quedó como antes y los agregados (interés, capital vencido y multas) quedaron al día. SaldoActual sin drift.`);
+        success(`El pago ${pagoData.correlativo} fue revertido; el crédito quedó igual que antes del pago y los agregados (interés, capital vencido, multas) quedaron al día, sin desfaces de centavos.`);
 
       }catch(e){
         console.error("revertirPago:", e);
@@ -538,7 +539,7 @@
         const nuevoTipo = (movData.tipo === "Ingreso") ? "Egreso" : "Ingreso";
         const compRef = doc(collection(db, "movimientosCaja"));
         batch.set(compRef, {
-          correlativo: Math.floor(Math.random() * 1000000), // cámbialo si usas correlativo secuencial
+          correlativo: Math.floor(Math.random() * 1000000), // si usas secuencial, reemplázalo
           tipo: nuevoTipo,
           descripcion: `Reversión correlativo ${movData.correlativo}`,
           agencia: movData.agencia,

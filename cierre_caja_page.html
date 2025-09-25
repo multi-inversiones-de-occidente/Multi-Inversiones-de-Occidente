@@ -183,6 +183,44 @@
           }
         }
 
+        // +++ NUEVO: incluir pagos (aunque no tengan 'cierre') para poblar el selector
+        {
+          const agenciaActualNorm = (agenciaActual || "").toLowerCase().trim();
+          const pagosQ = query(
+            collection(db, "pagos"),
+            where("sucursal", "==", agenciaActual) // nombre tal cual
+          );
+          const pagosSnap = await getDocs(pagosQ);
+
+          for (const docPago of pagosSnap.docs) {
+            const d = docPago.data();
+
+            if (d.anulado === true) continue;
+            // si existe 'cierre' y es true => ya cerrado, no contarlo
+            if (Object.prototype.hasOwnProperty.call(d, "cierre") && d.cierre === true) continue;
+
+            // seguridad por mayúsculas/espacios en sucursal
+            const sucNorm = (d.sucursal || "").toString().toLowerCase().trim();
+            if (sucNorm !== agenciaActualNorm) continue;
+
+            // Fecha operativa principal: fechaPago
+            if (typeof d.fechaPago === "string" && d.fechaPago.length >= 10) {
+              movDatesSet.add(d.fechaPago.slice(0,10));
+            } else if (d.fechaPago?.toDate) {
+              movDatesSet.add(yyyymmdd(d.fechaPago.toDate()));
+            }
+
+            // Si es retroactivo, también considerar fechaRegistro
+            if (d.retroactivo) {
+              if (typeof d.fechaRegistro === "string" && d.fechaRegistro.length >= 10) {
+                movDatesSet.add(d.fechaRegistro.slice(0,10));
+              } else if (d.fechaRegistro?.toDate) {
+                movDatesSet.add(yyyymmdd(d.fechaRegistro.toDate()));
+              }
+            }
+          }
+        }
+
         // Quitar las ya cerradas
         const cierresQ = query(collection(db, "cierres_caja"), where("agencia", "==", agenciaActual));
         const cierresSnap = await getDocs(cierresQ);
@@ -519,7 +557,6 @@
       position:sticky; top:0; z-index:10;
       backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
       background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
-      border-bottom:1px solid var(--glass-brd);
     }
     .topbar{
       max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
@@ -668,13 +705,5 @@
   </div>
 </body>
 </html>
-
-
-
-
-
-
-
-
 
 

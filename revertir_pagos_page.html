@@ -230,13 +230,11 @@
 
     /* === NUEVO: medianoche exacta de El Salvador (UTC-6) para una fecha dada (default: hoy) === */
     function svStartOfDay(date = new Date()){
-      // Tomamos YYYY-MM-DD de la fecha en zona America/El_Salvador
       const ymd = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'America/El_Salvador',
         year: 'numeric', month: '2-digit', day: '2-digit'
       }).format(date); // "YYYY-MM-DD"
-      // Medianoche local ES (UTC-6) equivale a 06:00:00.000Z
-      return new Date(`${ymd}T06:00:00.000Z`);
+      return new Date(`${ymd}T06:00:00.000Z`); // 00:00 ES = 06:00Z
     }
 
     /* ===== Buscar Pago ===== */
@@ -250,23 +248,42 @@
 
       if (!agenciaActual) await obtenerAgencia({ uid: userId });
 
-      // 1) número
-      let q1 = query(collection(db, "pagos"), where("correlativo","==", Number(raw)), where("sucursal","==", agenciaActual));
-      let s1 = await getDocs(q1);
-      // 2) string
-      if (s1.empty){
-        q1 = query(collection(db, "pagos"), where("correlativo","==", raw), where("sucursal","==", agenciaActual));
-        s1 = await getDocs(q1);
-      }
+      // Hacemos ambas consultas (número y string) y luego elegimos el MÁS RECIENTE
+      const qNum = query(collection(db, "pagos"),
+        where("correlativo","==", Number(raw)),
+        where("sucursal","==", agenciaActual)
+      );
+      const qStr = query(collection(db, "pagos"),
+        where("correlativo","==", raw),
+        where("sucursal","==", agenciaActual)
+      );
+
+      const [sNum, sStr] = await Promise.all([getDocs(qNum), getDocs(qStr)]);
 
       btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Buscar';
 
-      if (s1.empty){
+      const todos = [];
+      sNum.forEach(d=>todos.push(d));
+      sStr.forEach(d=>{ if(!todos.find(x=>x.id===d.id)) todos.push(d); });
+
+      if (todos.length === 0){
         showCard("pago-card", `<div class="card"><b style="color:#c0392b">No se encontró el pago.</b></div>`);
         return;
       }
-      pagoDoc = s1.docs[0];
+
+      // Elegir el MÁS RECIENTE priorizando fechaRegistro, luego fechaPago
+      const getMillis = (snap) => {
+        const data = snap.data();
+        const f1 = data?.fechaRegistro ? new Date(data.fechaRegistro).getTime() : NaN;
+        const f2 = data?.fechaPago ? new Date(data.fechaPago).getTime() : NaN;
+        if (Number.isFinite(f1)) return f1;
+        if (Number.isFinite(f2)) return f2;
+        return 0;
+      };
+      todos.sort((a,b)=> getMillis(b) - getMillis(a));
+      pagoDoc = todos[0];
       pagoData = pagoDoc.data();
+
       renderPagoCard();
     }
 
@@ -430,7 +447,7 @@
         let estadoCreditoNow = (saldoSnapCents === 0) ? "Pagado" : (cuotasAtrasadasNow > 0 ? "Mora Temprana" : "Activo");
 
         /* ====== ÚNICO CAMBIO IMPORTANTE: setear fechaUltimoCalculoIntereses EXACTA (medianoche ES) ====== */
-        const fechaULCI = svStartOfDay(new Date()); // p.ej. "25 de septiembre de 2025, 12:00:00 a.m. UTC-6" en consola
+        const fechaULCI = svStartOfDay(new Date()); // p.ej. 25/09/2025 00:00:00 (UTC-6)
 
         // ====== Snapshot final a restaurar ======
         const snapshotToRestore = {
@@ -590,7 +607,6 @@
   </script>
 </body>
 </html>
-
 
 
 

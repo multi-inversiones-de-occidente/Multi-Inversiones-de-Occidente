@@ -74,8 +74,6 @@
     .modal .btn-cancel{ background:#e74c3c; color:#fff; border:none; padding:9px 16px; border-radius:8px; font-weight:800; cursor:pointer }
     .modal .btn-ok{ background:#F8AF40; color:#1a1813; border:none; padding:9px 18px; border-radius:8px; font-weight:800; cursor:pointer }
     .error{ color:#c0392b; font-weight:700; margin-top:6px }
-    .hint{ color:#8a5b00; font-weight:800; margin-bottom:8px }
-    .btn-mini{ background:#eef3fb; border:1px solid #dbe1ea; padding:7px 10px; border-radius:8px; font-weight:800; cursor:pointer;}
   </style>
 </head>
 <body>
@@ -96,7 +94,7 @@
         <div class="title"><i class="fas fa-receipt"></i> Reversión de Pagos</div>
         <p class="subtitle">Ingresa el número de ticket del pago a reversar. <b>Sólo el gerente puede autorizar.</b></p>
         <div class="row">
-          <input id="correlativo" class="input" type="number" placeholder="Correlativo de Ticket" autocomplete="off"/>
+          <input id="correlativo" class="input" type="text" inputmode="numeric" placeholder="Correlativo de Ticket (p.ej. 00012)" autocomplete="off"/>
           <button id="buscar-btn" class="btn"><i class="fas fa-search"></i> Buscar</button>
         </div>
         <div id="pago-card"></div>
@@ -107,7 +105,7 @@
         <div class="title"><i class="fas fa-cash-register"></i> Reversión de Movimiento de Caja</div>
         <p class="subtitle">Reversa un movimiento de caja. <b>Requiere PIN de gerente.</b></p>
         <div class="row">
-          <input id="correlativo-mov" class="input" type="number" placeholder="Correlativo de Movimiento" autocomplete="off"/>
+          <input id="correlativo-mov" class="input" type="text" inputmode="numeric" placeholder="Correlativo de Movimiento" autocomplete="off"/>
           <button id="buscar-btn-mov" class="btn"><i class="fas fa-search"></i> Buscar</button>
         </div>
         <div id="mov-card"></div>
@@ -121,7 +119,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import {
       getFirestore, collection, query, where, getDocs, doc, getDoc,
-      setDoc, deleteDoc, orderBy, limit, writeBatch, addDoc
+      writeBatch, addDoc, orderBy, limit
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
@@ -144,7 +142,7 @@
     let pagoDoc = null, pagoData = null;
     let movDoc = null, movData = null;
 
-    /* ===== Util ===== */
+    /* ===== Helpers ===== */
     async function obtenerAgencia(user) {
       const snap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
       if (!snap.empty) {
@@ -152,6 +150,15 @@
       }
     }
     function showCard(id, html){ document.getElementById(id).innerHTML = html; }
+
+    // Normalizadores de correlativo para evitar choques "00002" vs 2
+    const digitsOnly = (x) => String(x ?? '').replace(/\D+/g, '');
+    const pad5 = (x) => {
+      const d = digitsOnly(x);
+      const n = d === '' ? 0 : Number(d);
+      return String(n).padStart(5,'0');
+    };
+    const sameCorr = (a,b) => pad5(a) === pad5(b);
 
     function confirmPINGerente() {
       return new Promise((resolve) => {
@@ -214,6 +221,7 @@
       };
     }
 
+    // fechas
     function toDate(val){
       if (!val) return null;
       if (val instanceof Date) return val;
@@ -227,53 +235,8 @@
       d.setHours(0,0,0,0);
       return d;
     }
-    const MS = 86400000;
 
-    /* ====== Helpers correlativo ====== */
-    function pad5(x){
-      const s = String(x ?? "").replace(/^0+/, '');
-      const n = s === '' ? 0 : Number(s);
-      return String(n).padStart(5,'0');
-    }
-    async function fetchPagosByCorrelativo(raw, sucursal){
-      const resultsMap = new Map();
-      const adds = (snap)=> snap.forEach(d=>resultsMap.set(d.id, d));
-
-      const padded = pad5(raw);
-      const asNum  = Number(raw);
-
-      // correlativoStr === padded
-      try{
-        const q1 = query(collection(db,"pagos"), where("sucursal","==",sucursal), where("correlativoStr","==",padded));
-        adds(await getDocs(q1));
-      }catch{}
-
-      // correlativoNum === asNum
-      if (Number.isFinite(asNum)){
-        try{
-          const q2 = query(collection(db,"pagos"), where("sucursal","==",sucursal), where("correlativoNum","==",asNum));
-          adds(await getDocs(q2));
-        }catch{}
-      }
-
-      // legacy: correlativo === padded (string)
-      try{
-        const q3 = query(collection(db,"pagos"), where("sucursal","==",sucursal), where("correlativo","==",padded));
-        adds(await getDocs(q3));
-      }catch{}
-
-      // legacy: correlativo === asNum (number)
-      if (Number.isFinite(asNum)){
-        try{
-          const q4 = query(collection(db,"pagos"), where("sucursal","==",sucursal), where("correlativo","==",asNum));
-          adds(await getDocs(q4));
-        }catch{}
-      }
-
-      return Array.from(resultsMap.values());
-    }
-
-    /* ===== Buscar Pago (robusto, lista si hay duplicados) ===== */
+    /* ===== Buscar Pago (normaliza correlativo y resuelve duplicados por fecha) ===== */
     async function buscarPago(){
       showCard("pago-card", "");
       const raw = document.getElementById("correlativo").value.trim();
@@ -284,68 +247,59 @@
 
       if (!agenciaActual) await obtenerAgencia({ uid: userId });
 
-      const matches = await fetchPagosByCorrelativo(raw, agenciaActual);
+      const wanted = pad5(raw);
+      const results = new Map();
+
+      // Query como número
+      try{
+        const sNum = await getDocs(
+          query(collection(db,"pagos"), where("correlativo","==", Number(digitsOnly(raw))), where("sucursal","==", agenciaActual))
+        );
+        sNum.forEach(d => results.set(d.id, d));
+      }catch{}
+
+      // Query como string
+      try{
+        const sStr = await getDocs(
+          query(collection(db,"pagos"), where("correlativo","==", raw), where("sucursal","==", agenciaActual))
+        );
+        sStr.forEach(d => results.set(d.id, d));
+      }catch{}
 
       btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Buscar';
 
-      if (!matches.length){
+      const filtered = Array.from(results.values()).filter(d => sameCorr(d.data().correlativo, wanted));
+
+      if (!filtered.length){
         showCard("pago-card", `<div class="card"><b style="color:#c0392b">No se encontró el pago.</b></div>`);
         return;
       }
 
-      // Si hay varios, mostrar lista para elegir
-      if (matches.length > 1){
-        const html = `
-          <div class="card">
-            <div class="hint"><i class="fas fa-clone"></i> Se encontraron ${matches.length} pagos con el mismo correlativo en esta agencia. Elige el correcto:</div>
-            ${matches.map(d=>{
-              const p = d.data();
-              const corrStr = p.correlativoStr ? p.correlativoStr : pad5(p.correlativo);
-              const fecha = p.fechaPago ? String(p.fechaPago).replace("T"," ").substring(0,16) : "";
-              const multas = (p.pagoMultas ?? p.pagoMulta ?? 0);
-              return `
-              <div style="border:1px solid #e7ebf3;border-radius:10px;padding:10px 12px;margin:10px 0;">
-                <div class="row" style="justify-content:space-between;"><div class="k">Ticket</div><div class="val"><b>${corrStr}</b> <span class="k" style="font-size:.9em">(${p.correlativo})</span></div></div>
-                <div class="row" style="justify-content:space-between;"><div class="k">Cliente</div><div class="val">${p.nombres || '-'}</div></div>
-                <div class="row" style="justify-content:space-between;"><div class="k">Fecha</div><div class="val">${fecha}</div></div>
-                <div class="row" style="justify-content:space-between;"><div class="k">Capital</div><div class="val">$${(+p.pagoCapital||0).toFixed(2)}</div></div>
-                <div class="row" style="justify-content:space-between;"><div class="k">Interés</div><div class="val">$${(+p.pagoInteres||0).toFixed(2)}</div></div>
-                <div class="row" style="justify-content:space-between;"><div class="k">Multas</div><div class="val">$${(+multas||0).toFixed(2)}</div></div>
-                <div style="text-align:right;margin-top:8px;">
-                  <button class="btn-mini" data-id="${d.id}"><i class="fas fa-check"></i> Usar este</button>
-                </div>
-              </div>`;
-            }).join('')}
-          </div>`;
-        showCard("pago-card", html);
-        document.querySelectorAll('#pago-card .btn-mini[data-id]').forEach(b=>{
-          b.onclick = ()=>{
-            const d = matches.find(x=>x.id===b.getAttribute('data-id'));
-            pagoDoc = d;
-            pagoData = d.data();
-            renderPagoCard();
-          };
-        });
-        return;
-      }
+      // Si hay varios con el mismo correlativo normalizado, tomar el más reciente por fechaPago
+      filtered.sort((a,b) => {
+        const fa = toDate(a.data().fechaPago)?.getTime() || 0;
+        const fb = toDate(b.data().fechaPago)?.getTime() || 0;
+        return fb - fa;
+      });
 
-      // Único resultado
-      pagoDoc = matches[0];
+      pagoDoc = filtered[0];
       pagoData = pagoDoc.data();
-      renderPagoCard();
+      renderPagoCard(filtered.length > 1);
     }
 
-    function renderPagoCard(){
+    function renderPagoCard(dup = false){
       if (!pagoData) return;
       const detalleMulta = (pagoData.pagoMultas ?? pagoData.pagoMulta ?? 0);
-      const corrStr = pagoData.correlativoStr ? pagoData.correlativoStr : pad5(pagoData.correlativo);
       showCard("pago-card", `
         <div class="card">
-          <div class="row" style="justify-content:space-between"><div class="k">Ticket</div><div class="val"><b>${corrStr}</b> <span class="k" style="font-size:.9em">(${pagoData.correlativo})</span></div></div>
+          ${dup ? `<div style="background:#fff7e6;border:1px solid #ffd9a8;color:#7a4b00;padding:8px 10px;border-radius:8px;margin-bottom:10px;">
+            Se encontraron varios tickets con este número. Se muestra el más reciente por fecha.
+          </div>` : ``}
+          <div class="row" style="justify-content:space-between"><div class="k">Ticket</div><div class="val"><b>${pad5(pagoData.correlativo)}</b></div></div>
           <div class="row" style="justify-content:space-between"><div class="k">Cliente</div><div class="val">${pagoData.nombres || '-'}</div></div>
           <div class="row" style="justify-content:space-between"><div class="k">Agencia</div><div class="val">${pagoData.sucursal || '-'}</div></div>
           <div class="row" style="justify-content:space-between"><div class="k">Cajero</div><div class="val">${pagoData.cajeroNombre || '-'}</div></div>
-          <div class="row" style="justify-content:space-between"><div class="k">Fecha</div><div class="val">${pagoData.fechaPago ? pagoData.fechaPago.replace("T"," ").substring(0,16) : ""}</div></div>
+          <div class="row" style="justify-content:space-between"><div class="k">Fecha</div><div class="val">${pagoData.fechaPago ? String(pagoData.fechaPago).replace("T"," ").substring(0,16) : ""}</div></div>
           <hr style="border:none;border-top:1px dashed #dfe5ef;margin:10px 0;">
           <div class="row" style="justify-content:space-between"><div class="k">Capital</div><div class="val">$${(+pagoData.pagoCapital||0).toFixed(2)}</div></div>
           <div class="row" style="justify-content:space-between"><div class="k">Interés</div><div class="val">$${(+pagoData.pagoInteres||0).toFixed(2)}</div></div>
@@ -360,7 +314,7 @@
       document.getElementById("revertir-btn").onclick = revertirPago;
     }
 
-    /* ===== Revertir Pago (ÚLTIMO pago, snapshot + catch-ups) ===== */
+    /* ===== Revertir Pago (último pago + snapshot + catch-ups) ===== */
     async function revertirPago(){
       try{
         if (!pagoData) return;
@@ -373,27 +327,41 @@
         const btn = document.getElementById("revertir-btn");
         btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Revirtiendo...';
 
-        // === (1) Validar que es el último pago vigente por fechaPago
-        const ultQ = query(collection(db, "pagos"), where("creditoID","==", pagoData.creditoID), orderBy("fechaPago","desc"), limit(5));
-        const ultSnap = await getDocs(ultQ);
+        // (1) Validar que es el último pago por fechaPago (más robusto que correlativo)
+        let ultSnap;
+        try{
+          ultSnap = await getDocs(
+            query(collection(db, "pagos"),
+                  where("creditoID","==", pagoData.creditoID),
+                  orderBy("fechaPago","desc"),
+                  limit(5))
+          );
+        }catch{
+          // Fallback sin orderBy (si falta índice). Selección más reciente se hará client-side.
+          ultSnap = await getDocs(query(collection(db, "pagos"), where("creditoID","==", pagoData.creditoID)));
+        }
         if (ultSnap.empty){
           btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
           alert("No se pudo validar el último pago.");
           return;
         }
-        // Tomar el primero no anulado
-        let ultimoVigente = ultSnap.docs.find(d => !d.data()?.anulado);
-        if (!ultimoVigente) ultimoVigente = ultSnap.docs[0]; // fallback
+        const candidatos = ultSnap.docs.filter(d => !d.data()?.anulado);
+        candidatos.sort((a,b) => {
+          const fa = toDate(a.data().fechaPago)?.getTime() || 0;
+          const fb = toDate(b.data().fechaPago)?.getTime() || 0;
+          return fb - fa;
+        });
+        const ultimoVigente = candidatos[0] || ultSnap.docs[0];
         if (ultimoVigente.id !== pagoDoc.id){
           btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
           alert("Solo puedes revertir el último pago realizado para este crédito.");
           return;
         }
 
-        // === (2) Traer snapshot guardado en reversionPago por correlativo (num/str/str-5)
+        // (2) Traer snapshot guardado en reversionPago por correlativo (num/str/str-5)
         async function fetchReversionByCorr(c){
           const padded = pad5(c);
-          const asNum = Number(c);
+          const asNum = Number(digitsOnly(c));
           const results = [];
           let s;
 
@@ -405,7 +373,6 @@
           if (Number.isFinite(asNum)) {
             try{ s = await getDocs(query(collection(db,"reversionPago"), where("correlativo","==", asNum))); if (!s.empty) results.push(...s.docs); }catch{}
           }
-          // quitar duplicados por id
           const map = new Map(); results.forEach(d=>map.set(d.id,d));
           return Array.from(map.values());
         }
@@ -428,20 +395,19 @@
           return;
         }
 
-        // === (3) Cargar crédito actual para preservar multas nuevas
-        const creditoRef = doc(db, "creditos", pagoData.creditoID);
-        const creditoNowSnap = await getDoc(creditoRef);
+        // (3) Cargar crédito actual para preservar multas nuevas
+        const creditoDocRef = doc(db, "creditos", pagoData.creditoID);
+        const creditoNowSnap = await getDoc(creditoDocRef);
         const creditoNow = creditoNowSnap.exists() ? creditoNowSnap.data() : {};
 
-        // ====== Catch-up de interés (al día) ======
+        // ====== Catch-up de interés ======
+        const MS = 86400000;
         const todayStart = startOfDayLocal(new Date());
-
         const baseCandidates = [];
         if (pagoData.fechaPago) baseCandidates.push(startOfDayLocal(pagoData.fechaPago));
         if (revData.snapshot?.fechaUltimoCalculoIntereses) baseCandidates.push(startOfDayLocal(revData.snapshot.fechaUltimoCalculoIntereses));
         if (!baseCandidates.length && revData.snapshot?.fechaInicio) baseCandidates.push(startOfDayLocal(revData.snapshot.fechaInicio));
         const base = baseCandidates.length ? new Date(Math.max(...baseCandidates.map(x=>x.getTime()))) : todayStart;
-
         const days = Math.max(0, Math.floor((todayStart.getTime() - base.getTime()) / MS));
 
         let td = parseFloat(revData.snapshot.tasaDiariaCredito);
@@ -449,12 +415,11 @@
           const an = parseFloat(revData.snapshot.tasaAnualCredito || 0);
           td = an ? (an / 365) / 100 : 0;
         }
-
         const saldoSnap = parseFloat(revData.snapshot.saldoActual || 0);
         const interesPrevio = parseFloat(revData.snapshot.interesActual || 0);
         const interesNuevo = +(interesPrevio + (days > 0 ? saldoSnap * td * days : 0)).toFixed(2);
 
-        // ====== Merge de MULTAS: snapshot + multas actuales no existentes en snapshot ======
+        // ====== Merge de multas (mantener nuevas que no existían en el snapshot) ======
         const keyMulta = (m) => {
           const tipo = (m.tipo || "").trim();
           const cuota = (m.cuotaNumero != null) ? String(m.cuotaNumero) : "";
@@ -476,7 +441,7 @@
           return acc;
         }, 0).toFixed(2);
 
-        // ====== Catch-up de CAPITAL: saldo/capitalAtrasado/cuotasAtrasadas desde amortización ======
+        // ====== Catch-up de capital atrasado y saldo desde amortización ======
         const EPS = 1e-6;
         const amort = Array.isArray(revData.snapshot.amortizacion) ? revData.snapshot.amortizacion : [];
         let saldoNowCents = 0, capAtrNowCents = 0, cuotasAtrasadasNow = 0;
@@ -515,20 +480,24 @@
           ultimaActualizacion: new Date().toISOString()
         };
 
-        // === (4) Commit en batch: set crédito exacto + catch-ups, borrar pago, marcar backup usado, log
+        // (4) Commit en batch (restaurar crédito, borrar pago, marcar backup usado, log)
         const batch = writeBatch(db);
         const pagoRef = doc(db, "pagos", pagoDoc.id);
-        const revRef = doc(db, "reversionPago", revDoc.id);
-        const logRef = doc(collection(db, "reversionesPagos"));
-        const creditoRef = doc(db, "creditos", pagoData.creditoID);
+        const revRef  = doc(db, "reversionPago", revDoc.id);
+        const logRef  = doc(collection(db, "reversionesPagos"));
 
-        batch.set(creditoRef, snapshotToRestore, { merge:false });
+        batch.set(creditoDocRef, snapshotToRestore, { merge:false });
         batch.delete(pagoRef);
-        batch.set(revRef, { usado:true, usadoAt:new Date().toISOString(), motivo, userId }, { merge:true });
+        batch.set(revRef, {
+          usado:true,
+          usadoAt:new Date().toISOString(),
+          motivo,
+          userId
+        }, { merge:true });
         batch.set(logRef, {
           correlativo: pagoData.correlativo,
-          correlativoStr: pagoData.correlativoStr ?? pad5(pagoData.correlativo),
-          correlativoNum: Number(String(pagoData.correlativo).replace(/^0+/,'')) || 0,
+          correlativoStr: pad5(pagoData.correlativo),
+          correlativoNum: Number(digitsOnly(pagoData.correlativo)) || 0,
           creditoID: pagoData.creditoID,
           clienteID: revData.clienteID || null,
           montoPagado: pagoData.montoPagado,
@@ -537,12 +506,15 @@
             pagoInteres: pagoData.pagoInteres || 0,
             pagoMultas: pagoData.pagoMultas ?? pagoData.pagoMulta ?? 0
           },
-          motivo, agencia: pagoData.sucursal || "",
-          revertidoPor: userId, revertidoAt: new Date().toISOString()
+          motivo,
+          agencia: pagoData.sucursal || "",
+          revertidoPor: userId,
+          revertidoAt: new Date().toISOString()
         });
 
         await batch.commit();
-        success(`El pago ${pad5(pagoData.correlativo)} fue revertido. El crédito quedó como antes y los agregados (interés, capital vencido y multas) se actualizaron al día.`);
+        btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
+        alert(`El pago ${pad5(pagoData.correlativo)} fue revertido correctamente.`);
       }catch(e){
         console.error("revertirPago:", e);
         alert("Error al revertir el pago: " + (e.message || e));
@@ -551,7 +523,7 @@
       }
     }
 
-    /* ===== Buscar / Revertir Movimiento de Caja (se mantiene) ===== */
+    /* ===== Buscar / Revertir Movimiento de Caja ===== */
     async function buscarMovimiento(){
       showCard("mov-card", "");
       const raw = document.getElementById("correlativo-mov").value.trim();
@@ -561,20 +533,27 @@
 
       if (!agenciaActual) await obtenerAgencia({ uid: userId });
 
-      let q1 = query(collection(db, "movimientosCaja"), where("correlativo","==", Number(raw)), where("agencia","==", agenciaActual));
-      let s1 = await getDocs(q1);
-      if (s1.empty){
-        q1 = query(collection(db, "movimientosCaja"), where("correlativo","==", raw), where("agencia","==", agenciaActual));
-        s1 = await getDocs(q1);
-      }
+      const results = new Map();
+      try{
+        const sNum = await getDocs(
+          query(collection(db, "movimientosCaja"), where("correlativo","==", Number(digitsOnly(raw))), where("agencia","==", agenciaActual))
+        );
+        sNum.forEach(d => results.set(d.id, d));
+      }catch{}
+      try{
+        const sStr = await getDocs(
+          query(collection(db, "movimientosCaja"), where("correlativo","==", raw), where("agencia","==", agenciaActual))
+        );
+        sStr.forEach(d => results.set(d.id, d));
+      }catch{}
 
       btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Buscar';
 
-      if (s1.empty){
+      if (!results.size){
         showCard("mov-card", `<div class="card"><b style="color:#c0392b">No se encontró el movimiento.</b></div>`);
         return;
       }
-      movDoc = s1.docs[0];
+      movDoc = Array.from(results.values())[0];
       movData = movDoc.data();
       renderMovCard();
     }
@@ -624,7 +603,7 @@
         const nuevoTipo = (movData.tipo === "Ingreso") ? "Egreso" : "Ingreso";
         const compRef = doc(collection(db, "movimientosCaja"));
         batch.set(compRef, {
-          correlativo: Math.floor(Math.random() * 1000000), // si usas secuencial, cámbialo por tu generador
+          correlativo: Math.floor(Math.random() * 1000000), // reemplázalo si usas correlativo secuencial propio
           tipo: nuevoTipo,
           descripcion: `Reversión correlativo ${movData.correlativo}`,
           agencia: movData.agencia,
@@ -636,6 +615,7 @@
         });
 
         await batch.commit();
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-undo"></i> Revertir Movimiento';
         success(`El movimiento ${movData.correlativo} fue reversado correctamente.`);
       }catch(e){
         console.error("revertirMovimiento:", e);
@@ -660,6 +640,7 @@
   </script>
 </body>
 </html>
+
 
 
 

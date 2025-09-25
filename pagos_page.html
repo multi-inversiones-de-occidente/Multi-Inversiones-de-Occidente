@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Recepción de Pagos – Multi Inversiones</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
   <style>
     /* ====== NUEVA LÍNEA GRÁFICA ====== */
     :root{
@@ -39,7 +38,6 @@
         radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.06), transparent 40%);
       background-size:100px 100px; mix-blend-mode:soft-light; opacity:.5;
     }
-
     header{
       position:sticky; top:0; z-index:10;
       backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
@@ -65,18 +63,14 @@
     .logo-plate img{ height:28px; width:auto; display:block }
     .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
     .page-name{ margin-left:auto; font-weight:700; color:var(--muted); }
-
     .container{
       position:relative; z-index:1; max-width:900px; margin:0 auto; padding:2.2rem 16px 3rem;
       display:flex; flex-direction:column; align-items:center;
     }
-
     .visually-hidden{
       position:absolute !important; clip: rect(1px, 1px, 1px, 1px);
       padding:0; border:0; height:1px; width:1px; overflow:hidden; white-space:nowrap;
     }
-
-    /* ===== Tarjeta de Identidad ===== */
     .identity-card{
       width:100%; max-width:900px; margin: .2rem auto 1.2rem auto;
       display:flex; align-items:center; gap:14px; padding:10px 12px;
@@ -93,66 +87,39 @@
       animation: halo 10s linear infinite;
     }
     @keyframes halo{ to{ transform: rotate(1turn) } }
-
-    .avatar{
-      width:60px; height:60px; padding:2px; border-radius:50%;
+    .avatar{ width:60px; height:60px; padding:2px; border-radius:50%;
       background: conic-gradient(from 210deg, var(--brand-cel), var(--brand-gold), var(--brand-green), var(--brand-cel));
-      position:relative; box-shadow: 0 8px 24px rgba(10,20,40,.15);
-      flex: 0 0 auto;
-    }
-    .avatar .inner{
-      width:100%; height:100%; border-radius:50%;
+      position:relative; box-shadow: 0 8px 24px rgba(10,20,40,.15); flex: 0 0 auto; }
+    .avatar .inner{ width:100%; height:100%; border-radius:50%;
       background: linear-gradient(180deg, #f6f9ff, #e9eef6);
-      overflow:hidden; display:grid; place-items:center;
-    }
+      overflow:hidden; display:grid; place-items:center; }
     .avatar img{ width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; }
-    .avatar .initials{
-      display:none; width:100%; height:100%; border-radius:50%;
+    .avatar .initials{ display:none; width:100%; height:100%; border-radius:50%;
       font-weight:800; letter-spacing:.5px; color:#243b86; font-size:1.05rem;
       background: linear-gradient(180deg, #ffffff, #ecf2fb);
-      place-items:center;
-    }
-    .avatar .status{
-      position:absolute; right:2px; bottom:2px; width:12px; height:12px; border-radius:50%;
-      background:#22c55e; border:2px solid #fff; box-shadow: 0 0 0 2px rgba(34,197,94,.2);
-    }
+      place-items:center; }
+    .avatar .status{ position:absolute; right:2px; bottom:2px; width:12px; height:12px; border-radius:50%;
+      background:#22c55e; border:2px solid #fff; box-shadow: 0 0 0 2px rgba(34,197,94,.2); }
     .who{ display:flex; flex-direction:column; gap:6px; min-width:0; width:100%; }
-    .email-pill{
-      display:inline-flex; align-items:center; gap:10px; max-width:100%;
+    .email-pill{ display:inline-flex; align-items:center; gap:10px; max-width:100%;
       padding:10px 14px; border-radius:999px;
       background: linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
       border: 1px solid rgba(36,59,134,.15);
       font-weight:800; color:var(--brand-blue); letter-spacing:.2px;
       box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
-      position:relative; overflow:hidden;
-    }
+      position:relative; overflow:hidden; }
     .email-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .email-icon{ color: var(--brand-blue); opacity:.85; }
-
-    /* ===== Banda agencia + búsqueda ===== */
-    .agencia-row{
-      width:100%; max-width:900px;
-      background: rgba(103,200,241,.12);
-      border:1px solid rgba(103,200,241,.25);
-      color:#0f6aa0; font-weight:700; letter-spacing:.2px;
-      padding:10px 14px; border-radius:14px; margin: 6px 0 16px 0;
-      display:flex; align-items:center; gap:10px;
-    }
+    .agencia-row{ width:100%; max-width:900px; background: rgba(103,200,241,.12);
+      border:1px solid rgba(103,200,241,.25); color:#0f6aa0; font-weight:700; letter-spacing:.2px;
+      padding:10px 14px; border-radius:14px; margin: 6px 0 16px 0; display:flex; align-items:center; gap:10px; }
     .agencia-row i{ color:#0f6aa0 }
-
-    .searchbar{
-      width:100%; max-width:900px;
-      display:flex; align-items:center; gap:10px; margin-bottom:16px;
+    .searchbar{ width:100%; max-width:900px; display:flex; align-items:center; gap:10px; margin-bottom:16px;
       background:var(--glass-bg); border:1px solid var(--glass-brd); border-radius:18px; padding:10px 14px;
-      box-shadow:var(--glass-shadow);
-    }
+      box-shadow:var(--glass-shadow); }
     .searchbar i{ color:var(--muted) }
-    .searchbar input{
-      flex:1; background:transparent; border:none; outline:none; color:var(--text);
-      font-size:1.05rem; padding:8px 4px;
-    }
-
-    /* ===== Listado de clientes ===== */
+    .searchbar input{ flex:1; background:transparent; border:none; outline:none; color:var(--text);
+      font-size:1.05rem; padding:8px 4px; }
     #clientes-list{ width:100%; max-width:900px; }
     .cliente-card{
       background:radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,.65), rgba(255,255,255,.28) 40%, rgba(255,255,255,.18) 100%);
@@ -169,7 +136,6 @@
     .cliente-dui{ color:#3e92cc; margin-top:4px; font-weight:700 }
     .estado-mora{ color:#F08C00; font-weight:800; display:inline-flex; align-items:center; gap:6px; margin-left:8px; }
     .muted{ color:var(--muted); font-size:.92rem }
-
     .btn-pagar{
       background: linear-gradient(90deg, var(--brand-green) 0%, #0b854c 100%);
       color:#fff; border:none; padding:10px 18px; border-radius:12px;
@@ -177,11 +143,9 @@
       display:inline-flex; align-items:center; gap:8px;
     }
     .btn-pagar:hover{ transform:translateY(-1px); box-shadow:0 8px 18px rgba(19,182,107,.35) }
-
-    /* ===== Modal ===== */
     .modal-bg{ position: fixed; inset:0; background: rgba(8,12,20,.55); z-index: 50; display: grid; place-items:center; padding: 14px; }
     .modal{
-      width: 100%; max-width: 460px; color: var(--text);
+      width: 100%; max-width: 520px; color: var(--text);
       background: radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,.92), rgba(255,255,255,.78) 40%, rgba(255,255,255,.72) 100%);
       border:1px solid var(--glass-brd); border-radius:20px; box-shadow: var(--glass-shadow);
       padding: 22px 18px 16px 18px; position: relative; animation: showmodal .18s ease-out;
@@ -190,31 +154,28 @@
     .modal-title{ font-size:1.18rem; font-weight:800; margin-bottom:6px; color:var(--brand-blue); display:flex; align-items:center; gap:8px; }
     .modal-sub{ color:var(--muted); margin-bottom:12px; }
     .modal-row{ margin-bottom:12px; }
-    .input-group{
-      display:flex; align-items:center; background: rgba(36,59,134,.06);
-      border:1px solid rgba(36,59,134,.18); border-radius:12px; padding-left:10px;
-    }
+    .input-group{ display:flex; align-items:center; background: rgba(36,59,134,.06);
+      border:1px solid rgba(36,59,134,.18); border-radius:12px; padding-left:10px; }
     .input-group span{ color: var(--brand-green); font-size:1.15rem; font-weight:800; margin-right:6px; }
     .input-group input{ border:none; background:transparent; padding:11px 10px; color:var(--text); font-size:1.12rem; outline:none; width:100%; }
     .modal-btns{ display:flex; gap:10px; justify-content:flex-end; margin-top:10px; }
     .modal-btn-cancel{
       background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%); color:#fff;
-      border:none; padding:10px 16px; border-radius:10px; cursor:pointer; font-weight:800;
-    }
+      border:none; padding:10px 16px; border-radius:10px; cursor:pointer; font-weight:800; }
     .modal-btn-pay{
       background: linear-gradient(90deg, var(--brand-green) 0%, #0b854c 100%); color:#fff;
-      border:none; padding:10px 18px; border-radius:10px; cursor:pointer; font-weight:800;
-    }
+      border:none; padding:10px 18px; border-radius:10px; cursor:pointer; font-weight:800; }
     .modal-btn-pay:disabled{ opacity:.5; cursor:not-allowed }
-
-    /* util */
+    .kpi-grid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:10px; }
+    .kpi{ background:rgba(36,59,134,.06); border:1px solid rgba(36,59,134,.18); border-radius:12px; padding:10px; text-align:center }
+    .kpi b{ display:block; font-size:.98rem; margin-bottom:4px; color:#0f6aa0 }
+    .kpi span{ font-weight:800 }
     .w-100{ width:100% }
   </style>
 </head>
 <body>
   <div class="pattern" aria-hidden="true"></div>
 
-  <!-- Topbar -->
   <header>
     <div class="topbar">
       <div class="logo-plate">
@@ -228,7 +189,6 @@
   <div class="container">
     <h1 class="visually-hidden">Recepción de Pagos</h1>
 
-    <!-- Tarjeta de identidad -->
     <div class="identity-card">
       <div class="avatar" aria-hidden="true">
         <div class="inner">
@@ -245,34 +205,34 @@
       </div>
     </div>
 
-    <!-- Agencia -->
     <div class="agencia-row" id="agencia-row" style="display:none;">
       <i class="fas fa-building"></i>
       <span id="agencia-nombre"></span>
     </div>
 
-    <!-- Buscador -->
     <div class="searchbar">
       <i class="fas fa-search"></i>
       <input id="buscador" type="text" placeholder="Buscar por nombre o DUI..."/>
     </div>
 
-    <!-- Listado -->
     <div id="clientes-list" class="w-100"></div>
   </div>
 
   <div id="modal-root"></div>
 
-  <!-- ==================== Firebase & lógica (BLINDADO) ==================== -->
+  <!-- ==================== Firebase & lógica ==================== -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, doc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import {
+      getFirestore, collection, query, where, getDocs, doc, updateDoc, addDoc,
+      runTransaction
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     /* =================== NUM & DATE SAFETY =================== */
     const EPS = 1e-6;
     const TOL = 0.01;       // tolerancia centavos
-    const TODAY_TOL = 0.05; // tolerancia para interés del mismo día
+    const CLOSE_TOL = 0.05; // tolerancia para cerrar capital/estado
 
     const nowISO = () => new Date().toISOString();
     const n = (x) => {
@@ -284,11 +244,10 @@
     const add = (a,b)=> n(a)+n(b);
     const round2 = (v)=> Math.round((n(v)+Number.EPSILON)*100)/100;
 
-    // YMD -> local midnight (NO UTC shift)
     function parseLocalYMD(ymd){
       try{
         if(!ymd) return null;
-        const [y,m,d] = String(ymd).split("-").map(Number);
+        const [y,m,d] = String(ymd).substring(0,10).split("-").map(Number);
         return new Date(y, (m||1)-1, d||1, 0,0,0,0);
       }catch{ return null; }
     }
@@ -302,6 +261,11 @@
     function isTodayLocal(ymd){
       const d = parseLocalYMD(ymd); if (!d) return false;
       return d.getTime() === startOfToday().getTime();
+    }
+    function daysAtraso(ymd){
+      const d = parseLocalYMD(ymd); if (!d) return -9999;
+      const diff = (startOfToday().getTime() - d.getTime())/(1000*60*60*24);
+      return Math.floor(diff); // >=0 incluye HOY como atraso de capital (alineado al cron)
     }
 
     /* =================== UI helpers =================== */
@@ -463,12 +427,37 @@
       }
     }
 
+    /* ============ Correlativo único con transacción ============ */
+    async function obtenerCorrelativoUnicoPagos(){
+      const ref = doc(db, "counters", "pagos");
+      const num = await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) {
+          tx.set(ref, { next: 2 }); // primer correlativo será 1
+          return 1;
+        } else {
+          const curr = n(snap.data().next);
+          const use = curr || 1;
+          tx.update(ref, { next: use + 1 });
+          return use;
+        }
+      });
+      return String(num).padStart(5, '0');
+    }
+
     /* =================== Modal de pago =================== */
     function mostrarDialogoPago(cliente, creditoData) {
       const modalRoot = document.getElementById("modal-root");
       let monto = "";
       let errorMsg = "";
+
+      // KPIs visibles para cajera (tomados tal cual del crédito)
+      const kpi_interesActual = round2(n(creditoData.interesActual));
+      const kpi_capitalAtrasado = round2(n(creditoData.capitalAtrasado));
+      const kpi_ppd = round2(n(creditoData.paraPonerseAlDia));
+
       function closeModal(){ modalRoot.innerHTML = ""; }
+
       function render(){
         modalRoot.innerHTML = `
           <div class="modal-bg" onclick="event.target===this && (${closeModal.toString()})();">
@@ -477,15 +466,23 @@
                 <i class="fas fa-coins" style="color:#13b66b;"></i> Pago a ${cliente.nombre}
               </div>
               <div class="modal-sub"><i class="fas fa-id-card"></i> DUI: <b>${cliente.numeroDui}</b></div>
+
+              <!-- KPIs del crédito (visibles) -->
+              <div class="kpi-grid" aria-label="Indicadores del crédito">
+                <div class="kpi"><b>Para ponerse al día</b><span>$${kpi_ppd.toFixed(2)}</span></div>
+                <div class="kpi"><b>Capital atrasado</b><span>$${kpi_capitalAtrasado.toFixed(2)}</span></div>
+                <div class="kpi"><b>Interés actual</b><span>$${kpi_interesActual.toFixed(2)}</span></div>
+              </div>
+
               <div class="modal-row">
                 <label for="monto-input" style="font-weight:700;margin-bottom:6px;display:block;">Monto a pagar</label>
                 <div class="input-group">
                   <span>$</span>
                   <input id="monto-input" type="number" min="0" step="0.01" placeholder="0.00" value="${monto}" autocomplete="off" autofocus/>
                 </div>
-                <div class="muted" style="margin-top:6px;">Orden: Multas → Interés exigible (vencidas + hoy) → Capital (vencidas → hoy → futuras)</div>
+                <div class="muted" style="margin-top:6px;">Orden: <b>Multas</b> → <b>Interés global</b> → <b>Capital</b> (en cadena).</div>
               </div>
-              ${errorMsg ? `<div class="modal-error">${errorMsg}</div>` : ""}
+              ${errorMsg ? `<div class="modal-error" style="color:#c0392b;font-weight:700">${errorMsg}</div>` : ""}
               <div class="modal-btns">
                 <button class="modal-btn-cancel" id="cancelar-pago">Cancelar</button>
                 <button class="modal-btn-pay" id="pagar-btn">Pagar</button>
@@ -515,39 +512,43 @@
       render();
     }
 
-    /* ============ Correlativo único para pagos ============ */
-    async function obtenerCorrelativoUnicoPagos(){
-      // Busca números existentes y toma el siguiente libre (1..n)
-      const pagosSnap = await getDocs(collection(db, "pagos"));
-      const usados = new Set();
-      pagosSnap.forEach(d=>{
-        let c = d.data()?.correlativo;
-        if (typeof c === "string" && /^\d+$/.test(c)) c = Number(c);
-        if (typeof c === "number" && c > 0) usados.add(c);
-      });
-      let correlativo = 1;
-      while (usados.has(correlativo)) correlativo++;
-      return String(correlativo).padStart(5, '0');
-    }
-
-    /* ============== LÓGICA DE PAGO (TZ-safe + hoy) ============== */
+    /* =================== LÓGICA DE PAGO =================== */
     async function realizarPago(cliente, montoNum){
       const fechaPago = nowISO();
       try{
         const user = auth.currentUser;
         if(!user) throw new Error("Sesión inválida. Inicia sesión.");
+
+        // Datos del cajero / sucursal
         const userSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
         const userData = userSnap?.docs?.[0]?.data() || {};
         const cajeroNombre = userData.nombre_autorizacion || userData.nombre || userNameForTicket || "Sin Nombre";
         const sucursal = userData.department || userDepartment || "N/A";
 
+        // Traer crédito
         const { data: creditoData } = await fetchCreditoById(cliente.id);
 
-        // Normalización fuerte
-        let saldoActual = n(creditoData.saldoActual);
-        let interesActual = n(creditoData.interesActual);
-        let multasAcumuladas = n(creditoData.multasAcumuladas);
-        let paraPonerseAlDia = n(creditoData.paraPonerseAlDia);
+        // ======== 0) Correlativo seguro (antes de todo) ========
+        const correlativoStr = await obtenerCorrelativoUnicoPagos();
+
+        // ======== 0.1) Guardar snapshot previo para reversión ========
+        // Se guarda TODO el crédito tal cual, más el correlativo y metadatos.
+        await window.firebaseAddDoc("reversionPago", {
+          correlativo: Number(correlativoStr),
+          creditoID: cliente.id,
+          clienteID: creditoData.clienteID || "",
+          snapshot: JSON.parse(JSON.stringify(creditoData)),
+          createdAt: new Date(),
+          realizadoPorUID: user.uid,
+          realizadoPorNombre: cajeroNombre,
+          sucursal: sucursal
+        });
+
+        // ======== 1) Normalizar estructuras ========
+        let saldoActual = round2(n(creditoData.saldoActual));
+        let interesActual = round2(n(creditoData.interesActual)); // TAL CUAL Cron
+        let multasAcumuladas = round2(n(creditoData.multasAcumuladas));
+        let paraPonerseAlDia = round2(n(creditoData.paraPonerseAlDia));
 
         let amortizacion = Array.isArray(creditoData.amortizacion) ? JSON.parse(JSON.stringify(creditoData.amortizacion)) : [];
         amortizacion = amortizacion.map(c => ({
@@ -556,73 +557,59 @@
           interes: n(c.interes),
           cuota: n(c.cuota),
           saldo: n(c.saldo),
-          montoPagado: n(c.montoPagado),
-          montoPagadoInteres: n(c.montoPagadoInteres),
+          montoPagado: n(c.montoPagado),                  // usado como capital pagado
+          montoPagadoInteres: n(c.montoPagadoInteres),    // legacy/visual
           estado: c.estado || "Pendiente",
-          fechaPagoReal: c.fechaPagoReal || null
+          fecha: c.fecha,
+          fechaPagoReal: c.fechaPagoReal || null,
+          numeroCuota: c.numeroCuota
         }));
 
-        let historialMultas = Array.isArray(creditoData.historialMultas) ? JSON.parse(JSON.stringify(creditoData.historialMultas)) : [];
+        let historialMultas = Array.isArray(creditoData.historialMultas)
+          ? JSON.parse(JSON.stringify(creditoData.historialMultas)).filter(m => !!m)
+          : [];
 
-        let restante = n(montoNum);
+        let restante = round2(n(montoNum));
         let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
 
-        /* === 1) MULTAS primero (exigibles) === */
-        if (restante > EPS && historialMultas.length){
-          for (let i=0; i<historialMultas.length && restante>EPS; i++){
-            const m = historialMultas[i];
-            const esNoPag = !m.estadoCuota || m.estadoCuota === "No Pagada";
-            if (!esNoPag) continue;
-            const montoMulta = n(m.monto);
-            if (montoMulta <= EPS) { m.estadoCuota = "Pagada"; continue; }
-            const pagar = Math.min(restante, montoMulta);
-            if (pagar > EPS){
-              pagoMultas = add(pagoMultas, pagar);
-              restante = n(restante - pagar);
-              if (Math.abs(pagar - montoMulta) <= TOL) m.estadoCuota = "Pagada";
-            }
+        // ======== 2) MULTAS primero ========
+        // Ordenar por fecha (antiguas primero)
+        historialMultas.sort((a,b) => new Date(a.fecha||0) - new Date(b.fecha||0));
+        for (let i=0; i<historialMultas.length && restante>EPS; i++){
+          const m = historialMultas[i];
+          const noPag = (!m.estadoCuota || m.estadoCuota === "No Pagada");
+          if (!noPag) continue;
+          const montoMulta = round2(n(m.monto));
+          if (montoMulta <= EPS){ m.estadoCuota = "Pagada"; continue; }
+          const pagar = Math.min(restante, montoMulta);
+          if (pagar > EPS){
+            pagoMultas = add(pagoMultas, pagar);
+            restante = round2(restante - pagar);
+            const nuevo = round2(montoMulta - pagar);
+            if (nuevo <= EPS){ m.estadoCuota = "Pagada"; m.monto = 0; }
+            else { m.monto = nuevo; m.estadoCuota = "No Pagada"; }
           }
         }
-        multasAcumuladas = round2(historialMultas.filter(m => !m.estadoCuota || m.estadoCuota === "No Pagada")
-          .reduce((acc,m)=> acc + n(m.monto), 0));
+        // Recalcular multasAcumuladas = suma de No Pagadas
+        multasAcumuladas = round2(historialMultas.reduce((acc,m)=>{
+          if (!m.estadoCuota || m.estadoCuota === "No Pagada") return acc + n(m.monto);
+          return acc;
+        }, 0));
 
-        /* === 2) INTERÉS EXIGIBLE: < hoy, luego hoy, hasta interesActual === */
+        // ======== 3) INTERÉS GLOBAL (no por cuota) ========
         if (restante > EPS && interesActual > EPS){
-          let restanteInt = Math.min(restante, interesActual);
-          // a) cuotas vencidas estrictas (< hoy)
-          for (let i=0; i<amortizacion.length && restanteInt>EPS; i++){
-            const c = amortizacion[i];
-            if (!isBeforeTodayLocal(c.fecha)) continue;
-            const falta = Math.max(0, n(c.interes) - n(c.montoPagadoInteres));
-            if (falta <= EPS) continue;
-            const apli = Math.min(falta, restanteInt);
-            c.montoPagadoInteres = round2(add(c.montoPagadoInteres, apli));
-            restanteInt = round2(restanteInt - apli);
-          }
-          // b) cuota de HOY (lo que toque, no exigimos el 100% de plan si aún no ha corrido el día)
-          if (restanteInt > EPS){
-            for (let i=0; i<amortizacion.length && restanteInt>EPS; i++){
-              const c = amortizacion[i];
-              if (!isTodayLocal(c.fecha)) continue;
-              const faltaPlanHoy = Math.max(0, n(c.interes) - n(c.montoPagadoInteres));
-              if (faltaPlanHoy <= EPS) continue;
-              const apli = Math.min(faltaPlanHoy, restanteInt);
-              c.montoPagadoInteres = round2(add(c.montoPagadoInteres, apli));
-              restanteInt = round2(restanteInt - apli);
-            }
-          }
-          const aplicadoInteres = round2(Math.min(interesActual, (Math.min(restante, interesActual) - restanteInt)));
+          const aplicadoInteres = Math.min(restante, interesActual);
           pagoInteres = add(pagoInteres, aplicadoInteres);
           restante = round2(restante - aplicadoInteres);
-          interesActual = round2(Math.max(0, interesActual - aplicadoInteres));
+          interesActual = round2(interesActual - aplicadoInteres);
         }
 
-        /* === 3) CAPITAL: < hoy → hoy → futuras === */
+        // ======== 4) CAPITAL en cadena ========
         function abonarCapital(selectorFn){
           for (let i=0; i<amortizacion.length && restante>EPS; i++){
             const c = amortizacion[i];
             if (!selectorFn(c)) continue;
-            const faltaCap = Math.max(0, n(c.capital) - n(c.montoPagado));
+            const faltaCap = Math.max(0, round2(n(c.capital) - n(c.montoPagado)));
             if (faltaCap <= EPS) continue;
             const abono = Math.min(restante, faltaCap);
             c.montoPagado = round2(add(c.montoPagado, abono));
@@ -630,74 +617,61 @@
             restante = round2(restante - abono);
           }
         }
-        abonarCapital(c=> isBeforeTodayLocal(c.fecha));                // vencidas
-        abonarCapital(c=> isTodayLocal(c.fecha));                      // hoy
-        abonarCapital(c=> !isBeforeTodayLocal(c.fecha) && !isTodayLocal(c.fecha)); // futuras
+        // Orden: vencidas (< hoy) → hoy → futuras (> hoy)
+        abonarCapital(c=> isBeforeTodayLocal(c.fecha));
+        abonarCapital(c=> isTodayLocal(c.fecha));
+        abonarCapital(c=> !isBeforeTodayLocal(c.fecha) && !isTodayLocal(c.fecha));
 
-        /* === 4) Estados por cuota === */
+        // ======== 5) Estados por cuota (por capital) ========
         for (let i=0;i<amortizacion.length;i++){
           const c = amortizacion[i];
-          const capOk = n(c.montoPagado) + TOL >= n(c.capital);
-          const intPlanOk = n(c.montoPagadoInteres) + TOL >= n(c.interes);
-          let intOkHoy = false;
-          if (isTodayLocal(c.fecha)){
-            const faltaInt = n(c.interes) - n(c.montoPagadoInteres);
-            intOkHoy = faltaInt <= TODAY_TOL; // hoy permitimos pequeña cola del día
-          }
-          if (isBeforeTodayLocal(c.fecha)){
-            if (capOk && intPlanOk){ c.estado = "Pagada"; if (!c.fechaPagoReal) c.fechaPagoReal = fechaPago; }
-            else if (n(c.montoPagado) > EPS || n(c.montoPagadoInteres) > EPS){ c.estado = "Parcial"; c.fechaPagoReal = null; }
-            else { c.estado = "Pendiente"; c.fechaPagoReal = null; }
-          } else if (isTodayLocal(c.fecha)){
-            if (capOk && (intPlanOk || intOkHoy)){ c.estado = "Pagada"; if (!c.fechaPagoReal) c.fechaPagoReal = fechaPago; }
-            else if (n(c.montoPagado) > EPS || n(c.montoPagadoInteres) > EPS){ c.estado = "Parcial"; c.fechaPagoReal = null; }
-            else { c.estado = "Pendiente"; c.fechaPagoReal = null; }
-          } else {
-            if (n(c.montoPagado) > EPS || n(c.montoPagadoInteres) > EPS){ c.estado = "Parcial"; c.fechaPagoReal = null; }
-            else { c.estado = "Pendiente"; c.fechaPagoReal = null; }
-          }
+          const capOk = n(c.montoPagado) + CLOSE_TOL >= n(c.capital);
+          if (capOk){ c.estado = "Pagada"; if (!c.fechaPagoReal) c.fechaPagoReal = fechaPago; }
+          else if (n(c.montoPagado) > EPS){ c.estado = "Parcial"; c.fechaPagoReal = null; }
+          else { c.estado = "Pendiente"; c.fechaPagoReal = null; }
         }
 
-        /* === 5) KPIs de mora solo con fechas < hoy === */
-        paraPonerseAlDia = 0;
+        // ======== 6) KPIs (alineados al cron) ========
+        // capitalVencido: sumar capital pendiente de cuotas con diasAtraso >= 0 (incluye HOY)
         let capitalAtrasado = 0;
         let cuotasAtrasadas = 0;
+        let maxDiasAtraso = 0;
 
-        for (let i=0;i<amortizacion.length;i++){
-          const c = amortizacion[i];
-          if (!isBeforeTodayLocal(c.fecha)) continue; // HOY no es atraso
-          if (c.estado !== "Pagada"){
-            const faltaCap = Math.max(0, n(c.capital) - n(c.montoPagado));
-            const faltaInt = Math.max(0, n(c.interes) - n(c.montoPagadoInteres));
-            paraPonerseAlDia += faltaCap + faltaInt;
-            capitalAtrasado += faltaCap;
+        for (const c of amortizacion){
+          const atras = daysAtraso(c.fecha);
+          const faltaCap = Math.max(0, round2(n(c.capital) - n(c.montoPagado)));
+          if (atras >= 0 && faltaCap > EPS){
+            capitalAtrasado = round2(add(capitalAtrasado, faltaCap));
+          }
+          if (atras >= 1 && faltaCap > EPS){
             cuotasAtrasadas++;
+            if (atras > maxDiasAtraso) maxDiasAtraso = atras;
           }
         }
-        paraPonerseAlDia = round2(paraPonerseAlDia + multasAcumuladas);
-        capitalAtrasado = round2(capitalAtrasado);
-        cuotasAtrasadas = Math.max(0, cuotasAtrasadas|0);
 
-        /* === 6) saldoActual desde amortización (centavos) === */
-        let saldoCents = 0;
-        for (const c of amortizacion){
-          const capC = Math.round(n(c.capital)*100);
-          const pagC = Math.round(n(c.montoPagado)*100);
-          saldoCents += Math.max(0, capC - pagC);
+        // PPD = interesActual + capitalAtrasado + multas No Pagadas
+        paraPonerseAlDia = round2(add(add(interesActual, capitalAtrasado), multasAcumuladas));
+
+        // ======== 7) saldoActual (simple) ========
+        const saldoAnterior = round2(n(creditoData.saldoActual));
+        let saldoNuevo = round2(saldoAnterior - pagoCapital);
+        if (saldoNuevo < 0) saldoNuevo = 0;
+
+        // ======== 8) Estado del crédito ========
+        let nuevoEstado = (saldoNuevo <= EPS) ? "Pagado" : (creditoData.estadoCredito || "Activo");
+        if (nuevoEstado !== "Pagado"){
+          if (cuotasAtrasadas > 0){
+            if (maxDiasAtraso <= 30) nuevoEstado = "Mora Temprana";
+            else if (maxDiasAtraso <= 60) nuevoEstado = "Mora Moderada";
+            else if (maxDiasAtraso <= 90) nuevoEstado = "Mora Severa";
+            else if (maxDiasAtraso <= 180) nuevoEstado = "Riesgo Alto";
+            else nuevoEstado = "Cobro Judicial";
+          } else {
+            nuevoEstado = "Activo";
+          }
         }
-        saldoActual = round2(saldoCents/100);
 
-        /* === 7) Estado del crédito === */
-        let nuevoEstado = (saldoActual <= EPS) ? "Pagado" : (creditoData.estadoCredito || "Activo");
-        if (nuevoEstado !== "Pagado" && paraPonerseAlDia <= TOL && capitalAtrasado <= TOL && multasAcumuladas <= TOL){
-          nuevoEstado = "Activo";
-        } else if (paraPonerseAlDia > TOL && nuevoEstado === "Activo"){
-          nuevoEstado = "Mora Temprana";
-        }
-
-        /* === 8) Guardar pago (correlativo único) === */
-        const correlativoStr = await obtenerCorrelativoUnicoPagos();
-
+        // ======== 9) Recibo (auditoría) ========
         await window.firebaseAddDoc("pagos", {
           clienteID: creditoData.clienteID,
           creditoID: cliente.id,
@@ -709,31 +683,32 @@
           pagoMultas: round2(pagoMultas),
           pagoInteres: round2(pagoInteres),
           pagoCapital: round2(pagoCapital),
-          saldoRestante: round2(saldoActual),
+          saldoRestante: round2(saldoNuevo),
           cajeroID: user.uid,
           cajeroNombre: cajeroNombre,
           sucursal: sucursal,
           correlativo: Number(correlativoStr),
           timestamp: new Date(),
-          paraPonerseAlDiaAntes: round2(n(creditoData.paraPonerseAlDia))
+          paraPonerseAlDiaAntes: round2(n(creditoData.paraPonerseAlDia)),
+          paraPonerseAlDiaDespues: round2(paraPonerseAlDia)
         });
 
-        /* === 9) Persistir crédito === */
+        // ======== 10) Persistir crédito actualizado ========
         await window.firebaseUpdateDoc("creditos", cliente.id, {
-          saldoActual: round2(saldoActual),
+          saldoActual: round2(saldoNuevo),
           interesActual: round2(interesActual),
           capitalAtrasado: round2(capitalAtrasado),
           paraPonerseAlDia: round2(paraPonerseAlDia),
           multasAcumuladas: round2(multasAcumuladas),
           cuotasAtrasadas: cuotasAtrasadas,
           ultimaActualizacion: fechaPago,
-          fechaUltimoCalculoIntereses: fechaPago,
+          // SIN tocar fechaUltimoCalculoIntereses: la maneja el CRON
           estadoCredito: nuevoEstado,
           amortizacion: amortizacion,
           historialMultas: historialMultas
         });
 
-        // Redirigir ticket
+        // ======== 11) Redirigir a ticket ========
         const url = `ticket_page.html?correlativo=${encodeURIComponent(correlativoStr)}` +
           `&cliente=${encodeURIComponent(creditoData.nombre)}` +
           `&apellido=${encodeURIComponent(creditoData.apellido || '')}` +
@@ -744,7 +719,7 @@
           `&pagoCapital=${encodeURIComponent(round2(pagoCapital).toFixed(2))}` +
           `&pagoInteres=${encodeURIComponent(round2(pagoInteres).toFixed(2))}` +
           `&pagoMultas=${encodeURIComponent(round2(pagoMultas).toFixed(2))}` +
-          `&saldoRestante=${encodeURIComponent(round2(saldoActual).toFixed(2))}`;
+          `&saldoRestante=${encodeURIComponent(round2(saldoNuevo).toFixed(2))}`;
         window.location.href = url;
 
       }catch(e){
@@ -768,6 +743,7 @@
   </script>
 </body>
 </html>
+
 
 
 

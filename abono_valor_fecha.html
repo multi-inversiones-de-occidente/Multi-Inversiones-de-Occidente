@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>  
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
@@ -440,6 +440,23 @@
       const autorizado = await showGerentePinDialog();
       if (!autorizado) return alert("PIN de gerente incorrecto o cancelado.");
 
+      /* ===== [NUEVO] SNAPSHOT PREVIO PARA REVERSION (igual que en pagos normales) ===== */
+      const correlativoGenerado = await obtenerCorrelativoUnicoPagos(db);
+      const credRef = doc(db, "creditos", creditoSeleccionado.id);
+      const credSnap = await getDoc(credRef);
+      const creditoAntes = credSnap.exists() ? credSnap.data() : JSON.parse(JSON.stringify(creditoSeleccionado));
+      await addDoc(collection(db, "reversionPago"), {
+        correlativo: Number(correlativoGenerado),
+        creditoID: creditoSeleccionado.id,
+        clienteID: creditoAntes.clienteID || "",
+        snapshot: JSON.parse(JSON.stringify(creditoAntes)),
+        createdAt: new Date(),
+        realizadoPorUID: userId,
+        realizadoPorNombre: usuarioActual,
+        sucursal: userAgencia
+      });
+      /* ===== FIN NUEVO ===== */
+
       let abonoRestante = monto;
       let pagoInteres = 0, pagoCapital = 0, pagoMulta = 0;
 
@@ -652,7 +669,7 @@
       const nuevoEstadoCredito = (cuotasAtrasadasFinal === 0 && multasAcumuladasFinal === 0) ? "Activo" : "Mora Temprana";
 
       // correlativo
-      let correlativo = await obtenerCorrelativoUnicoPagos(db);
+      let correlativo = Number(correlativoGenerado);
 
       // Registrar pago
       let pagoObj = {
@@ -722,6 +739,7 @@
   </script>
 </body>
 </html>
+
 
 
 

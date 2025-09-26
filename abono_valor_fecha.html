@@ -10,34 +10,26 @@
     .container { max-width: 580px; margin: 2.2rem auto 0 auto; background: #232a37; border-radius: 17px; box-shadow: 0 2px 24px #0008; padding: 2.4rem 1.8rem 1.7rem 1.8rem;}
     .titulo { font-size: 1.38rem; font-weight: bold; margin-bottom: 10px;}
     .info-msg { background: #334155; border-radius: 13px; padding: 16px; font-size: 1.01rem; color: #ffd579; margin-bottom: 18px;}
-    .input-main, .input-select, .input-motivo { width: 100%; background: #19212b; color: #fff; border: 1.5px solid #475569; border-radius: 9px; font-size: 1.11rem; padding: 11px 13px; margin-bottom: 0.95em;}
+    .input-main, .input-motivo { width: 100%; background: #19212b; color: #fff; border: 1.5px solid #475569; border-radius: 9px; font-size: 1.11rem; padding: 11px 13px; margin-bottom: 0.95em;}
     .input-motivo { min-height: 45px; resize: vertical;}
-    .btn-main, .btn-date { background: #fb923c; color: #181818; border: none; border-radius: 10px; font-size: 1.11rem; font-weight: 600; padding: 13px 0; cursor: pointer; margin-top: 1.1em; width: 100%; transition: background .18s;}
-    .btn-main:hover, .btn-date:hover { background: #e07514;}
-    .error { color: #f87171; font-size: 1.05rem; margin-bottom: 10px;}
-    .ok-msg { color: #38bdf8; text-align: center; font-weight: bold; margin-bottom: 18px; font-size: 1.09rem;}
-    .sim-block { background: #0f172a; color: #fcd34d; border-radius: 11px; margin: 14px 0 16px 0; padding: 15px 18px; font-size: 1.09rem;}
+    .btn-main { background: #fb923c; color: #181818; border: none; border-radius: 10px; font-size: 1.11rem; font-weight: 600; padding: 13px 0; cursor: pointer; margin-top: 1.1em; width: 100%; transition: background .18s;}
+    .btn-main:hover { background: #e07514;}
     .list-group { max-height: 180px; overflow-y: auto; margin-bottom: 18px;}
     .list-group-item { background: #181e2b; color: #fff; border-radius: 8px; padding: 8px 14px; margin-bottom: 7px; cursor: pointer; }
     .list-group-item.selected, .list-group-item:hover { background: #fb923c; color: #181818; font-weight: bold;}
     .label { color: #fb923c; font-weight: 600; margin-bottom: 4px; display: block;}
     .modal-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #181e21cc; z-index: 9998; display: flex; align-items: center; justify-content: center;}
-    .modal { background: #fff; color: #222; border-radius: 15px; box-shadow: 0 6px 38px #0008; padding: 26px 23px 20px 23px; max-width: 340px; width: 95%; z-index: 9999; position: relative; text-align: left; font-size: 1rem; animation: showmodal .18s;}
-    @keyframes showmodal { from { transform: scale(.93); opacity:.6;} to {transform:none;opacity:1;} }
+    .modal { background: #fff; color: #222; border-radius: 15px; box-shadow: 0 6px 38px #0008; padding: 26px 23px 20px 23px; max-width: 340px; width: 95%; text-align: left; font-size: 1rem; }
     .modal label {font-weight: bold;}
     .modal input { width: 100%; background: #f5f8fb; border: 1.2px solid #dadada; color: #111; font-size: 1.12rem; padding: 11px 10px; margin-bottom: 12px; border-radius: 8px; outline: none; box-sizing: border-box;}
     .modal-btns { display: flex; gap: 13px; margin-top: 8px; justify-content: flex-end;}
-    .modal-btn-cancel { background: #e74c3c; color: #fff; border: none; padding: 9px 16px; border-radius: 7px; cursor: pointer; font-weight: bold; transition: background .17s;}
-    .modal-btn-cancel:hover { background: #bb2c1a; }
-    .modal-btn-ok { background: #F8AF40; color: #1a1813; border: none; padding: 9px 18px; border-radius: 7px; cursor: pointer; font-weight: bold; transition: background .17s;}
-    .modal-error { color: #d30013; font-size: 0.99rem; margin-bottom: 9px; font-weight: 500;}
+    .modal-btn-cancel { background: #e74c3c; color: #fff; border: none; padding: 9px 16px; border-radius: 7px; cursor: pointer; font-weight: bold;}
+    .modal-btn-ok { background: #F8AF40; color: #1a1813; border: none; padding: 9px 18px; border-radius: 7px; cursor: pointer; font-weight: bold;}
     .recibo-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #181e21cc; z-index: 9999; display: flex; align-items: center; justify-content: center;}
     .recibo { background: #fff; color: #232a37; border-radius: 14px; box-shadow: 0 2px 32px #0007; padding: 27px 23px 18px 23px; max-width: 350px; width: 96%; font-size: 1.03rem; }
     .recibo-titulo { font-weight: bold; font-size: 1.2rem; margin-bottom: 12px; color: #fb923c; }
     .recibo-row { margin-bottom: 7px; }
     .recibo-close { background: #e74c3c; color: #fff; border: none; padding: 7px 15px; border-radius: 7px; cursor: pointer; font-weight: bold; float: right; margin-top: 9px;}
-    .recibo-close:hover { background: #bb2c1a; }
-    @media (max-width:640px){.container{padding:1.15rem .6rem;}}
   </style>
 </head>
 <body>
@@ -45,16 +37,18 @@
     <div class="titulo"><i class="fas fa-history"></i> Abono a Fechas Anteriores</div>
     <div class="info-msg">
       Esta opción registra un abono en una fecha anterior a la actual.<br>
-      <b>El interés a cobrar se calcula EXCLUSIVAMENTE desde el último recibo (colección "pagos").</b>
+      <b>El interés se calcula <u>EXCLUSIVAMENTE</u> desde el último recibo en “pagos”.</b>
     </div>
+
     <label class="label" for="busqueda">Buscar cliente por nombre o DUI</label>
     <input id="busqueda" class="input-main" type="text" placeholder="Escribe el nombre o DUI..." autocomplete="off"/>
     <div id="lista-creditos" class="list-group"></div>
+
     <div id="seleccion-fecha" style="display:none;">
       <label class="label" for="fecha-abono">Selecciona la fecha del abono</label>
       <input id="fecha-abono" type="date" class="input-main"/>
     </div>
-    <div id="simulacion-block" class="sim-block" style="display:none;"></div>
+
     <form id="form-abono" style="display:none;">
       <label class="label" for="monto">Monto del abono ($)</label>
       <input id="monto" class="input-main" type="number" min="0.01" step="0.01" placeholder="0.00" required/>
@@ -64,6 +58,7 @@
       <div id="ok-msg" class="ok-msg" style="display:none;"></div>
     </form>
   </div>
+
   <div id="modal-root"></div>
   <div id="recibo-root"></div>
 
@@ -74,15 +69,14 @@
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
-    // =========================
-    // Config & Constantes
-    // =========================
+    // ====== POLÍTICA ======
+    const INTERES_SOLO_DESDE_RECIBOS = true;
+
+    // ====== Config ======
     const TZ_OFFSET = "-06:00"; // El Salvador
     const MODO_RETRO = true;    // Reglas especiales de retroactivo
 
-    // =========================
-    // Utils blindados (TZ ES)
-    // =========================
+    // ====== Utils TZ ======
     function toLocalEndISO(ymd){ return `${ymd}T23:59:59${TZ_OFFSET}`; }
     function toLocalStartISO(ymd){ return `${ymd}T00:00:00${TZ_OFFSET}`; }
     function atLocalMidnight(d){ const x=new Date(d); x.setHours(0,0,0,0); return x; }
@@ -111,7 +105,7 @@
     }
     function round2(v){ return Math.round((v + Number.EPSILON)*100)/100; }
 
-    // ✅ saldo actual desde amortización en centavos (para exactitud)
+    // Saldo desde amortización (centavos para exactitud)
     function saldoDesdeAmortizacion(amortizacion){
       let totalCents = 0;
       for (const c of (amortizacion || [])) {
@@ -137,9 +131,7 @@
       return td;
     }
 
-    // =========================
-    // SOLO RECIBOS: último pago y cálculo
-    // =========================
+    // ====== SOLO RECIBOS: último pago y cálculo ======
     async function obtenerUltimoRecibo(db, creditoID, fechaAbonoYMD){
       const corte = new Date(`${fechaAbonoYMD}T23:59:59-06:00`);
       const snap = await getDocs(
@@ -148,7 +140,7 @@
       let ultimo = null;
       snap.forEach(d=>{
         const p = d.data();
-        if (!p || p.anulado === true) return; // descarta solo si está expresamente anulado
+        if (!p || p.anulado === true) return;      // descarta sólo si está marcado anulado
         if (!p.fechaPago) return;
         const f = new Date(p.fechaPago);
         if (Number.isNaN(f.getTime()) || f > corte) return;
@@ -159,44 +151,27 @@
         }
       });
       if (!ultimo) return null;
-      return {
-        fecha: ultimo._f,
-        saldoRestante: Number(num(ultimo.saldoRestante, 0)), // soporta string
-        raw: ultimo
-      };
+      return { fecha: ultimo._f, saldoRestante: Number(num(ultimo.saldoRestante, 0)), raw: ultimo };
     }
 
-    /**
-     * Interés a cobrar EXCLUSIVAMENTE desde el último recibo (pagos).
-     * Si no hay recibos previos al corte => interés 0 (política solicitada).
-     */
+    // Interés a cobrar EXCLUSIVAMENTE desde el último recibo
     async function calcularInteresSoloRecibos(db, credito, fechaAbonoYMD){
       const tasa = normalizeDailyRate(credito);
       const fechaCorte = new Date(toLocalEndISO(fechaAbonoYMD));
       const up = await obtenerUltimoRecibo(db, credito.id, fechaAbonoYMD);
 
       if (!up){
-        return {
-          interesCobrar: 0,
-          dias: 0,
-          saldoBase: 0,
-          fechaBase: fechaCorte,
-          fechaCorte,
-          origen: "sin_recibo"
-        };
+        return { interesCobrar: 0, dias: 0, saldoBase: 0, fechaBase: fechaCorte, fechaCorte, origen: "sin_recibo" };
       }
 
       const fechaBase = up.fecha;
       const saldoBase = Number.isFinite(up.saldoRestante) ? up.saldoRestante : num(credito.saldoActual, 0);
       const dias = daysMedioAbiertoDates(fechaBase, fechaCorte); // (último recibo, corte]
       const interes = round2(Math.max(0, saldoBase * tasa * dias));
-
       return { interesCobrar: interes, dias, saldoBase, fechaBase, fechaCorte, origen: "ultimo_recibo" };
     }
 
-    // =========================
-    // Firebase / estado
-    // =========================
+    // ====== Firebase / estado ======
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -275,9 +250,7 @@
       });
     }
 
-    // =========================
-    // Carga de créditos (para búsqueda)
-    // =========================
+    // ====== Búsqueda de créditos ======
     onAuthStateChanged(auth, async user=>{
       if(!user) return location.href="login.html";
       usuarioActual = user.displayName || user.email || "Usuario desconocido";
@@ -292,9 +265,6 @@
         .filter(c => (c.estadoCredito || "").toString().trim().toLowerCase() !== "revertido");
     });
 
-    // =========================
-    // Búsqueda por nombre o DUI
-    // =========================
     document.getElementById("busqueda").addEventListener("input", ()=>{
       const raw = document.getElementById("busqueda").value || "";
       const queryTxt = raw.toLowerCase().trim();
@@ -333,7 +303,6 @@
       event.target.classList.add("selected");
       document.getElementById("seleccion-fecha").style.display = "block";
       document.getElementById("form-abono").style.display = "none";
-      document.getElementById("simulacion-block").style.display = "none";
     }
 
     function mostrarRecibo(datos){
@@ -361,13 +330,11 @@
         </div>`;
     }
 
-    // =========================
-    // Interés vencido visible (opcional para repartir en cuotas)
-    // =========================
     function ordenarAmortizacionPorFecha(amortizacion){
       amortizacion.sort((a,b)=> new Date(a.fecha) - new Date(b.fecha));
     }
 
+    // Reparte el interés calculado (desde recibos) en cuotas <= corte (sin inflar)
     function cubrirInteresVencidasPrimero(amortizacion, fechaAbonoYMD, refAbono, refPagoInteres){
       const fechaCorte = new Date(toLocalEndISO(fechaAbonoYMD));
       for (let i=0; i<amortizacion.length && refAbono.value>0; i++){
@@ -387,9 +354,7 @@
       }
     }
 
-    // =========================
-    // SUBMIT
-    // =========================
+    // ====== SUBMIT ======
     document.getElementById("form-abono").onsubmit = async function(e){
       e.preventDefault();
       if (!creditoSeleccionado || !fechaSeleccionada) return alert("Selecciona cliente y fecha.");
@@ -400,7 +365,7 @@
       const autorizado = await showGerentePinDialog();
       if (!autorizado) return alert("PIN de gerente incorrecto o cancelado.");
 
-      // ===== SNAPSHOT PREVIO PARA REVERSION =====
+      // Snapshot para reversión
       const correlativoGenerado = await obtenerCorrelativoUnicoPagos(db);
       const credRef = doc(db, "creditos", creditoSeleccionado.id);
       const credSnap = await getDoc(credRef);
@@ -415,7 +380,6 @@
         realizadoPorNombre: usuarioActual,
         sucursal: userAgencia
       });
-      // ==========================================
 
       let abonoRestante = monto;
       let pagoInteres = 0, pagoCapital = 0, pagoMulta = 0;
@@ -427,16 +391,15 @@
       const fechaAbonoEnd = new Date(toLocalEndISO(fechaAbonoYMD));
       ordenarAmortizacionPorFecha(amortizacion);
 
-      // ——— Guardar saldo inicial de la operación (preferente del crédito)
       const saldoInicialOperacion = Number.isFinite(num(creditoAntes?.saldoActual, NaN))
         ? num(creditoAntes.saldoActual, 0)
         : num(creditoSeleccionado.saldoActual, 0);
 
-      // 0) Interés exigible EXACTO al corte: SOLO desde RECIBOS
+      // 0) Interés EXCLUSIVO desde RECIBOS
       const resumenInt = await calcularInteresSoloRecibos(db, creditoSeleccionado, fechaAbonoYMD);
       const interesAlCorte = round2(resumenInt.interesCobrar);
 
-      // 1) MULTAS: No procede si la multa es posterior al abono
+      // 1) MULTAS: no proceden si son posteriores al abono
       let historialMultasActualizado = historialMultas.map(m=>{
         if (m.estadoCuota === "Pagada" || m.estadoCuota === "No Procede") return m;
         let multaFecha = atLocalMidnight(new Date(m.fecha));
@@ -445,35 +408,35 @@
         return m;
       });
 
-      // 2) INTERÉS AL CORTE — SOLO hasta interesAlCorte (no piso, no anclas)
+      // 2) INTERÉS — solo el calculado (no sumamos más)
       let interesAPagar = Math.min(abonoRestante, interesAlCorte);
       if (interesAPagar > 0){
         const refAbono = { value: interesAPagar };
         const refPagoInteres = { value: 0 };
-        // Repartir en cuotas vencidas/<= corte (sin inflar)
         cubrirInteresVencidasPrimero(amortizacion, fechaAbonoYMD, refAbono, refPagoInteres);
-        // Lo que no se pudo repartir (si queda centavos) igual se considera interés cobrado,
-        // pero no forzamos a sobre-escribir las cuotas.
         const aplicadoInteres = round2(interesAPagar - Math.max(0, refAbono.value));
         pagoInteres = round2(pagoInteres + aplicadoInteres);
         abonoRestante = round2(abonoRestante - aplicadoInteres);
       }
 
-      // 3) CAPITAL — vencidas primero
+      // 3) CAPITAL — vencidas primero (SIN volver a pagar interés de cuotas)
       for (let i=0; i<amortizacion.length && abonoRestante>0; i++){
         let cuota = amortizacion[i];
         let fechaCuota = new Date(cuota.fecha);
         if (fechaCuota <= fechaAbonoEnd && cuota.estado !== "Pagada"){
           cuota.montoPagado = num(cuota.montoPagado, 0);
 
-          const interesCuota = num(cuota.interes, 0);
-          const pagInt = num(cuota.montoPagadoInteres, 0);
-          const intPend = round2(Math.max(0, interesCuota - pagInt));
-          if (intPend > 0 && abonoRestante > 0){
-            const apliInt = Math.min(intPend, abonoRestante);
-            cuota.montoPagadoInteres = round2(pagInt + apliInt);
-            pagoInteres = round2(pagoInteres + apliInt);
-            abonoRestante = round2(abonoRestante - apliInt);
+          // *** BLOQUE DESACTIVADO SI SOLO DESDE RECIBOS ***
+          if (!INTERES_SOLO_DESDE_RECIBOS) {
+            const interesCuota = num(cuota.interes, 0);
+            const pagInt = num(cuota.montoPagadoInteres, 0);
+            const intPend = round2(Math.max(0, interesCuota - pagInt));
+            if (intPend > 0 && abonoRestante > 0){
+              const apliInt = Math.min(intPend, abonoRestante);
+              cuota.montoPagadoInteres = round2(pagInt + apliInt);
+              pagoInteres = round2(pagoInteres + apliInt);
+              abonoRestante = round2(abonoRestante - apliInt);
+            }
           }
 
           let capitalCuota = num(cuota.capital, 0);
@@ -499,7 +462,7 @@
         }
       }
 
-      // FUTURAS — TODO el remanente a capital (en orden)
+      // 4) FUTURAS — todo remanente a capital
       if (abonoRestante > 0){
         for (let j=0; j<amortizacion.length && abonoRestante>0; j++){
           let cuotaSig = amortizacion[j];
@@ -528,25 +491,19 @@
         }
       }
 
-      // 4) TOTALES post-pago (sin "ánclas")
+      // 5) TOTALES / actualización
       let saldoPendiente = round2(Math.max(0, saldoInicialOperacion - pagoCapital));
       const saldoDesdeAmort = round2(saldoDesdeAmortizacion(amortizacion));
       if (Math.abs(saldoDesdeAmort - saldoPendiente) >= 0.03) {
         saldoPendiente = saldoDesdeAmort;
       }
 
-      // Interés actual post abono: solo desde fechaAbono -> hoy (informativo)
+      // Informativo: interés desde fechaAbono -> hoy
       const fechaHoy = atLocalMidnight(new Date());
       const diasPost = diasEntreFechasSinHora(fechaAbonoYMD, fechaHoy);
       let interesActual = round2(saldoPendiente * tasaDiaria * diasPost);
 
-      // Multas activas (posteriores no proceden)
-      let multasAcumuladasFinal = round2(
-        (historialMultasActualizado || [])
-          .filter(m=> m.estadoCuota === "No Pagada" && num(m.monto,0) > 0.01)
-          .reduce((acc,m)=> acc + num(m.monto,0), 0)
-      );
-
+      let multasAcumuladasFinal = 0; // ya filtradas como No Procede si eran posteriores
       let cuotasAtrasadasFinal = amortizacion.filter(c=>{
         const f = new Date(c.fecha);
         const hoy = atLocalMidnight(new Date());
@@ -568,7 +525,7 @@
       const paraPonerseAlDiaFinal = round2(capitalAtrasado + multasAcumuladasFinal + interesActual);
       const nuevoEstadoCredito = (cuotasAtrasadasFinal === 0 && multasAcumuladasFinal === 0) ? "Activo" : "Mora Temprana";
 
-      // ===== Registrar pago =====
+      // Registrar pago
       let pagoObj = {
         creditoID: creditoSeleccionado.id,
         clienteID: creditoSeleccionado.clienteID || "",
@@ -587,8 +544,7 @@
         anulado: false,
         fechaRegistro: new Date().toISOString(),
         correlativo: Number(correlativoGenerado),
-
-        // Auditoría de interés (SOLO recibos)
+        // Auditoría interés (SOLO recibos)
         interesCalculadoDesde: resumenInt.origen,
         interesDiasBase: resumenInt.dias,
         interesSaldoBase: round2(resumenInt.saldoBase || 0),
@@ -609,7 +565,7 @@
         creditoID: creditoSeleccionado.id
       });
 
-      // Update del crédito (sin campos de "áncla")
+      // Update crédito (sin anclas)
       await updateDoc(doc(db, "creditos", creditoSeleccionado.id), {
         amortizacion: amortizacion,
         saldoActual: round2(saldoPendiente),
@@ -626,7 +582,7 @@
 
       mostrarRecibo(pagoObj);
 
-      document.getElementById("ok-msg").textContent = "Abono retroactivo registrado correctamente (interés calculado SOLO desde recibos).";
+      document.getElementById("ok-msg").textContent = "Abono retroactivo registrado (interés SOLO desde recibos).";
       document.getElementById("ok-msg").style.display = "block";
       setTimeout(()=>{
         document.getElementById("ok-msg").style.display = "none";
@@ -634,7 +590,6 @@
         document.getElementById("busqueda").value = "";
         document.getElementById("lista-creditos").innerHTML = "";
         document.getElementById("seleccion-fecha").style.display = "none";
-        document.getElementById("simulacion-block").style.display = "none";
         document.getElementById("form-abono").style.display = "none";
       }, 2100);
     };
@@ -646,7 +601,6 @@
   </script>
 </body>
 </html>
-
 
 
 

@@ -180,9 +180,12 @@
       const up = await ultimoPagoDesdeColeccionPagos(db, credito.id, fechaAbonoYMD);
       if (up && Number.isFinite(up.saldoRestante)){
         return {
-          fechaAnclaInteres: new Date(`${fechaAbonoYMD}T23:59:59-06:00`),
+          // ✅ usar la FECHA REAL del último pago
+          fechaAnclaInteres: up.fecha,
           saldoAncla: round2(Math.max(0, up.saldoRestante)),
-          interesPendienteAncla: round2(Math.max(0, up.interesPendientePostPago || 0))
+          // si no existe el campo en ese pago, asumimos 0 como pediste
+          interesPendienteAncla: Number.isFinite(up.interesPendientePostPago) ? round2(Math.max(0, up.interesPendientePostPago)) : 0,
+          _source: "pagos"
         };
       }
       // Última cuota con fechaPagoReal y 'saldo'
@@ -197,7 +200,8 @@
         return {
           fechaAnclaInteres: new Date(last.fechaPagoReal),
           saldoAncla: round2(Math.max(0, num(last.saldo, 0))),
-          interesPendienteAncla: 0
+          interesPendienteAncla: 0,
+          _source: "amortizacion"
         };
       }
       // SaldoActual + fechaInicio (último recurso)
@@ -207,7 +211,8 @@
       return {
         fechaAnclaInteres: atLocalMidnight(fechaBase),
         saldoAncla: round2(Math.max(0, saldo)),
-        interesPendienteAncla: 0
+        interesPendienteAncla: 0,
+        _source: "saldo"
       };
     }
 
@@ -216,22 +221,31 @@
       const tasa = normalizeDailyRate(credito);
       const corte = new Date(toLocalEndISO(fechaAbonoYMD));
 
+      // 1) Si hay áncla guardada en el crédito, úsala
       let { fechaAnclaInteres, saldoAncla, interesPendienteAncla, exists } = getAnchorFields(credito);
+      let sourceAnchor = "anchor_fields";
       if (!exists){
+        // 2) Si no hay áncla, caer a pagos/amortización/saldo
         const fb = await fallbackAnchor(db, credito, amortizacion, fechaAbonoYMD);
         fechaAnclaInteres = fb.fechaAnclaInteres;
         saldoAncla = fb.saldoAncla;
         interesPendienteAncla = fb.interesPendienteAncla;
+        sourceAnchor = fb._source;
       }
 
       const dias = daysMedioAbiertoDates(fechaAnclaInteres, corte); // (ancla, corte]
-      let interes = round2(Math.max(0, interesPendienteAncla + saldoAncla * tasa * dias));
+      // Si viene de pagos, asumimos interés pendiente 0 ese día
+      const interesBase = (sourceAnchor === "pagos") ? 0 : Math.max(0, interesPendienteAncla);
+      let interes = round2(Math.max(0, interesBase + saldoAncla * tasa * dias));
 
       // Guardarraíl ~4 meses
       const tope = round2(saldoAncla * tasa * 122);
       if (interes > tope) interes = tope;
 
-      return { interesExigible: interes, anchorUsada: { fechaAnclaInteres, saldoAncla, interesPendienteAncla } };
+      return { 
+        interesExigible: interes, 
+        anchorUsada: { fechaAnclaInteres, saldoAncla, interesPendienteAncla, _source: sourceAnchor } 
+      };
     }
 
     // =========================
@@ -500,12 +514,16 @@
         ? num(creditoAntes.saldoActual, 0)
         : num(creditoSeleccionado.saldoActual, 0);
 
-      // 0) Interés exigible EXACTO al corte por áncla (lee crédito -> pagos -> amortización -> saldoActual)
+      // 0) Interés exigible EXACTO al corte:
+      //    - Si hay áncla en crédito, se usa.
+      //    - Si no hay, se usa el último pago y se asume interés 0 en ese pago.
       const { interesExigible, anchorUsada } = await interesExigibleAlCorteConAnchor(db, creditoSeleccionado, amortizacion, fechaAbonoYMD);
 
       // Piso por cuotas vencidas (defensa ante inconsistencias históricas)
       const pisoInteres = interesVencidoPorCuotas(amortizacion, fechaAbonoYMD);
-      const interesAlCorte = round2(Math.max(interesExigible, pisoInteres));
+      // ⚠️ Si el origen es 'pagos', no aplicar piso (evita inflar como tu caso $8.83)
+      const interesAlCorte = round2(anchorUsada?._source === "pagos" ? interesExigible
+                                                           : Math.max(interesExigible, pisoInteres));
 
       // 1) MULTAS: No procede si posterior al abono
       let historialMultasActualizado = historialMultas.map(m=>{
@@ -744,9 +762,6 @@
   </script>
 </body>
 </html>
-
-
-
 
 
 

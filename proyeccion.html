@@ -3,345 +3,312 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Proyección de Crédito</title>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
-
-    // Configuración Firebase
-    const firebaseConfig = {
-      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
-      authDomain: "multinversiones-38e13.firebaseapp.com",
-      projectId: "multinversiones-38e13",
-      storageBucket: "multinversiones-38e13.appspot.com",
-      messagingSenderId: "380001917078",
-      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
-      measurementId: "G-H4E31XHG1Y"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-
-    function getIdParam() {
-      const url = new URL(window.location.href);
-      return url.searchParams.get("id");
-    }
-    function money(n) {
-      return "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits:2 });
-    }
-    function pad(num) {
-      return num < 10 ? "0" + num : num;
-    }
-    function formatDate(date) {
-      if (!date) return "-";
-      if (typeof date === "string" && date.length === 10 && date.includes("-")) {
-        return date;
-      }
-      const d = new Date(date);
-      if (isNaN(d.getTime())) return "-";
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    }
-    function formatHumanDate(date) {
-      if (!date) return "-";
-      const d = new Date(date);
-      if (isNaN(d.getTime())) return "-";
-      return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
-    }
-
-    // Parsear input de tipo date como fecha local, no UTC
-    function parseDateInput(dateStr) {
-      // dateStr tiene formato "YYYY-MM-DD"
-      const [year, month, day] = dateStr.split('-').map(Number);
-      // mes en JS va de 0 a 11, así que restamos 1
-      return new Date(year, month - 1, day, 12, 0, 0);
-    }
-
-    // Lógica corregida y optimizada para cálculo bancario real
-    function calcularProyeccion(credito, fechaProy) {
-      const tasaDiaria = parseFloat(credito.tasaDiariaCredito || "0") || 0;
-      const saldoActual = parseFloat(credito.saldoActual || "0") || 0;
-      const interesActual = parseFloat(credito.interesActual || "0") || 0;
-      const amortizacion = credito.amortizacion || [];
-
-      // Tomar SIEMPRE la última actualización real como fecha base
-      let fechaBaseStr = credito.fechaUltimoMovimiento || credito.fechaInicio;
-      let fechaBase;
-      try {
-        fechaBase = new Date(fechaBaseStr.replace(' a.m.','').replace(' p.m.','').replace(' a.m.','').replace(' p.m.',''));
-      } catch { fechaBase = new Date(); }
-
-      let fechaProyeccion = new Date(fechaProy);
-
-      let cuotasVencidas = 0.0;
-      let capitalVencido = 0.0;
-      let interesesVencidos = 0.0;
-      let cuotasAtrasadas = 0;
-
-      for (const cuotaItem of amortizacion) {
-        if (!cuotaItem) continue;
-        let fechaCuota;
-        try {
-          fechaCuota = new Date(cuotaItem.fecha);
-        } catch { continue; }
-        const estado = cuotaItem.estado || "Pendiente";
-        if (fechaCuota <= fechaProyeccion && estado !== "Pagada") {
-          cuotasVencidas += parseFloat(cuotaItem.cuota || "0");
-          capitalVencido += parseFloat(cuotaItem.capital || "0");
-          interesesVencidos += parseFloat(cuotaItem.interes || "0");
-          cuotasAtrasadas++;
-        }
-      }
-
-      // Intereses corridos SOLO desde la última actualización real (fechaBase)
-      let dias = Math.floor((fechaProyeccion - fechaBase) / 86400000);
-      let interesCorriente = (dias > 0) ? saldoActual * tasaDiaria * dias : 0.0;
-
-      // "Para ponerse al día" = cuotas vencidas + intereses corridos NO incluidos en cuotas vencidas
-      let paraPonerseAlDia = cuotasVencidas + interesCorriente;
-
-      // Interés acumulado (solo para mostrar) = interesActual + intereses corridos + intereses vencidos
-      let interesProyectado = interesActual + interesCorriente + interesesVencidos;
-
-      return {
-        diasProyeccion: dias,
-        cuotasAtrasadas,
-        cuotasVencidas,
-        interesesVencidos,
-        capitalVencido,
-        interesesCorridos: interesCorriente,
-        saldoActual,
-        paraPonerseAlDia,
-        interesProyectado
-      };
-    }
-
-    let creditoGlobal = null;
-    let fechaProyeccion = null;
-    let proyeccion = null;
-
-    async function cargarCredito() {
-      const creditoId = getIdParam();
-      if (!creditoId) {
-        document.getElementById("main-proyeccion").innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
-        return;
-      }
-      document.getElementById("main-proyeccion").innerHTML = `<div class="loader"></div>`;
-
-      onAuthStateChanged(auth, async user => {
-        if (!user) {
-          window.location.href = "login.html";
-          return;
-        }
-        try {
-          const ref = doc(db, "creditos", creditoId);
-          const snap = await getDoc(ref);
-
-          if (!snap.exists()) {
-            document.getElementById("main-proyeccion").innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
-            return;
-          }
-          const c = snap.data();
-          creditoGlobal = c;
-          renderUI();
-        } catch (err) {
-          document.getElementById("main-proyeccion").innerHTML = `<div class="notfound">No tienes permisos para ver este crédito.</div>`;
-        }
-      });
-    }
-
-    function renderUI() {
-      const c = creditoGlobal;
-      if (!c) {
-        document.getElementById("main-proyeccion").innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
-        return;
-      }
-      let html = `
-        <div class="cabecera">
-          <div class="title">${(c.nombre || "") + " " + (c.apellido || "")}</div>
-          <div class="subtitle">DUI: <b>${c.numeroDui || "-"}</b></div>
-        </div>
-        <div class="seccion-fecha">
-          <button id="btnElegirFecha" class="btn-fecha">
-            ${fechaProyeccion ? "Cambiar fecha de proyección" : "Seleccionar fecha para proyección"}
-          </button>
-        </div>
-        <div id="modalFecha" class="modal-fecha" style="display:none;">
-          <div class="modal-content">
-            <label for="inputFecha">Selecciona la fecha de proyección:</label>
-            <input type="date" id="inputFecha" min="${formatDate(new Date(Date.now() - 365*24*60*60*1000))}" max="${formatDate(new Date(Date.now() + 3*365*24*60*60*1000))}" value="${formatDate(new Date())}">
-            <div style="margin-top:12px; text-align:right;">
-              <button id="btnCancelarFecha" class="btn-cancelar">Cancelar</button>
-              <button id="btnConfirmarFecha" class="btn-confirmar">Aceptar</button>
-            </div>
-          </div>
-        </div>
-      `;
-
-      if (fechaProyeccion && proyeccion) {
-        html += `
-          <div class="card-proyeccion">
-            <div class="row-card"><span class="icon-mat orange">date_range</span>
-              <b>Proyección al:</b> ${formatHumanDate(fechaProyeccion)}
-            </div>
-            <div class="row-card"><span class="icon-mat">timer</span>
-              Días proyectados: <b>${proyeccion.diasProyeccion}</b>
-            </div>
-            <div class="row-card"><span class="icon-mat blue">savings</span>
-              Saldo actual: <b>${money(proyeccion.saldoActual)}</b>
-            </div>
-            <div class="row-card"><span class="icon-mat orange">trending_up</span>
-              Intereses corridos: <b>${money(proyeccion.interesesCorridos)}</b>
-            </div>
-        `;
-        if (proyeccion.cuotasAtrasadas > 0) {
-          html += `
-            <div class="row-card"><span class="icon-mat red">assignment_late</span>
-              Cuotas vencidas: <b>${proyeccion.cuotasAtrasadas}</b>
-            </div>
-            <div class="row-card detalles-vencidos">
-              <span style="width:130px;display:inline-block"></span>
-              Capital vencido: <b>${money(proyeccion.capitalVencido)}</b>
-            </div>
-            <div class="row-card detalles-vencidos">
-              <span style="width:130px;display:inline-block"></span>
-              Interés vencido: <b>${money(proyeccion.interesesVencidos)}</b>
-            </div>
-            <div class="row-card detalles-vencidos">
-              <span style="width:130px;display:inline-block"></span>
-              Total cuotas vencidas: <b>${money(proyeccion.cuotasVencidas)}</b>
-            </div>
-          `;
-        }
-        html += `
-            <div class="row-card"><span class="icon-mat orange">paid</span>
-              Para ponerse al día: <b>${money(proyeccion.paraPonerseAlDia)}</b>
-            </div>
-            <div class="row-card"><span class="icon-mat orange">trending_up</span>
-              Interés acumulado: <b>${money(proyeccion.interesProyectado)}</b>
-            </div>
-          </div>
-        `;
-      } else {
-        html += `
-          <div class="aviso-fecha">
-            Selecciona una fecha para calcular la proyección del crédito.
-          </div>
-        `;
-      }
-      document.getElementById("main-proyeccion").innerHTML = html;
-
-      // Modal lógica con corrección de zona horaria
-      document.getElementById("btnElegirFecha").onclick = () => {
-        document.getElementById("modalFecha").style.display = "block";
-      };
-      if (document.getElementById("btnCancelarFecha")) {
-        document.getElementById("btnCancelarFecha").onclick = () => {
-          document.getElementById("modalFecha").style.display = "none";
-        };
-      }
-      if (document.getElementById("btnConfirmarFecha")) {
-        document.getElementById("btnConfirmarFecha").onclick = () => {
-          const val = document.getElementById("inputFecha").value;
-          if (val) {
-            fechaProyeccion = parseDateInput(val); // ¡Aquí usamos la función corregida!
-            proyeccion = calcularProyeccion(creditoGlobal, fechaProyeccion);
-            renderUI();
-          }
-          document.getElementById("modalFecha").style.display = "none";
-        };
-      }
-    }
-
-    window.addEventListener("DOMContentLoaded", cargarCredito);
-  </script>
+  <title>Proyección de Crédito (a futuro, basado en recibos)</title>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
-    body { background: #101012; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
-    .main { max-width: 480px; margin: 0 auto; padding: 1.5rem 1rem 3rem 1rem; }
-    .cabecera {
-      background: #ffb30012; border-radius: 16px; padding: 22px 18px 13px 18px;
-      margin-bottom: 16px; box-shadow: 0 2px 14px #0002;
-    }
-    .title { font-size: 1.55rem; font-weight: bold; color: #fff;}
-    .subtitle { color: #ffe5b7; font-size: 1rem; margin-top: 1px;}
-    .seccion-fecha { margin-bottom: 17px; }
+    body { background:#101012; color:#fff; font-family:'Segoe UI', Arial, sans-serif; margin:0; min-height:100vh;}
+    .main { max-width:540px; margin:0 auto; padding:1.5rem 1rem 3rem;}
+    .cabecera { background:#ffb30012; border-radius:16px; padding:22px 18px 13px; margin-bottom:16px; box-shadow:0 2px 14px #0002;}
+    .title { font-size:1.55rem; font-weight:bold;}
+    .subtitle { color:#ffe5b7; font-size:1rem; margin-top:1px;}
+    .seccion-fecha { margin-bottom:17px;}
     .btn-fecha {
-      background: #2196f3;
-      border: none;
-      color: #fff;
-      font-size: 1.12rem;
-      padding: 14px 12px;
-      border-radius: 10px;
-      font-weight: 600;
-      cursor: pointer;
-      min-width: 80%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: background 0.16s;
-      margin: 0 auto;
+      background:#2196f3; border:none; color:#fff; font-size:1.12rem; padding:14px 12px; border-radius:10px;
+      font-weight:600; cursor:pointer; min-width:80%; display:flex; align-items:center; justify-content:center; gap:8px;
+      transition:background .16s; margin:0 auto;
     }
-    .btn-fecha:hover { background: #2962ff;}
-    .card-proyeccion {
-      background: #181828;
-      border-radius: 13px;
-      box-shadow: 0 2px 12px #0003;
-      padding: 19px 16px 13px 16px;
-      margin-bottom: 18px;
+    .btn-fecha:hover { background:#2962ff;}
+    .card-proyeccion { background:#181828; border-radius:13px; box-shadow:0 2px 12px #0003; padding:19px 16px 13px; margin-bottom:18px;}
+    .row-card { display:flex; align-items:center; gap:10px; font-size:1.06rem; color:#ffe0b7; margin-bottom:6px;}
+    .row-card b { color:#fff; }
+    .icon-mat { font-family:'Material Icons'; font-size:22px; color:#ffb300; width:23px; text-align:center;}
+    .loader { width:44px; height:44px; margin:60px auto 70px; border-radius:50%; border:4.5px solid #ffb300; border-top:4.5px solid #eee0; animation:spin 1s linear infinite;}
+    @keyframes spin {100%{transform:rotate(360deg)}}
+    .notfound,.aviso-fecha { color:#fff9; font-size:1.08rem; text-align:center; margin:35px 0;}
+    .modal-fecha { display:none; position:fixed; inset:0; background:#000a; z-index:90; justify-content:center; align-items:center;}
+    .modal-content { background:#181828; border-radius:10px; padding:28px 24px 20px; box-shadow:0 8px 32px #0006; max-width:340px; margin:110px auto 0;}
+    .modal-content label { color:#ffb300; display:block; margin-bottom:8px;}
+    .modal-content input[type="date"]{ background:#222; color:#fff; border:1px solid #ffb300; border-radius:7px; padding:8px 10px; font-size:1rem; width:100%;}
+    .btn-cancelar,.btn-confirmar{
+      background:#222; border:1.5px solid #ffb300; color:#ffb300; border-radius:7px; font-size:1rem; padding:7px 20px; font-weight:bold; cursor:pointer; margin-left:9px;
+      transition:background .14s, color .14s;
     }
-    .row-card {
-      display: flex; align-items: center; gap: 10px;
-      font-size: 1.08rem; color: #ffe0b7; margin-bottom: 6px;
-    }
-    .detalles-vencidos { color: #ffd9b0; font-size: .98rem; }
-    .icon-mat {
-      font-family: 'Material Icons'; font-size: 22px; color: #ffb300; display: inline-block;
-      vertical-align: middle; width: 23px; text-align: center;
-    }
-    .icon-mat.orange { color: #ffb300; }
-    .icon-mat.blue { color: #37aaff; }
-    .icon-mat.red { color: #ff4040; }
-    .loader {
-      width: 44px; height: 44px; margin: 60px auto 70px auto; border-radius: 50%;
-      border: 4.5px solid #ffb300; border-top: 4.5px solid #eee0; animation: spin 1s linear infinite;
-      display: block;
-    }
-    @keyframes spin { 100% { transform: rotate(360deg); } }
-    .notfound { color: #fff9; font-size: 1.22rem; text-align: center; margin: 70px 0;}
-    .aviso-fecha { color: #fff9; font-size: 1.08rem; text-align: center; margin: 35px 0;}
-    .modal-fecha {
-      display: none; position: fixed; left: 0; top: 0; right: 0; bottom: 0;
-      background: #000a; z-index: 90; justify-content: center; align-items: center;
-    }
-    .modal-content {
-      background: #181828; border-radius: 10px; padding: 28px 24px 20px 24px; box-shadow: 0 8px 32px #0006; max-width: 340px; margin: 110px auto 0 auto;
-    }
-    .modal-content label { color: #ffb300; font-size: 1rem; margin-bottom: 8px; display:block;}
-    .modal-content input[type="date"] {
-      background: #222; color: #fff; border: 1px solid #ffb300; border-radius: 7px; padding: 8px 10px; font-size: 1rem;
-      margin: 0 0 7px 0; width: 100%;
-    }
-    .btn-cancelar, .btn-confirmar {
-      background: #222; border: 1.5px solid #ffb300; color: #ffb300; border-radius: 7px;
-      font-size: 1rem; padding: 7px 20px; font-weight: bold; cursor: pointer; margin-left: 9px;
-      transition: background .14s, color .14s;
-    }
-    .btn-confirmar { background: #ffb300; color: #222; border: 1.5px solid #ffb300;}
-    .btn-cancelar:hover { background: #333; color: #fff;}
-    .btn-confirmar:hover { background: #f8c43d; color: #101012;}
-    @media (max-width: 570px) {
-      .main { max-width: 99vw; padding: 1rem .4rem 2rem .4rem;}
-      .card-proyeccion { font-size: .99rem; }
-    }
+    .btn-confirmar{ background:#ffb300; color:#222; }
+    .btn-cancelar:hover{ background:#333; color:#fff;}
+    .btn-confirmar:hover{ background:#f8c43d; color:#101012;}
+    @media (max-width:600px){ .main{max-width:99vw; padding:1rem .4rem 2rem} .card-proyeccion{font-size:.99rem} }
   </style>
 </head>
 <body>
-  <div class="main">
-    <div id="main-proyeccion"></div>
-  </div>
+<div class="main">
+  <div id="main-proyeccion"><div class="loader"></div></div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+  import {
+    getFirestore, doc, getDoc, collection, getDocs, query, where
+  } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+  // =========================
+  // Firebase
+  // =========================
+  const firebaseConfig = {
+    apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+    authDomain: "multinversiones-38e13.firebaseapp.com",
+    projectId: "multinversiones-38e13",
+    storageBucket: "multinversiones-38e13.appspot.com",
+    messagingSenderId: "380001917078",
+    appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+    measurementId: "G-H4E31XHG1Y"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+  const auth = getAuth(app);
+
+  // =========================
+  // Utils TZ (-06:00) blindados
+  // =========================
+  const TZ_OFFSET = "-06:00";
+  const MS_DAY = 86400000;
+
+  function money(n){ return "$" + Number(n||0).toFixed(2); }
+  function pad(n){ return n<10?("0"+n):n; }
+  function ymd(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+  function toLocalEndISO(ymdStr){ return `${ymdStr}T23:59:59${TZ_OFFSET}`; }
+  function atLocalMidnight(d){ const x = new Date(d); x.setHours(0,0,0,0); return x; }
+  function parseDateInput(dateStr){ const [Y,M,D] = dateStr.split("-").map(Number); return new Date(Y, M-1, D, 12,0,0); } // evita UTC shift
+  function round2(v){ return Math.round((Number(v)+Number.EPSILON)*100)/100; }
+  function num(n,def=0){ const x=(typeof n==="string")?n.replace(",",".").trim():n; const v=Number(x); return Number.isFinite(v)?v:def; }
+
+  // (a,b] contando días enteros entre medianoches locales
+  function daysMedioAbiertoDates(d1, d2){
+    const a = atLocalMidnight(d1).getTime();
+    const b = atLocalMidnight(d2).getTime();
+    return Math.max(0, Math.floor((b - a)/MS_DAY));
+  }
+
+  function formatHumanDate(date){
+    if(!date) return "-";
+    const d = new Date(date);
+    return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`;
+  }
+
+  function normalizeDailyRate(credito){
+    let td = num(credito.tasaDiariaCredito, 0);
+    if (td <= 0 || td >= 0.02){
+      if (td > 1 && td <= 100) td = td/100; // venía en %
+    }
+    if (td <= 0 || td >= 0.02){
+      const ta = num(credito.tasaAnualCredito, 0);
+      if (ta > 0) td = ta/100/365;
+    }
+    if (!(td>0 && td<0.02)) td = 0.005; // 0.5%/día fallback
+    return td;
+  }
+
+  // =========================
+  // Pagos: último recibo ≤ fecha
+  // =========================
+  async function obtenerUltimoReciboHastaFecha(db, creditoID, fechaYMD){
+    const corte = new Date(toLocalEndISO(fechaYMD));
+    const snap = await getDocs(query(collection(db,"pagos"), where("creditoID","==", creditoID)));
+    let ultimo = null;
+    snap.forEach(d=>{
+      const p = d.data();
+      if (!p || p.anulado === true) return;
+      if (!p.fechaPago) return;
+      const f = new Date(p.fechaPago);
+      if (Number.isNaN(f.getTime()) || f > corte) return;
+      if (!ultimo) ultimo = { ...p, _f: f };
+      else if (f > ultimo._f || (f.getTime()===ultimo._f.getTime() && new Date(p.fechaRegistro||0) > new Date(ultimo.fechaRegistro||0))){
+        ultimo = { ...p, _f: f };
+      }
+    });
+    if (!ultimo) return null;
+    return { fecha: ultimo._f, saldoRestante: num(ultimo.saldoRestante, 0), raw: ultimo };
+  }
+
+  // =========================
+  // Multa proyectada por cuota
+  // =========================
+  function deducirMontoMulta(credito){
+    // 1) Campo directo si existe
+    if (Number.isFinite(num(credito.multaPorAtraso, NaN))) return Math.max(0, num(credito.multaPorAtraso, 0));
+    // 2) Valor "típico" del historial
+    const his = Array.isArray(credito.historialMultas)? credito.historialMultas : [];
+    let vals = his.map(m=>num(m.monto, NaN)).filter(v=>Number.isFinite(v) && v>0);
+    if (vals.length>0){
+      // modo robusto: el más frecuente
+      const freq = {};
+      for(const v of vals){ const k=v.toFixed(2); freq[k]=(freq[k]||0)+1; }
+      const top = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0][0];
+      return round2(Number(top));
+    }
+    // 3) Fallback compañía
+    return 3;
+  }
+
+  // =========================
+  // Proyección a futuro (SÓLO recibos)
+  // =========================
+  async function calcularProyeccionSoloRecibos(db, credito, fechaSeleccionadaYMD){
+    const tasa = normalizeDailyRate(credito);
+    // 1) Último recibo <= fecha de proyección
+    const up = await obtenerUltimoReciboHastaFecha(db, credito.id, fechaSeleccionadaYMD);
+    const fechaCorte = new Date(toLocalEndISO(fechaSeleccionadaYMD));
+
+    let interes = 0, dias = 0, saldoBase = 0, fechaBase = null, origen = "sin_recibo";
+    if (up){
+      fechaBase = up.fecha;
+      saldoBase = num(up.saldoRestante, 0);
+      dias = daysMedioAbiertoDates(fechaBase, fechaCorte); // (recibo, corte]
+      interes = round2(Math.max(0, saldoBase * tasa * dias));
+      origen = "ultimo_recibo";
+    }
+
+    // 2) Capital vencido (cuotas con fecha < fechaSeleccionada) y no pagadas
+    const amort = Array.isArray(credito.amortizacion)? credito.amortizacion.slice() : [];
+    let capitalAtrasado = 0;
+    let cuotasAtrasadas = 0;
+    const corte0h = atLocalMidnight(new Date(fechaCorte));
+    for(const c of amort){
+      const f = new Date(c.fecha);
+      if (f < corte0h && (c.estado !== "Pagada")){
+        const cap = num(c.capital, 0);
+        const pag = num(c.montoPagado, 0);
+        const pendCap = Math.max(0, cap - pag);
+        if (pendCap > 0.009){
+          capitalAtrasado = round2(capitalAtrasado + pendCap);
+          cuotasAtrasadas++;
+        }
+      }
+    }
+
+    // 3) Multas proyectadas: por cada cuota no pagada cuya fecha + 1 día ≤ fechaSeleccionada
+    const multaUnit = deducirMontoMulta(credito);
+    let multasProyectadas = 0;
+    for(const c of amort){
+      const f = atLocalMidnight(new Date(c.fecha));
+      const diaMulta = new Date(f.getTime() + MS_DAY); // día siguiente
+      if (diaMulta <= corte0h && (c.estado !== "Pagada")){
+        // Solo si hay capital pendiente
+        const cap = num(c.capital, 0);
+        const pag = num(c.montoPagado, 0);
+        if (Math.max(0, cap - pag) > 0.009){
+          multasProyectadas = round2(multasProyectadas + multaUnit);
+        }
+      }
+    }
+
+    const paraPonerseAlDia = round2(capitalAtrasado + multasProyectadas + interes);
+
+    return {
+      origenInteres: origen,
+      interesCobrar: interes,
+      interesDiasBase: dias,
+      interesSaldoBase: round2(saldoBase),
+      interesFechaBaseISO: fechaBase ? fechaBase.toISOString() : null,
+      interesCorteISO: fechaCorte.toISOString(),
+
+      capitalAtrasado,
+      cuotasAtrasadas,
+      multasProyectadas,
+      multaUnit,
+
+      paraPonerseAlDia
+    };
+  }
+
+  // =========================
+  // UI / flujo
+  // =========================
+  function getIdParam(){ return new URL(location.href).searchParams.get("id"); }
+
+  let creditoGlobal = null;
+  let fechaProyeccion = null;
+  let resumen = null;
+
+  function render(c){
+    if(!c){ document.getElementById("main-proyeccion").innerHTML = `<div class="notfound">Crédito no encontrado</div>`; return; }
+    let html = `
+      <div class="cabecera">
+        <div class="title">${(c.nombre||"")} ${(c.apellido||"")}</div>
+        <div class="subtitle">DUI: <b>${c.numeroDui||"-"}</b></div>
+        <div class="subtitle">Saldo actual: <b>${money(c.saldoActual||0)}</b></div>
+        <div class="subtitle">Tasa diaria: <b>${round2(normalizeDailyRate(c)*100)}%</b></div>
+      </div>
+      <div class="seccion-fecha">
+        <button id="btnElegirFecha" class="btn-fecha"><span class="icon-mat">date_range</span>${fechaProyeccion? "Cambiar fecha de proyección":"Seleccionar fecha de proyección"}</button>
+      </div>
+      <div id="modalFecha" class="modal-fecha" style="display:none;">
+        <div class="modal-content">
+          <label for="inputFecha">Selecciona una fecha:</label>
+          <input type="date" id="inputFecha" value="${ymd(new Date())}">
+          <div style="margin-top:12px; text-align:right;">
+            <button id="btnCancelarFecha" class="btn-cancelar">Cancelar</button>
+            <button id="btnConfirmarFecha" class="btn-confirmar">Aceptar</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    if (fechaProyeccion && resumen){
+      html += `
+        <div class="card-proyeccion">
+          <div class="row-card"><span class="icon-mat">event</span> Proyección al: <b>${formatHumanDate(fechaProyeccion)}</b></div>
+          <div class="row-card"><span class="icon-mat">timelapse</span> Días desde último recibo: <b>${resumen.interesDiasBase}</b></div>
+          <div class="row-card"><span class="icon-mat">savings</span> Saldo base (recibo): <b>${money(resumen.interesSaldoBase)}</b></div>
+          <div class="row-card"><span class="icon-mat">trending_up</span> Interés a cobrar: <b>${money(resumen.interesCobrar)}</b></div>
+          <div class="row-card"><span class="icon-mat">assignment_late</span> Cuotas vencidas: <b>${resumen.cuotasAtrasadas}</b></div>
+          <div class="row-card"><span class="icon-mat">account_balance_wallet</span> Capital vencido: <b>${money(resumen.capitalAtrasado)}</b></div>
+          <div class="row-card"><span class="icon-mat">gavel</span> Multas proyectadas (=$${resumen.multaUnit.toFixed(2)} c/u): <b>${money(resumen.multasProyectadas)}</b></div>
+          <hr style="border-color:#ffffff22;">
+          <div class="row-card"><span class="icon-mat">paid</span> <b>Para ponerse al día:</b> <b>${money(resumen.paraPonerseAlDia)}</b></div>
+          <div class="row-card" style="font-size:.92rem;color:#ffffff88;">
+            * Interés calculado exclusivamente desde <b>${resumen.origenInteres==="ultimo_recibo"?"último recibo":"(sin recibos previos)"}</b>.
+          </div>
+        </div>
+      `;
+    } else {
+      html += `<div class="aviso-fecha">Selecciona una fecha para calcular la proyección exacta.</div>`;
+    }
+
+    document.getElementById("main-proyeccion").innerHTML = html;
+
+    // abrir/cerrar modal
+    document.getElementById("btnElegirFecha").onclick = ()=>{ document.getElementById("modalFecha").style.display = "flex"; };
+    document.getElementById("btnCancelarFecha").onclick = ()=>{ document.getElementById("modalFecha").style.display = "none"; };
+    document.getElementById("btnConfirmarFecha").onclick = async ()=>{
+      const val = document.getElementById("inputFecha").value;
+      if (val){
+        fechaProyeccion = parseDateInput(val);
+        const ymdSel = ymd(fechaProyeccion);
+        resumen = await calcularProyeccionSoloRecibos(db, creditoGlobal, ymdSel);
+        render(creditoGlobal);
+      }
+      document.getElementById("modalFecha").style.display = "none";
+    };
+  }
+
+  // =========================
+  // Boot
+  // =========================
+  function getCreditoId(){ return getIdParam(); }
+
+  onAuthStateChanged(auth, async user=>{
+    if(!user){ location.href="login.html"; return; }
+    const id = getCreditoId();
+    if(!id){ document.getElementById("main-proyeccion").innerHTML = `<div class="notfound">Crédito no encontrado</div>`; return; }
+    const ref = doc(db,"creditos", id);
+    const snap = await getDoc(ref);
+    if(!snap.exists()){ document.getElementById("main-proyeccion").innerHTML = `<div class="notfound">Crédito no encontrado</div>`; return; }
+    creditoGlobal = { id, ...snap.data() };
+    render(creditoGlobal);
+  });
+</script>
 </body>
 </html>
+
 

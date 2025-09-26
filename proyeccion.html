@@ -123,7 +123,7 @@
       const [y,m,d] = str.split("-").map(Number);
       return new Date(y, m-1, d, 0,0,0,0);
     }
-    // Si viene ISO con hora (p.ej. ...T06:00:00.000Z), usar Date normal
+    // Si viene ISO con hora, usar Date normal
     return new Date(str);
   }
 
@@ -153,28 +153,25 @@
   // Multa proyectada por cuota
   // =========================
   function deducirMontoMulta(credito){
-    // 1) Campo directo si existe
     if (Number.isFinite(num(credito.multaPorAtraso, NaN))) return Math.max(0, num(credito.multaPorAtraso, 0));
-    // 2) Valor "típico" del historial
     const his = Array.isArray(credito.historialMultas)? credito.historialMultas : [];
     let vals = his.map(m=>num(m.monto, NaN)).filter(v=>Number.isFinite(v) && v>0);
     if (vals.length>0){
-      // modo robusto: el más frecuente
       const freq = {};
       for(const v of vals){ const k=v.toFixed(2); freq[k]=(freq[k]||0)+1; }
       const top = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0][0];
       return round2(Number(top));
     }
-    // 3) Fallback compañía
     return 3;
   }
 
   // =========================
-  // Proyección a futuro (SÓLO recibos) con multa = fechaCuota+1 día
+  // Proyección a futuro (SÓLO recibos)
+  // Capital vencido: cuenta el MISMO día de la cuota
+  // Multa: desde el día SIGUIENTE
   // =========================
   async function calcularProyeccionSoloRecibos(db, credito, fechaSeleccionadaYMD){
     const tasa = normalizeDailyRate(credito);
-    // 1) Último recibo <= fecha de proyección
     const up = await obtenerUltimoReciboHastaFecha(db, credito.id, fechaSeleccionadaYMD);
     const fechaCorte = new Date(toLocalEndISO(fechaSeleccionadaYMD));
 
@@ -187,14 +184,14 @@
       origen = "ultimo_recibo";
     }
 
-    // 2) Capital vencido (cuotas con fecha < fechaSeleccionada) y no pagadas
+    // ---- Capital vencido (MISMO día cuenta como vencido) ----
     const amort = Array.isArray(credito.amortizacion)? credito.amortizacion.slice() : [];
     let capitalAtrasado = 0;
     let cuotasAtrasadas = 0;
     const corte0h = atLocalMidnight(new Date(fechaCorte));
     for(const c of amort){
-      const f = parseYMDLocal(c.fecha);               // <-- parse local
-      if (f < corte0h && (c.estado !== "Pagada")){
+      const f = parseYMDLocal(c.fecha);
+      if (f <= corte0h && (c.estado !== "Pagada")){      // <= (mismo día cuenta como vencido)
         const cap = num(c.capital, 0);
         const pag = num(c.montoPagado, 0);
         const pendCap = Math.max(0, cap - pag);
@@ -205,14 +202,13 @@
       }
     }
 
-    // 3) Multas proyectadas: por cada cuota no pagada cuya (fecha + 1 día) ≤ fechaSeleccionada
+    // ---- Multas (DÍA SIGUIENTE al vencimiento) ----
     const multaUnit = deducirMontoMulta(credito);
     let multasProyectadas = 0;
     for(const c of amort){
-      const f = parseYMDLocal(c.fecha);               // <-- parse local
+      const f = parseYMDLocal(c.fecha);
       const diaMulta = new Date(atLocalMidnight(f).getTime() + MS_DAY); // día siguiente
       if (diaMulta <= corte0h && (c.estado !== "Pagada")){
-        // Solo si hay capital pendiente
         const cap = num(c.capital, 0);
         const pag = num(c.montoPagado, 0);
         if (Math.max(0, cap - pag) > 0.009){
@@ -230,12 +226,10 @@
       interesSaldoBase: round2(saldoBase),
       interesFechaBaseISO: fechaBase ? fechaBase.toISOString() : null,
       interesCorteISO: fechaCorte.toISOString(),
-
       capitalAtrasado,
       cuotasAtrasadas,
       multasProyectadas,
       multaUnit,
-
       paraPonerseAlDia
     };
   }
@@ -331,6 +325,8 @@
 </script>
 </body>
 </html>
+
+
 
 
 

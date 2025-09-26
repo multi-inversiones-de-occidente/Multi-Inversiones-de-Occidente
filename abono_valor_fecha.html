@@ -1,4 +1,4 @@
-<!DOCTYPE html>  
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
@@ -150,19 +150,23 @@
     }
 
     // ——— Último pago real desde colección `pagos` (≤ fecha valor)
+    //     *** ARREGLO: no filtramos 'anulado==false' en la query para no excluir
+    //     pagos antiguos sin el campo. Descartamos anulado===true en memoria. ***
     async function ultimoPagoDesdeColeccionPagos(db, creditoID, fechaAbonoYMD){
       const corte = new Date(`${fechaAbonoYMD}T23:59:59-06:00`);
       const snap = await getDocs(
-        query(collection(db,"pagos"), where("creditoID","==", creditoID), where("anulado","==", false))
+        query(collection(db,"pagos"), where("creditoID","==", creditoID))
       );
       let ultimo = null;
       snap.forEach(d=>{
         const p = d.data();
+        if (!p || p.anulado === true) return; // descarta SOLO si está expresamente anulado
         if (!p.fechaPago) return;
         const f = new Date(p.fechaPago);
         if (f <= corte){
           if (!ultimo) ultimo = { ...p, _f: f };
-          else if (f > ultimo._f || (f.getTime()===ultimo._f.getTime() && new Date(p.fechaRegistro||0) > new Date(ultimo.fechaRegistro||0))) {
+          else if (f > ultimo._f || (f.getTime()===ultimo._f.getTime() &&
+                   new Date(p.fechaRegistro||0) > new Date(ultimo.fechaRegistro||0))) {
             ultimo = { ...p, _f: f };
           }
         }
@@ -180,7 +184,7 @@
       const up = await ultimoPagoDesdeColeccionPagos(db, credito.id, fechaAbonoYMD);
       if (up && Number.isFinite(up.saldoRestante)){
         return {
-          // ✅ usar la FECHA REAL del último pago
+          // usar la FECHA REAL del último pago
           fechaAnclaInteres: up.fecha,
           saldoAncla: round2(Math.max(0, up.saldoRestante)),
           // si no existe el campo en ese pago, asumimos 0 como pediste
@@ -221,12 +225,11 @@
       const tasa = normalizeDailyRate(credito);
       const corte = new Date(toLocalEndISO(fechaAbonoYMD));
 
-      // 1) Si hay áncla guardada en el crédito, úsala SOLO si es válida para el corte
+      // 1) Si hay áncla guardada en el crédito, usarla SOLO si es válida para el corte
       let { fechaAnclaInteres, saldoAncla, interesPendienteAncla, exists } = getAnchorFields(credito);
       let sourceAnchor = "anchor_fields";
-      // ⚠️ Blindaje: áncla guardada solo si fechaAnclaInteres <= corte
       if (exists && !(fechaAnclaInteres && fechaAnclaInteres <= corte)) {
-        exists = false;
+        exists = false; // blindaje: áncla futura no aplica
       }
 
       if (!exists){
@@ -247,9 +250,9 @@
       const tope = round2(saldoAncla * tasa * 122);
       if (interes > tope) interes = tope;
 
-      return { 
-        interesExigible: interes, 
-        anchorUsada: { fechaAnclaInteres, saldoAncla, interesPendienteAncla, _source: sourceAnchor } 
+      return {
+        interesExigible: interes,
+        anchorUsada: { fechaAnclaInteres, saldoAncla, interesPendienteAncla, _source: sourceAnchor }
       };
     }
 
@@ -422,6 +425,7 @@
 
     // =========================
     // Interés vencido visible (piso)
+    // =========================
     function interesVencidoPorCuotas(amortizacion, fechaAbonoYMD){
       const corte = new Date(toLocalEndISO(fechaAbonoYMD));
       let suma = 0;
@@ -465,7 +469,7 @@
           const pendienteInt = round2(Math.max(0, interesCuota - pagadoInt));
           if (pendienteInt > 0){
             const apli = Math.min(pendienteInt, refAbono.value);
-            c.montoPagadoInteres = round2(pagInt + apli);
+            c.montoPagadoInteres = round2(pagadoInt + apli); // fix nombre variable
             refPagoInteres.value = round2(refPagoInteres.value + apli);
             refAbono.value = round2(refAbono.value - apli);
           }
@@ -763,6 +767,7 @@
   </script>
 </body>
 </html>
+
 
 
 

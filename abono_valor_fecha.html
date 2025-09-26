@@ -70,7 +70,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import {
-      getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, query, where, orderBy, limit
+      getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, query, where
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
@@ -170,8 +170,8 @@
       if (!ultimo) return null;
       return {
         fecha: ultimo._f,
-        saldoRestante: Number(ultimo.saldoRestante ?? NaN),
-        interesPendientePostPago: Number(ultimo.interesPendientePostPago ?? NaN)
+        saldoRestante: Number(num(ultimo.saldoRestante, NaN)),
+        interesPendientePostPago: Number(num(ultimo.interesPendientePostPago, NaN))
       };
     }
 
@@ -221,11 +221,16 @@
       const tasa = normalizeDailyRate(credito);
       const corte = new Date(toLocalEndISO(fechaAbonoYMD));
 
-      // 1) Si hay áncla guardada en el crédito, úsala
+      // 1) Si hay áncla guardada en el crédito, úsala SOLO si es válida para el corte
       let { fechaAnclaInteres, saldoAncla, interesPendienteAncla, exists } = getAnchorFields(credito);
       let sourceAnchor = "anchor_fields";
+      // ⚠️ Blindaje: áncla guardada solo si fechaAnclaInteres <= corte
+      if (exists && !(fechaAnclaInteres && fechaAnclaInteres <= corte)) {
+        exists = false;
+      }
+
       if (!exists){
-        // 2) Si no hay áncla, caer a pagos/amortización/saldo
+        // 2) Si no hay áncla válida, caer a pagos/amortización/saldo
         const fb = await fallbackAnchor(db, credito, amortizacion, fechaAbonoYMD);
         fechaAnclaInteres = fb.fechaAnclaInteres;
         saldoAncla = fb.saldoAncla;
@@ -417,7 +422,6 @@
 
     // =========================
     // Interés vencido visible (piso)
-    // =========================
     function interesVencidoPorCuotas(amortizacion, fechaAbonoYMD){
       const corte = new Date(toLocalEndISO(fechaAbonoYMD));
       let suma = 0;
@@ -461,7 +465,7 @@
           const pendienteInt = round2(Math.max(0, interesCuota - pagadoInt));
           if (pendienteInt > 0){
             const apli = Math.min(pendienteInt, refAbono.value);
-            c.montoPagadoInteres = round2(pagadoInt + apli);
+            c.montoPagadoInteres = round2(pagInt + apli);
             refPagoInteres.value = round2(refPagoInteres.value + apli);
             refAbono.value = round2(refAbono.value - apli);
           }
@@ -515,13 +519,13 @@
         : num(creditoSeleccionado.saldoActual, 0);
 
       // 0) Interés exigible EXACTO al corte:
-      //    - Si hay áncla en crédito, se usa.
-      //    - Si no hay, se usa el último pago y se asume interés 0 en ese pago.
+      //    - Áncla válida => se usa.
+      //    - Si no hay áncla válida => último pago (interés base 0).
       const { interesExigible, anchorUsada } = await interesExigibleAlCorteConAnchor(db, creditoSeleccionado, amortizacion, fechaAbonoYMD);
 
       // Piso por cuotas vencidas (defensa ante inconsistencias históricas)
       const pisoInteres = interesVencidoPorCuotas(amortizacion, fechaAbonoYMD);
-      // ⚠️ Si el origen es 'pagos', no aplicar piso (evita inflar como tu caso $8.83)
+      // Si el origen es 'pagos', NO usar piso (evita inflar)
       const interesAlCorte = round2(anchorUsada?._source === "pagos" ? interesExigible
                                                            : Math.max(interesExigible, pisoInteres));
 
@@ -566,7 +570,7 @@
         let fechaCuota = new Date(cuota.fecha);
         if (fechaCuota <= fechaAbonoEnd && cuota.estado !== "Pagada"){
           cuota.montoPagado = num(cuota.montoPagado, 0);
-          // garantizar interés vencido en 0 para esa cuota (por si faltó centavos)
+
           const interesCuota = num(cuota.interes, 0);
           const pagInt = num(cuota.montoPagadoInteres, 0);
           const intPend = round2(Math.max(0, interesCuota - pagInt));
@@ -589,7 +593,6 @@
           const EPS=0.01;
           const capitalOk = Math.abs(round2(cuota.montoPagado) - round2(capitalCuota)) < EPS;
 
-          // En RETRO: Pagada si capital completo (interés plan futuro no se anticipa)
           if (capitalOk && MODO_RETRO){
             cuota.estado = "Pagada";
             cuota.fechaPagoReal = fechaAbonoYMD;
@@ -631,7 +634,6 @@
       }
 
       // 4) TOTALES y ÁNCLA post-pago
-      // SaldoActual preferente: saldoInicialOperacion - pagoCapital
       let saldoPendiente = round2(Math.max(0, saldoInicialOperacion - pagoCapital));
 
       // Verificación contra amortización en centavos
@@ -684,7 +686,7 @@
         pagoCapital: round2(pagoCapital),
         pagoMulta: round2(pagoMulta),
         saldoRestante: round2(saldoPendiente),
-        fechaPago: new Date(toLocalStartISO(fechaAbonoYMD)).toISOString(), // guardado al inicio del día local
+        fechaPago: new Date(toLocalStartISO(fechaAbonoYMD)).toISOString(),
         nombres: creditoSeleccionado.nombre,
         numeroDui: creditoSeleccionado.numeroDui || "",
         sucursal: userAgencia,
@@ -699,7 +701,6 @@
         anchorPrevFecha: anchorUsada.fechaAnclaInteres ? anchorUsada.fechaAnclaInteres.toISOString() : null,
         anchorPrevSaldo: round2(anchorUsada.saldoAncla ?? 0),
         anchorPrevInteresPendiente: round2(anchorUsada.interesPendienteAncla ?? 0),
-        // (Opcional) guarda también esto para facilitar la próxima lectura exacta:
         interesPendientePostPago: round2(Math.max(0, interesAlCorte - pagoInteres))
       };
       await addDoc(collection(db, "pagos"), pagoObj);
@@ -762,6 +763,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 

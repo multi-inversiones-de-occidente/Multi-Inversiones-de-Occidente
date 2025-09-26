@@ -82,18 +82,6 @@
   function round2(v){ return Math.round((Number(v)+Number.EPSILON)*100)/100; }
   function num(n,def=0){ const x=(typeof n==="string")?n.replace(",",".").trim():n; const v=Number(x); return Number.isFinite(v)?v:def; }
 
-  // ✅ Parseo LOCAL de fechas "YYYY-MM-DD" para evitar el bug de UTC
-  function parseLocalYMD(ymdStr){
-    if (typeof ymdStr === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ymdStr)){
-      const [Y,M,D] = ymdStr.split("-").map(Number);
-      return new Date(Y, M-1, D, 0,0,0,0); // medianoche local del día
-    }
-    // fallback: si trae hora/ISO, tomamos la fecha y la llevamos a 00:00 local
-    const d = new Date(ymdStr);
-    d.setHours(0,0,0,0);
-    return d;
-  }
-
   // (a,b] contando días enteros entre medianoches locales
   function daysMedioAbiertoDates(d1, d2){
     const a = atLocalMidnight(d1).getTime();
@@ -121,6 +109,11 @@
   }
 
   // =========================
+  // Param URL (definido UNA sola vez)
+  // =========================
+  function getIdParam(){ return new URL(location.href).searchParams.get("id"); }
+
+  // =========================
   // Pagos: último recibo ≤ fecha
   // =========================
   async function obtenerUltimoReciboHastaFecha(db, creditoID, fechaYMD){
@@ -146,15 +139,19 @@
   // Multa proyectada por cuota
   // =========================
   function deducirMontoMulta(credito){
+    // 1) Campo directo si existe
     if (Number.isFinite(num(credito.multaPorAtraso, NaN))) return Math.max(0, num(credito.multaPorAtraso, 0));
+    // 2) Valor "típico" del historial
     const his = Array.isArray(credito.historialMultas)? credito.historialMultas : [];
     let vals = his.map(m=>num(m.monto, NaN)).filter(v=>Number.isFinite(v) && v>0);
     if (vals.length>0){
+      // modo robusto: el más frecuente
       const freq = {};
       for(const v of vals){ const k=v.toFixed(2); freq[k]=(freq[k]||0)+1; }
       const top = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0][0];
       return round2(Number(top));
     }
+    // 3) Fallback compañía
     return 3;
   }
 
@@ -182,7 +179,7 @@
     let cuotasAtrasadas = 0;
     const corte0h = atLocalMidnight(new Date(fechaCorte));
     for(const c of amort){
-      const f = parseLocalYMD(c.fecha);            // ← ← FIX: parseo local
+      const f = new Date(c.fecha);
       if (f < corte0h && (c.estado !== "Pagada")){
         const cap = num(c.capital, 0);
         const pag = num(c.montoPagado, 0);
@@ -198,9 +195,10 @@
     const multaUnit = deducirMontoMulta(credito);
     let multasProyectadas = 0;
     for(const c of amort){
-      const f = parseLocalYMD(c.fecha);            // ← ← FIX: parseo local
-      const diaMulta = new Date(f.getTime() + MS_DAY); // día siguiente
+      const f = atLocalMidnight(new Date(c.fecha));
+      const diaMulta = new Date(f.getTime() + MS_DAY); // día siguiente de la cuota
       if (diaMulta <= corte0h && (c.estado !== "Pagada")){
+        // Solo si hay capital pendiente
         const cap = num(c.capital, 0);
         const pag = num(c.montoPagado, 0);
         if (Math.max(0, cap - pag) > 0.009){
@@ -231,8 +229,6 @@
   // =========================
   // UI / flujo
   // =========================
-  function getIdParam(){ return new URL(location.href).searchParams.get("id"); }
-
   let creditoGlobal = null;
   let fechaProyeccion = null;
   let resumen = null;
@@ -302,21 +298,27 @@
   // =========================
   // Boot
   // =========================
-  function getIdParam(){ return new URL(location.href).searchParams.get("id"); }
-
   onAuthStateChanged(auth, async user=>{
     if(!user){ location.href="login.html"; return; }
     const id = getIdParam();
-    if(!id){ document.getElementById("main-proyeccion").innerHTML = `<div class="notfound">Crédito no encontrado</div>`; return; }
+    if(!id){
+      document.getElementById("main-proyeccion").innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
+      return;
+    }
     const ref = doc(db,"creditos", id);
     const snap = await getDoc(ref);
-    if(!snap.exists()){ document.getElementById("main-proyeccion").innerHTML = `<div class="notfound">Crédito no encontrado</div>`; return; }
-    const creditoGlobal = { id, ...snap.data() };
+    if(!snap.exists()){
+      document.getElementById("main-proyeccion").innerHTML = `<div class="notfound">Crédito no encontrado</div>`;
+      return;
+    }
+    creditoGlobal = { id, ...snap.data() };
     render(creditoGlobal);
   });
 </script>
 </body>
 </html>
+
+
 
 
 

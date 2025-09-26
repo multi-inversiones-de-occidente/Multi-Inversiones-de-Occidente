@@ -254,10 +254,6 @@
     function startOfToday(){
       const t = new Date(); t.setHours(0,0,0,0); return t;
     }
-    /* >>> NUEVO (para áncla al FIN de hoy local) <<< */
-    function endOfToday(){
-      const t = new Date(); t.setHours(23,59,59,0); return t;
-    }
     function isBeforeTodayLocal(ymd){
       const d = parseLocalYMD(ymd); if (!d) return false;
       return d.getTime() < startOfToday().getTime();
@@ -536,6 +532,7 @@
         const correlativoStr = await obtenerCorrelativoUnicoPagos();
 
         // ======== 0.1) Guardar snapshot previo para reversión ========
+        // Se guarda TODO el crédito tal cual, más el correlativo y metadatos.
         await window.firebaseAddDoc("reversionPago", {
           correlativo: Number(correlativoStr),
           creditoID: cliente.id,
@@ -576,6 +573,7 @@
         let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
 
         // ======== 2) MULTAS primero ========
+        // Ordenar por fecha (antiguas primero)
         historialMultas.sort((a,b) => new Date(a.fecha||0) - new Date(b.fecha||0));
         for (let i=0; i<historialMultas.length && restante>EPS; i++){
           const m = historialMultas[i];
@@ -592,6 +590,7 @@
             else { m.monto = nuevo; m.estadoCuota = "No Pagada"; }
           }
         }
+        // Recalcular multasAcumuladas = suma de No Pagadas
         multasAcumuladas = round2(historialMultas.reduce((acc,m)=>{
           if (!m.estadoCuota || m.estadoCuota === "No Pagada") return acc + n(m.monto);
           return acc;
@@ -618,6 +617,7 @@
             restante = round2(restante - abono);
           }
         }
+        // Orden: vencidas (< hoy) → hoy → futuras (> hoy)
         abonarCapital(c=> isBeforeTodayLocal(c.fecha));
         abonarCapital(c=> isTodayLocal(c.fecha));
         abonarCapital(c=> !isBeforeTodayLocal(c.fecha) && !isTodayLocal(c.fecha));
@@ -632,6 +632,7 @@
         }
 
         // ======== 6) KPIs (alineados al cron) ========
+        // capitalVencido: sumar capital pendiente de cuotas con diasAtraso >= 0 (incluye HOY)
         let capitalAtrasado = 0;
         let cuotasAtrasadas = 0;
         let maxDiasAtraso = 0;
@@ -648,7 +649,8 @@
           }
         }
 
-        const paraPonerseAlDia = round2(add(add(interesActual, capitalAtrasado), multasAcumuladas));
+        // PPD = interesActual + capitalAtrasado + multas No Pagadas
+        paraPonerseAlDia = round2(add(add(interesActual, capitalAtrasado), multasAcumuladas));
 
         // ======== 7) saldoActual (simple) ========
         const saldoAnterior = round2(n(creditoData.saldoActual));
@@ -691,13 +693,7 @@
           paraPonerseAlDiaDespues: round2(paraPonerseAlDia)
         });
 
-        /* ======== 10) Persistir crédito actualizado + ÁNCLAS ========
-           >>> ÚNICO CAMBIO SOLICITADO <<<
-           Guardamos:
-           - fechaAnclaInteres = fin de HOY local (23:59:59) para evitar doble devengo mismo día
-           - saldoAncla = saldoNuevo
-           - interesPendienteAncla = interesActual (lo que quedó sin pagar de interés)
-        */
+        // ======== 10) Persistir crédito actualizado ========
         await window.firebaseUpdateDoc("creditos", cliente.id, {
           saldoActual: round2(saldoNuevo),
           interesActual: round2(interesActual),
@@ -706,12 +702,13 @@
           multasAcumuladas: round2(multasAcumuladas),
           cuotasAtrasadas: cuotasAtrasadas,
           ultimaActualizacion: fechaPago,
+          // SIN tocar fechaUltimoCalculoIntereses: la maneja el CRON
           estadoCredito: nuevoEstado,
           amortizacion: amortizacion,
           historialMultas: historialMultas,
 
-          // === ÁNCLAS ESCRITAS DESPUÉS DEL PAGO (nuevo) ===
-          fechaAnclaInteres: endOfToday(),
+          // ======== NUEVOS CAMPOS ÁNCLA (SOLO ESCRITURA) ========
+          fechaAnclaInteres: new Date(fechaPago),
           saldoAncla: round2(saldoNuevo),
           interesPendienteAncla: round2(interesActual)
         });
@@ -751,6 +748,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 

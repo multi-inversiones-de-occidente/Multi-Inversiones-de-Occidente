@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Abono a Fechas Anteriores – Multi Inversiones</title>
+  <title>Abono a Fechas Anteriores – Solo desde Recibos</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body { background: #111827; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
@@ -44,8 +44,8 @@
   <div class="container">
     <div class="titulo"><i class="fas fa-history"></i> Abono a Fechas Anteriores</div>
     <div class="info-msg">
-      Esta opción permite registrar un abono en una fecha anterior a la actual. <br>
-      <b>Solo personal autorizado puede hacer esta operación.</b> Por seguridad, deberás ingresar el motivo y el PIN de gerente.
+      Esta opción registra un abono en una fecha anterior a la actual.<br>
+      <b>El interés a cobrar se calcula EXCLUSIVAMENTE desde el último recibo (colección "pagos").</b>
     </div>
     <label class="label" for="busqueda">Buscar cliente por nombre o DUI</label>
     <input id="busqueda" class="input-main" type="text" placeholder="Escribe el nombre o DUI..." autocomplete="off"/>
@@ -78,10 +78,10 @@
     // Config & Constantes
     // =========================
     const TZ_OFFSET = "-06:00"; // El Salvador
-    const MODO_RETRO = true;
+    const MODO_RETRO = true;    // Reglas especiales de retroactivo
 
     // =========================
-    // Utilidades (TZ ES)
+    // Utils blindados (TZ ES)
     // =========================
     function toLocalEndISO(ymd){ return `${ymd}T23:59:59${TZ_OFFSET}`; }
     function toLocalStartISO(ymd){ return `${ymd}T00:00:00${TZ_OFFSET}`; }
@@ -111,7 +111,7 @@
     }
     function round2(v){ return Math.round((v + Number.EPSILON)*100)/100; }
 
-    // saldo desde amortización en centavos
+    // ✅ saldo actual desde amortización en centavos (para exactitud)
     function saldoDesdeAmortizacion(amortizacion){
       let totalCents = 0;
       for (const c of (amortizacion || [])) {
@@ -123,89 +123,75 @@
       return totalCents / 100;
     }
 
+    // Tasa diaria robusta
     function normalizeDailyRate(credito){
       let td = num(credito.tasaDiariaCredito, 0);
       if (td <= 0 || td >= 0.02){
         if (td > 1 && td <= 100) td = td/100; // venía en %
       }
       if (td <= 0 || td >= 0.02){
-        const ta = num(credito.tasaAnualCredito, 0);
+        const ta = num(credito.tasaAnualCredito, 0); // % anual
         if (ta > 0) td = ta/100/365;
       }
-      if (!(td > 0 && td < 0.02)) td = 0.005;
+      if (!(td > 0 && td < 0.02)) td = 0.005; // fallback ~0.5%/día
       return td;
     }
 
     // =========================
-    // Cálculo “exacto” pedido: desde ÚLTIMO PAGO
+    // SOLO RECIBOS: último pago y cálculo
     // =========================
-    async function obtenerUltimoPago(db, creditoID, fechaAbonoYMD){
+    async function obtenerUltimoRecibo(db, creditoID, fechaAbonoYMD){
       const corte = new Date(`${fechaAbonoYMD}T23:59:59-06:00`);
-      const snap = await getDocs(query(collection(db,"pagos"), where("creditoID","==", creditoID)));
+      const snap = await getDocs(
+        query(collection(db,"pagos"), where("creditoID","==", creditoID))
+      );
       let ultimo = null;
       snap.forEach(d=>{
         const p = d.data();
-        if (!p || p.anulado === true) return;
+        if (!p || p.anulado === true) return; // descarta solo si está expresamente anulado
         if (!p.fechaPago) return;
         const f = new Date(p.fechaPago);
-        if (f <= corte){
-          if (!ultimo) ultimo = { ...p, _f: f };
-          else if (f > ultimo._f || (f.getTime()===ultimo._f.getTime() && new Date(p.fechaRegistro||0) > new Date(ultimo.fechaRegistro||0))) {
-            ultimo = { ...p, _f: f };
-          }
+        if (Number.isNaN(f.getTime()) || f > corte) return;
+        if (!ultimo) ultimo = { ...p, _f: f };
+        else if (f > ultimo._f || (f.getTime()===ultimo._f.getTime() &&
+                 new Date(p.fechaRegistro||0) > new Date(ultimo.fechaRegistro||0))) {
+          ultimo = { ...p, _f: f };
         }
       });
-      return ultimo ? { fecha: ultimo._f, saldoRestante: num(ultimo.saldoRestante, NaN) } : null;
+      if (!ultimo) return null;
+      return {
+        fecha: ultimo._f,
+        saldoRestante: Number(num(ultimo.saldoRestante, 0)), // soporta string
+        raw: ultimo
+      };
     }
 
-    function obtenerUltimaCuotaPagada(amortizacion, fechaAbonoYMD){
-      const corte = new Date(toLocalEndISO(fechaAbonoYMD));
-      let last = null;
-      for (const c of amortizacion || []) {
-        if (c.fechaPagoReal){
-          const f = new Date(c.fechaPagoReal);
-          if (f <= corte){
-            if (!last || f > new Date(last.fechaPagoReal)) last = c;
-          }
-        }
-      }
-      return last;
-    }
-
-    async function interesDesdeUltimoPagoOAmortizacion(db, credito, amortizacion, fechaAbonoYMD){
+    /**
+     * Interés a cobrar EXCLUSIVAMENTE desde el último recibo (pagos).
+     * Si no hay recibos previos al corte => interés 0 (política solicitada).
+     */
+    async function calcularInteresSoloRecibos(db, credito, fechaAbonoYMD){
       const tasa = normalizeDailyRate(credito);
-      const corte = new Date(toLocalEndISO(fechaAbonoYMD));
+      const fechaCorte = new Date(toLocalEndISO(fechaAbonoYMD));
+      const up = await obtenerUltimoRecibo(db, credito.id, fechaAbonoYMD);
 
-      // 1) Intentar con último pago en colección pagos
-      const up = await obtenerUltimoPago(db, credito.id, fechaAbonoYMD);
-      if (up && Number.isFinite(up.saldoRestante)){
-        const dias = daysMedioAbiertoDates(up.fecha, corte);
-        let interes = round2(Math.max(0, up.saldoRestante * tasa * dias));
-        const tope = round2(up.saldoRestante * tasa * 122);
-        if (interes > tope) interes = tope;
-        return { interesExigible: interes, anchor: { fecha: up.fecha, saldo: round2(up.saldoRestante), _source: "pagos" } };
+      if (!up){
+        return {
+          interesCobrar: 0,
+          dias: 0,
+          saldoBase: 0,
+          fechaBase: fechaCorte,
+          fechaCorte,
+          origen: "sin_recibo"
+        };
       }
 
-      // 2) Fallback con última cuota pagada
-      const lc = obtenerUltimaCuotaPagada(amortizacion, fechaAbonoYMD);
-      if (lc && Number.isFinite(num(lc.saldo, NaN))){
-        const fecha = new Date(lc.fechaPagoReal);
-        const saldo = num(lc.saldo, 0);
-        const dias = daysMedioAbiertoDates(fecha, corte);
-        let interes = round2(Math.max(0, saldo * tasa * dias));
-        const tope = round2(saldo * tasa * 122);
-        if (interes > tope) interes = tope;
-        return { interesExigible: interes, anchor: { fecha, saldo: round2(saldo), _source: "amortizacion" } };
-      }
+      const fechaBase = up.fecha;
+      const saldoBase = Number.isFinite(up.saldoRestante) ? up.saldoRestante : num(credito.saldoActual, 0);
+      const dias = daysMedioAbiertoDates(fechaBase, fechaCorte); // (último recibo, corte]
+      const interes = round2(Math.max(0, saldoBase * tasa * dias));
 
-      // 3) Último recurso: fechaInicio + saldoActual
-      const fechaBase = new Date(credito.fechaInicio || credito.fechaDesembolso || credito.fechaColocacion || `${fechaAbonoYMD}T00:00:00-06:00`);
-      const saldo = Number.isFinite(num(credito.saldoActual, NaN)) ? num(credito.saldoActual, 0) : num(credito.montoAprobado, 0);
-      const dias = daysMedioAbiertoDates(fechaBase, corte);
-      let interes = round2(Math.max(0, saldo * tasa * dias));
-      const tope = round2(saldo * tasa * 122);
-      if (interes > tope) interes = tope;
-      return { interesExigible: interes, anchor: { fecha: atLocalMidnight(fechaBase), saldo: round2(saldo), _source: "saldo" } };
+      return { interesCobrar: interes, dias, saldoBase, fechaBase, fechaCorte, origen: "ultimo_recibo" };
     }
 
     // =========================
@@ -376,6 +362,32 @@
     }
 
     // =========================
+    // Interés vencido visible (opcional para repartir en cuotas)
+    // =========================
+    function ordenarAmortizacionPorFecha(amortizacion){
+      amortizacion.sort((a,b)=> new Date(a.fecha) - new Date(b.fecha));
+    }
+
+    function cubrirInteresVencidasPrimero(amortizacion, fechaAbonoYMD, refAbono, refPagoInteres){
+      const fechaCorte = new Date(toLocalEndISO(fechaAbonoYMD));
+      for (let i=0; i<amortizacion.length && refAbono.value>0; i++){
+        const c = amortizacion[i];
+        const f = new Date(c.fecha);
+        if (f <= fechaCorte){
+          const interesCuota = num(c.interes, 0);
+          const pagadoInt = num(c.montoPagadoInteres, 0);
+          const pendienteInt = round2(Math.max(0, interesCuota - pagadoInt));
+          if (pendienteInt > 0){
+            const apli = Math.min(pendienteInt, refAbono.value);
+            c.montoPagadoInteres = round2(pagadoInt + apli);
+            refPagoInteres.value = round2(refPagoInteres.value + apli);
+            refAbono.value = round2(refAbono.value - apli);
+          }
+        }
+      }
+    }
+
+    // =========================
     // SUBMIT
     // =========================
     document.getElementById("form-abono").onsubmit = async function(e){
@@ -403,6 +415,7 @@
         realizadoPorNombre: usuarioActual,
         sucursal: userAgencia
       });
+      // ==========================================
 
       let abonoRestante = monto;
       let pagoInteres = 0, pagoCapital = 0, pagoMulta = 0;
@@ -412,12 +425,18 @@
       let amortizacion = Array.isArray(creditoSeleccionado.amortizacion) ? JSON.parse(JSON.stringify(creditoSeleccionado.amortizacion)) : [];
       const fechaAbonoYMD = fechaSeleccionada;
       const fechaAbonoEnd = new Date(toLocalEndISO(fechaAbonoYMD));
+      ordenarAmortizacionPorFecha(amortizacion);
 
-      // === Interés EXACTO al corte: SOLO desde ÚLTIMO PAGO → fecha valor ===
-      const { interesExigible, anchor } = await interesDesdeUltimoPagoOAmortizacion(db, creditoSeleccionado, amortizacion, fechaAbonoYMD);
-      const interesAlCorte = round2(interesExigible); // sin pisos ni sumas extra
+      // ——— Guardar saldo inicial de la operación (preferente del crédito)
+      const saldoInicialOperacion = Number.isFinite(num(creditoAntes?.saldoActual, NaN))
+        ? num(creditoAntes.saldoActual, 0)
+        : num(creditoSeleccionado.saldoActual, 0);
 
-      // 1) MULTAS: marcar “No Procede” si son posteriores al abono
+      // 0) Interés exigible EXACTO al corte: SOLO desde RECIBOS
+      const resumenInt = await calcularInteresSoloRecibos(db, creditoSeleccionado, fechaAbonoYMD);
+      const interesAlCorte = round2(resumenInt.interesCobrar);
+
+      // 1) MULTAS: No procede si la multa es posterior al abono
       let historialMultasActualizado = historialMultas.map(m=>{
         if (m.estadoCuota === "Pagada" || m.estadoCuota === "No Procede") return m;
         let multaFecha = atLocalMidnight(new Date(m.fecha));
@@ -426,32 +445,21 @@
         return m;
       });
 
-      // 2) INTERÉS (solo por el monto calculado)
+      // 2) INTERÉS AL CORTE — SOLO hasta interesAlCorte (no piso, no anclas)
       let interesAPagar = Math.min(abonoRestante, interesAlCorte);
       if (interesAPagar > 0){
-        let restanteInt = interesAPagar;
-
-        // Reparto a cuotas <= corte (pero el total es SOLO 'interesAPagar')
-        for (let i=0; i<amortizacion.length && restanteInt>0; i++){
-          const c = amortizacion[i];
-          const f = new Date(c.fecha);
-          if (f <= fechaAbonoEnd){
-            c.montoPagadoInteres = num(c.montoPagadoInteres, 0);
-            const interesCuota = num(c.interes, 0);
-            const pendiente = Math.max(0, interesCuota - c.montoPagadoInteres);
-            if (pendiente > 0){
-              const apli = Math.min(pendiente, restanteInt);
-              c.montoPagadoInteres = round2(c.montoPagadoInteres + apli);
-              restanteInt = round2(restanteInt - apli);
-            }
-          }
-        }
-        const aplicadoInteres = round2(interesAPagar - Math.max(0, restanteInt));
+        const refAbono = { value: interesAPagar };
+        const refPagoInteres = { value: 0 };
+        // Repartir en cuotas vencidas/<= corte (sin inflar)
+        cubrirInteresVencidasPrimero(amortizacion, fechaAbonoYMD, refAbono, refPagoInteres);
+        // Lo que no se pudo repartir (si queda centavos) igual se considera interés cobrado,
+        // pero no forzamos a sobre-escribir las cuotas.
+        const aplicadoInteres = round2(interesAPagar - Math.max(0, refAbono.value));
         pagoInteres = round2(pagoInteres + aplicadoInteres);
         abonoRestante = round2(abonoRestante - aplicadoInteres);
       }
 
-      // 3) CAPITAL — vencidas primero (≤ corte)
+      // 3) CAPITAL — vencidas primero
       for (let i=0; i<amortizacion.length && abonoRestante>0; i++){
         let cuota = amortizacion[i];
         let fechaCuota = new Date(cuota.fecha);
@@ -491,7 +499,7 @@
         }
       }
 
-      // FUTURAS — remanente a capital
+      // FUTURAS — TODO el remanente a capital (en orden)
       if (abonoRestante > 0){
         for (let j=0; j<amortizacion.length && abonoRestante>0; j++){
           let cuotaSig = amortizacion[j];
@@ -520,27 +528,19 @@
         }
       }
 
-      // 4) TOTALES y actualización de crédito
-      const saldoInicialOperacion = Number.isFinite(num(creditoAntes?.saldoActual, NaN))
-        ? num(creditoAntes.saldoActual, 0)
-        : num(creditoSeleccionado.saldoActual, 0);
-
+      // 4) TOTALES post-pago (sin "ánclas")
       let saldoPendiente = round2(Math.max(0, saldoInicialOperacion - pagoCapital));
-
-      // Cross-check con amortización
       const saldoDesdeAmort = round2(saldoDesdeAmortizacion(amortizacion));
       if (Math.abs(saldoDesdeAmort - saldoPendiente) >= 0.03) {
         saldoPendiente = saldoDesdeAmort;
       }
 
-      // Interés actual post abono: desde fecha valor → hoy (solo informativo del crédito)
+      // Interés actual post abono: solo desde fechaAbono -> hoy (informativo)
       const fechaHoy = atLocalMidnight(new Date());
       const diasPost = diasEntreFechasSinHora(fechaAbonoYMD, fechaHoy);
       let interesActual = round2(saldoPendiente * tasaDiaria * diasPost);
-      const limiteHoy = round2(saldoPendiente * tasaDiaria * 122);
-      if (interesActual > limiteHoy) interesActual = limiteHoy;
 
-      // Multas activas
+      // Multas activas (posteriores no proceden)
       let multasAcumuladasFinal = round2(
         (historialMultasActualizado || [])
           .filter(m=> m.estadoCuota === "No Pagada" && num(m.monto,0) > 0.01)
@@ -588,12 +588,13 @@
         fechaRegistro: new Date().toISOString(),
         correlativo: Number(correlativoGenerado),
 
-        // Auditoría (para que veas “de dónde salió” el interés)
-        interesExigibleAlCorte: round2(interesAlCorte),
-        anchorPrevFecha: anchor?.fecha ? new Date(anchor.fecha).toISOString() : null,
-        anchorPrevSaldo: round2(anchor?.saldo ?? 0),
-        anchorPrevInteresPendiente: 0,
-        interesPendientePostPago: round2(Math.max(0, interesAlCorte - pagoInteres))
+        // Auditoría de interés (SOLO recibos)
+        interesCalculadoDesde: resumenInt.origen,
+        interesDiasBase: resumenInt.dias,
+        interesSaldoBase: round2(resumenInt.saldoBase || 0),
+        interesFechaBaseISO: resumenInt.fechaBase ? resumenInt.fechaBase.toISOString() : null,
+        interesCorteISO: resumenInt.fechaCorte ? resumenInt.fechaCorte.toISOString() : null,
+        interesCobrarAlCorte: round2(interesAlCorte)
       };
       await addDoc(collection(db, "pagos"), pagoObj);
 
@@ -608,11 +609,7 @@
         creditoID: creditoSeleccionado.id
       });
 
-      // ======= ÁNCLA DESPUÉS DEL PAGO (para futuros cálculos) =======
-      const interesPendientePostPago = round2(Math.max(0, interesAlCorte - pagoInteres));
-      const nuevaFechaAnclaInteres = new Date(toLocalEndISO(fechaAbonoYMD));
-      const nuevoSaldoAncla = round2(saldoPendiente);
-
+      // Update del crédito (sin campos de "áncla")
       await updateDoc(doc(db, "creditos", creditoSeleccionado.id), {
         amortizacion: amortizacion,
         saldoActual: round2(saldoPendiente),
@@ -624,16 +621,12 @@
         cuotasAtrasadas: cuotasAtrasadasFinal,
         capitalAtrasado: round2(capitalAtrasado),
         fechaUltimoCalculoIntereses: new Date(),
-        ultimaActualizacion: new Date(),
-        // Campos áncla
-        fechaAnclaInteres: nuevaFechaAnclaInteres,
-        saldoAncla: nuevoSaldoAncla,
-        interesPendienteAncla: interesPendientePostPago
+        ultimaActualizacion: new Date()
       });
 
       mostrarRecibo(pagoObj);
 
-      document.getElementById("ok-msg").textContent = "Abono retroactivo registrado correctamente.";
+      document.getElementById("ok-msg").textContent = "Abono retroactivo registrado correctamente (interés calculado SOLO desde recibos).";
       document.getElementById("ok-msg").style.display = "block";
       setTimeout(()=>{
         document.getElementById("ok-msg").style.display = "none";
@@ -653,6 +646,7 @@
   </script>
 </body>
 </html>
+
 
 
 

@@ -114,6 +114,20 @@
   function getIdParam(){ return new URL(location.href).searchParams.get("id"); }
 
   // =========================
+  // Parse robusto de fecha de cuota (local)
+  // =========================
+  function parseYMDLocal(str){
+    if (!str) return new Date(NaN);
+    // Si viene como "YYYY-MM-DD", parsear en LOCAL (evita UTC shift)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      const [y,m,d] = str.split("-").map(Number);
+      return new Date(y, m-1, d, 0,0,0,0);
+    }
+    // Si viene ISO con hora (p.ej. ...T06:00:00.000Z), usar Date normal
+    return new Date(str);
+  }
+
+  // =========================
   // Pagos: último recibo ≤ fecha
   // =========================
   async function obtenerUltimoReciboHastaFecha(db, creditoID, fechaYMD){
@@ -156,7 +170,7 @@
   }
 
   // =========================
-  // Proyección a futuro (SÓLO recibos)
+  // Proyección a futuro (SÓLO recibos) con multa = fechaCuota+1 día
   // =========================
   async function calcularProyeccionSoloRecibos(db, credito, fechaSeleccionadaYMD){
     const tasa = normalizeDailyRate(credito);
@@ -179,7 +193,7 @@
     let cuotasAtrasadas = 0;
     const corte0h = atLocalMidnight(new Date(fechaCorte));
     for(const c of amort){
-      const f = new Date(c.fecha);
+      const f = parseYMDLocal(c.fecha);               // <-- parse local
       if (f < corte0h && (c.estado !== "Pagada")){
         const cap = num(c.capital, 0);
         const pag = num(c.montoPagado, 0);
@@ -191,12 +205,12 @@
       }
     }
 
-    // 3) Multas proyectadas: por cada cuota no pagada cuya fecha + 1 día ≤ fechaSeleccionada
+    // 3) Multas proyectadas: por cada cuota no pagada cuya (fecha + 1 día) ≤ fechaSeleccionada
     const multaUnit = deducirMontoMulta(credito);
     let multasProyectadas = 0;
     for(const c of amort){
-      const f = atLocalMidnight(new Date(c.fecha));
-      const diaMulta = new Date(f.getTime() + MS_DAY); // día siguiente de la cuota
+      const f = parseYMDLocal(c.fecha);               // <-- parse local
+      const diaMulta = new Date(atLocalMidnight(f).getTime() + MS_DAY); // día siguiente
       if (diaMulta <= corte0h && (c.estado !== "Pagada")){
         // Solo si hay capital pendiente
         const cap = num(c.capital, 0);
@@ -317,6 +331,7 @@
 </script>
 </body>
 </html>
+
 
 
 

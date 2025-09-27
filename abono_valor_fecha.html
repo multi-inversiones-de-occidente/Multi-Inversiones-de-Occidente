@@ -140,7 +140,7 @@
       let ultimo = null;
       snap.forEach(d=>{
         const p = d.data();
-        if (!p || p.anulado === true) return;      // descarta sólo si está marcado anulado
+        if (!p || p.anulado === true) return;
         if (!p.fechaPago) return;
         const f = new Date(p.fechaPago);
         if (Number.isNaN(f.getTime()) || f > corte) return;
@@ -169,6 +169,24 @@
       const dias = daysMedioAbiertoDates(fechaBase, fechaCorte); // (último recibo, corte]
       const interes = round2(Math.max(0, saldoBase * tasa * dias));
       return { interesCobrar: interes, dias, saldoBase, fechaBase, fechaCorte, origen: "ultimo_recibo" };
+    }
+
+    // ====== Helpers de MULTAS ======
+    function getMultaFechaISO(m){
+      const fRaw = m.fecha;
+      if (!fRaw) return null;
+      const f = new Date(fRaw);
+      return Number.isNaN(f.getTime()) ? null : f;
+    }
+    function getMultaMonto(m){
+      const v = m.monto;
+      const n = Number(v);
+      return Number.isFinite(n) ? round2(n) : 0;
+    }
+    function getMultaPagado(m){
+      const v = m.pagadoMulta;
+      const n = Number(v);
+      return Number.isFinite(n) ? round2(n) : 0;
     }
 
     // ====== Firebase / estado ======
@@ -395,28 +413,69 @@
         ? num(creditoAntes.saldoActual, 0)
         : num(creditoSeleccionado.saldoActual, 0);
 
-      // 0) Interés EXCLUSIVO desde RECIBOS
+      // 0) Interés EXCLUSIVO desde RECIBOS (solo calcular; aplicar después de multas)
       const resumenInt = await calcularInteresSoloRecibos(db, creditoSeleccionado, fechaAbonoYMD);
       const interesAlCorte = round2(resumenInt.interesCobrar);
 
-      // 1) MULTAS: no proceden si son posteriores al abono
-      let historialMultasActualizado = historialMultas.map(m=>{
-        if (m.estadoCuota === "Pagada" || m.estadoCuota === "No Procede") return m;
-        let multaFecha = atLocalMidnight(new Date(m.fecha));
-        let abono0h = new Date(toLocalStartISO(fechaAbonoYMD));
-        if (abono0h < multaFecha) return { ...m, estadoCuota: "No Procede" };
-        return m;
-      });
+      // ====== 1) MULTAS — COBRAR ANTES QUE INTERÉS Y CAPITAL ======
+      let historialMultasActualizado = Array.isArray(historialMultas) ? JSON.parse(JSON.stringify(historialMultas)) : [];
+      {
+        const abono0h = new Date(toLocalStartISO(fechaAbonoYMD));
+        for (let i = 0; i < historialMultasActualizado.length && abonoRestante > 0; i++) {
+          const m = historialMultasActualizado[i] || {};
+          const estado = String(m.estadoCuota || "").trim();
+          if (estado === "No Procede" || estado === "Pagada") continue; // nunca se cobran
+          if (estado !== "No Pagada") continue; // solo cobramos multas marcadas como No Pagada
 
-      // 2) INTERÉS — solo el calculado (no sumamos más)
-      let interesAPagar = Math.min(abonoRestante, interesAlCorte);
-      if (interesAPagar > 0){
-        const refAbono = { value: interesAPagar };
-        const refPagoInteres = { value: 0 };
-        cubrirInteresVencidasPrimero(amortizacion, fechaAbonoYMD, refAbono, refPagoInteres);
-        const aplicadoInteres = round2(interesAPagar - Math.max(0, refAbono.value));
-        pagoInteres = round2(pagoInteres + aplicadoInteres);
-        abonoRestante = round2(abonoRestante - aplicadoInteres);
+          const fMulta = getMultaFechaISO(m);
+          if (!fMulta) continue;                        // sin fecha válida, no se cobra
+          const fMulta0h = atLocalMidnight(fMulta);
+          if (fMulta0h > abono0h) continue;            // solo si ya eran exigibles al abono
+
+          const valor = getMultaMonto(m);
+          const pagadoPrevio = getMultaPagado(m);
+          const pendiente = round2(Math.max(0, valor - pagadoPrevio));
+          if (pendiente <= 0) {
+            // ya estaba cubierta; marcamos pagada por consistencia
+            historialMultasActualizado[i] = {
+              ...m,
+              estadoCuota: "Pagada",
+              pagadoMulta: round2(valor),
+              fechaPagoMulta: toLocalStartISO(fechaAbonoYMD)
+            };
+            continue;
+          }
+
+          const apli = Math.min(pendiente, abonoRestante);
+          if (apli > 0) {
+            const nuevoPagado = round2(pagadoPrevio + apli);
+            let nuevoEstado = "No Pagada";
+            if (Math.abs(nuevoPagado - valor) < 0.01) {
+              nuevoEstado = "Pagada";
+            }
+            historialMultasActualizado[i] = {
+              ...m,
+              pagadoMulta: nuevoPagado,
+              estadoCuota: nuevoEstado,
+              fechaPagoMulta: toLocalStartISO(fechaAbonoYMD)
+            };
+            pagoMulta = round2(pagoMulta + apli);
+            abonoRestante = round2(abonoRestante - apli);
+          }
+        }
+      }
+
+      // 2) INTERÉS — se aplica después de multas (sin tocar cálculo original)
+      if (abonoRestante > 0){
+        const interesAPagar = Math.min(abonoRestante, interesAlCorte);
+        if (interesAPagar > 0){
+          const refAbono = { value: interesAPagar };
+          const refPagoInteres = { value: 0 };
+          cubrirInteresVencidasPrimero(amortizacion, fechaAbonoYMD, refAbono, refPagoInteres);
+          const aplicadoInteres = round2(interesAPagar - Math.max(0, refAbono.value));
+          pagoInteres = round2(pagoInteres + aplicadoInteres);
+          abonoRestante = round2(abonoRestante - aplicadoInteres);
+        }
       }
 
       // 3) CAPITAL — vencidas primero (SIN volver a pagar interés de cuotas)
@@ -503,7 +562,24 @@
       const diasPost = diasEntreFechasSinHora(fechaAbonoYMD, fechaHoy);
       let interesActual = round2(saldoPendiente * tasaDiaria * diasPost);
 
-      let multasAcumuladasFinal = 0; // ya filtradas como No Procede si eran posteriores
+      // Recalcular multas pendientes (para métricas y paraPonerseAlDia)
+      let multasAcumuladasFinal = 0;
+      {
+        const hoy0h = atLocalMidnight(new Date());
+        for (const m of (historialMultasActualizado || [])) {
+          const estado = String(m.estadoCuota || "").trim();
+          if (estado === "Pagada" || estado === "No Procede") continue;
+          const fMulta = getMultaFechaISO(m);
+          if (!fMulta) continue;
+          if (atLocalMidnight(fMulta) <= hoy0h) {
+            const valor = getMultaMonto(m);
+            const pagado = getMultaPagado(m);
+            const pendiente = round2(Math.max(0, valor - pagado));
+            multasAcumuladasFinal = round2(multasAcumuladasFinal + pendiente);
+          }
+        }
+      }
+
       let cuotasAtrasadasFinal = amortizacion.filter(c=>{
         const f = new Date(c.fecha);
         const hoy = atLocalMidnight(new Date());
@@ -582,10 +658,12 @@
 
       mostrarRecibo(pagoObj);
 
-      document.getElementById("ok-msg").textContent = "Abono retroactivo registrado (interés SOLO desde recibos).";
-      document.getElementById("ok-msg").style.display = "block";
+      // Reset UI
+      const ok = document.getElementById("ok-msg");
+      ok.textContent = "Abono retroactivo registrado (Multa → Interés → Capital; interés SOLO desde recibos).";
+      ok.style.display = "block";
       setTimeout(()=>{
-        document.getElementById("ok-msg").style.display = "none";
+        ok.style.display = "none";
         document.getElementById("form-abono").reset();
         document.getElementById("busqueda").value = "";
         document.getElementById("lista-creditos").innerHTML = "";
@@ -601,6 +679,7 @@
   </script>
 </body>
 </html>
+
 
 
 

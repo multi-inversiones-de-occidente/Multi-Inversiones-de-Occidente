@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
@@ -154,7 +154,7 @@
       return { fecha: ultimo._f, saldoRestante: Number(num(ultimo.saldoRestante, 0)), raw: ultimo };
     }
 
-    // Interés a cobrar EXCLUSIVAMENTE desde el último recibo
+    // Interés a cobrar EXCLUSIVAMENTE desde el último recibo (por días)
     async function calcularInteresSoloRecibos(db, credito, fechaAbonoYMD){
       const tasa = normalizeDailyRate(credito);
       const fechaCorte = new Date(toLocalEndISO(fechaAbonoYMD));
@@ -352,7 +352,7 @@
       amortizacion.sort((a,b)=> new Date(a.fecha) - new Date(b.fecha));
     }
 
-    // Reparte el interés calculado (desde recibos) en cuotas <= corte (sin inflar)
+    // (Se deja por compatibilidad, pero ya NO se usa para topes de interés)
     function cubrirInteresVencidasPrimero(amortizacion, fechaAbonoYMD, refAbono, refPagoInteres){
       const fechaCorte = new Date(toLocalEndISO(fechaAbonoYMD));
       for (let i=0; i<amortizacion.length && refAbono.value>0; i++){
@@ -413,7 +413,7 @@
         ? num(creditoAntes.saldoActual, 0)
         : num(creditoSeleccionado.saldoActual, 0);
 
-      // 0) Interés EXCLUSIVO desde RECIBOS (solo calcular; aplicar después de multas)
+      // 0) Interés EXCLUSIVO desde RECIBOS (por días)
       const resumenInt = await calcularInteresSoloRecibos(db, creditoSeleccionado, fechaAbonoYMD);
       const interesAlCorte = round2(resumenInt.interesCobrar);
 
@@ -436,7 +436,6 @@
           const pagadoPrevio = getMultaPagado(m);
           const pendiente = round2(Math.max(0, valor - pagadoPrevio));
           if (pendiente <= 0) {
-            // ya estaba cubierta; marcamos pagada por consistencia
             historialMultasActualizado[i] = {
               ...m,
               estadoCuota: "Pagada",
@@ -465,20 +464,18 @@
         }
       }
 
-      // 2) INTERÉS — se aplica después de multas (sin tocar cálculo original)
+      // ====== 2) INTERÉS — POR DÍAS (sin tope por cuotas)
       if (abonoRestante > 0){
         const interesAPagar = Math.min(abonoRestante, interesAlCorte);
         if (interesAPagar > 0){
-          const refAbono = { value: interesAPagar };
-          const refPagoInteres = { value: 0 };
-          cubrirInteresVencidasPrimero(amortizacion, fechaAbonoYMD, refAbono, refPagoInteres);
-          const aplicadoInteres = round2(interesAPagar - Math.max(0, refAbono.value));
-          pagoInteres = round2(pagoInteres + aplicadoInteres);
-          abonoRestante = round2(abonoRestante - aplicadoInteres);
+          // Aplicación directa del interés por días
+          pagoInteres = round2(pagoInteres + interesAPagar);
+          abonoRestante = round2(abonoRestante - interesAPagar);
+          // Nota: NO llamamos a cubrirInteresVencidasPrimero(...) para que no lo limite por cuota
         }
       }
 
-      // 3) CAPITAL — vencidas primero (SIN volver a pagar interés de cuotas)
+      // ====== 3) CAPITAL — vencidas primero (SIN volver a pagar interés de cuotas)
       for (let i=0; i<amortizacion.length && abonoRestante>0; i++){
         let cuota = amortizacion[i];
         let fechaCuota = new Date(cuota.fecha);
@@ -521,7 +518,7 @@
         }
       }
 
-      // 4) FUTURAS — todo remanente a capital
+      // ====== 4) FUTURAS — todo remanente a capital
       if (abonoRestante > 0){
         for (let j=0; j<amortizacion.length && abonoRestante>0; j++){
           let cuotaSig = amortizacion[j];
@@ -550,7 +547,7 @@
         }
       }
 
-      // 5) TOTALES / actualización
+      // ====== 5) TOTALES / actualización
       let saldoPendiente = round2(Math.max(0, saldoInicialOperacion - pagoCapital));
       const saldoDesdeAmort = round2(saldoDesdeAmortizacion(amortizacion));
       if (Math.abs(saldoDesdeAmort - saldoPendiente) >= 0.03) {
@@ -660,7 +657,7 @@
 
       // Reset UI
       const ok = document.getElementById("ok-msg");
-      ok.textContent = "Abono retroactivo registrado (Multa → Interés → Capital; interés SOLO desde recibos).";
+      ok.textContent = "Abono retroactivo registrado (Multa → Interés por días → Capital; interés SOLO desde recibos).";
       ok.style.display = "block";
       setTimeout(()=>{
         ok.style.display = "none";
@@ -679,6 +676,7 @@
   </script>
 </body>
 </html>
+
 
 
 

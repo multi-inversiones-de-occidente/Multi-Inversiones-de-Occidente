@@ -430,8 +430,19 @@
           const fMulta = getMultaFechaISO(m);
           if (!fMulta) continue;                        // sin fecha válida, no se cobra
           const fMulta0h = atLocalMidnight(fMulta);
-          if (fMulta0h > abono0h) continue;            // solo si ya eran exigibles al abono
 
+          // *** CAMBIO QUIRÚRGICO: si la multa NO era exigible a la fecha del abono -> NO PROCEDE ***
+          if (fMulta0h > abono0h) {
+            historialMultasActualizado[i] = {
+              ...m,
+              estadoCuota: "No Procede",
+              pagadoMulta: 0,
+              fechaPagoMulta: null
+            };
+            continue; // no se cobra ni se acumula
+          }
+
+          // Exigible: se puede cobrar (si hay abono)
           const valor = getMultaMonto(m);
           const pagadoPrevio = getMultaPagado(m);
           const pendiente = round2(Math.max(0, valor - pagadoPrevio));
@@ -676,6 +687,7 @@
   </script>
 </body>
 </html>
+
 
 
 

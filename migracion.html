@@ -47,6 +47,9 @@
     .danger{background:#2a1414;border:1px solid #3a1c1c;color:#ffdada;border-radius:12px;padding:14px}
     .table-wrap{max-height:320px;overflow:auto;border:1px solid #273041;border-radius:12px;margin-top:10px}
     .pill{padding:2px 8px;border-radius:999px;border:1px solid #2b3241;background:#121721;font-size:11px}
+    /* NUEVO: Multi-crédito UI */
+    .credit-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0 12px}
+    .credit-bar select{min-width:120px}
   </style>
 </head>
 <body>
@@ -242,6 +245,15 @@
     <section class="card hidden" id="step2">
       <h2>Paso 2 — Crédito</h2>
       <div class="muted">Define los datos del crédito. Se creará el documento en <span class="tag">creditos</span>.</div>
+
+      <!-- NUEVO: barra multi-crédito -->
+      <div class="credit-bar">
+        <span class="tag" id="multiCreditTag">Crédito actual: 1 de 1</span>
+        <select id="creditSelector" title="Seleccionar crédito"></select>
+        <button id="btnAddCredit">Añadir otro crédito</button>
+        <span class="tag" id="creditoIDTag">creditoID: —</span>
+      </div>
+
       <div class="row" style="margin-top:10px">
         <div class="field col-3"><label>Agencia asignada</label><input id="c_agencia" placeholder="Ahuachapán / Sonsonate…"></div>
         <div class="field col-3"><label>Asesor</label><input id="c_asesor" placeholder="Nombre del ejecutivo"></div>
@@ -276,7 +288,6 @@
       <div class="actions">
         <button id="btnCalcularTasa">Calcular tasa diaria</button>
         <button id="btnCrearCredito" class="primary">Crear Crédito</button>
-        <span class="tag" id="creditoIDTag">creditoID: —</span>
       </div>
     </section>
 
@@ -284,6 +295,13 @@
     <section class="card hidden" id="step3">
       <h2>Paso 3 — Amortización</h2>
       <div class="muted">Genera automáticamente o carga un CSV con <span class="code">fecha,cuota,capital,interes,saldo</span>. Se valida contra el monto.</div>
+
+      <!-- NUEVO: barra multi-crédito (referencia visual) -->
+      <div class="credit-bar">
+        <span class="tag" id="multiCreditTag3">Crédito actual: 1 de 1</span>
+        <select id="creditSelector3" title="Seleccionar crédito"></select>
+      </div>
+
       <div class="row">
         <div class="field col-3"><label>Generar desde fecha</label><input id="a_start" type="date"></div>
         <div class="field col-3"><label>Periodicidad</label><select id="a_freq"><option>Semanal</option><option>Catorcenal</option><option>Quincenal</option><option>Mensual</option></select></div>
@@ -311,6 +329,12 @@
     <section class="card hidden" id="step4">
       <h2>Paso 4 — Pagos Históricos (retroactivos)</h2>
       <div class="muted">Puedes cargar CSV <span class="pill">opcional</span> o ingresar pagos manualmente con el formulario. Se guardan en <b>pagos</b>.</div>
+
+      <!-- NUEVO: barra multi-crédito (referencia visual) -->
+      <div class="credit-bar">
+        <span class="tag" id="multiCreditTag4">Crédito actual: 1 de 1</span>
+        <select id="creditSelector4" title="Seleccionar crédito"></select>
+      </div>
 
       <!-- CSV opcional -->
       <div class="row">
@@ -424,6 +448,8 @@
         // Autorizado
         authGate.classList.add('hidden');
         main.classList.remove('hidden');
+        // Inicializar selector multi-crédito
+        initCreditSelectors();
       } catch (e) {
         console.error(e);
         authMsg.classList.remove('hidden');
@@ -433,7 +459,33 @@
     });
 
     /* ================= Estado global & Utils ================= */
-    const state = { clienteID:null, cliente:{}, solicitudID:null, solicitud:{}, creditoID:null, credito:{}, amortizacion:[], pagos:[] };
+    const state = {
+      clienteID:null, cliente:{},
+      solicitudID:null, solicitud:{},
+      // ===== NUEVO: multi-crédito =====
+      creditos: [ { creditoID:null, credito:{}, amortizacion:[], pagos:[] } ],
+      activeCredit: 0
+    };
+
+    // Alias de compatibilidad (se sincronizan con el crédito activo)
+    Object.defineProperties(state, {
+      creditoID: {
+        get(){ return state.creditos[state.activeCredit]?.creditoID || null; },
+        set(v){ if(state.creditos[state.activeCredit]) state.creditos[state.activeCredit].creditoID = v; }
+      },
+      credito: {
+        get(){ return state.creditos[state.activeCredit]?.credito || {}; },
+        set(v){ if(state.creditos[state.activeCredit]) state.creditos[state.activeCredit].credito = v; }
+      },
+      amortizacion: {
+        get(){ return state.creditos[state.activeCredit]?.amortizacion || []; },
+        set(v){ if(state.creditos[state.activeCredit]) state.creditos[state.activeCredit].amortizacion = v; }
+      },
+      pagos: {
+        get(){ return state.creditos[state.activeCredit]?.pagos || []; },
+        set(v){ if(state.creditos[state.activeCredit]) state.creditos[state.activeCredit].pagos = v; }
+      }
+    });
 
     const $ = s => document.querySelector(s);
     const fmt = n => Number(n||0).toFixed(2);
@@ -447,6 +499,8 @@
       for(let i=0;i<=5;i++){ document.getElementById('step'+i)?.classList.add('hidden'); }
       document.getElementById('step'+idx).classList.remove('hidden');
       window.scrollTo({top:0,behavior:'smooth'});
+      // sincronizar selectores de crédito en cada paso visible
+      syncCreditSelectorsUI();
     }
     // Hacer las pestañas clicables (navegación libre)
     document.querySelectorAll('.chip').forEach(chip=>{
@@ -458,17 +512,15 @@
       .forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('input', e=> e.target.value = maskTel(e.target.value)); });
 
     /* ====== Fechas con zona horaria -06:00 (El Salvador) ====== */
-    const TZ_OFFSET = '-06:00';          // fijo (sin DST)
+    const TZ_OFFSET = '-06:00';
     const TZ = 'America/El_Salvador';
     const pad2 = n => String(n).padStart(2,'0');
 
-    // from <input type="date"> -> 'YYYY-MM-DDT00:00:00.000-06:00'
     function dateInputToISO_TZ(dateStr){
       if(!dateStr) return '';
       const [y,m,d]=dateStr.split('-').map(Number);
       return `${y}-${pad2(m)}-${pad2(d)}T00:00:00.000${TZ_OFFSET}`;
     }
-    // now -> 'YYYY-MM-DDTHH:mm:ss.000-06:00'
     function nowISO_TZ(){
       const parts = new Intl.DateTimeFormat('en-CA',{
         timeZone: TZ, year:'numeric', month:'2-digit', day:'2-digit',
@@ -476,6 +528,149 @@
       }).formatToParts(new Date())
        .reduce((a,p)=>{a[p.type]=p.value; return a;}, {});
       return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}.000${TZ_OFFSET}`;
+    }
+
+    /* ================= Helpers Multi-crédito ================= */
+    const cs = () => document.getElementById('creditSelector');
+    const cs3 = () => document.getElementById('creditSelector3');
+    const cs4 = () => document.getElementById('creditSelector4');
+
+    function initCreditSelectors(){
+      // Crear opciones iniciales
+      refreshCreditSelector(cs(), true);
+      refreshCreditSelector(cs3(), false);
+      refreshCreditSelector(cs4(), false);
+      updateCreditBars();
+      bindCreditSelectorEvents();
+      loadCreditIntoForm(state.activeCredit); // cargar valores (vacíos al inicio)
+    }
+
+    function bindCreditSelectorEvents(){
+      [cs(), cs3(), cs4()].forEach(sel=>{
+        if(!sel) return;
+        sel.addEventListener('change', (e)=>{
+          const idx = Number(e.target.value||0);
+          setActiveCredit(idx);
+        });
+      });
+
+      const btnAdd = document.getElementById('btnAddCredit');
+      btnAdd.addEventListener('click', ()=>{
+        if(state.creditsLocked) return; // no usamos, pero por si a futuro
+        if(state.credits?.length >= 3 || state.credMinorGuard){} // nada
+        if(state.creditos.length >= 3) return alert('Límite de créditos','Puedes agregar hasta 3 créditos por cliente.','warning');
+        state.creditos.push({ creditoID:null, credito:{}, amortizacion:[], pagos:[] });
+        setActiveCredit(state.creditos.length - 1);
+        refreshCreditSelector(cs(), true);
+        refreshCreditSelector(cs3(), false);
+        refreshCreditSelector(cs4(), false);
+        updateCreditBars();
+        clearCreditForms(); // limpiar formulario para nuevo crédito
+      });
+    }
+
+    function refreshCreditSelector(selectEl, includeAdd){
+      if(!selectEl) return;
+      const prev = selectEl.value;
+      selectEl.innerHTML = '';
+      state.creditos.forEach((_, i)=>{
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = `Crédito ${i+1}`;
+        selectEl.appendChild(opt);
+      });
+      selectEl.value = (prev !== null && prev !== undefined) ? Math.min(Number(prev), state.creditos.length-1) : state.activeCredit;
+    }
+
+    function setActiveCredit(idx){
+      idx = Math.max(0, Math.min(idx, state.creditos.length-1));
+      state.activeCredit = idx;
+      // sincronizar selects
+      [cs(), cs3(), cs4()].forEach(sel=>{
+        if(sel) sel.value = String(idx);
+      });
+      updateCreditBars();
+      loadCreditIntoForm(idx);
+      loadAmortIntoUI(idx);
+      loadPagosIntoUI(idx);
+    }
+
+    function updateCreditBars(){
+      const bar = document.getElementById('multiCreditTag');
+      const bar3 = document.getElementById('multiCreditTag3');
+      const bar4 = document.getElementById('multiCreditTag4');
+      const total = state.creditos.length;
+      const label = `Crédito actual: ${state.activeCredit+1} de ${total}`;
+      if(bar) bar.textContent = label;
+      if(bar3) bar3.textContent = label;
+      if(bar4) bar4.textContent = label;
+
+      // actualizar selector principal
+      refreshCreditSelector(cs(), true);
+      refreshCreditSelector(cs3(), false);
+      refreshCreditSelector(cs4(), false);
+
+      // actualizar tag de creditoID
+      const tag = document.getElementById('creditoIDTag');
+      const id = state.creditoID || '—';
+      if(tag) tag.textContent = `creditoID: ${id}`;
+    }
+
+    function loadCreditIntoForm(idx){
+      const c = state.creditos[idx]?.credito || {};
+      // Cargar valores al formulario (si existieran)
+      document.getElementById('c_agencia').value = c.agenciaAsignada || '';
+      document.getElementById('c_asesor').value = c.asignadoA || '';
+      document.getElementById('c_linea').value = c.lineaDeCredito || 'Credicash';
+      document.getElementById('c_estado').value = c.estadoCredito || 'Activo';
+      document.getElementById('c_monto').value = (c.montoAprobado ?? '') === '' ? '' : c.montoAprobado;
+      document.getElementById('c_saldoIni').value = (c.saldoInicial ?? '') === '' ? '' : c.saldoInicial;
+      document.getElementById('c_saldoAct').value = (c.saldoActual ?? 0);
+      document.getElementById('c_cuota').value = (c.cuotaAprobada ?? '') === '' ? '' : c.cuotaAprobada;
+      document.getElementById('c_numCuotas').value = (c.numeroCuotas ?? '') === '' ? '' : c.numeroCuotas;
+      document.getElementById('c_freq').value = c.frecuenciaPago || 'Quincenal';
+      document.getElementById('c_tasaAnual').value = (c.tasaAnualCredito ?? 180);
+      document.getElementById('c_tasaDiaria').value = (c.tasaDiariaCredito ?? '') === '' ? '' : c.tasaDiariaCredito;
+      document.getElementById('c_fechaInicio').value = (c.fechaInicio || '').slice(0,10);
+      document.getElementById('c_interesActual').value = (c.interesActual ?? 0);
+      document.getElementById('c_multas').value = (c.multasAcumuladas ?? 0);
+      document.getElementById('c_ppaldia').value = (c.paraPonerseAlDia ?? 0);
+
+      // Tag de creditoID
+      const tag = document.getElementById('creditoIDTag');
+      const id = state.creditos[idx]?.creditoID || '—';
+      if(tag) tag.textContent = `creditoID: ${id}`;
+    }
+
+    function clearCreditForms(){
+      ['c_agencia','c_asesor','c_monto','c_saldoIni','c_saldoAct','c_cuota','c_numCuotas','c_tasaAnual','c_tasaDiaria','c_fechaInicio','c_interesActual','c_multas','c_ppaldia']
+        .forEach(id=>{ const el=document.getElementById(id); if(!el) return; el.value = (id==='c_tasaAnual')?180:''; });
+      document.getElementById('c_linea').value='Credicash';
+      document.getElementById('c_estado').value='Activo';
+      document.getElementById('c_freq').value='Quincenal';
+      // limpiar amort y pagos UI
+      renderAmort([]);
+      renderPagos([]);
+      updateCreditBars();
+    }
+
+    function loadAmortIntoUI(idx){
+      const rows = state.creditos[idx]?.amortizacion || [];
+      renderAmort(rows);
+    }
+
+    function loadPagosIntoUI(idx){
+      const rows = state.creditos[idx]?.pagos || [];
+      renderPagos(rows);
+    }
+
+    function syncCreditSelectorsUI(){
+      [cs(), cs3(), cs4()].forEach(sel=>{
+        if(!sel) return;
+        refreshCreditSelector(sel, sel===cs());
+        sel.value = String(state.activeCredit);
+      });
+      updateCreditBars();
     }
 
     /* ================= Paso 0: Cliente ================= */
@@ -489,7 +684,7 @@
       if(snap.empty){ alert('No encontrado','Puedes crear un nuevo usuario con estos datos','info'); return; }
       const d = snap.docs[0]; state.clienteID = d.id; state.cliente = d.data();
 
-      document.getElementById('u_nombre').value = state.cliente.nombre||'';
+      document.getElementById('u_nombre').value = state.cliente.nombre||''
       document.getElementById('u_apellido').value = state.cliente.apellido||'';
       document.getElementById('u_email').value = state.cliente.email||'';
       document.getElementById('u_tel').value = state.cliente.telefono||'';
@@ -500,13 +695,11 @@
       document.getElementById('u_nac').value = (state.cliente.dateOfBirth||'').slice(0,10);
       document.getElementById('u_stars').value = state.cliente.estrellas||'5';
 
-      // Prefill manual pagos form
       document.getElementById('pm_nombres').value = [state.cliente.nombre||'', state.cliente.apellido||''].join(' ').trim();
       document.getElementById('pm_dui').value = state.cliente.numeroDui || '';
 
       document.getElementById('clienteIDTag').textContent = `clienteID: ${state.clienteID}`;
       document.getElementById('clienteIDTag2').textContent = `clienteID: ${state.clienteID}`;
-      // No forzamos paso siguiente: navegación libre
     }
 
     async function guardarCliente(){
@@ -543,6 +736,7 @@
       document.getElementById('pm_dui').value = datos.numeroDui || '';
     }
     document.getElementById('btnBuscarCliente').addEventListener('click', buscarCliente);
+    document.getElementById('btnGuardarSolicitud')?.addEventListener('click', guardarSolicitud);
     document.getElementById('btnGuardarCliente').addEventListener('click', guardarCliente);
 
     // Totales auto
@@ -640,7 +834,6 @@
       state.solicitudID = refId; state.solicitud = datos;
       document.getElementById('solicitudIDTag').textContent = `solicitudID: ${refId}`;
     }
-    document.getElementById('btnGuardarSolicitud').addEventListener('click', guardarSolicitud);
 
     /* ================= Paso 2: Crédito ================= */
     document.getElementById('btnCalcularTasa').addEventListener('click', ()=>{
@@ -653,14 +846,13 @@
       if(!state.clienteID) return alert('Falta cliente','Completa el Paso 0','warning');
 
       const datos = {
-        // ===== NUEVO: identidad/contacto para que la vista "Detalles del Crédito" muestre cabecera =====
-        nombre: (state.cliente?.nombre || '').trim(),          // NUEVO
-        apellido: (state.cliente?.apellido || '').trim(),      // NUEVO
-        numeroDui: (state.cliente?.numeroDui || '').trim(),    // NUEVO
-        telefono: (state.cliente?.telefono || '').trim(),      // NUEVO
-        direccion: (state.cliente?.direccion || '').trim(),    // NUEVO
-
-        // ===== Datos del crédito (ya estaban) =====
+        // ===== Identidad/contacto =====
+        nombre: (state.cliente?.nombre || '').trim(),
+        apellido: (state.cliente?.apellido || '').trim(),
+        numeroDui: (state.cliente?.numeroDui || '').trim(),
+        telefono: (state.cliente?.telefono || '').trim(),
+        direccion: (state.cliente?.direccion || '').trim(),
+        // ===== Datos del crédito =====
         clienteID: state.clienteID,
         agenciaAsignada: document.getElementById('c_agencia').value.trim(),
         asignadoA: document.getElementById('c_asesor').value.trim(),
@@ -679,13 +871,11 @@
         multasAcumuladas: Number(document.getElementById('c_multas').value||0),
         paraPonerseAlDia: Number(document.getElementById('c_ppaldia').value||0),
         fechaUltimoCalculoIntereses: serverTimestamp(),
-
-        // defaults útiles
+        // defaults
         capitalAtrasado: 0,
         cuotasAtrasadas: 0,
         diasMora: 0,
         diasIntereses: 0,
-
         amortizacion: []
       };
 
@@ -696,15 +886,16 @@
       let id = state.creditoID || doc(collection(db,'creditos')).id;
       await setDoc(doc(db,'creditos', id), datos, {merge:true});
       state.creditoID = id; state.credito = datos;
-      document.getElementById('creditoIDTag').textContent = `creditoID: ${id}`;
 
-      // Precargar campos del paso 3 (navegación libre)
+      // Precargar campos del paso 3
       document.getElementById('a_start').value = (document.getElementById('c_fechaInicio').value)||'';
       document.getElementById('a_freq').value = document.getElementById('c_freq').value;
       document.getElementById('a_n').value = document.getElementById('c_numCuotas').value;
       document.getElementById('a_cuota').value = document.getElementById('c_cuota').value;
       document.getElementById('a_monto').value = document.getElementById('c_monto').value;
       document.getElementById('a_tasa').value = document.getElementById('c_tasaAnual').value;
+
+      updateCreditBars();
     }
     document.getElementById('btnCrearCredito').addEventListener('click', crearCredito);
 
@@ -749,7 +940,7 @@
         tr.innerHTML=`<td>${r.numeroCuota}</td><td>${r.fecha}</td><td>${fmt(r.cuota)}</td><td>${fmt(r.capital)}</td><td>${fmt(r.interes)}</td><td>${fmt(r.saldo)}</td><td>${r.estado}</td>`;
         tb.appendChild(tr);
       });
-      state.amortizacion = rows;
+      state.amortizacion = rows; // guarda en crédito activo
       const ok = Math.abs(sumCap - Number(document.getElementById('a_monto').value||0))<=0.02 && Math.abs(lastSaldo-0)<=0.02;
       document.getElementById('chkAmort').textContent = ok? `OK · capital=${fmt(sumCap)} saldo final=${fmt(lastSaldo)}`: `Revisar · capital=${fmt(sumCap)} saldo final=${fmt(lastSaldo)}`;
       document.getElementById('chkAmort').style.background = ok? '#0f2c16':'#2a1414';
@@ -920,10 +1111,13 @@
       };
       sec('Usuario', {id:state.clienteID, ...state.cliente});
       sec('Solicitud', {id:state.solicitudID, ...state.solicitud});
-      sec('Crédito', {id:state.creditoID, ...state.credito});
-      sec('Amortización (n='+state.amortizacion.length+')',
-          state.amortizacion.slice(0,5).concat([{info:`… ${Math.max(0,state.amortizacion.length-5)} filas más`} ]));
-      sec('Pagos (n='+state.pagos.length+')', state.pagos);
+      // Listado por cada crédito
+      state.creditos.forEach((c,i)=>{
+        sec(`Crédito (${i+1})`, {id:c.creditoID, ...c.credito});
+        sec(`Amortización (${i+1}) (n=${c.amortizacion.length})`,
+          c.amortizacion.slice(0,5).concat(c.amortizacion.length>5?[{info:`… ${Math.max(0,c.amortizacion.length-5)} filas más`}]:[]));
+        sec(`Pagos (${i+1}) (n=${c.pagos.length})`, c.pagos);
+      });
     }
     document.getElementById('btnIntegrar').addEventListener('click', ()=>{ pintarResumen(); alert('Integración lista','Revisa el resumen.','success'); });
     document.getElementById('btnReiniciar').addEventListener('click', ()=> location.reload());
@@ -933,6 +1127,7 @@
   </script>
 </body>
 </html>
+
 
 
 

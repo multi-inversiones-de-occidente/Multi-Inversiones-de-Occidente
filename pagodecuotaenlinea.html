@@ -5,10 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Pagar Crédito en Línea – Multi Inversiones</title>
 
-  <!-- Firebase compat (misma versión que usabas) -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-functions-compat.js"></script>
-
   <style>
     :root{
       --bg:#f5f7fb; --card:#fff; --text:#1b2b3a; --muted:#64748b;
@@ -24,12 +20,8 @@
       min-height: 100vh;
       display:flex; align-items:flex-start; justify-content:center;
     }
-    .container{
-      width:100%; max-width: 880px; padding: 20px; margin: 28px 16px;
-    }
-    .header{
-      display:flex; align-items:center; gap:12px; margin-bottom:16px;
-    }
+    .container{ width:100%; max-width: 880px; padding: 20px; margin: 28px 16px; }
+    .header{ display:flex; align-items:center; gap:12px; margin-bottom:16px; }
     .brand{
       background:#fff; border-radius:999px; padding:8px 12px; box-shadow: var(--shadow);
       display:inline-flex; align-items:center; gap:10px; border:1px solid #eef2f7;
@@ -38,8 +30,7 @@
     h1{ font-size:1.25rem; margin:10px 0 18px 0; color:#0f172a }
     .card{
       background:var(--card); border-radius:var(--radius); box-shadow: var(--shadow);
-      border: 1px solid #eef2f7;
-      padding: 18px;
+      border: 1px solid #eef2f7; padding: 18px;
     }
     label{ display:block; font-weight:700; color:#0f172a; margin-bottom:6px; }
     input[type="text"], input[type="number"]{
@@ -107,20 +98,10 @@
   </div>
 
   <script>
-    // ========= 1) Firebase =========
-    const firebaseConfig = {
-      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
-      authDomain: "multinversiones-38e13.firebaseapp.com",
-      projectId: "multinversiones-38e13",
-      storageBucket: "multinversiones-38e13.appspot.com",
-      messagingSenderId: "380001917078",
-      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
-      measurementId: "G-H4E31XHG1Y"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const functions = firebase.functions();
+    // ========= 0) URL base de Cloud Functions (HTTP) =========
+    const CF_BASE = 'https://us-central1-multinversiones-38e13.cloudfunctions.net';
 
-    // ========= 2) Helpers =========
+    // ========= Helpers =========
     const $ = (id)=> document.getElementById(id);
     const show = (el, on=true)=> { el.style.display = on ? '' : 'none'; };
     const money = (v)=> {
@@ -134,7 +115,7 @@
       else { btn.innerHTML = btn.dataset.originalText || 'Procesar'; }
     };
 
-    // ========= 3) UI Buscar créditos por DUI =========
+    // ========= UI Buscar créditos por DUI =========
     const duiInput   = $('dui');
     const btnBuscar  = $('btn-buscar');
     const spBuscar   = $('sp-buscar');
@@ -161,11 +142,21 @@
 
       try{
         disable(btnBuscar, true);
-        // Llama a la Function: getResumenPorDUI
-        const callable = functions.httpsCallable('getResumenPorDUI');
-        const resp = await callable({ dui });
 
-        const creditos = Array.isArray(resp.data?.creditos) ? resp.data.creditos : [];
+        // Llama a la Function HTTP: getResumenPorDUI (GET ?numeroDui=)
+        const resp = await fetch(`${CF_BASE}/getResumenPorDUI?numeroDui=${encodeURIComponent(dui)}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!resp.ok){
+          const txt = await resp.text();
+          throw new Error(`(${resp.status}) ${txt || 'Error'}`);
+        }
+
+        const data = await resp.json(); // { ok: true, creditos: [...] }
+        const creditos = Array.isArray(data?.creditos) ? data.creditos : [];
+
         if (!creditos.length){
           resultsDiv.innerHTML = `<div class="muted">No encontramos créditos activos con ese DUI.</div>`;
           return;
@@ -173,21 +164,27 @@
 
         // Render de tarjetas de crédito
         creditos.forEach(c => {
+          // La función devuelve: id, lineaDeCredito, estadoCredito, saldoActual, interesActual, multasAcumuladas, paraPonerseAlDia, nombre, numeroDui...
+          const creditoID = c.id;
+
           const card = document.createElement('div');
           card.className = 'result-item';
 
           const left = document.createElement('div');
           left.innerHTML = `
-            <div style="font-weight:800; color:#0f172a">${c.alias || 'Crédito'}</div>
+            <div style="font-weight:800; color:#0f172a">
+              Crédito ${c.lineaDeCredito ? `– ${c.lineaDeCredito}` : ''} <span class="muted">(${creditoID})</span>
+            </div>
+            <div class="muted" style="margin:4px 0 8px 0">Estado: <b>${c.estadoCredito || 'N/D'}</b></div>
             <div class="kpis">
               <div class="kpi"><b>Para ponerse al día</b><span>$${money(c.paraPonerseAlDia)}</span></div>
               <div class="kpi"><b>Saldo</b><span>$${money(c.saldoActual)}</span></div>
-              ${c.cuotasVencidas>0 ? `<div class="kpi"><b>Cuotas vencidas</b><span>${c.cuotasVencidas}</span></div>`:''}
-              ${c.proximaCuotaFecha ? `<div class="kpi"><b>Próxima cuota</b><span>${c.proximaCuotaFecha} ${c.proximaCuotaMonto? `• $${money(c.proximaCuotaMonto)}`:''}</span></div>`:''}
+              <div class="kpi"><b>Interés</b><span>$${money(c.interesActual)}</span></div>
+              <div class="kpi"><b>Multas</b><span>$${money(c.multasAcumuladas)}</span></div>
             </div>
             <div class="consent">
-              <input type="checkbox" id="consent-${c.creditoID}"/>
-              <label for="consent-${c.creditoID}" style="font-weight:600;">Declaro que soy el titular del DUI ingresado y autorizo el cargo por el monto seleccionado.</label>
+              <input type="checkbox" id="consent-${creditoID}"/>
+              <label for="consent-${creditoID}" style="font-weight:600;">Declaro que soy el titular del DUI ingresado y autorizo el cargo por el monto seleccionado.</label>
             </div>
           `;
 
@@ -207,13 +204,15 @@
           const inputAmount = right.querySelector('input.amount');
 
           btnPPD.addEventListener('click', ()=> iniciarCheckout({
-            dui, creditoId: c.creditoID, amount: Number(c.paraPonerseAlDia||0), consentId:`consent-${c.creditoID}`, btn: btnPPD
+            dui, creditoId: creditoID, amount: Number(c.paraPonerseAlDia||0),
+            consentId:`consent-${creditoID}`, btn: btnPPD
           }));
 
           btnCustom.addEventListener('click', ()=> {
             const amt = parseFloat(inputAmount.value);
             iniciarCheckout({
-              dui, creditoId: c.creditoID, amount: Number.isFinite(amt)? amt:0, consentId:`consent-${c.creditoID}`, btn: btnCustom
+              dui, creditoId: creditoID, amount: Number.isFinite(amt)? amt:0,
+              consentId:`consent-${creditoID}`, btn: btnCustom
             });
           });
 
@@ -232,10 +231,11 @@
       }
     });
 
-    // ========= 4) Crear checkout (anon) y redirigir =========
+    // ========= Crear checkout y redirigir a Pagadito =========
     async function iniciarCheckout({ dui, creditoId, amount, consentId, btn }){
       show(globalMsg, false);
       const consent = document.getElementById(consentId);
+
       if (!consent || !consent.checked){
         globalMsg.className = 'msg error';
         globalMsg.textContent = 'Debes aceptar la declaración de titularidad para continuar.';
@@ -251,17 +251,26 @@
 
       try{
         disable(btn, true);
-        const callable = functions.httpsCallable('createCheckoutAnon');
-        // returnUrl: página a la que el procesador volverá (la crearemos luego)
-        const returnUrl = window.location.origin + '/estado-pago.html';
-        const resp = await callable({ dui, creditoId, amount, returnUrl });
 
-        const checkoutUrl = resp.data?.checkoutUrl;
-        if (!checkoutUrl){
-          throw new Error('No se recibió la URL de pago.');
+        // POST a la Function HTTP: crearTransaccionPagadito
+        const resp = await fetch(`${CF_BASE}/crearTransaccionPagadito`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ numeroDui: dui, creditoID: creditoId, monto: amount })
+        });
+
+        const data = await resp.json().catch(()=> ({}));
+        if (!resp.ok){
+          throw new Error(data?.error || `Error (${resp.status}) al iniciar transacción`);
         }
-        // Redirige al checkout hospedado (Stripe/Wompi/PayPal)
-        window.location.href = checkoutUrl;
+
+        const redirectUrl = data.redirect_url;
+        if (!redirectUrl){
+          throw new Error(data?.error || 'No se recibió la URL de pago.');
+        }
+
+        // Redirige al checkout hospedado de Pagadito
+        window.location.href = redirectUrl;
 
       }catch(err){
         globalMsg.className = 'msg error';
@@ -274,4 +283,5 @@
   </script>
 </body>
 </html>
+
 

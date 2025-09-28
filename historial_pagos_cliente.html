@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
@@ -135,13 +135,24 @@
           return showEmpty("El crédito no pertenece al ClienteID suministrado.");
         }
 
+        // Excluir créditos Revertidos en modo automático
+        if ((credData.estadoCredito || '') === 'Revertido') {
+          return showEmpty("El crédito está en estado Revertido y no se considera en esta vista.");
+        }
+
         // Render resumen y pagos directos
         renderResumenCreditoDirecto(creditoID, credData);
         await cargarPagosPorCredito(creditoID);
         return;
       }
 
-      // Si solo hay clienteID (o nada), se deja el flujo manual
+      // ➕ BÚSQUEDA AUTOMÁTICA AL ENTRAR (sin click):
+      // - Si viene clienteID (sin creditoID), o
+      // - Si el input ya tiene valor al cargar la página.
+      const inputVal = document.getElementById('clienteID-input').value.trim();
+      if (inputVal && !creditoID) {
+        await buscarCreditos(inputVal);
+      }
     });
 
     // Eventos de búsqueda manual
@@ -169,9 +180,15 @@
         const qCreds = query(collection(db, "creditos"), where("clienteID", "==", clienteID));
         const snap = await getDocs(qCreds);
         creditosDelCliente = [];
-        snap.forEach(d => creditosDelCliente.push({ id: d.id, data: d.data() }));
+        snap.forEach(d => {
+          const data = d.data();
+          // Excluir créditos con estado "Revertido"
+          if ((data.estadoCredito || '') !== 'Revertido') {
+            creditosDelCliente.push({ id: d.id, data });
+          }
+        });
 
-        if (!creditosDelCliente.length) return showEmpty("No se encontraron créditos para este ClienteID.");
+        if (!creditosDelCliente.length) return showEmpty("No se encontraron créditos (no Revertidos) para este ClienteID.");
 
         // Poblar selector
         const sel = document.getElementById('credito-select');
@@ -348,9 +365,5 @@
   </script>
 </body>
 </html>
-
-
-
-
 
 

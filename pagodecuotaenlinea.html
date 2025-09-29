@@ -83,12 +83,12 @@
 
     <!-- BLOQUE: Buscar por DUI (sin login) -->
     <div class="card" id="search-card">
-      <label for="dui">Ingresa tu DUI (solo números)</label>
+      <label for="dui">Ingresa tu DUI</label>
       <div class="row">
-        <input id="dui" type="text" inputmode="numeric" placeholder="Ej.: 012345678" maxlength="9" />
+        <input id="dui" type="text" inputmode="numeric" placeholder="Ej.: 01234567-8" maxlength="10" />
         <button id="btn-buscar" class="btn btn-primary"><span id="sp-buscar">Buscar créditos</span></button>
       </div>
-      <div class="help muted">Tu DUI se usará para localizar tus créditos activos. No necesitas crear cuenta.</div>
+      <div class="help muted">Escribe los 9 dígitos; el guion se coloca automáticamente.</div>
       <div id="search-msg" class="msg" style="display:none;"></div>
       <div id="results" class="results"></div>
     </div>
@@ -108,7 +108,13 @@
       const n = Number.isFinite(v) ? v : parseFloat(String(v||0));
       return (Math.round((n + Number.EPSILON)*100)/100).toFixed(2);
     };
-    const normDui = (s)=> (String(s||'').replace(/\D+/g,'').slice(0,9));
+    const digitsOnly = (s)=> String(s||'').replace(/\D+/g,'');
+    const cap9 = (s)=> digitsOnly(s).slice(0,9);
+    const formatDui = (s)=> {
+      const d = cap9(s);
+      if (d.length <= 8) return d;               // 0..8 dígitos
+      return `${d.slice(0,8)}-${d.slice(8)}`;    // XXXXXXXX-X
+    };
     const disable = (btn, on=true)=> {
       btn.disabled = on;
       if (on) { btn.dataset.originalText = btn.innerHTML; btn.innerHTML = `<span class="loader"></span>`; }
@@ -123,8 +129,15 @@
     const searchMsg  = $('search-msg');
     const globalMsg  = $('global-msg');
 
-    duiInput.addEventListener('input', ()=> {
-      duiInput.value = normDui(duiInput.value);
+    // Formateo automático con guion mientras se escribe / pega
+    function applyMask(e){
+      const val = e.target.value;
+      const masked = formatDui(val);
+      e.target.value = masked;
+    }
+    duiInput.addEventListener('input', applyMask);
+    duiInput.addEventListener('paste', (e)=>{
+      requestAnimationFrame(()=> applyMask({target: duiInput}));
     });
 
     btnBuscar.addEventListener('click', async ()=>{
@@ -132,8 +145,10 @@
       show(searchMsg, false);
       show(globalMsg, false);
 
-      const dui = normDui(duiInput.value);
-      if (dui.length !== 9){
+      const duiConGuion = formatDui(duiInput.value);
+      const digits = digitsOnly(duiConGuion);
+
+      if (digits.length !== 9){
         searchMsg.className = 'msg error';
         searchMsg.textContent = 'Por favor ingresa un DUI válido (9 dígitos).';
         show(searchMsg, true);
@@ -143,8 +158,8 @@
       try{
         disable(btnBuscar, true);
 
-        // Llama a la Function HTTP: getResumenPorDUI (GET ?numeroDui=)
-        const resp = await fetch(`${CF_BASE}/getResumenPorDUI?numeroDui=${encodeURIComponent(dui)}`, {
+        // Llama a la Function HTTP: getResumenPorDUI (GET ?numeroDui=XXXXXXXX-X)
+        const resp = await fetch(`${CF_BASE}/getResumenPorDUI?numeroDui=${encodeURIComponent(duiConGuion)}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
         });
@@ -164,9 +179,7 @@
 
         // Render de tarjetas de crédito
         creditos.forEach(c => {
-          // La función devuelve: id, lineaDeCredito, estadoCredito, saldoActual, interesActual, multasAcumuladas, paraPonerseAlDia, nombre, numeroDui...
           const creditoID = c.id;
-
           const card = document.createElement('div');
           card.className = 'result-item';
 
@@ -198,20 +211,19 @@
             <div class="muted" style="margin-top:6px">El desglose exacto (multas/interés/capital) se aplicará al confirmar el pago.</div>
           `;
 
-          // Wire actions
           const btnPPD = right.querySelector('button[data-action="ppd"]');
           const btnCustom = right.querySelector('button[data-action="custom"]');
           const inputAmount = right.querySelector('input.amount');
 
           btnPPD.addEventListener('click', ()=> iniciarCheckout({
-            dui, creditoId: creditoID, amount: Number(c.paraPonerseAlDia||0),
+            duiConGuion, creditoId: creditoID, amount: Number(c.paraPonerseAlDia||0),
             consentId:`consent-${creditoID}`, btn: btnPPD
           }));
 
           btnCustom.addEventListener('click', ()=> {
             const amt = parseFloat(inputAmount.value);
             iniciarCheckout({
-              dui, creditoId: creditoID, amount: Number.isFinite(amt)? amt:0,
+              duiConGuion, creditoId: creditoID, amount: Number.isFinite(amt)? amt:0,
               consentId:`consent-${creditoID}`, btn: btnCustom
             });
           });
@@ -232,7 +244,7 @@
     });
 
     // ========= Crear checkout y redirigir a Pagadito =========
-    async function iniciarCheckout({ dui, creditoId, amount, consentId, btn }){
+    async function iniciarCheckout({ duiConGuion, creditoId, amount, consentId, btn }){
       show(globalMsg, false);
       const consent = document.getElementById(consentId);
 
@@ -252,11 +264,11 @@
       try{
         disable(btn, true);
 
-        // POST a la Function HTTP: crearTransaccionPagadito
+        // POST a la Function HTTP: crearTransaccionPagadito (enviamos DUI con guion)
         const resp = await fetch(`${CF_BASE}/crearTransaccionPagadito`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ numeroDui: dui, creditoID: creditoId, monto: amount })
+          body: JSON.stringify({ numeroDui: duiConGuion, creditoID: creditoId, monto: amount })
         });
 
         const data = await resp.json().catch(()=> ({}));
@@ -283,5 +295,6 @@
   </script>
 </body>
 </html>
+
 
 

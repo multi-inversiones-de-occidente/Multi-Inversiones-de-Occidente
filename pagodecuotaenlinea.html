@@ -121,6 +121,23 @@
       else { btn.innerHTML = btn.dataset.originalText || 'Procesar'; }
     };
 
+    // ========= LOG helpers =========
+    const TAG = 'PAGO-EN-LINEA';
+    const log = (...a)=> console.log(`[${TAG}]`, ...a);
+    const warn = (...a)=> console.warn(`[${TAG}]`, ...a);
+    const err = (...a)=> console.error(`[${TAG}]`, ...a);
+
+    // Handlers globales de errores JS
+    window.addEventListener('error', (e)=>{
+      err('JS error:', e.message, 'en', e.filename, 'l', e.lineno, e.error || '');
+    });
+    window.addEventListener('unhandledrejection', (e)=>{
+      err('Promise rejection sin manejar:', e.reason || e);
+    });
+
+    // Log inicial de contexto
+    log('Iniciado', { CF_BASE, origin: location.origin, href: location.href, ua: navigator.userAgent });
+
     // ========= UI Buscar créditos por DUI =========
     const duiInput   = $('dui');
     const btnBuscar  = $('btn-buscar');
@@ -129,11 +146,13 @@
     const searchMsg  = $('search-msg');
     const globalMsg  = $('global-msg');
 
-    // Formateo automático con guion mientras se escribe / pega
+    // Formateo automático con guion mientras se escribe / pega (con logs)
     function applyMask(e){
-      const val = e.target.value;
-      const masked = formatDui(val);
+      const before = e.target.value;
+      const masked = formatDui(before);
+      const dig = digitsOnly(masked);
       e.target.value = masked;
+      log('Input DUI', { before, masked, digits: dig, len: dig.length });
     }
     duiInput.addEventListener('input', applyMask);
     duiInput.addEventListener('paste', (e)=>{
@@ -141,6 +160,7 @@
     });
 
     btnBuscar.addEventListener('click', async ()=>{
+      console.groupCollapsed('🔎 Buscar créditos');
       resultsDiv.innerHTML = '';
       show(searchMsg, false);
       show(globalMsg, false);
@@ -148,32 +168,65 @@
       const duiConGuion = formatDui(duiInput.value);
       const digits = digitsOnly(duiConGuion);
 
+      log('Buscar click', { duiInput: duiInput.value, duiConGuion, digits });
+
       if (digits.length !== 9){
         searchMsg.className = 'msg error';
         searchMsg.textContent = 'Por favor ingresa un DUI válido (9 dígitos).';
         show(searchMsg, true);
+        warn('DUI inválido (no son 9 dígitos)', { digits, length: digits.length });
+        console.groupEnd();
         return;
       }
 
       try{
         disable(btnBuscar, true);
 
-        // Llama a la Function HTTP: getResumenPorDUI (GET ?numeroDui=XXXXXXXX-X)
-        const resp = await fetch(`${CF_BASE}/getResumenPorDUI?numeroDui=${encodeURIComponent(duiConGuion)}`, {
+        const url = `${CF_BASE}/getResumenPorDUI?numeroDui=${encodeURIComponent(duiConGuion)}`;
+        log('GET →', url);
+
+        console.time('fetch:getResumenPorDUI');
+        const resp = await fetch(url, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
-        });
+        }).catch((e)=>{ throw new Error(`Network/Fetch error: ${e?.message || e}`); });
+        console.timeEnd('fetch:getResumenPorDUI');
+
+        log('Respuesta', { ok: resp.ok, status: resp.status, statusText: resp.statusText });
 
         if (!resp.ok){
-          const txt = await resp.text();
+          const txt = await resp.text().catch(()=> '(no body)');
+          err('Respuesta no OK', { status: resp.status, body: txt });
           throw new Error(`(${resp.status}) ${txt || 'Error'}`);
         }
 
-        const data = await resp.json(); // { ok: true, creditos: [...] }
+        const data = await resp.json().catch((e)=>{ throw new Error(`JSON parse error: ${e?.message || e}`); });
+        log('JSON recibido', data);
+
         const creditos = Array.isArray(data?.creditos) ? data.creditos : [];
+        log(`Créditos encontrados: ${creditos.length}`);
+        if (creditos.length){
+          try {
+            // Muestra una tabla resumida en consola (si hay campos)
+            const rows = creditos.map(c => ({
+              id: c.id,
+              estado: c.estadoCredito,
+              saldo: c.saldoActual,
+              interes: c.interesActual,
+              multas: c.multasAcumuladas,
+              ppd: c.paraPonerseAlDia,
+              linea: c.lineaDeCredito,
+              dui: c.numeroDui
+            }));
+            console.table(rows);
+          } catch (tErr) {
+            warn('No se pudo imprimir tabla', tErr);
+          }
+        }
 
         if (!creditos.length){
           resultsDiv.innerHTML = `<div class="muted">No encontramos créditos activos con ese DUI.</div>`;
+          console.groupEnd();
           return;
         }
 
@@ -233,68 +286,92 @@
           resultsDiv.appendChild(card);
         });
 
-      }catch(err){
+      }catch(e){
+        err('Fallo en búsqueda', e);
         searchMsg.className = 'msg error';
-        searchMsg.textContent = `Error al buscar: ${err?.message || err}`;
+        searchMsg.textContent = `Error al buscar: ${e?.message || e}`;
         show(searchMsg, true);
       }finally{
         disable(btnBuscar, false);
         spBuscar.textContent = 'Buscar créditos';
+        console.groupEnd();
       }
     });
 
     // ========= Crear checkout y redirigir a Pagadito =========
     async function iniciarCheckout({ duiConGuion, creditoId, amount, consentId, btn }){
+      console.groupCollapsed('💳 Iniciar checkout');
       show(globalMsg, false);
       const consent = document.getElementById(consentId);
+
+      log('Params', { duiConGuion, creditoId, amount });
 
       if (!consent || !consent.checked){
         globalMsg.className = 'msg error';
         globalMsg.textContent = 'Debes aceptar la declaración de titularidad para continuar.';
         show(globalMsg, true);
+        warn('Consentimiento no marcado');
+        console.groupEnd();
         return;
       }
       if (!(amount > 0.009)){
         globalMsg.className = 'msg error';
         globalMsg.textContent = 'Ingresa un monto válido (mayor a $0.01).';
         show(globalMsg, true);
+        warn('Monto inválido', { amount });
+        console.groupEnd();
         return;
       }
 
       try{
         disable(btn, true);
 
-        // POST a la Function HTTP: crearTransaccionPagadito (enviamos DUI con guion)
-        const resp = await fetch(`${CF_BASE}/crearTransaccionPagadito`, {
+        const url = `${CF_BASE}/crearTransaccionPagadito`;
+        const payload = { numeroDui: duiConGuion, creditoID: creditoId, monto: amount };
+        log('POST →', url, 'payload:', payload);
+
+        console.time('fetch:crearTransaccionPagadito');
+        const resp = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ numeroDui: duiConGuion, creditoID: creditoId, monto: amount })
-        });
+          body: JSON.stringify(payload)
+        }).catch((e)=>{ throw new Error(`Network/Fetch error: ${e?.message || e}`); });
+        console.timeEnd('fetch:crearTransaccionPagadito');
+
+        log('Respuesta', { ok: resp.ok, status: resp.status, statusText: resp.statusText });
 
         const data = await resp.json().catch(()=> ({}));
+        log('JSON recibido', data);
+
         if (!resp.ok){
+          err('Respuesta no OK', { status: resp.status, data });
           throw new Error(data?.error || `Error (${resp.status}) al iniciar transacción`);
         }
 
         const redirectUrl = data.redirect_url;
         if (!redirectUrl){
+          err('No hay redirect_url en respuesta', data);
           throw new Error(data?.error || 'No se recibió la URL de pago.');
         }
 
-        // Redirige al checkout hospedado de Pagadito
+        log('Redirigiendo a Pagadito →', redirectUrl);
         window.location.href = redirectUrl;
 
-      }catch(err){
+      }catch(e){
+        err('Fallo en checkout', e);
         globalMsg.className = 'msg error';
-        globalMsg.textContent = `No se pudo iniciar el pago: ${err?.message || err}`;
+        globalMsg.textContent = `No se pudo iniciar el pago: ${e?.message || e}`;
         show(globalMsg, true);
       }finally{
         disable(btn, false);
+        console.groupEnd();
       }
     }
   </script>
 </body>
 </html>
+
+
 
 
 

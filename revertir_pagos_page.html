@@ -22,12 +22,10 @@
         radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
         radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
         linear-gradient(180deg, var(--bg), var(--bg-2));
-      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
-      min-height:100vh;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; min-height:100vh;
     }
     header{
-      position:sticky; top:0; z-index:10;
-      backdrop-filter:saturate(1.1) blur(10px); -webkit-backdrop-filter:saturate(1.1) blur(10px);
+      position:sticky; top:0; z-index:10; backdrop-filter:saturate(1.1) blur(10px); -webkit-backdrop-filter:saturate(1.1) blur(10px);
       background:linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.45));
       border-bottom:1px solid var(--glass-brd);
     }
@@ -36,36 +34,27 @@
     .brand i{ color:var(--brand-gold); font-size:1.25rem }
     .brand b{ color:var(--brand-blue); letter-spacing:.2px }
     .page{ margin-left:auto; color:var(--muted); font-weight:800 }
+
     .container{ position:relative; z-index:1; max-width:960px; margin:0 auto; padding:2rem 16px 3rem; }
-    .panel{
-      background:var(--glass-bg); border:1px solid var(--glass-brd); border-radius:var(--radius-2xl);
-      box-shadow:var(--glass-shadow); padding:18px 16px; margin-bottom:18px;
-    }
+    .panel{ background:var(--glass-bg); border:1px solid var(--glass-brd); border-radius:var(--radius-2xl); box-shadow:var(--glass-shadow); padding:18px 16px; margin-bottom:18px; }
     .title{ display:flex; align-items:center; gap:10px; font-weight:900; color:var(--brand-blue); margin-bottom:6px; }
     .subtitle{ color:var(--muted); margin:0 0 12px 30px; }
     .row{ display:flex; gap:10px; align-items:center; margin-top:8px; }
     .input{ flex:1; background:#fff; border:1px solid #dbe1ea; border-radius:10px; padding:12px 12px; font-size:1.05rem; outline:none; }
-    .btn{
-      background: linear-gradient(90deg, var(--brand-blue) 0%, #16265c 100%);
-      color:#fff; border:none; padding:11px 14px; border-radius:10px; cursor:pointer; font-weight:800; display:inline-flex; gap:8px; align-items:center;
-    }
+    .btn{ background: linear-gradient(90deg, var(--brand-blue) 0%, #16265c 100%); color:#fff; border:none; padding:11px 14px; border-radius:10px; cursor:pointer; font-weight:800; display:inline-flex; gap:8px; align-items:center; }
     .btn:hover{ filter:brightness(1.05) }
-    .card{
-      background:#fff; border:1px solid #e7ebf3; border-radius:14px; padding:16px; margin-top:12px; box-shadow:0 8px 24px rgba(10,20,40,.08);
-    }
+    .card{ background:#fff; border:1px solid #e7ebf3; border-radius:14px; padding:16px; margin-top:12px; box-shadow:0 8px 24px rgba(10,20,40,.08); }
     .k{ color:#6b7482 }
     .val b{ color:#0b3b85 }
-    .btn-danger{
-      background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%);
-      color:#fff; border:none; padding:12px 16px; border-radius:10px; cursor:pointer; font-weight:900; width:100%;
-      display:flex; align-items:center; justify-content:center; gap:8px; margin-top:10px;
-    }
+    .btn-danger{ background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%); color:#fff; border:none; padding:12px 16px; border-radius:10px; cursor:pointer; font-weight:900; width:100%; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:10px; }
     .btn-danger[disabled]{ opacity:.55; cursor:not-allowed }
     .textarea{ width:100%; min-height:64px; resize:vertical; background:#fafcff; border:1px solid #dbe1ea; border-radius:10px; padding:10px; font-size:1rem; }
     .split{ display:grid; grid-template-columns:1fr; gap:16px; }
     @media (min-width:860px){ .split{ grid-template-columns:1fr 1fr; } }
+
     .spinner { display:inline-block; width:18px; height:18px; border-radius:50%; border:3px solid #fff6; border-top:3px solid #fff; animation:spin 1s linear infinite;}
     @keyframes spin {100%{transform:rotate(360deg);}}
+
     /* Modal */
     .modal-bg { position: fixed; inset:0; background: #0b1020bb; z-index: 9998; display:flex; align-items:center; justify-content:center; padding:14px;}
     .modal{ background:#fff; color:#222; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.35); padding:22px 18px; width:100%; max-width:380px; }
@@ -118,8 +107,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import {
-      getFirestore, collection, query, where, getDocs, doc, getDoc,
-      orderBy, limit, writeBatch
+      getFirestore, collection, query, where, getDocs, doc, getDoc, orderBy, limit, writeBatch
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
@@ -134,41 +122,58 @@
       measurementId: "G-H4E31XHG1Y"
     };
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    const db  = getFirestore(app);
     const auth = getAuth(app);
 
     /* ===== Estado ===== */
     let userId = null, agenciaActual = "";
     let pagoDoc = null, pagoData = null;
-    let movDoc = null, movData = null;
+    let movDoc  = null, movData  = null;
 
     /* ===== Util ===== */
     async function obtenerAgencia(user) {
       const snap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
       if (!snap.empty) {
-        agenciaActual = snap.docs[0].data().department || snap.docs[0].data().agencia || "";
+        const d = snap.docs[0].data();
+        agenciaActual = d.department || d.agencia || "";
       }
     }
+
     function showCard(id, html){ document.getElementById(id).innerHTML = html; }
 
     function confirmPINGerente() {
       return new Promise((resolve) => {
         const root = document.getElementById("modal-root");
         let error = "";
+
         async function onOk(){
           const pin = document.getElementById("gerente-pin-input").value.trim();
-          if (!pin){ error = "Debes ingresar el PIN del gerente."; render(); return; }
+          if (!pin){
+            error = "Debes ingresar el PIN del gerente.";
+            render();
+            return;
+          }
           const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
           const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
           const q = query(collection(db, "users"), where("rol", "==", "gerente"));
           const snap = await getDocs(q);
-          if (snap.empty){ error = "No hay gerente configurado."; render(); return; }
+          if (snap.empty){
+            error = "No hay gerente configurado.";
+            render();
+            return;
+          }
           let ok = false;
           snap.forEach(g => { if (g.data().internalPassword === hashHex) ok = true; });
-          if (ok) { root.innerHTML=""; resolve(true); }
-          else { error = "PIN incorrecto."; render(); }
+          if (ok) {
+            root.innerHTML="";
+            resolve(true);
+          } else {
+            error = "PIN incorrecto.";
+            render();
+          }
         }
         function cancel(){ document.getElementById("modal-root").innerHTML = ""; resolve(false); }
+
         function render(){
           root.innerHTML = `
             <div class="modal-bg">
@@ -206,7 +211,8 @@
         </div>`;
       document.getElementById("ok").onclick = () => {
         root.innerHTML = "";
-        showCard("pago-card", ""); showCard("mov-card", "");
+        showCard("pago-card", "");
+        showCard("mov-card", "");
         document.getElementById("correlativo").value = "";
         document.getElementById("correlativo-mov").value = "";
       };
@@ -225,16 +231,18 @@
       d.setHours(0,0,0,0);
       return d;
     }
-    const toCents = (v)=> Math.round((parseFloat(v||0)+Number.EPSILON)*100);
-    const fromCents = (c)=> (c/100).toFixed(2);
+    const toCents  = (v)=> Math.round((parseFloat(v||0)+Number.EPSILON)*100);
+    const fromCents= (c)=> (c/100).toFixed(2);
 
-    /* === NUEVO: medianoche exacta de El Salvador (UTC-6) para una fecha dada (default: hoy) === */
+    /* === Medianoche exacta de El Salvador (UTC-6) para una fecha dada === */
     function svStartOfDay(date = new Date()){
-      const ymd = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/El_Salvador',
-        year: 'numeric', month: '2-digit', day: '2-digit'
-      }).format(date); // "YYYY-MM-DD"
-      return new Date(`${ymd}T06:00:00.000Z`); // 00:00 ES = 06:00Z
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/El_Salvador', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).formatToParts(date);
+      const y = parts.find(p=>p.type==='year').value;
+      const m = parts.find(p=>p.type==='month').value;
+      const d = parts.find(p=>p.type==='day').value;
+      return new Date(`${y}-${m}-${d}T06:00:00.000Z`); // 00:00 ES = 06:00Z
     }
 
     /* ===== Buscar Pago ===== */
@@ -248,16 +256,9 @@
 
       if (!agenciaActual) await obtenerAgencia({ uid: userId });
 
-      // Hacemos ambas consultas (número y string) y luego elegimos el MÁS RECIENTE
-      const qNum = query(collection(db, "pagos"),
-        where("correlativo","==", Number(raw)),
-        where("sucursal","==", agenciaActual)
-      );
-      const qStr = query(collection(db, "pagos"),
-        where("correlativo","==", raw),
-        where("sucursal","==", agenciaActual)
-      );
-
+      // Buscar por correlativo (número y string) + sucursal
+      const qNum = query(collection(db, "pagos"), where("correlativo","==", Number(raw)), where("sucursal","==", agenciaActual));
+      const qStr = query(collection(db, "pagos"), where("correlativo","==", raw), where("sucursal","==", agenciaActual));
       const [sNum, sStr] = await Promise.all([getDocs(qNum), getDocs(qStr)]);
 
       btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Buscar';
@@ -283,13 +284,13 @@
       todos.sort((a,b)=> getMillis(b) - getMillis(a));
       pagoDoc = todos[0];
       pagoData = pagoDoc.data();
-
       renderPagoCard();
     }
 
     function renderPagoCard(){
       if (!pagoData) return;
       const detalleMulta = (pagoData.pagoMultas ?? pagoData.pagoMulta ?? 0);
+
       showCard("pago-card", `
         <div class="card">
           <div class="row" style="justify-content:space-between"><div class="k">Ticket</div><div class="val"><b>${pagoData.correlativo}</b></div></div>
@@ -311,30 +312,53 @@
       document.getElementById("revertir-btn").onclick = revertirPago;
     }
 
-    /* ===== Revertir Pago (ÚLTIMO por fecha, snapshot + catch-ups) ===== */
+    /* ===== Revertir Pago – validar último por fechaRegistro (no anulado) ===== */
     async function revertirPago(){
       try{
         if (!pagoData) return;
         const motivo = document.getElementById("motivo").value.trim();
-        if (!motivo){ document.getElementById("motivo").focus(); return; }
-
+        if (!motivo){
+          document.getElementById("motivo").focus();
+          return;
+        }
         const ok = await confirmPINGerente();
         if (!ok) return;
 
         const btn = document.getElementById("revertir-btn");
-        btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Revirtiendo...';
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Revirtiendo...';
 
-        // (1) Validar último pago por fechaPago
+        // (1) Buscar los últimos pagos por fechaRegistro para este crédito y tomar el más reciente no anulado
         const ultQ = query(
           collection(db, "pagos"),
           where("creditoID", "==", pagoData.creditoID),
-          orderBy("fechaPago","desc"),
-          limit(1)
+          orderBy("fechaRegistro", "desc"),
+          limit(10)
         );
         const ultSnap = await getDocs(ultQ);
-        if (ultSnap.empty || ultSnap.docs[0].id !== pagoDoc.id){
+
+        if (ultSnap.empty){
           btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
-          alert("Solo puedes revertir el último pago realizado para este crédito.");
+          alert("No se encontraron pagos para validar el último registro.");
+          return;
+        }
+
+        let ultimoNoAnulado = null;
+        for (const d of ultSnap.docs){
+          const data = d.data();
+          if (data && data.anulado !== true){ ultimoNoAnulado = d; break; }
+        }
+        if (!ultimoNoAnulado){
+          btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
+          alert("No hay pagos activos (no anulados) para revertir en este crédito.");
+          return;
+        }
+
+        if (ultimoNoAnulado.id !== pagoDoc.id){
+          const d = ultimoNoAnulado.data();
+          const corr = (d?.correlativo ?? "(s/ correlativo)");
+          btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
+          alert(`Solo puedes revertir el último pago registrado de este crédito.\nÚltimo registrado: correlativo ${corr}.`);
           return;
         }
 
@@ -348,6 +372,7 @@
           alert("No se encontró el respaldo previo (reversionPago) para este correlativo.");
           return;
         }
+
         const revDoc = revSnap.docs[0];
         const revData = revDoc.data();
         if (!revData.creditoID || revData.creditoID !== pagoData.creditoID){
@@ -362,11 +387,11 @@
         }
 
         // (3) Cargar crédito actual para preservar multas nuevas
-        const creditoRef = doc(db, "creditos", pagoData.creditoID);  // <<— declarada UNA sola vez
+        const creditoRef = doc(db, "creditos", pagoData.creditoID);
         const creditoNowSnap = await getDoc(creditoRef);
         const creditoNow = creditoNowSnap.exists() ? creditoNowSnap.data() : {};
 
-        // ====== Catch-up de INTERÉS “al día” sobre el snapshot (sin tocar lógica previa) ======
+        // ====== Catch-up de INTERÉS “al día” sobre el snapshot ======
         const todayStart = startOfDayLocal(new Date());
         const bases = [];
         if (pagoData.fechaPago) bases.push(startOfDayLocal(pagoData.fechaPago));
@@ -376,19 +401,16 @@
 
         const MS = 86400000;
         const days = Math.max(0, Math.floor((todayStart.getTime() - base.getTime()) / MS));
-
         let td = parseFloat(revData.snapshot.tasaDiariaCredito);
         if (!Number.isFinite(td) || td <= 0){
           const an = parseFloat(revData.snapshot.tasaAnualCredito || 0);
           td = an ? (an / 365) / 100 : 0;
         }
-
         const toCentsSafe = (v)=> Math.round((parseFloat(v||0)+Number.EPSILON)*100);
 
-        const principalCents =
-          Number.isFinite(revData.snapshot?.montoAprobado)
-            ? toCentsSafe(revData.snapshot.montoAprobado)
-            : (revData.snapshot?.saldoInicial ? toCentsSafe(revData.snapshot.saldoInicial) : 0);
+        const principalCents = Number.isFinite(revData.snapshot?.montoAprobado)
+          ? toCentsSafe(revData.snapshot.montoAprobado)
+          : (revData.snapshot?.saldoInicial ? toCentsSafe(revData.snapshot.saldoInicial) : 0);
 
         // Capital ya pagado hasta el snapshot (tope a capital por cuota)
         const amortSnap = Array.isArray(revData.snapshot.amortizacion) ? revData.snapshot.amortizacion : [];
@@ -399,15 +421,14 @@
           capPagadoCents += pagC;
         }
         const saldoSnapCents = Math.max(0, principalCents - capPagadoCents);
-
         const interesPrevioCents = toCentsSafe(revData.snapshot.interesActual || 0);
-        const interesPeriodoCents = Math.max(0, Math.round(saldoSnapCents * td * days / 1));
+        const interesPeriodoCents = Math.max(0, Math.round(saldoSnapCents * td * days));
         const interesNuevoCents = interesPrevioCents + interesPeriodoCents;
         const interesNuevo = (interesNuevoCents/100).toFixed(2);
 
         // ====== Merge de MULTAS: snapshot + las nuevas que existan ahora (evita duplicados exactos) ======
         const keyMulta = (m) => {
-          const tipo = (m.tipo || "").trim();
+          const tipo  = (m.tipo || "").trim();
           const cuota = (m.cuotaNumero != null) ? String(m.cuotaNumero) : "";
           const fecha = (m.fecha || "").toString().slice(0,10);
           const monto = Number(m.monto || 0).toFixed(2);
@@ -439,15 +460,14 @@
             cuotasAtrasadasNow++;
           }
         }
-
         const saldoNow = (saldoSnapCents/100).toFixed(2);
         const capitalAtrasadoNow = (capAtrNowCents/100).toFixed(2);
         const multasAjustadas = (multasAjustadasCents/100).toFixed(2);
         const ppdNuevo = ((interesNuevoCents + capAtrNowCents + multasAjustadasCents)/100).toFixed(2);
         let estadoCreditoNow = (saldoSnapCents === 0) ? "Pagado" : (cuotasAtrasadasNow > 0 ? "Mora Temprana" : "Activo");
 
-        /* ====== ÚNICO CAMBIO IMPORTANTE: setear fechaUltimoCalculoIntereses EXACTA (medianoche ES) ====== */
-        const fechaULCI = svStartOfDay(new Date()); // p.ej. 25/09/2025 00:00:00 (UTC-6)
+        /* ====== Setear fechaUltimoCalculoIntereses EXACTA (medianoche ES) ====== */
+        const fechaULCI = svStartOfDay(new Date());
 
         // ====== Snapshot final a restaurar ======
         const snapshotToRestore = {
@@ -460,17 +480,17 @@
           cuotasAtrasadas: cuotasAtrasadasNow,
           paraPonerseAlDia: parseFloat(ppdNuevo),
           estadoCredito: estadoCreditoNow,
-          fechaUltimoCalculoIntereses: fechaULCI,      // <<<<<<<< AQUÍ
+          fechaUltimoCalculoIntereses: fechaULCI,
           ultimaActualizacion: new Date().toISOString()
         };
 
         // (4) Commit en batch: set crédito exacto + catch-ups, borrar pago, marcar backup usado, log
         const batch = writeBatch(db);
         const pagoRef = doc(db, "pagos", pagoDoc.id);
-        const revRef = doc(db, "reversionPago", revDoc.id);
-        const logRef = doc(collection(db, "reversionesPagos"));
+        const revRef  = doc(db, "reversionPago", revDoc.id);
+        const logRef  = doc(collection(db, "reversionesPagos"));
 
-        batch.set(creditoRef, snapshotToRestore, { merge:false });
+        batch.set(doc(db, "creditos", pagoData.creditoID), snapshotToRestore, { merge:false });
         batch.delete(pagoRef);
         batch.set(revRef, { usado:true, usadoAt:new Date().toISOString(), motivo, userId }, { merge:true });
         batch.set(logRef, {
@@ -483,13 +503,15 @@
             pagoInteres: pagoData.pagoInteres || 0,
             pagoMultas: pagoData.pagoMultas ?? pagoData.pagoMulta ?? 0
           },
-          motivo, agencia: pagoData.sucursal || "",
-          revertidoPor: userId, revertidoAt: new Date().toISOString()
+          motivo,
+          agencia: pagoData.sucursal || "",
+          revertidoPor: userId,
+          revertidoAt: new Date().toISOString()
         });
 
         await batch.commit();
-        success(`El pago ${pagoData.correlativo} fue revertido; el crédito quedó igual que antes del pago y los agregados (interés, capital vencido, multas) quedaron al día. Se fijó fechaUltimoCalculoIntereses a la medianoche local (UTC-6) para que el cron sume 1 día mañana.`);
 
+        success(`El pago ${pagoData.correlativo} fue revertido; el crédito quedó igual que antes del pago y los agregados (interés, capital vencido, multas) quedaron al día. Se fijó fechaUltimoCalculoIntereses a la medianoche local (UTC-6) para que el cron sume 1 día mañana.`);
       }catch(e){
         console.error("revertirPago:", e);
         alert("Error al revertir el pago: " + (e.message || e));
@@ -503,6 +525,7 @@
       showCard("mov-card", "");
       const raw = document.getElementById("correlativo-mov").value.trim();
       if (!raw) return;
+
       const btn = document.getElementById("buscar-btn-mov");
       btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Buscando...';
 
@@ -521,6 +544,7 @@
         showCard("mov-card", `<div class="card"><b style="color:#c0392b">No se encontró el movimiento.</b></div>`);
         return;
       }
+
       movDoc = s1.docs[0];
       movData = movDoc.data();
       renderMovCard();
@@ -550,8 +574,10 @@
       try{
         if (!movData) return;
         const motivo = document.getElementById("motivo-mov").value.trim();
-        if (!motivo){ document.getElementById("motivo-mov").focus(); return; }
-
+        if (!motivo){
+          document.getElementById("motivo-mov").focus();
+          return;
+        }
         const ok = await confirmPINGerente();
         if (!ok) return;
 
@@ -561,6 +587,7 @@
         const batch = writeBatch(db);
         const movRef = doc(db, "movimientosCaja", movDoc.id);
 
+        // Marcar original como anulado
         batch.set(movRef, {
           anulado: true,
           fechaReversion: new Date().toISOString(),
@@ -568,10 +595,11 @@
           motivoReversion: motivo
         }, { merge:true });
 
+        // Asiento compensatorio
         const nuevoTipo = (movData.tipo === "Ingreso") ? "Egreso" : "Ingreso";
         const compRef = doc(collection(db, "movimientosCaja"));
         batch.set(compRef, {
-          correlativo: Math.floor(Math.random() * 1000000), // si usas secuencial, reemplázalo
+          correlativo: Math.floor(Math.random() * 1000000), // Si usas secuencial, reemplázalo por tu generador
           tipo: nuevoTipo,
           descripcion: `Reversión correlativo ${movData.correlativo}`,
           agencia: movData.agencia,
@@ -607,7 +635,6 @@
   </script>
 </body>
 </html>
-
 
 
 

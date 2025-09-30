@@ -131,6 +131,26 @@
       return td;
     }
 
+    // ====== Helper fecha base según tipo de pago (quirúrgico) ======
+    function getFechaBaseDePago(p){
+      // Retroactivo: usar fechaRegistro si existe y es válida
+      if (p && p.retroactivo === true && p.fechaRegistro){
+        const fr = new Date(p.fechaRegistro);
+        if (!Number.isNaN(fr.getTime())) return fr;
+      }
+      // Pago normal: usar fechaPago si es válida
+      if (p && p.fechaPago){
+        const fp = new Date(p.fechaPago);
+        if (!Number.isNaN(fp.getTime())) return fp;
+      }
+      // Último fallback: timestamp si existiera y fuera válido
+      if (p && p.timestamp){
+        const ft = new Date(p.timestamp);
+        if (!Number.isNaN(ft.getTime())) return ft;
+      }
+      return null;
+    }
+
     // ====== SOLO RECIBOS: último pago y cálculo ======
     async function obtenerUltimoRecibo(db, creditoID, fechaAbonoYMD){
       const corte = new Date(`${fechaAbonoYMD}T23:59:59-06:00`);
@@ -141,17 +161,29 @@
       snap.forEach(d=>{
         const p = d.data();
         if (!p || p.anulado === true) return;
-        if (!p.fechaPago) return;
-        const f = new Date(p.fechaPago);
-        if (Number.isNaN(f.getTime()) || f > corte) return;
-        if (!ultimo) ultimo = { ...p, _f: f };
-        else if (f > ultimo._f || (f.getTime()===ultimo._f.getTime() &&
-                 new Date(p.fechaRegistro||0) > new Date(ultimo.fechaRegistro||0))) {
-          ultimo = { ...p, _f: f };
+
+        const base = getFechaBaseDePago(p);
+        if (!base || Number.isNaN(base.getTime())) return;
+        if (base > corte) return;
+
+        if (!ultimo) {
+          ultimo = { ...p, _base: base };
+        } else if (base > ultimo._base) {
+          ultimo = { ...p, _base: base };
+        } else if (base.getTime() === ultimo._base.getTime()){
+          // Desempate por fechaRegistro (si existe), luego por fechaPago (consistencia)
+          const regA = p.fechaRegistro ? new Date(p.fechaRegistro) : new Date(p.fechaPago || 0);
+          const regB = ultimo.fechaRegistro ? new Date(ultimo.fechaRegistro) : new Date(ultimo.fechaPago || 0);
+          if (regA > regB) ultimo = { ...p, _base: base };
         }
       });
       if (!ultimo) return null;
-      return { fecha: ultimo._f, saldoRestante: Number(num(ultimo.saldoRestante, 0)), raw: ultimo };
+      return { 
+        fechaBase: ultimo._base, 
+        saldoRestante: Number(num(ultimo.saldoRestante, 0)), 
+        raw: ultimo,
+        esRetroactivo: ultimo.retroactivo === true
+      };
     }
 
     // ====== Interés por días: desde último recibo; si no hay, desde credito.fechaInicio (string ISO) ======
@@ -162,7 +194,7 @@
 
       // Caso estándar: hay último recibo -> política "solo desde recibos"
       if (up){
-        const fechaBase = up.fecha;
+        const fechaBase = up.fechaBase; // <- cambio quirúrgico: usar la fecha base real (registro si retroactivo, pago si normal)
         const saldoBase = Number.isFinite(up.saldoRestante) ? up.saldoRestante : num(credito.saldoActual, 0);
         const dias = daysMedioAbiertoDates(fechaBase, fechaCorte); // (último recibo, corte]
         const interes = round2(Math.max(0, saldoBase * tasa * dias));
@@ -716,15 +748,5 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
 
 

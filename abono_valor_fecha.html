@@ -18,18 +18,55 @@
     .list-group-item { background: #181e2b; color: #fff; border-radius: 8px; padding: 8px 14px; margin-bottom: 7px; cursor: pointer; }
     .list-group-item.selected, .list-group-item:hover { background: #fb923c; color: #181818; font-weight: bold;}
     .label { color: #fb923c; font-weight: 600; margin-bottom: 4px; display: block;}
-    .modal-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #181e21cc; z-index: 9998; display: flex; align-items: center; justify-content: center;}
-    .modal { background: #fff; color: #222; border-radius: 15px; box-shadow: 0 6px 38px #0008; padding: 26px 23px 20px 23px; max-width: 340px; width: 95%; text-align: left; font-size: 1rem; }
-    .modal label {font-weight: bold;}
-    .modal input { width: 100%; background: #f5f8fb; border: 1.2px solid #dadada; color: #111; font-size: 1.12rem; padding: 11px 10px; margin-bottom: 12px; border-radius: 8px; outline: none; box-sizing: border-box;}
-    .modal-btns { display: flex; gap: 13px; margin-top: 8px; justify-content: flex-end;}
-    .modal-btn-cancel { background: #e74c3c; color: #fff; border: none; padding: 9px 16px; border-radius: 7px; cursor: pointer; font-weight: bold;}
-    .modal-btn-ok { background: #F8AF40; color: #1a1813; border: none; padding: 9px 18px; border-radius: 7px; cursor: pointer; font-weight: bold;}
-    .recibo-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #181e21cc; z-index: 9999; display: flex; align-items: center; justify-content: center;}
+    .modal-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #181e21cc; z-index: 9999; display: flex; align-items: center; justify-content: center;}
+    .modal { background: #fff; color: #232a37; border-radius: 14px; box-shadow: 0 2px 32px #0007; padding: 27px 23px 18px 23px; max-width: 350px; width: 96%; font-size: 1.03rem; }
     .recibo { background: #fff; color: #232a37; border-radius: 14px; box-shadow: 0 2px 32px #0007; padding: 27px 23px 18px 23px; max-width: 350px; width: 96%; font-size: 1.03rem; }
     .recibo-titulo { font-weight: bold; font-size: 1.2rem; margin-bottom: 12px; color: #fb923c; }
     .recibo-row { margin-bottom: 7px; }
-    .recibo-close { background: #e74c3c; color: #fff; border: none; padding: 7px 15px; border-radius: 7px; cursor: pointer; font-weight: bold; float: right; margin-top: 9px;}
+    .recibo-actions { display:flex; gap:8px; justify-content:flex-end; margin-top: 12px; }
+    .recibo-close { background: #e74c3c; color: #fff; border: none; padding: 7px 15px; border-radius: 7px; cursor: pointer; font-weight: bold;}
+    .recibo-print { background: #10b981; color: #0b2b22; border: none; padding: 7px 15px; border-radius: 7px; cursor: pointer; font-weight: bold;}
+    .recibo-hr { border: 0; border-top: 1px dashed #cbd5e1; margin: 10px 0 14px; }
+
+    /* ===== IMPRESIÓN: una sola página bonita ===== */
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 12mm;
+      }
+      /* Oculta todo excepto el recibo */
+      body *:not(.recibo):not(.recibo *){
+        visibility: hidden !important;
+      }
+      /* Vuelve el overlay en contenedor estático para que no sume alto de viewport */
+      .modal-bg, .recibo-bg {
+        position: static !important;
+        width: auto !important;
+        height: auto !important;
+        background: transparent !important;
+        box-shadow: none !important;
+      }
+      /* Muestra solo el recibo y que ocupe el ancho de impresión sin saltos */
+      .recibo {
+        visibility: visible !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        font-size: 12pt !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+      }
+      /* Ocultar botones y elementos de acción en impresión */
+      .no-print, .recibo-close, .recibo-print {
+        display: none !important;
+      }
+      /* Evitar que encabezados/filas se partan */
+      .recibo-row {
+        page-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -389,9 +426,10 @@
       let fechaFmt = new Date(datos.fechaPago).toLocaleDateString('es-SV');
       let hoyFmt = new Date().toLocaleDateString('es-SV');
       reciboDiv.innerHTML = `
-        <div class="recibo-bg">
+        <div class="modal-bg recibo-bg">
           <div class="recibo">
             <div class="recibo-titulo">Recibo de Pago Retroactivo</div>
+            <hr class="recibo-hr"/>
             <div class="recibo-row"><b>No. Correlativo:</b> ${datos.correlativo || '-'}</div>
             <div class="recibo-row"><b>Cliente:</b> ${datos.nombres}</div>
             <div class="recibo-row"><b>DUI:</b> ${datos.numeroDui || ''}</div>
@@ -404,7 +442,10 @@
             <div class="recibo-row"><b>Saldo restante:</b> $${Number(datos.saldoRestante).toFixed(2)}</div>
             <div class="recibo-row"><b>Registrado el:</b> ${hoyFmt}</div>
             <div class="recibo-row"><b>Motivo:</b> ${datos.motivo || ''}</div>
-            <button class="recibo-close" onclick="document.getElementById('recibo-root').innerHTML=''">Cerrar</button>
+            <div class="recibo-actions no-print">
+              <button class="recibo-print" onclick="window.print()"><i class="fa fa-print"></i> Imprimir</button>
+              <button class="recibo-close" onclick="document.getElementById('recibo-root').innerHTML=''"><i class="fa fa-times"></i> Cerrar</button>
+            </div>
           </div>
         </div>`;
     }
@@ -748,5 +789,6 @@
   </script>
 </body>
 </html>
+
 
 

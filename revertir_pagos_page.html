@@ -63,6 +63,11 @@
     .modal .btn-cancel{ background:#e74c3c; color:#fff; border:none; padding:9px 16px; border-radius:8px; font-weight:800; cursor:pointer }
     .modal .btn-ok{ background:#F8AF40; color:#1a1813; border:none; padding:9px 18px; border-radius:8px; font-weight:800; cursor:pointer }
     .error{ color:#c0392b; font-weight:700; margin-top:6px }
+
+    /* Toast */
+    .toast-wrap{position:fixed;right:16px;bottom:16px;z-index:9999;display:flex;flex-direction:column;gap:10px}
+    .toast{background:#1f2937;color:#fff;padding:10px 12px;border-radius:10px;box-shadow:0 6px 18px #0005;max-width:320px;transition:all .35s ease}
+    .toast.warn{background:#b45309}.toast.error{background:#991b1b}.toast.info{background:#374151}
   </style>
 </head>
 <body>
@@ -141,62 +146,6 @@
 
     function showCard(id, html){ document.getElementById(id).innerHTML = html; }
 
-    function confirmPINGerente() {
-      return new Promise((resolve) => {
-        const root = document.getElementById("modal-root");
-        let error = "";
-
-        async function onOk(){
-          const pin = document.getElementById("gerente-pin-input").value.trim();
-          if (!pin){
-            error = "Debes ingresar el PIN del gerente.";
-            render();
-            return;
-          }
-          const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
-          const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-          const q = query(collection(db, "users"), where("rol", "==", "gerente"));
-          const snap = await getDocs(q);
-          if (snap.empty){
-            error = "No hay gerente configurado.";
-            render();
-            return;
-          }
-          let ok = false;
-          snap.forEach(g => { if (g.data().internalPassword === hashHex) ok = true; });
-          if (ok) {
-            root.innerHTML="";
-            resolve(true);
-          } else {
-            error = "PIN incorrecto.";
-            render();
-          }
-        }
-        function cancel(){ document.getElementById("modal-root").innerHTML = ""; resolve(false); }
-
-        function render(){
-          root.innerHTML = `
-            <div class="modal-bg">
-              <div class="modal">
-                <div class="hd"><i class="fas fa-user-shield"></i> Autorización Gerente</div>
-                <label>PIN del gerente</label>
-                <input type="password" id="gerente-pin-input" maxlength="10" autocomplete="off" placeholder="PIN"/>
-                ${error ? `<div class="error">${error}</div>` : ""}
-                <div class="btns">
-                  <button class="btn-cancel" id="cancel-pin">Cancelar</button>
-                  <button class="btn-ok" id="ok-pin">Autorizar</button>
-                </div>
-              </div>
-            </div>`;
-          document.getElementById("cancel-pin").onclick = cancel;
-          document.getElementById("ok-pin").onclick = onOk;
-          document.getElementById("gerente-pin-input").onkeydown = e => { if (e.key === "Enter") onOk(); };
-          setTimeout(()=>document.getElementById("gerente-pin-input").focus(), 40);
-        }
-        render();
-      });
-    }
-
     function success(msg){
       const root = document.getElementById("modal-root");
       root.innerHTML = `
@@ -213,9 +162,54 @@
         root.innerHTML = "";
         showCard("pago-card", "");
         showCard("mov-card", "");
-        document.getElementById("correlativo").value = "";
-        document.getElementById("correlativo-mov").value = "";
+        const c1 = document.getElementById("correlativo");
+        const c2 = document.getElementById("correlativo-mov");
+        if (c1) c1.value = "";
+        if (c2) c2.value = "";
       };
+    }
+
+    /* ====== Mensajería propia (reemplazo de alert) ====== */
+    function showMessage({ title = "Aviso", html = "", tone = "info" }) {
+      const root = document.getElementById("modal-root");
+      // Cierra cualquier modal previo para evitar colisiones
+      root.innerHTML = "";
+
+      const tones = {
+        info:  { color: "#0f2a6a", icon: "fa-circle-info" },
+        warn:  { color: "#c27b11", icon: "fa-triangle-exclamation" },
+        error: { color: "#b00020", icon: "fa-circle-exclamation" },
+      };
+      const t = tones[tone] || tones.info;
+
+      root.innerHTML = `
+        <div class="modal-bg">
+          <div class="modal">
+            <div class="hd" style="color:${t.color}">
+              <i class="fas ${t.icon}"></i> ${title}
+            </div>
+            <div style="margin:6px 0 10px;">${html}</div>
+            <div class="btns">
+              <button class="btn-ok" id="msg-ok">OK</button>
+            </div>
+          </div>
+        </div>`;
+      document.getElementById("msg-ok").onclick = () => { root.innerHTML = ""; };
+    }
+    const warn  = (msg) => showMessage({ title: "Atención", html: msg, tone: "warn"  });
+    const error = (msg) => showMessage({ title: "Error",     html: msg, tone: "error" });
+    const info  = (msg) => showMessage({ title: "Información",html: msg, tone: "info"  });
+
+    /* ====== Toast no bloqueante (opcional) ====== */
+    function toast(msg, tone="info", ms=3800){
+      let wrap = document.querySelector(".toast-wrap");
+      if(!wrap){ wrap = document.createElement("div"); wrap.className="toast-wrap"; document.body.appendChild(wrap); }
+      const el = document.createElement("div");
+      el.className = `toast ${tone}`;
+      el.textContent = msg;
+      wrap.appendChild(el);
+      setTimeout(()=>{ el.style.opacity="0"; el.style.transform="translateY(6px)"; }, ms-500);
+      setTimeout(()=>{ el.remove(); if(!wrap.childElementCount) wrap.remove(); }, ms);
     }
 
     function toDate(val){
@@ -243,6 +237,65 @@
       const m = parts.find(p=>p.type==='month').value;
       const d = parts.find(p=>p.type==='day').value;
       return new Date(`${y}-${m}-${d}T06:00:00.000Z`); // 00:00 ES = 06:00Z
+    }
+
+    /* ===== Confirmación PIN Gerente ===== */
+    function confirmPINGerente() {
+      return new Promise((resolve) => {
+        const root = document.getElementById("modal-root");
+        // Limpia cualquier modal abierto antes de mostrar el de PIN
+        root.innerHTML = "";
+        let errorMsg = "";
+
+        async function onOk(){
+          const pin = document.getElementById("gerente-pin-input").value.trim();
+          if (!pin){
+            errorMsg = "Debes ingresar el PIN del gerente.";
+            render();
+            return;
+          }
+          const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
+          const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+          const q = query(collection(db, "users"), where("rol", "==", "gerente"));
+          const snap = await getDocs(q);
+          if (snap.empty){
+            errorMsg = "No hay gerente configurado.";
+            render();
+            return;
+          }
+          let ok = false;
+          snap.forEach(g => { if (g.data().internalPassword === hashHex) ok = true; });
+          if (ok) {
+            root.innerHTML="";
+            resolve(true);
+          } else {
+            errorMsg = "PIN incorrecto.";
+            render();
+          }
+        }
+        function cancel(){ document.getElementById("modal-root").innerHTML = ""; resolve(false); }
+
+        function render(){
+          root.innerHTML = `
+            <div class="modal-bg">
+              <div class="modal">
+                <div class="hd"><i class="fas fa-user-shield"></i> Autorización Gerente</div>
+                <label>PIN del gerente</label>
+                <input type="password" id="gerente-pin-input" maxlength="10" autocomplete="off" placeholder="PIN"/>
+                ${errorMsg ? `<div class="error">${errorMsg}</div>` : ""}
+                <div class="btns">
+                  <button class="btn-cancel" id="cancel-pin">Cancelar</button>
+                  <button class="btn-ok" id="ok-pin">Autorizar</button>
+                </div>
+              </div>
+            </div>`;
+          document.getElementById("cancel-pin").onclick = cancel;
+          document.getElementById("ok-pin").onclick = onOk;
+          document.getElementById("gerente-pin-input").onkeydown = e => { if (e.key === "Enter") onOk(); };
+          setTimeout(()=>document.getElementById("gerente-pin-input").focus(), 40);
+        }
+        render();
+      });
     }
 
     /* ===== Buscar Pago ===== */
@@ -319,6 +372,7 @@
         const motivo = document.getElementById("motivo").value.trim();
         if (!motivo){
           document.getElementById("motivo").focus();
+          toast("Debes indicar el motivo de la reversión.","warn");
           return;
         }
         const ok = await confirmPINGerente();
@@ -339,7 +393,7 @@
 
         if (ultSnap.empty){
           btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
-          alert("No se encontraron pagos para validar el último registro.");
+          warn("No se encontraron pagos para validar el último registro.");
           return;
         }
 
@@ -350,7 +404,7 @@
         }
         if (!ultimoNoAnulado){
           btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
-          alert("No hay pagos activos (no anulados) para revertir en este crédito.");
+          warn("No hay pagos activos (no anulados) para revertir en este crédito.");
           return;
         }
 
@@ -358,7 +412,7 @@
           const d = ultimoNoAnulado.data();
           const corr = (d?.correlativo ?? "(s/ correlativo)");
           btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
-          alert(`Solo puedes revertir el último pago registrado de este crédito.\nÚltimo registrado: correlativo ${corr}.`);
+          warn(`Solo puedes revertir el último pago registrado de este crédito.<br>Último registrado: <b>correlativo ${corr}</b>.`);
           return;
         }
 
@@ -369,7 +423,7 @@
         }
         if (revSnap.empty){
           btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
-          alert("No se encontró el respaldo previo (reversionPago) para este correlativo.");
+          error('No se encontró el respaldo previo (<b>reversionPago</b>) para este correlativo.');
           return;
         }
 
@@ -377,12 +431,12 @@
         const revData = revDoc.data();
         if (!revData.creditoID || revData.creditoID !== pagoData.creditoID){
           btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
-          alert("El respaldo encontrado no corresponde a este crédito.");
+          error("El respaldo encontrado no corresponde a este crédito.");
           return;
         }
         if (!revData.snapshot || typeof revData.snapshot !== "object"){
           btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
-          alert("El snapshot del crédito está incompleto.");
+          error("El snapshot del crédito está incompleto.");
           return;
         }
 
@@ -514,7 +568,7 @@
         success(`El pago ${pagoData.correlativo} fue revertido; el crédito quedó igual que antes del pago y los agregados (interés, capital vencido, multas) quedaron al día. Se fijó fechaUltimoCalculoIntereses a la medianoche local (UTC-6) para que el cron sume 1 día mañana.`);
       }catch(e){
         console.error("revertirPago:", e);
-        alert("Error al revertir el pago: " + (e.message || e));
+        error("Error al revertir el pago:<br><small>"+ (e?.message || String(e)) +"</small>");
         const btn = document.getElementById("revertir-btn");
         if (btn){ btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago'; }
       }
@@ -576,6 +630,7 @@
         const motivo = document.getElementById("motivo-mov").value.trim();
         if (!motivo){
           document.getElementById("motivo-mov").focus();
+          toast("Debes indicar el motivo de la reversión.","warn");
           return;
         }
         const ok = await confirmPINGerente();
@@ -599,7 +654,7 @@
         const nuevoTipo = (movData.tipo === "Ingreso") ? "Egreso" : "Ingreso";
         const compRef = doc(collection(db, "movimientosCaja"));
         batch.set(compRef, {
-          correlativo: Math.floor(Math.random() * 1000000), // Si usas secuencial, reemplázalo por tu generador
+          correlativo: Math.floor(Math.random() * 1000000), // Reemplaza por tu generador secuencial si aplica
           tipo: nuevoTipo,
           descripcion: `Reversión correlativo ${movData.correlativo}`,
           agencia: movData.agencia,
@@ -614,7 +669,7 @@
         success(`El movimiento ${movData.correlativo} fue reversado correctamente.`);
       }catch(e){
         console.error("revertirMovimiento:", e);
-        alert("Error al revertir el movimiento: " + (e.message || e));
+        error("Error al revertir el movimiento:<br><small>"+ (e?.message || String(e)) +"</small>");
         const btn = document.getElementById("revertir-btn-mov");
         if (btn){ btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Movimiento'; }
       }
@@ -635,6 +690,7 @@
   </script>
 </body>
 </html>
+
 
 
 

@@ -154,21 +154,50 @@
       return { fecha: ultimo._f, saldoRestante: Number(num(ultimo.saldoRestante, 0)), raw: ultimo };
     }
 
-    // Interés a cobrar EXCLUSIVAMENTE desde el último recibo (por días)
+    // ====== Interés por días: desde último recibo; si no hay, desde credito.fechaInicio (string ISO) ======
     async function calcularInteresSoloRecibos(db, credito, fechaAbonoYMD){
       const tasa = normalizeDailyRate(credito);
       const fechaCorte = new Date(toLocalEndISO(fechaAbonoYMD));
       const up = await obtenerUltimoRecibo(db, credito.id, fechaAbonoYMD);
 
-      if (!up){
+      // Caso estándar: hay último recibo -> política "solo desde recibos"
+      if (up){
+        const fechaBase = up.fecha;
+        const saldoBase = Number.isFinite(up.saldoRestante) ? up.saldoRestante : num(credito.saldoActual, 0);
+        const dias = daysMedioAbiertoDates(fechaBase, fechaCorte); // (último recibo, corte]
+        const interes = round2(Math.max(0, saldoBase * tasa * dias));
+        return { interesCobrar: interes, dias, saldoBase, fechaBase, fechaCorte, origen: "ultimo_recibo" };
+      }
+
+      // === PRIMER PAGO: EXCLUSIVAMENTE DESDE credito.fechaInicio (string ISO) ===
+      // Si no existe o no es válida, no cobramos interés por seguridad.
+      const fechaInicioRaw = credito && typeof credito.fechaInicio === "string" ? credito.fechaInicio : null;
+      if (!fechaInicioRaw) {
         return { interesCobrar: 0, dias: 0, saldoBase: 0, fechaBase: fechaCorte, fechaCorte, origen: "sin_recibo" };
       }
 
-      const fechaBase = up.fecha;
-      const saldoBase = Number.isFinite(up.saldoRestante) ? up.saldoRestante : num(credito.saldoActual, 0);
-      const dias = daysMedioAbiertoDates(fechaBase, fechaCorte); // (último recibo, corte]
+      const fechaBase = new Date(fechaInicioRaw);
+      if (Number.isNaN(fechaBase.getTime()) || fechaBase > fechaCorte){
+        return { interesCobrar: 0, dias: 0, saldoBase: 0, fechaBase: fechaCorte, fechaCorte, origen: "sin_recibo" };
+      }
+
+      // Base de saldo: saldoActual; si no es válido/positivo se intenta reconstruir desde amortización
+      let saldoBase = num(credito.saldoActual, NaN);
+      if (!Number.isFinite(saldoBase) || saldoBase <= 0){
+        saldoBase = round2(saldoDesdeAmortizacion(credito.amortizacion || []));
+      }
+
+      const dias = daysMedioAbiertoDates(fechaBase, fechaCorte); // (fechaInicio, corte]
       const interes = round2(Math.max(0, saldoBase * tasa * dias));
-      return { interesCobrar: interes, dias, saldoBase, fechaBase, fechaCorte, origen: "ultimo_recibo" };
+
+      return {
+        interesCobrar: interes,
+        dias,
+        saldoBase,
+        fechaBase,
+        fechaCorte,
+        origen: "primer_pago_desde_fechaInicio"
+      };
     }
 
     // ====== Helpers de MULTAS ======
@@ -413,7 +442,7 @@
         ? num(creditoAntes.saldoActual, 0)
         : num(creditoSeleccionado.saldoActual, 0);
 
-      // 0) Interés EXCLUSIVO desde RECIBOS (por días)
+      // 0) Interés EXCLUSIVO desde RECIBOS (por días) con fallback primer pago desde credito.fechaInicio
       const resumenInt = await calcularInteresSoloRecibos(db, creditoSeleccionado, fechaAbonoYMD);
       const interesAlCorte = round2(resumenInt.interesCobrar);
 
@@ -628,7 +657,7 @@
         anulado: false,
         fechaRegistro: new Date().toISOString(),
         correlativo: Number(correlativoGenerado),
-        // Auditoría interés (SOLO recibos)
+        // Auditoría interés (SOLO recibos o primer pago desde fechaInicio)
         interesCalculadoDesde: resumenInt.origen,
         interesDiasBase: resumenInt.dias,
         interesSaldoBase: round2(resumenInt.saldoBase || 0),
@@ -668,7 +697,7 @@
 
       // Reset UI
       const ok = document.getElementById("ok-msg");
-      ok.textContent = "Abono retroactivo registrado (Multa → Interés por días → Capital; interés SOLO desde recibos).";
+      ok.textContent = "Abono retroactivo registrado (Multa → Interés por días → Capital; primer pago desde fechaInicio si no hay recibos).";
       ok.style.display = "block";
       setTimeout(()=>{
         ok.style.display = "none";
@@ -687,6 +716,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 

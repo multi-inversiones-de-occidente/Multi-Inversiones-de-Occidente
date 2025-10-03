@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Solicitudes Aprobadas Crédito Estacionario</title>
+
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import { getFirestore, collection, query, where, orderBy, onSnapshot, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    // Configuración de tu proyecto Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    let asignaciones = []; // Array con todas las asignaciones visibles
+
+    // ---- util: iniciales desde email (fallback del avatar)
+    function inicialesDesdeEmail(email){
+      const base = (email || "").split("@")[0];
+      const partes = base.split(/[.\-_]+/).filter(Boolean);
+      let ini = partes.slice(0,2).map(s=>s[0]).join("").toUpperCase();
+      if(!ini) ini = (email||"U")[0].toUpperCase();
+      return ini;
+    }
+
+    // Renderiza la tabla
+    function renderTable(data) {
+      const tbody = document.getElementById('tabla-solicitudes');
+      tbody.innerHTML = '';
+      if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="color:#8fa1b3;text-align:center;padding:35px 0;">No tienes solicitudes asignadas.</td></tr>`;
+        return;
+      }
+      data.forEach(row => {
+        tbody.innerHTML += `
+          <tr class="fila-click rippleable" data-id="${row.asignacionID}" style="cursor:pointer;">
+            <td><i class="fas fa-check-circle" style="color:#243b86;"></i></td>
+            <td>${row.nombre}</td>
+            <td>${row.numeroDui}</td>
+            <td>${row.montoAprobado}</td>
+            <td>${row.cuota}</td>
+            <td>${row.frecuenciaPago} x ${row.numeroCuotas}</td>
+            <td>${row.fechaAsignacion}</td>
+          </tr>
+        `;
+      });
+
+      // Agrega eventos click a cada fila + ripple
+      document.querySelectorAll(".fila-click").forEach(tr => {
+        tr.addEventListener("click", function(e) {
+          const id = this.getAttribute("data-id");
+          if (!id) return;
+
+          // ripple visual
+          const rect = this.getBoundingClientRect();
+          const ripple = document.createElement('span');
+          const x = (e.clientX ?? rect.left + rect.width/2) - rect.left;
+          const y = (e.clientY ?? rect.top + rect.height/2) - rect.top;
+          const max = Math.max(rect.width, rect.height);
+          Object.assign(ripple.style, {
+            position:'absolute', left:`${x}px`, top:`${y}px`,
+            width:`${max*1.2}px`, height:`${max*1.2}px`,
+            borderRadius:'50%', transform:'translate(-50%, -50%)',
+            background:'radial-gradient(circle, rgba(255,255,255,.5), rgba(255,255,255,0) 60%)',
+            pointerEvents:'none', opacity:'0.9', zIndex:'1'
+          });
+          this.style.position = 'relative';
+          this.appendChild(ripple);
+          ripple.animate(
+            [{opacity:.9, transform:'translate(-50%, -50%) scale(0.15)'},
+             {opacity:0,  transform:'translate(-50%, -50%) scale(1.05)'}],
+            {duration:450, easing:'ease-out'}
+          );
+          setTimeout(()=>ripple.remove(), 480);
+
+          // navegar al detalle (usa el id de asignación)
+          window.location.href = `detalle_aprobaciones_page.html?id=${encodeURIComponent(id)}`;
+        });
+      });
+    }
+
+    // Filtro por nombre o DUI
+    function applyFilter(term) {
+      const t = term.trim().toLowerCase();
+      if (!t) {
+        renderTable(asignaciones);
+      } else {
+        const filtered = asignaciones.filter(row =>
+          (row.nombre || '').toLowerCase().includes(t) ||
+          (row.numeroDui || '').toLowerCase().includes(t)
+        );
+        renderTable(filtered);
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      onAuthStateChanged(auth, async user => {
+        if (!user) {
+          window.location.href = "login.html";
+          return;
+        }
+
+        // Identidad visual (avatar+correo)
+        const emailEl = document.getElementById("usuario-email");
+        const imgEl   = document.getElementById("usuario-avatar");
+        const initEl  = document.getElementById("usuario-iniciales");
+        emailEl.textContent = user.email;
+        initEl.textContent  = inicialesDesdeEmail(user.email);
+
+        const fallbackSrc = "assets/avatar_user.png";
+        const usarIniciales = () => { imgEl.style.display="none"; initEl.style.display="grid"; };
+        imgEl.onerror = () => {
+          if (imgEl.dataset.fallbackTried === "1") usarIniciales();
+          else { imgEl.dataset.fallbackTried = "1"; imgEl.src = fallbackSrc; }
+        };
+        if (user.photoURL) imgEl.src = user.photoURL; else imgEl.src = fallbackSrc;
+
+        // Consulta todas las asignaciones para el usuario
+        const asignQuery = query(
+          collection(db, "asignacion_de_cuota"),
+          where("AsignacionID", "==", user.uid),
+          orderBy("fechaAsignacion", "desc")
+        );
+
+        // Escuchar en tiempo real los cambios
+        onSnapshot(asignQuery, async (snap) => {
+          asignaciones = [];
+          // Usamos un array de promesas para hacer el fetch de todas las solicitudes en paralelo
+          const promesas = snap.docs.map(async (asignDoc) => {
+            const asignData = asignDoc.data();
+            const solicitudID = asignData.solicitudID;
+            if (!solicitudID) return null;
+
+            // Filtrar por respuesta del cliente en la asignación
+            if (asignData.respuestaCliente !== "Aceptado") return null;
+
+            try {
+              const solRef = doc(db, "Archivo Solicitudes", solicitudID);
+              const solSnap = await getDoc(solRef);
+              if (!solSnap.exists()) return null;
+              const solData = solSnap.data();
+
+              // SOLO mostrar Crédito Estacionario y Aprobado
+              if (solData.creditLine !== "CreditoEstacionario" || solData.estado !== "Aprobado") return null;
+
+              return {
+                asignacionID: asignDoc.id,
+                nombre: solData.nombre || '',
+                numeroDui: solData.numeroDui || solData.dui || '',
+                montoAprobado: asignData.montoAprobado ?? '',
+                cuota: asignData.cuota ?? '',
+                frecuenciaPago: asignData.frecuenciaPago ?? '',
+                numeroCuotas: asignData.numeroCuotas ?? '',
+                fechaAsignacion: asignData.fechaAsignacion && asignData.fechaAsignacion.toDate
+                  ? asignData.fechaAsignacion.toDate().toLocaleString('es-SV')
+                  : '',
+              };
+            } catch (err) {
+              // Si ocurre un error, lo ignoramos para ese documento
+              return null;
+            }
+          });
+
+          // Espera que todas las promesas terminen
+          const resultados = await Promise.all(promesas);
+          asignaciones = resultados.filter(item => !!item); // Solo los válidos
+          applyFilter(document.getElementById('search').value);
+        });
+
+        // Buscador en vivo
+        document.getElementById('search').addEventListener('input', e => {
+          applyFilter(e.target.value);
+        });
+      });
+    });
+  </script>
+
+  <!-- FontAwesome para íconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    :root{
+      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --white:#ffffff; --muted:#5b6776;
+      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#32D47B; --brand-gold:#F8AF40;
+      --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
+      --accent: var(--brand-green);
+    }
+    @media (prefers-color-scheme: dark){
+      :root{ --bg:#0c0f14; --bg-2:#0f141b; --text:#dfe6ef; --muted:#9aa6b6; --glass-bg:rgba(255,255,255,.12); --glass-brd:rgba(255,255,255,.18); --glass-shadow:0 24px 60px rgba(0,0,0,.45); }
+    }
+
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      min-height:100vh;
+    }
+
+    .pattern{ position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image:radial-gradient(1px 1px at 25px 25px, rgba(255,255,255,.10), transparent 40%),
+                       radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,.06), transparent 40%);
+      background-size:100px 100px; mix-blend-mode:soft-light; opacity:.5; }
+
+    /* Topbar con logo */
+    header{
+      position:sticky; top:0; z-index:10; border-bottom:1px solid var(--glass-brd);
+      backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
+      background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
+    }
+    @media (prefers-color-scheme: dark){
+      header{ background:linear-gradient(180deg, rgba(15,20,30,.75), rgba(15,20,30,.35)); }
+    }
+    .topbar{ max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px; }
+    .logo-plate{ display:inline-flex; align-items:center; gap:10px; background:var(--glass-bg); border:1px solid var(--glass-brd);
+      padding:8px 14px; border-radius:16px; box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate; }
+    .logo-plate::after{ content:""; position:absolute; inset:-1px;
+      background:linear-gradient(120deg, transparent 0 35%, rgba(255,255,255,.55) 45%, transparent 55% 100%);
+      transform:translateX(-120%); animation:plateSheen 6s linear infinite; pointer-events:none; }
+    @keyframes plateSheen{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
+    .logo-plate img{ height:28px; width:auto; display:block }
+    .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
+    .page-name{ margin-left:auto; font-weight:800; color:#3b4a63; }
+
+    /* Tarjeta identidad */
+    .identity-card{
+      max-width:1100px; margin: 16px auto 10px auto;
+      display:flex; align-items:center; gap:14px; padding:10px 12px;
+      background:var(--glass-bg); border:1px solid var(--glass-brd); border-radius:22px; box-shadow:var(--glass-shadow);
+      position:relative; overflow:hidden; isolation:isolate;
+    }
+    .identity-card::before{
+      content:""; position:absolute; inset:-2px; border-radius:inherit; pointer-events:none;
+      background: conic-gradient(from 220deg, rgba(103,200,241,.18), rgba(248,175,64,.16), rgba(50,212,123,.18), rgba(103,200,241,.18));
+      filter: blur(8px); opacity:.45; mask:linear-gradient(#000,#000) content-box, linear-gradient(#000,#000);
+      -webkit-mask-composite:xor; mask-composite:exclude; padding:1px; animation:halo 10s linear infinite;
+    }
+    @keyframes halo{ to{ transform: rotate(1turn) } }
+    .avatar{ width:64px; height:64px; padding:2px; border-radius:50%; background: conic-gradient(from 210deg, var(--brand-cel), var(--brand-gold), var(--accent), var(--brand-cel)); position:relative; box-shadow: 0 8px 24px rgba(10,20,40,.15); }
+    .avatar .inner{ width:100%; height:100%; border-radius:50%; background: linear-gradient(180deg, #f6f9ff, #e9eef6); overflow:hidden; display:grid; place-items:center; }
+    .avatar img{ width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; }
+    .avatar .initials{ display:none; width:100%; height:100%; border-radius:50%; font-weight:800; color:#243b86; font-size:1.1rem; background: linear-gradient(180deg, #ffffff, #ecf2fb); place-items:center; }
+    .avatar .status{ position:absolute; right:2px; bottom:2px; width:12px; height:12px; border-radius:50%; background:#22c55e; border:2px solid #fff; box-shadow:0 0 0 2px rgba(34,197,94,.2); }
+    .who{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+    .email-pill{ display:inline-flex; align-items:center; gap:10px; max-width:100%; padding:10px 14px; border-radius:999px;
+      background: linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08)); border:1px solid rgba(36,59,134,.15); font-weight:800; color:var(--brand-blue);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7); position:relative; overflow:hidden; }
+    .email-pill::after{ content:""; position:absolute; inset:0; background: linear-gradient(120deg, transparent 0 40%, rgba(255,255,255,.6) 50%, transparent 60% 100%); transform: translateX(-120%); opacity:.55; mix-blend-mode: screen; animation: pillSheen 8s cubic-bezier(.2,.6,.2,1) infinite; }
+    @keyframes pillSheen{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
+    .email-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .email-icon{ color: var(--brand-blue); opacity:.8; }
+
+    /* Contenedor de página */
+    .container{
+      max-width:1100px; margin: 12px auto 24px auto;
+      background: var(--glass-bg); border:1px solid var(--glass-brd);
+      border-radius: 22px; box-shadow: var(--glass-shadow);
+      padding: 22px 20px;
+    }
+
+    h1{
+      margin: 0 0 1rem 0; font-size: clamp(1.4rem, 1.2vw + 1rem, 2rem);
+      color: var(--accent); font-weight: 800; text-align:center; letter-spacing:.2px;
+    }
+
+    /* Searchbar tipo píldora */
+    .searchbar{
+      width:100%; max-width:520px; margin:0 auto 1.2rem auto; display:flex; align-items:center; gap:.5rem;
+      background: linear-gradient(180deg, #ffffff, #f2f6fb); border:1px solid rgba(36,59,134,.18);
+      border-radius: 999px; padding: 8px 12px; box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
+    }
+    .searchbar i{ color:#243b86; font-size:1.15rem; margin-left:.3rem; }
+    .searchbar input{
+      width:100%; padding:.65rem .9rem; border-radius:999px; border:none; font-size:1.02rem; background:transparent; color:#1b2a41; outline:none;
+    }
+
+    /* Tabla glass */
+    .table-wrap{ overflow-x:auto; border-radius:16px; }
+    table{ width:100%; border-collapse:separate; border-spacing:0; background:#fff; border:1px solid rgba(36,59,134,.12); border-radius:16px; overflow:hidden; }
+    thead th{
+      position:sticky; top:0; z-index:1; background: linear-gradient(180deg, #f8fbff, #eef3fb);
+      color:var(--accent); font-weight:800; font-size:1rem; text-align:left; padding:14px 12px; border-bottom:1px solid rgba(36,59,134,.15);
+    }
+    tbody td{ padding:14px 12px; border-bottom:1px solid rgba(36,59,134,.10); color:#2c3a4f; font-weight:600; }
+    tbody tr:last-child td{ border-bottom:none; }
+    tbody tr{ transition: background .18s ease, transform .12s ease; }
+    tbody tr:hover{ background:rgba(103,200,241,.08); }
+    .rippleable{ position:relative; overflow:hidden; }
+
+    @media (prefers-color-scheme: dark){
+      .container{ background: rgba(255,255,255,.08); }
+      table{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); }
+      thead th{ background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06)); color:#cfe2ff; border-bottom-color: rgba(255,255,255,.2); }
+      tbody td{ color:#e5edf7; border-bottom-color: rgba(255,255,255,.12); }
+      tbody tr:hover{ background: rgba(103,200,241,.16); }
+    }
+  </style>
+</head>
+<body>
+  <div class="pattern" aria-hidden="true"></div>
+
+  <header>
+    <div class="topbar">
+      <div class="logo-plate">
+        <img src="assets/logo_mi_bw.png" alt="Logo Multi Inversiones" width="140" height="40" />
+        <strong class="brand-name">MULTI INVERSIONES DE OCCIDENTE</strong>
+      </div>
+      <div class="page-name">Aprobadas · Crédito Estacionario</div>
+    </div>
+  </header>
+
+  <!-- Identidad del usuario -->
+  <div class="identity-card">
+    <div class="avatar" aria-hidden="true">
+      <div class="inner">
+        <img id="usuario-avatar" alt="Avatar de usuario">
+        <div id="usuario-iniciales" class="initials">U</div>
+      </div>
+      <span class="status" title="Conectado"></span>
+    </div>
+    <div class="who">
+      <div class="email-pill" title="Usuario autenticado">
+        <i class="fa-solid fa-user email-icon" aria-hidden="true"></i>
+        <span id="usuario-email" class="email-text">usuario@correo.com</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <h1><i class="fas fa-check-circle"></i> Solicitudes Aprobadas Crédito Estacionario</h1>
+
+    <div class="searchbar">
+      <i class="fas fa-search"></i>
+      <input id="search" type="text" placeholder="Buscar por nombre o DUI..." autocomplete="off" />
+    </div>
+
+    <div class="table-wrap">
+      <table role="grid" aria-label="Solicitudes Aprobadas Crédito Estacionario">
+        <thead>
+          <tr>
+            <th style="width:48px;"></th>
+            <th>Nombre</th>
+            <th>DUI</th>
+            <th>Monto</th>
+            <th>Cuota</th>
+            <th>Frecuencia</th>
+            <th>Fecha Asignación</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-solicitudes">
+          <tr><td colspan="7" style="color:#8fa1b3;text-align:center;padding:40px 0;">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Script de búsqueda y carga ya está arriba dentro del módulo -->
+</body>
+</html>

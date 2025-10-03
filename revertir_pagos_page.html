@@ -330,6 +330,7 @@
         const data = snap.data();
         const f1 = data?.fechaRegistro ? new Date(data.fechaRegistro).getTime() : NaN;
         const f2 = data?.fechaPago ? new Date(data.fechaPago).getTime() : NaN;
+        if (Number.isFinite(f1) && Number.isFinite(f2)) return Math.max(f1, f2);
         if (Number.isFinite(f1)) return f1;
         if (Number.isFinite(f2)) return f2;
         return 0;
@@ -365,7 +366,7 @@
       document.getElementById("revertir-btn").onclick = revertirPago;
     }
 
-    /* ===== Revertir Pago – validar último por fechaRegistro (no anulado) ===== */
+    /* ===== Revertir Pago – validar último por max(fechaRegistro, fechaPago) ===== */
     async function revertirPago(){
       try{
         if (!pagoData) return;
@@ -382,12 +383,11 @@
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner"></span> Revirtiendo...';
 
-        // (1) Buscar los últimos pagos por fechaRegistro para este crédito y tomar el más reciente no anulado
+        // (1) Traer pagos del crédito SIN orderBy y ordenar localmente por el más reciente entre fechaRegistro y fechaPago
         const ultQ = query(
           collection(db, "pagos"),
           where("creditoID", "==", pagoData.creditoID),
-          orderBy("fechaRegistro", "desc"),
-          limit(10)
+          limit(50)
         );
         const ultSnap = await getDocs(ultQ);
 
@@ -397,8 +397,20 @@
           return;
         }
 
+        // Función para obtener el timestamp más alto entre fechaRegistro y fechaPago
+        const getMillisMixed = (data) => {
+          const f1 = data?.fechaRegistro ? toDate(data.fechaRegistro).getTime() : NaN;
+          const f2 = data?.fechaPago ? toDate(data.fechaPago).getTime() : NaN;
+          if (Number.isFinite(f1) && Number.isFinite(f2)) return Math.max(f1, f2);
+          if (Number.isFinite(f1)) return f1;
+          if (Number.isFinite(f2)) return f2;
+          return 0;
+        };
+
+        // Ordenar por más reciente y tomar el primero no anulado
+        const pagosDocs = ultSnap.docs.slice().sort((a,b)=> getMillisMixed(b.data()) - getMillisMixed(a.data()));
         let ultimoNoAnulado = null;
-        for (const d of ultSnap.docs){
+        for (const d of pagosDocs){
           const data = d.data();
           if (data && data.anulado !== true){ ultimoNoAnulado = d; break; }
         }
@@ -690,6 +702,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 

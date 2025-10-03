@@ -33,13 +33,14 @@
       return ini;
     }
 
-    // Actualiza los cuatro badges
-    function actualizarBadges({credicash=0, credicel=0, amuebla2=0, refi=0}){
+    // Actualiza los cinco badges (se agrega Estacionario)
+    function actualizarBadges({credicash=0, credicel=0, amuebla2=0, refi=0, estacionario=0}){
       const map = {
         "badge-app-credicash": credicash,
         "badge-app-credicel": credicel,
         "badge-app-amuebla2": amuebla2,
-        "badge-app-refinanciamiento": refi
+        "badge-app-refinanciamiento": refi,
+        "badge-app-estacionario": estacionario
       };
       Object.entries(map).forEach(([id,val])=>{
         const el = document.getElementById(id);
@@ -67,11 +68,11 @@
         });
 
         if (ids.size === 0){
-          actualizarBadges({credicash:0, credicel:0, amuebla2:0, refi:0});
+          actualizarBadges({credicash:0, credicel:0, amuebla2:0, refi:0, estacionario:0});
           return;
         }
 
-        const contadores = {credicash:0, credicel:0, amuebla2:0, refi:0};
+        const contadores = {credicash:0, credicel:0, amuebla2:0, refi:0, estacionario:0};
 
         // Traemos cada solicitud y sumamos si está Aprobado
         await Promise.all([...ids].map(async sid=>{
@@ -83,19 +84,21 @@
             if (s.estado !== "Aprobado") return;
 
             // Algunas bases usan creditLine, otras tipo para Refinanciamiento
-            const linea = (s.creditLine || s.tipo || "").trim();
+            const lineaRaw = (s.creditLine || s.tipo || "").trim();
+            const linea = lineaRaw.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
 
-            if (linea === "Credicash") contadores.credicash++;
-            else if (linea === "Credicel") contadores.credicel++;
-            else if (linea === "Amuebla2") contadores.amuebla2++;
-            else if (linea === "Refinanciamiento") contadores.refi++;
+            if (linea.includes("credicash")) contadores.credicash++;
+            else if (linea.includes("credicel")) contadores.credicel++;
+            else if (linea.includes("amuebla2")) contadores.amuebla2++;
+            else if (linea.includes("refinanciamiento")) contadores.refi++;
+            else if (linea.includes("estacionario")) contadores.estacionario++;
           }catch(_e){ /* ignoramos errores individuales */ }
         }));
 
         actualizarBadges(contadores);
       }, (_err)=>{
         // En caso de error, muestra "!" para señalizar
-        ["badge-app-credicash","badge-app-credicel","badge-app-amuebla2","badge-app-refinanciamiento"].forEach(id=>{
+        ["badge-app-credicash","badge-app-credicel","badge-app-amuebla2","badge-app-refinanciamiento","badge-app-estacionario"].forEach(id=>{
           const el = document.getElementById(id);
           if(el) el.textContent = "!";
         });
@@ -125,7 +128,7 @@
         };
         if (user.photoURL) imgEl.src = user.photoURL; else imgEl.src = fallbackSrc;
 
-        // === NUEVO: badges correctos con JOIN ===
+        // === NUEVO: badges correctos con JOIN (incluye Estacionario) ===
         suscribirBadgesJoin(user.uid);
       });
     });
@@ -409,6 +412,12 @@
         <span class="label">Solicitudes Aprobadas Refinanciamiento</span>
         <span id="badge-app-refinanciamiento" class="badge">0</span>
       </a>
+      <!-- NUEVO: Crédito Estacionario (después de Refinanciamiento) -->
+      <a href="solicitudes_aprobadas_estacionario.html" class="btn-grande btn-caja">
+        <i class="fas fa-check-circle"></i>
+        <span class="label">Solicitudes Aprobadas Crédito Estacionario</span>
+        <span id="badge-app-estacionario" class="badge">0</span>
+      </a>
 
       <!-- Acciones -->
       <a href="detalle_gerente_caja_page.html" class="btn-grande btn-caja">
@@ -507,6 +516,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 

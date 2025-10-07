@@ -67,7 +67,7 @@
       position:relative; z-index:1; max-width:900px; margin:0 auto; padding:2.2rem 16px 3rem;
       display:flex; flex-direction:column; align-items:center;
     }
-    .visually-hidden{
+    .visualmente-oculto{
       position:absolute !important; clip: rect(1px, 1px, 1px, 1px);
       padding:0; border:0; height:1px; width:1px; overflow:hidden; white-space:nowrap;
     }
@@ -187,7 +187,7 @@
   </header>
 
   <div class="container">
-    <h1 class="visually-hidden">Recepción de Pagos</h1>
+    <h1 class="visualmente-oculto">Recepción de Pagos</h1>
 
     <div class="identity-card">
       <div class="avatar" aria-hidden="true">
@@ -225,7 +225,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import {
       getFirestore, collection, query, where, getDocs, doc, updateDoc, addDoc,
-      runTransaction
+      runTransaction, setDoc
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
@@ -235,6 +235,8 @@
     const CLOSE_TOL = 0.05; // tolerancia para cerrar capital/estado
 
     const nowISO = () => new Date().toISOString();
+    const todayKey = () => nowISO().substring(0, 10); // "YYYY-MM-DD"
+
     const n = (x) => {
       if (typeof x === "number" && Number.isFinite(x)) return x;
       if (x === null || x === undefined) return 0;
@@ -499,8 +501,7 @@
               render(); setTimeout(()=>document.getElementById("monto-input")?.focus(), 50);
               return;
             }
-            await realizarPago(cliente, montoNum);
-            closeModal();
+            await verificarPagoDuplicadoYConfirmar({ cliente, creditoData, montoNum: round2(montoNum), closeModal });
           }catch(err){
             alert("Error al realizar el pago: " + (err?.message || err));
           }
@@ -512,12 +513,72 @@
       render();
     }
 
+    /* =================== ANTI-DUPLICADO (Advertencia + Idempotencia) =================== */
+    async function verificarPagoDuplicadoYConfirmar({ cliente, creditoData, montoNum, closeModal }) {
+      const fechaHoy = todayKey();
+
+      // Buscar pagos existentes de HOY para este crédito
+      const pagosSnap = await getDocs(query(collection(db, "pagos"), where("creditoID", "==", cliente.id)));
+      const pagosHoy = pagosSnap.docs
+        .map(d => d.data())
+        .filter(p => String(p.fechaPago || "").substring(0,10) === fechaHoy);
+
+      const hayPagoHoy = pagosHoy.length > 0;
+      const hayMismoMonto = pagosHoy.some(p => Math.abs(n(p.montoPagado) - n(montoNum)) < 0.01);
+
+      if (hayPagoHoy) {
+        // Mostrar advertencia con lista de pagos de hoy
+        const modalRoot = document.getElementById("modal-root");
+        const lista = pagosHoy.map(p => `• $${round2(n(p.montoPagado)).toFixed(2)} (correlativo: ${p.correlativo ?? "s/d"})`).join("<br/>");
+        const msgExtra = hayMismoMonto
+          ? `<div style="margin-top:8px;color:#b71c1c;font-weight:800">Se detectó un pago HOY por <u>el mismo monto</u>. Esto podría ser un duplicado.</div>`
+          : `<div style="margin-top:8px;color:#8a6d3b">Ya existe un pago HOY para este crédito.</div>`;
+        modalRoot.innerHTML = `
+          <div class="modal-bg">
+            <div class="modal">
+              <div class="modal-title"><i class="fas fa-exclamation-triangle" style="color:#e67e22"></i> Advertencia de posible duplicado</div>
+              <div class="modal-sub">Pagos detectados hoy (${fechaHoy}):</div>
+              <div class="muted" style="background:rgba(36,59,134,.06);border:1px solid rgba(36,59,134,.18);padding:10px;border-radius:10px;">
+                ${lista || "—"}
+              </div>
+              <div style="margin:10px 0 4px 0;">Monto que intentas registrar: <b>$${round2(montoNum).toFixed(2)}</b></div>
+              ${msgExtra}
+              <div class="modal-btns" style="margin-top:14px;">
+                <button class="modal-btn-cancel" id="cancelar-dup">Cancelar</button>
+                <button class="modal-btn-pay" id="continuar-dup">Pagar de todas formas</button>
+              </div>
+            </div>
+          </div>`;
+        document.getElementById("cancelar-dup").onclick = () => { modalRoot.innerHTML = ""; };
+        document.getElementById("continuar-dup").onclick = async () => {
+          modalRoot.innerHTML = "";
+          await realizarPago(cliente, montoNum); // idempotencia dentro
+          closeModal();
+        };
+      } else {
+        // No hay pagos hoy: proceder directo
+        await realizarPago(cliente, montoNum); // idempotencia dentro
+        closeModal();
+      }
+    }
+
     /* =================== LÓGICA DE PAGO =================== */
     async function realizarPago(cliente, montoNum){
       const fechaPago = nowISO();
       try{
         const user = auth.currentUser;
         if(!user) throw new Error("Sesión inválida. Inicia sesión.");
+
+        // ---------- Idempotencia (antes de generar correlativo) ----------
+        const idempotKey = `${cliente.id}|${round2(montoNum).toFixed(2)}|${todayKey()}`;
+        const guardRef = doc(db, "payment_guard", idempotKey);
+        await runTransaction(db, async (tx) => {
+          const guardSnap = await tx.get(guardRef);
+          if (guardSnap.exists()) {
+            throw new Error("Pago duplicado detectado por idempotencia. Operación cancelada.");
+          }
+          tx.set(guardRef, { createdAt: new Date(), creditoID: cliente.id, monto: round2(montoNum) });
+        });
 
         // Datos del cajero / sucursal
         const userSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
@@ -528,11 +589,10 @@
         // Traer crédito
         const { data: creditoData } = await fetchCreditoById(cliente.id);
 
-        // ======== 0) Correlativo seguro (antes de todo) ========
+        // ======== 0) Correlativo seguro (después del guard) ========
         const correlativoStr = await obtenerCorrelativoUnicoPagos();
 
         // ======== 0.1) Guardar snapshot previo para reversión ========
-        // Se guarda TODO el crédito tal cual, más el correlativo y metadatos.
         await window.firebaseAddDoc("reversionPago", {
           correlativo: Number(correlativoStr),
           creditoID: cliente.id,
@@ -573,7 +633,6 @@
         let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
 
         // ======== 2) MULTAS primero ========
-        // Ordenar por fecha (antiguas primero)
         historialMultas.sort((a,b) => new Date(a.fecha||0) - new Date(b.fecha||0));
         for (let i=0; i<historialMultas.length && restante>EPS; i++){
           const m = historialMultas[i];
@@ -590,7 +649,6 @@
             else { m.monto = nuevo; m.estadoCuota = "No Pagada"; }
           }
         }
-        // Recalcular multasAcumuladas = suma de No Pagadas
         multasAcumuladas = round2(historialMultas.reduce((acc,m)=>{
           if (!m.estadoCuota || m.estadoCuota === "No Pagada") return acc + n(m.monto);
           return acc;
@@ -617,7 +675,6 @@
             restante = round2(restante - abono);
           }
         }
-        // Orden: vencidas (< hoy) → hoy → futuras (> hoy)
         abonarCapital(c=> isBeforeTodayLocal(c.fecha));
         abonarCapital(c=> isTodayLocal(c.fecha));
         abonarCapital(c=> !isBeforeTodayLocal(c.fecha) && !isTodayLocal(c.fecha));
@@ -626,13 +683,19 @@
         for (let i=0;i<amortizacion.length;i++){
           const c = amortizacion[i];
           const capOk = n(c.montoPagado) + CLOSE_TOL >= n(c.capital);
-          if (capOk){ c.estado = "Pagada"; if (!c.fechaPagoReal) c.fechaPagoReal = fechaPago; }
-          else if (n(c.montoPagado) > EPS){ c.estado = "Parcial"; c.fechaPagoReal = null; }
+          if (capOk){
+            // PARCHE A: cuando cierres por tolerancia, cuadra el capital exactamente
+            c.montoPagado = round2(n(c.capital));
+            c.estado = "Pagada";
+            if (!c.fechaPagoReal) c.fechaPagoReal = fechaPago;
+          }
+          else if (n(c.montoPagado) > EPS){
+            c.estado = "Parcial"; c.fechaPagoReal = null;
+          }
           else { c.estado = "Pendiente"; c.fechaPagoReal = null; }
         }
 
         // ======== 6) KPIs (alineados al cron) ========
-        // capitalVencido: sumar capital pendiente de cuotas con diasAtraso >= 0 (incluye HOY)
         let capitalAtrasado = 0;
         let cuotasAtrasadas = 0;
         let maxDiasAtraso = 0;
@@ -657,6 +720,24 @@
         let saldoNuevo = round2(saldoAnterior - pagoCapital);
         if (saldoNuevo < 0) saldoNuevo = 0;
 
+        // PARCHE B: Si queda un residuo minúsculo, empújalo a capital y cierra en 0.00
+        if (saldoNuevo <= TOL || saldoNuevo <= CLOSE_TOL) {
+          let faltaPendiente = saldoNuevo;
+          for (let i = amortizacion.length - 1; i >= 0 && faltaPendiente > EPS; i--) {
+            const c = amortizacion[i];
+            const faltaCap = round2(n(c.capital) - n(c.montoPagado));
+            if (faltaCap > EPS) {
+              const abono = Math.min(faltaPendiente, faltaCap);
+              c.montoPagado = round2(n(c.montoPagado) + abono);
+              pagoCapital = round2(pagoCapital + abono);
+              faltaPendiente = round2(faltaPendiente - abono);
+            }
+          }
+          // Recalcular saldoNuevo después de empujar a capital
+          saldoNuevo = round2(saldoAnterior - pagoCapital);
+          if (saldoNuevo < TOL) saldoNuevo = 0;
+        }
+
         // ======== 8) Estado del crédito ========
         let nuevoEstado = (saldoNuevo <= EPS) ? "Pagado" : (creditoData.estadoCredito || "Activo");
         if (nuevoEstado !== "Pagado"){
@@ -679,7 +760,7 @@
           apellido: creditoData.apellido || "",
           numeroDui: creditoData.numeroDui || "",
           montoPagado: round2(montoNum),
-          fechaPago: fechaPago,
+          fechaPago: fechaPago,                           // ISO string (p.ej. "2025-10-07T21:23:33.712Z")
           pagoMultas: round2(pagoMultas),
           pagoInteres: round2(pagoInteres),
           pagoCapital: round2(pagoCapital),
@@ -748,6 +829,7 @@
   </script>
 </body>
 </html>
+
 
 
 

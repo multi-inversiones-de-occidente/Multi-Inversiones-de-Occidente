@@ -298,6 +298,79 @@
       });
     }
 
+    /* ==================== NUEVO HELPER (único agregado) ==================== */
+    async function encontrarRespaldoPago(pagoDoc, pagoData) {
+      const col = collection(db, "reversionPago");
+      const candidatos = [];
+
+      // Si en el futuro guardas pagoID en reversionPago, descomenta estas 3 líneas:
+      // const byPagoId = await getDocs(query(col, where("pagoID","==", pagoDoc.id), where("usado","==", false)));
+      // if (!byPagoId.empty) return byPagoId.docs[0];
+
+      const suc = pagoData.sucursal || "";
+      const cred = pagoData.creditoID;
+
+      const pushAll = s => s.forEach(d => { if (!candidatos.find(x => x.id === d.id)) candidatos.push(d); });
+
+      // correlativo number/string + sucursal
+      pushAll(await getDocs(query(col,
+        where("correlativo","==", Number(pagoData.correlativo)),
+        where("creditoID","==", cred),
+        where("usado","==", false),
+        where("sucursal","==", suc)
+      )));
+      pushAll(await getDocs(query(col,
+        where("correlativo","==", String(pagoData.correlativo)),
+        where("creditoID","==", cred),
+        where("usado","==", false),
+        where("sucursal","==", suc)
+      )));
+
+      // compatibilidad: algunos docs viejos usan 'agencia' o 'agenciaAsignada'
+      pushAll(await getDocs(query(col,
+        where("correlativo","==", Number(pagoData.correlativo)),
+        where("creditoID","==", cred),
+        where("usado","==", false),
+        where("agencia","==", suc)
+      )));
+      pushAll(await getDocs(query(col,
+        where("correlativo","==", String(pagoData.correlativo)),
+        where("creditoID","==", cred),
+        where("usado","==", false),
+        where("agencia","==", suc)
+      )));
+      pushAll(await getDocs(query(col,
+        where("correlativo","==", Number(pagoData.correlativo)),
+        where("creditoID","==", cred),
+        where("usado","==", false),
+        where("agenciaAsignada","==", suc)
+      )));
+      pushAll(await getDocs(query(col,
+        where("correlativo","==", String(pagoData.correlativo)),
+        where("creditoID","==", cred),
+        where("usado","==", false),
+        where("agenciaAsignada","==", suc)
+      )));
+
+      if (!candidatos.length) return null;
+
+      // Elegir el más reciente por timestamp completo (fecha y hora)
+      const toMillis = v => {
+        if (!v) return 0;
+        if (v.seconds !== undefined) return (v.seconds * 1000) + Math.floor((v.nanoseconds || 0)/1e6);
+        const d = new Date(v);
+        return isNaN(d) ? 0 : d.getTime();
+      };
+      candidatos.sort((a,b) => {
+        const A = a.data(), B = b.data();
+        const aT = Math.max(toMillis(A.createdAt), toMillis(A.snapshot?.ultimaActualizacion));
+        const bT = Math.max(toMillis(B.createdAt), toMillis(B.snapshot?.ultimaActualizacion));
+        return bT - aT;
+      });
+      return candidatos[0];
+    }
+    /* ==================== FIN NUEVO HELPER ==================== */
+
     /* ===== Buscar Pago ===== */
     async function buscarPago(){
       showCard("pago-card", "");
@@ -428,19 +501,16 @@
           return;
         }
 
-        // (2) Traer snapshot guardado en reversionPago por correlativo
-        let revSnap = await getDocs(query(collection(db,"reversionPago"), where("correlativo","==", Number(pagoData.correlativo))));
-        if (revSnap.empty){
-          revSnap = await getDocs(query(collection(db,"reversionPago"), where("correlativo","==", String(pagoData.correlativo))));
-        }
-        if (revSnap.empty){
+        /* ==================== BLOQUE CAMBIADO: búsqueda de respaldo ==================== */
+        const revDoc = await encontrarRespaldoPago(pagoDoc, pagoData);
+        if (!revDoc){
           btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
-          error('No se encontró el respaldo previo (<b>reversionPago</b>) para este correlativo.');
+          error('No se encontró un respaldo válido (reversionPago) para este ticket en esta sucursal/credito.');
           return;
         }
-
-        const revDoc = revSnap.docs[0];
         const revData = revDoc.data();
+
+        // Seguridad extra
         if (!revData.creditoID || revData.creditoID !== pagoData.creditoID){
           btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
           error("El respaldo encontrado no corresponde a este crédito.");
@@ -451,6 +521,7 @@
           error("El snapshot del crédito está incompleto.");
           return;
         }
+        /* ==================== FIN BLOQUE CAMBIADO ==================== */
 
         // (3) Cargar crédito actual para preservar multas nuevas
         const creditoRef = doc(db, "creditos", pagoData.creditoID);
@@ -702,8 +773,6 @@
   </script>
 </body>
 </html>
-
-
 
 
 

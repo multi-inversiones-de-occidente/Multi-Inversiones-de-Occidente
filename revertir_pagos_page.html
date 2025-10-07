@@ -298,61 +298,58 @@
       });
     }
 
-    /* ==================== NUEVO HELPER (único agregado) ==================== */
+    /* ==================== HELPER (actualizado) ==================== */
     async function encontrarRespaldoPago(pagoDoc, pagoData) {
       const col = collection(db, "reversionPago");
       const candidatos = [];
 
-      // Si en el futuro guardas pagoID en reversionPago, descomenta estas 3 líneas:
-      // const byPagoId = await getDocs(query(col, where("pagoID","==", pagoDoc.id), where("usado","==", false)));
-      // if (!byPagoId.empty) return byPagoId.docs[0];
-
-      const suc = pagoData.sucursal || "";
+      const suc = (pagoData.sucursal || "").trim();
       const cred = pagoData.creditoID;
 
       const pushAll = s => s.forEach(d => { if (!candidatos.find(x => x.id === d.id)) candidatos.push(d); });
 
-      // correlativo number/string + sucursal
+      // correlativo number/string + sucursal (sin where("usado","==", false))
       pushAll(await getDocs(query(col,
         where("correlativo","==", Number(pagoData.correlativo)),
         where("creditoID","==", cred),
-        where("usado","==", false),
         where("sucursal","==", suc)
       )));
       pushAll(await getDocs(query(col,
         where("correlativo","==", String(pagoData.correlativo)),
         where("creditoID","==", cred),
-        where("usado","==", false),
         where("sucursal","==", suc)
       )));
 
-      // compatibilidad: algunos docs viejos usan 'agencia' o 'agenciaAsignada'
+      // compat: 'agencia' y 'agenciaAsignada'
       pushAll(await getDocs(query(col,
         where("correlativo","==", Number(pagoData.correlativo)),
         where("creditoID","==", cred),
-        where("usado","==", false),
         where("agencia","==", suc)
       )));
       pushAll(await getDocs(query(col,
         where("correlativo","==", String(pagoData.correlativo)),
         where("creditoID","==", cred),
-        where("usado","==", false),
         where("agencia","==", suc)
       )));
       pushAll(await getDocs(query(col,
         where("correlativo","==", Number(pagoData.correlativo)),
         where("creditoID","==", cred),
-        where("usado","==", false),
         where("agenciaAsignada","==", suc)
       )));
       pushAll(await getDocs(query(col,
         where("correlativo","==", String(pagoData.correlativo)),
         where("creditoID","==", cred),
-        where("usado","==", false),
         where("agenciaAsignada","==", suc)
       )));
 
       if (!candidatos.length) return null;
+
+      // Aceptar docs sin 'usado' o con usado === false
+      const validos = candidatos.filter(d => {
+        const x = d.data();
+        return x && x.usado !== true;
+      });
+      if (!validos.length) return null;
 
       // Elegir el más reciente por timestamp completo (fecha y hora)
       const toMillis = v => {
@@ -361,15 +358,15 @@
         const d = new Date(v);
         return isNaN(d) ? 0 : d.getTime();
       };
-      candidatos.sort((a,b) => {
+      validos.sort((a,b) => {
         const A = a.data(), B = b.data();
         const aT = Math.max(toMillis(A.createdAt), toMillis(A.snapshot?.ultimaActualizacion));
         const bT = Math.max(toMillis(B.createdAt), toMillis(B.snapshot?.ultimaActualizacion));
         return bT - aT;
       });
-      return candidatos[0];
+      return validos[0];
     }
-    /* ==================== FIN NUEVO HELPER ==================== */
+    /* ==================== FIN HELPER ==================== */
 
     /* ===== Buscar Pago ===== */
     async function buscarPago(){
@@ -501,7 +498,7 @@
           return;
         }
 
-        /* ==================== BLOQUE CAMBIADO: búsqueda de respaldo ==================== */
+        /* ===== BÚSQUEDA DEL RESPALDO ===== */
         const revDoc = await encontrarRespaldoPago(pagoDoc, pagoData);
         if (!revDoc){
           btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
@@ -521,7 +518,6 @@
           error("El snapshot del crédito está incompleto.");
           return;
         }
-        /* ==================== FIN BLOQUE CAMBIADO ==================== */
 
         // (3) Cargar crédito actual para preservar multas nuevas
         const creditoRef = doc(db, "creditos", pagoData.creditoID);

@@ -30,6 +30,9 @@
     // ===== Estado en memoria =====
     let department = null;            // Agencia del logueado
     let nombreLogueado = null;        // Nombre del logueado
+
+    // NUEVO: base completa de créditos y base de morosos (para métricas y detalle)
+    let todosCreditosDeAgencia = [];  // TODOS los créditos de la agencia (con y sin mora)
     let morososDeAgencia = [];        // Créditos de la agencia con al menos una cuota "Atrasado"
 
     // ===== Utilidades =====
@@ -78,31 +81,41 @@
       return "Sin nombre";
     }
 
-    // ===== Carga base: morosos por agencia =====
+    // ===== Carga base: TODOS los créditos de la agencia + morosos =====
     async function cargarBase() {
       const qCreds = query(collection(db, "creditos"), where("agenciaAsignada", "==", department));
       const snap = await getDocs(qCreds);
 
+      // Reiniciar bases
+      todosCreditosDeAgencia = [];
       morososDeAgencia = [];
+
       for (const ddoc of snap.docs) {
         const d = ddoc.data();
-        const estado = d.estadoCredito || "";
+        const estado = (d.estadoCredito || "").trim();
         const cuotasAtrasadas = contarCuotasAtrasadas(d.amortizacion);
+
+        const baseItem = {
+          idCredito: ddoc.id,
+          asignadoA: (d.asignadoA || "").trim(),
+          estadoCredito: estado || "—",
+          saldoActual: asNumber(d.saldoActual),
+          capitalAtrasado: asNumber(d.capitalAtrasado),
+          paraPonerseAlDia: asNumber(d.paraPonerseAlDia),
+          cuotasAtrasadas,
+          raw: d
+        };
+
+        // Agregar a TODOS (sin filtrar por mora)
+        todosCreditosDeAgencia.push(baseItem);
+
+        // Si tiene al menos una cuota Atrasado, agregar a la base de morosos
         if (cuotasAtrasadas > 0) {
-          morososDeAgencia.push({
-            idCredito: ddoc.id,
-            asignadoA: (d.asignadoA || "").trim(),
-            estadoCredito: estado || "—",
-            saldoActual: asNumber(d.saldoActual),
-            capitalAtrasado: asNumber(d.capitalAtrasado),
-            paraPonerseAlDia: asNumber(d.paraPonerseAlDia),
-            cuotasAtrasadas,
-            raw: d
-          });
+          morososDeAgencia.push(baseItem);
         }
       }
 
-      // Usuarios únicos (asignadoA) que realmente tienen mora
+      // Usuarios únicos (asignadoA) con mora para el selector
       const select = document.getElementById("user-select");
       const set = new Set(
         morososDeAgencia.map(x => x.asignadoA).filter(n => n && n.length > 0)
@@ -121,7 +134,34 @@
       `;
     }
 
-    // ===== Cálculo / render =====
+    // ===== Cálculo de métricas por selección =====
+    function calcularMetricas(nombreSeleccionado){
+      // Base para Cartera Total: TODOS los créditos (con y sin mora)
+      const baseCartera = (nombreSeleccionado === "__todos__")
+        ? todosCreditosDeAgencia
+        : todosCreditosDeAgencia.filter(x => x.asignadoA === nombreSeleccionado);
+
+      // Items morosos: SOLO créditos con mora (para Capital en Mora y detalle)
+      const itemsMorosos = (nombreSeleccionado === "__todos__")
+        ? morososDeAgencia
+        : morososDeAgencia.filter(x => x.asignadoA === nombreSeleccionado);
+
+      // Cartera Total Real (excluye Revertido)
+      const carteraTotal = baseCartera
+        .filter(x => x.estadoCredito !== "Revertido")
+        .reduce((acc, x) => acc + asNumber(x.saldoActual), 0);
+
+      // Capital en Mora
+      const capitalEnMora = itemsMorosos
+        .reduce((acc, x) => acc + asNumber(x.capitalAtrasado), 0);
+
+      // % de Mora
+      const moraPct = carteraTotal > 0 ? (capitalEnMora / carteraTotal) * 100 : 0;
+
+      return { carteraTotal, capitalEnMora, moraPct, itemsMorosos };
+    }
+
+    // ===== Render principal =====
     async function calcular(nombreSeleccionado) {
       const resBox = document.getElementById('resultado');
       const detBox = document.getElementById('detalle-box');
@@ -132,34 +172,22 @@
       if (!nombreSeleccionado) { resBox.innerHTML = ""; return; }
       resBox.innerHTML = `<div class="cargando">Calculando...</div>`;
 
-      let items = [];
-      if (nombreSeleccionado === "__todos__") {
-        items = morososDeAgencia.map(x => ({...x}));
-      } else {
-        items = morososDeAgencia.filter(x => x.asignadoA === nombreSeleccionado);
-      }
-
-      let capitalAtrasado = 0;
-      let carteraTotal    = 0;
-      for (const it of items) {
-        if (it.estadoCredito !== "Revertido") carteraTotal += it.saldoActual;
-        capitalAtrasado += it.capitalAtrasado;
-      }
-      const moraPct = carteraTotal > 0 ? (capitalAtrasado / carteraTotal) * 100 : 0;
+      // Cálculo de métricas (Cartera Total real, Capital en Mora, %)
+      const { carteraTotal, capitalEnMora, moraPct, itemsMorosos } = calcularMetricas(nombreSeleccionado);
 
       const tituloUsuario = (nombreSeleccionado === "__todos__") ? "Todos (con mora)" : nombreSeleccionado;
       resBox.innerHTML = `
         <div class="card-res">
           <div><span>Usuario:</span> <b>${tituloUsuario}</b></div>
-          <div><span>Capital en Mora:</span> <b class="num">${formatoDinero(capitalAtrasado)}</b></div>
+          <div><span>Capital en Mora:</span> <b class="num">${formatoDinero(capitalEnMora)}</b></div>
           <div><span>Cartera Total:</span> <b class="num verde">${formatoDinero(carteraTotal)}</b></div>
           <div><span>% Mora:</span> <b class="num rojo">${moraPct.toFixed(2)}%</b></div>
         </div>
       `;
 
-      // Detalle
-      items.sort((a, b) => b.capitalAtrasado - a.capitalAtrasado);
-      for (const it of items) {
+      // Detalle (ordenado por mayor capital atrasado)
+      itemsMorosos.sort((a, b) => b.capitalAtrasado - a.capitalAtrasado);
+      for (const it of itemsMorosos) {
         const nombreCliente = await resolverNombreCliente(it.raw);
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -171,12 +199,13 @@
           <td class="num" title="${formatoDinero(it.paraPonerseAlDia)}">${formatoDinero(it.paraPonerseAlDia)}</td>
           <td class="num" title="${it.cuotasAtrasadas}">${it.cuotasAtrasadas}</td>
         `;
-        document.getElementById('detalle-body').appendChild(tr);
+        tbody.appendChild(tr);
       }
 
-      document.getElementById("total-registros").textContent = String(items.length);
-      document.getElementById("tabla-detalle").dataset.json = JSON.stringify(items);
-      document.getElementById("btn-exportar").style.display = items.length ? "inline-flex" : "none";
+      // dataset para exportar Excel (exportamos los morosos mostrados)
+      document.getElementById("total-registros").textContent = String(itemsMorosos.length);
+      document.getElementById("tabla-detalle").dataset.json = JSON.stringify(itemsMorosos);
+      document.getElementById("btn-exportar").style.display = itemsMorosos.length ? "inline-flex" : "none";
       detBox.style.display = "block";
     }
 

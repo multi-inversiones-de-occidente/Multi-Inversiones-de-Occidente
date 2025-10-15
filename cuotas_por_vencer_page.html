@@ -52,6 +52,7 @@
       font-weight: 600;
       margin: 0 0 1.1rem 0;
     }
+
     .filters {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -145,15 +146,12 @@
     .tel i { margin-right: 5px;}
     .total-monto { color: var(--warm); font-weight: 800; }
 
-    /* Colores por buckets existentes */
     .row-today { background: #fefbe7 !important; }
     .row-7d   { background: #e8fbe7 !important; }
     .row-15d  { background: #e7f3fb !important; }
     .row-30d  { background: #f4e7fb !important; }
 
-    .loading {
-      color: #667; text-align: center; padding: 28px 0; font-size: 1.05rem;
-    }
+    .loading { color: #667; text-align: center; padding: 28px 0; font-size: 1.05rem; }
 
     .legend{
       display:flex; gap:10px; align-items:center; flex-wrap:wrap;
@@ -182,7 +180,7 @@
     <div class="subtitulo">Cuotas Pendientes Próximas a Vencer</div>
     <div class="user-email" id="usuario-email"></div>
 
-    <!-- Filtros existentes + NUEVO selector de fecha (extra) -->
+    <!-- Filtros -->
     <div class="filters">
       <div class="filter-row">
         <span class="group-label">Filtrar por:</span>
@@ -191,6 +189,13 @@
           <option value="7">Próximos 7 días</option>
           <option value="15">Próximos 15 días</option>
           <option value="30">Próximos 30 días</option>
+        </select>
+
+        <!-- NUEVO: filtro Asignado a -->
+        <span class="group-label">Asignado a:</span>
+        <select id="asignadoAFilter" aria-label="Filtrar por asignado a">
+          <option value="__TODOS__">Todos</option>
+          <!-- opciones se llenan dinámicamente -->
         </select>
       </div>
 
@@ -251,18 +256,14 @@
       const yyyy = f.getUTCFullYear();
       return `${dd}/${mm}/${yyyy}`;
     }
-
     function toUTCDateOnly(d){
       return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
     }
-
     function diasEntreUTC(f1, f2) {
-      // f1 - f2 en días
       const d1 = toUTCDateOnly(f1);
       const d2 = toUTCDateOnly(f2);
       return Math.floor((d1 - d2) / (1000*60*60*24));
     }
-
     function sameUTCDate(a, b){
       return a.getUTCFullYear()===b.getUTCFullYear()
         && a.getUTCMonth()===b.getUTCMonth()
@@ -270,7 +271,9 @@
     }
 
     let agenciaActual = "";
-    let ultimoRango = "hoy"; // recordamos el último filtro de rango
+    let ultimoRango = "hoy";
+    let ultimoAsignado = "__TODOS__"; // nuevo
+    let opcionesAsignadoCargadas = false; // evitar repoblar cada vez
 
     onAuthStateChanged(auth, async user => {
       if (!user) return location.href = "login.html";
@@ -282,10 +285,18 @@
         agenciaActual = data?.department || "";
       }
 
-      cargarCuotas("hoy"); // default
+      // Cargar inicialmente (hoy, todos)
+      await cargarCuotas("hoy", null, ultimoAsignado, true);
     });
 
-    async function cargarCuotas(rango, fechaSeleccionadaStr=null) {
+    /**
+     * Carga y pinta cuotas
+     * @param {('hoy'|'7'|'15'|'30'|'fecha')} rango
+     * @param {string|null} fechaSeleccionadaStr 'YYYY-MM-DD' o null
+     * @param {string} asignadoSel '__TODOS__' | '__SIN_ASIGNAR__' | nombre
+     * @param {boolean} poblarAsignados si true, repobla el select con opciones únicas
+     */
+    async function cargarCuotas(rango, fechaSeleccionadaStr=null, asignadoSel="__TODOS__", poblarAsignados=false) {
       const hoy = new Date();
       const hoyUTC = toUTCDateOnly(new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate())));
       let cuotas = [];
@@ -298,13 +309,29 @@
         return;
       }
 
-      // Consulta: créditos de la agencia del usuario (se excluyen revertidos)
+      // Traer créditos por agencia
       const snapshot = await getDocs(query(collection(db, "creditos"), where("agenciaAsignada", "==", agenciaActual)));
+
+      // Armar set de asignados si es necesario
+      const setAsignados = new Set();
 
       snapshot.forEach(doc => {
         const d = doc.data();
         if (d.estadoCredito === "Revertido") return;
         if (!Array.isArray(d.amortizacion)) return;
+
+        const asignado = (d.asignadoA && String(d.asignadoA).trim()) ? String(d.asignadoA).trim() : "__SIN_ASIGNAR__";
+        if (poblarAsignados) setAsignados.add(asignado);
+
+        // Filtro por asignado
+        const pasaAsignado =
+          asignadoSel === "__TODOS__"
+            ? true
+            : asignadoSel === "__SIN_ASIGNAR__"
+              ? (asignado === "__SIN_ASIGNAR__")
+              : (asignado === asignadoSel);
+
+        if (!pasaAsignado) return;
 
         d.amortizacion.forEach(cuota => {
           if (!["Pendiente", "Parcial", "Atrasado"].includes(cuota?.estado)) return;
@@ -314,14 +341,13 @@
           const fcuotaUTC = toUTCDateOnly(new Date(Date.UTC(fcuota.getUTCFullYear(), fcuota.getUTCMonth(), fcuota.getUTCDate())));
           const dias = diasEntreUTC(fcuotaUTC, hoyUTC);
 
-          // Determinar si se muestra según el rango OR fecha exacta (extra)
+          // Decidir mostrar por rango o fecha exacta
           let mostrar = false, clase = "";
           if (rango === "fecha" && fechaSeleccionadaStr){
             const sel = new Date(fechaSeleccionadaStr + "T00:00:00Z");
             const selUTC = toUTCDateOnly(sel);
             if (sameUTCDate(fcuotaUTC, selUTC)) {
               mostrar = true;
-              // Coloreamos con el bucket relativo a HOY para mantener consistencia visual
               if (dias === 0) clase = "row-today";
               else if (dias > 0 && dias <= 7) clase = "row-7d";
               else if (dias > 0 && dias <= 15) clase = "row-15d";
@@ -341,7 +367,7 @@
               cliente,
               numero: cuota.numeroCuota,
               fecha: cuota.fecha,
-              fechaUTCts: tsUTC, // para ordenar por fecha ascendente
+              fechaUTCts: tsUTC,
               dias,
               capital: cuota.capital,
               interes: cuota.interes,
@@ -354,10 +380,30 @@
         });
       });
 
-      // ORDEN ASCENDENTE por fecha (más próxima primero). Si empatan, por # de cuota
-      cuotas.sort((a,b) => (a.fechaUTCts - b.fechaUTCts) || ((a.numero||0) - (b.numero||0)));
+      // Poblar select Asignado a (una sola vez o cuando se pida)
+      if (poblarAsignados && !opcionesAsignadoCargadas) {
+        const selectAsig = document.getElementById("asignadoAFilter");
+        // limpiar todo menos "Todos"
+        selectAsig.querySelectorAll('option:not([value="__TODOS__"])').forEach(o=>o.remove());
 
-      const html = cuotas.length
+        const arr = Array.from(setAsignados).sort((a,b)=>{
+          const A = (a==="__SIN_ASIGNAR__" ? "Sin asignar" : a).toLowerCase();
+          const B = (b==="__SIN_ASIGNAR__" ? "Sin asignar" : b).toLowerCase();
+          return A.localeCompare(B);
+        });
+
+        for (const val of arr) {
+          const opt = document.createElement("option");
+          opt.value = val;
+          opt.textContent = (val==="__SIN_ASIGNAR__") ? "Sin asignar" : val;
+          selectAsig.appendChild(opt);
+        }
+        opcionesAsignadoCargadas = true;
+      }
+
+      // Ordenar y pintar
+      cuotas.sort((a,b) => (a.fechaUTCts - b.fechaUTCts) || ((a.numero||0) - (b.numero||0)));
+      const tbodyHtml = cuotas.length
         ? cuotas.map(c => `
           <tr class="${c.clase}">
             <td title="${c.cliente}">${c.cliente || "-"}</td>
@@ -372,36 +418,43 @@
           </tr>
         `).join('')
         : `<tr><td colspan="9" class="loading">Sin cuotas por vencer en este filtro</td></tr>`;
-
-      tbody.innerHTML = html;
+      document.getElementById("cuotas-list").innerHTML = tbodyHtml;
     }
 
-    // Mantener filtros originales
+    // Eventos de filtros
     document.getElementById("rango").addEventListener("change", function(){
       ultimoRango = this.value;
-      cargarCuotas(this.value);
+      cargarCuotas(ultimoRango, null, ultimoAsignado);
     });
 
-    // NUEVO: filtrar por fecha exacta (extra, sin remover lo anterior)
+    document.getElementById("asignadoAFilter").addEventListener("change", function(){
+      ultimoAsignado = this.value;
+      const fechaVal = document.getElementById("fechaSeleccionada").value;
+      if (fechaVal) {
+        cargarCuotas("fecha", fechaVal, ultimoAsignado);
+      } else {
+        cargarCuotas(ultimoRango || "hoy", null, ultimoAsignado);
+      }
+    });
+
     document.getElementById("btnFecha").addEventListener("click", () => {
       const val = document.getElementById("fechaSeleccionada").value;
       if (!val){
-        // Si no elige fecha, mantenemos el último rango activo
-        cargarCuotas(ultimoRango || "hoy");
+        cargarCuotas(ultimoRango || "hoy", null, ultimoAsignado);
         return;
       }
-      cargarCuotas("fecha", val);
+      cargarCuotas("fecha", val, ultimoAsignado);
     });
 
-    // Limpiar selector de fecha y volver al último rango
     document.getElementById("btnLimpiar").addEventListener("click", () => {
       const inp = document.getElementById("fechaSeleccionada");
       inp.value = "";
-      cargarCuotas(ultimoRango || "hoy");
+      cargarCuotas(ultimoRango || "hoy", null, ultimoAsignado);
     });
   </script>
 </body>
 </html>
+
 
 
 

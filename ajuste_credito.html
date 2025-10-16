@@ -16,7 +16,7 @@
     header .wrap{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:14px 20px}
     .logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.3px}
     .logo .dot{width:12px;height:12px;border-radius:999px;background:var(--brand)}
-    .container{max-width:1160px;margin:22px auto;padding:0 16px 120px}
+    .container{max-width:1160px;margin:22px auto;padding:0 16px 140px}
     .card{background:var(--card);border:1px solid #232833;border-radius:var(--radius);padding:18px}
     h2{margin:0 0 10px 0;font-size:20px}
     h3{margin:14px 0 8px 0;font-size:16px;color:#c9d2df}
@@ -39,12 +39,12 @@
     th{color:#c9d2df;text-align:left;position:sticky;top:0;background:#182029;z-index:1}
     .tag{display:inline-flex;align-items:center;gap:6px;background:#141a22;border:1px solid #263144;color:#b9c3d0;border-radius:999px;padding:4px 8px;font-size:12px}
     .hidden{display:none}
-    .kbd{font-family:ui-monospace,Consolas,Menlo,monospace;background:#0f1318;border:1px solid #273041;border-radius:8px;padding:2px 6px}
     .soft{opacity:.85}
     .results{display:flex;flex-direction:column;gap:8px;margin-top:10px}
     .result-card{display:flex;justify-content:space-between;align-items:center;border:1px solid #2a3444;border-radius:12px;padding:8px 10px;background:#121721}
     .result-card small{color:var(--muted)}
     .divider{height:1px;background:#263144;margin:18px 0}
+    .kbd{font-family:ui-monospace,Consolas,Menlo,monospace;background:#0f1318;border:1px solid #273041;border-radius:8px;padding:2px 6px}
   </style>
 </head>
 <body>
@@ -83,7 +83,7 @@
       </div>
     </div>
     <div id="listaCreditos" class="results"></div>
-    <div class="muted">Frecuencia respeta: <span class="kbd">Semanal=7d</span>, <span class="kbd">Catorcenal=14d</span>, <span class="kbd">Quincenal=15d</span>, <span class="kbd">Mensual=+1 mes</span>.</div>
+    <div class="muted">Frecuencia: <span class="kbd">Semanal=7d</span>, <span class="kbd">Catorcenal=14d</span>, <span class="kbd">Quincenal=15d</span>, <span class="kbd">Mensual=+1 mes</span>.</div>
   </section>
 
   <!-- DATOS GENERALES -->
@@ -232,7 +232,7 @@
   <section class="card hidden" id="panelRefi">
     <h2>Refinanciamiento (crear nuevo crédito para este cliente)</h2>
     <div class="muted">
-      Usa este formulario para crear un <b>nuevo crédito</b> con línea <span class="pill">Refinanciamiento</span> vinculado al <b>mismo cliente</b> del crédito cargado.
+      Crea un <b>nuevo crédito</b> con línea <span class="pill">Refinanciamiento</span> vinculado al <b>mismo cliente</b> del crédito cargado.
     </div>
 
     <div class="actions" style="margin-top:8px">
@@ -298,6 +298,43 @@
     </div>
 
     <div id="refiResult" class="muted"></div>
+
+    <!-- NUEVO: AMORTIZACIÓN DEL REFINANCIAMIENTO -->
+    <div class="divider"></div>
+    <h3>Amortización del refinanciamiento</h3>
+    <div id="refiAmortGuard" class="muted">Primero crea el refinanciamiento para habilitar esta sección.</div>
+    <div id="refiAmortPanel" class="hidden">
+      <div class="actions">
+        <button id="r_btnPrefillAmort">Prefill desde formulario del refinanciamiento</button>
+        <button id="r_btnGenerarAmort">Generar tabla</button>
+        <button id="r_btnGuardarAmort" class="success">Guardar amortización</button>
+        <span id="r_lblAmort" class="muted"></span>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <div class="field col-3"><label>Fecha inicio</label><input id="r_a_start" type="date"></div>
+        <div class="field col-3"><label>Frecuencia</label>
+          <select id="r_a_freq">
+            <option>Semanal</option>
+            <option>Catorcenal</option>
+            <option>Quincenal</option>
+            <option>Mensual</option>
+          </select>
+        </div>
+        <div class="field col-2"><label>N° de cuotas</label><input id="r_a_n" type="number" min="1"></div>
+        <div class="field col-2"><label>Cuota ($)</label><input id="r_a_cuota" type="number" step="0.01"></div>
+        <div class="field col-2"><label>Monto aprobado ($)</label><input id="r_a_monto" type="number" step="0.01"></div>
+        <div class="field col-2"><label>Tasa anual (%)</label><input id="r_a_tasa" type="number" step="0.01"></div>
+      </div>
+      <div class="muted">Chequeo: <span id="r_chkAmort" class="tag">Pendiente</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Fecha</th><th>Cuota</th><th>Capital</th><th>Interés</th><th>Saldo</th><th>Estado</th></tr>
+          </thead>
+          <tbody id="r_amortBody"></tbody>
+        </table>
+      </div>
+    </div>
   </section>
 </div>
 
@@ -360,7 +397,8 @@
     credito:null, 
     amort:[], 
     multas:[],
-    pagos:[]
+    pagos:[],
+    refi:{ id:null, amort:[] }  // NUEVO: estado del refinanciamiento
   };
 
   onAuthStateChanged(auth, async (user) => { /* rol opcional */ });
@@ -470,6 +508,7 @@
     state.amort = Array.isArray(data?.amortizacion) ? JSON.parse(JSON.stringify(data.amortizacion)) : [];
     state.multas = Array.isArray(data?.historialMultas) ? JSON.parse(JSON.stringify(data.historialMultas)) : [];
     state.pagos = [];
+    state.refi = { id:null, amort:[] };
 
     // Mostrar paneles
     $('#panelGeneral').classList.remove('hidden');
@@ -509,6 +548,10 @@
     $('#r_dui').value     = data.numeroDui || '';
     $('#r_tel').value     = data.telefono || '';
     $('#r_dir').value     = data.direccion || '';
+
+    // Bloquear amort refi hasta crear
+    $('#refiAmortGuard').classList.remove('hidden');
+    $('#refiAmortPanel').classList.add('hidden');
   }
 
   /* ============== MULTAS ============== */
@@ -560,7 +603,7 @@
   }
   $('#btnGuardarMultas').addEventListener('click', guardarMultas);
 
-  /* ============== AMORTIZACIÓN (editar fechas) ============== */
+  /* ============== AMORTIZACIÓN (editar fechas crédito cargado) ============== */
   function renderAmort(){
     const body = $('#amortBody'); body.innerHTML = '';
     if(!state.amort?.length){
@@ -812,7 +855,6 @@
     if(!state.creditoID || !state.credito?.clienteID){
       return alert('Falta cliente','Carga primero un crédito para heredar el clienteID.','warning');
     }
-    // Validación mínima
     const monto = Number($('#r_monto').value || 0);
     const numCuotas = Number($('#r_numCuotas').value || 0);
     const cuota = Number($('#r_cuota').value || 0);
@@ -863,8 +905,12 @@
     const ref = doc(collection(db,'creditos'));
     await setDoc(ref, datos, { merge:true });
 
-    // Feedback
+    // Guardar ID en estado y habilitar panel de amortización refi
+    state.refi.id = ref.id;
+    $('#refiAmortGuard').classList.add('hidden');
+    $('#refiAmortPanel').classList.remove('hidden');
     $('#lblRefi').textContent = 'Refinanciamiento creado ✓';
+
     const result = document.getElementById('refiResult');
     result.innerHTML = `
       <div style="margin-top:8px">
@@ -882,7 +928,102 @@
     alert('Refinanciamiento creado','Se creó el nuevo crédito y quedó vinculado al mismo cliente.','success');
   }
   $('#btnCrearRefi').addEventListener('click', crearRefinanciamiento);
+
+  /* ======= AMORTIZACIÓN DEL REFINANCIAMIENTO ======= */
+  function r_prefillAmortFromForm(){
+    $('#r_a_start').value = $('#r_fechaInicio').value || '';
+    $('#r_a_freq').value  = $('#r_freq').value || 'Quincenal';
+    $('#r_a_n').value     = $('#r_numCuotas').value || '';
+    $('#r_a_cuota').value = $('#r_cuota').value || '';
+    $('#r_a_monto').value = $('#r_monto').value || '';
+    $('#r_a_tasa').value  = $('#r_tasaAnual').value || 0;
+  }
+
+  function r_renderAmort(){
+    const body = $('#r_amortBody'); body.innerHTML='';
+    if(!state.refi.amort?.length){
+      body.innerHTML = `<tr><td colspan="7" class="muted">Sin filas. Genera la tabla.</td></tr>`;
+      return;
+    }
+    state.refi.amort.forEach((r,i)=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${r.numeroCuota}</td>
+        <td>${r.fecha}</td>
+        <td>${fmt2(r.cuota)}</td>
+        <td>${fmt2(r.capital)}</td>
+        <td>${fmt2(r.interes)}</td>
+        <td>${fmt2(r.saldo)}</td>
+        <td>${r.estado}</td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+
+  function r_generarAmort(){
+    const start = $('#r_a_start').value;
+    const n = Number($('#r_a_n').value || 0);
+    const cuota = Number($('#r_a_cuota').value || 0);
+    const monto = Number($('#r_a_monto').value || 0);
+    const tasaAnual = Number($('#r_a_tasa').value || 0)/100;
+    const freq = $('#r_a_freq').value;
+
+    if(!start || !n || !cuota || !monto){
+      return alert('Datos incompletos','Fecha, N° cuotas, cuota y monto son obligatorios','warning');
+    }
+    // Periodos por año (igual que en tu generador original: Semanal=52, Mensual=12, y el resto 26)
+    const periods = (freq==='Mensual')?12:(freq==='Semanal'?52:26);
+
+    let saldo = monto;
+    let date = new Date(start);
+    const rows=[];
+    for(let i=1;i<=n;i++){
+      const interes = Math.max(0, +(saldo * (tasaAnual / periods)).toFixed(2));
+      let capital = +(cuota - interes).toFixed(2);
+      if(capital > saldo) capital = saldo;
+      saldo = +(saldo - capital).toFixed(2);
+      rows.push({
+        numeroCuota:i,
+        fecha: new Date(date).toISOString().slice(0,10),
+        cuota:+cuota.toFixed(2),
+        capital:+capital.toFixed(2),
+        interes:+interes.toFixed(2),
+        saldo:+saldo.toFixed(2),
+        estado:'Pendiente',
+        montoPagado:0,
+        montoPagadoInteres:0,
+        fechaPagoReal:null
+      });
+      date = new Date(nextFrom(`${rows[rows.length-1].fecha}T00:00:00.000${TZ_OFFSET}`, freq));
+    }
+    state.refi.amort = rows;
+
+    // Chequeo
+    const sumCap = rows.reduce((s,r)=> s + Number(r.capital||0), 0);
+    const lastSaldo = rows.length? rows[rows.length-1].saldo : 0;
+    const ok = Math.abs(sumCap - monto)<=0.02 && Math.abs(lastSaldo-0)<=0.02;
+    $('#r_chkAmort').textContent = ok ? `OK · capital=${fmt2(sumCap)} saldo final=${fmt2(lastSaldo)}` : `Revisar · capital=${fmt2(sumCap)} saldo final=${fmt2(lastSaldo)}`;
+    $('#r_chkAmort').style.background = ok? '#0f2c16':'#2a1414';
+
+    r_renderAmort();
+  }
+
+  async function r_guardarAmort(){
+    if(!state.refi.id) return alert('Sin refinanciamiento','Primero crea el refinanciamiento.','warning');
+    if(!state.refi.amort.length) return alert('Sin tabla','Genera la tabla antes de guardar.','warning');
+    await updateDoc(doc(db,'creditos', state.refi.id), {
+      amortizacion: state.refi.amort,
+      ultimaActualizacion: serverTimestamp()
+    });
+    $('#r_lblAmort').textContent = 'Amortización guardada ✓';
+    setTimeout(()=> $('#r_lblAmort').textContent='', 2000);
+    alert('Amortización creada','Se guardó la amortización en el nuevo crédito.','success');
+  }
+
+  // Listeners amort refi
+  $('#r_btnPrefillAmort').addEventListener('click', r_prefillAmortFromForm);
+  $('#r_btnGenerarAmort').addEventListener('click', r_generarAmort);
+  $('#r_btnGuardarAmort').addEventListener('click', r_guardarAmort);
 </script>
 </body>
 </html>
-

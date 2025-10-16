@@ -257,7 +257,6 @@
       <div class="field col-3"><label>Agencia asignada</label><input id="r_agencia"></div>
       <div class="field col-3"><label>Asesor (asignadoA)</label><input id="r_asesor"></div>
       <div class="field col-3"><label>Línea de crédito</label>
-        <!-- AHORA PERMITE MÁS LÍNEAS -->
         <select id="r_linea">
           <option selected>Refinanciamiento</option>
           <option>Estacionario</option>
@@ -349,6 +348,7 @@
     <h2>Estados de cuotas</h2>
     <div class="muted">Visualiza todas las cuotas del crédito y cambia el <b>estado</b> de cada una. Opciones: <span class="pill">Pendiente</span>, <span class="pill">Atrasado</span>, <span class="pill">Pagado</span>, <span class="pill">Parcial</span>. No altera montos ni fechas.</div>
     <div class="actions">
+      <button id="btnMarcarTodasPagadas">Marcar todas como pagadas</button>
       <button id="btnGuardarEstados" class="primary">Guardar estados</button>
       <span id="lblGuardadoEstados" class="muted"></span>
     </div>
@@ -570,17 +570,6 @@
     renderAmort();
     renderPagos();
     renderEstados();
-
-    // Pre-cargar identidad cliente para nuevo crédito
-    $('#r_nombre').value  = data.nombre || '';
-    $('#r_apellido').value= data.apellido || '';
-    $('#r_dui').value     = data.numeroDui || '';
-    $('#r_tel').value     = data.telefono || '';
-    $('#r_dir').value     = data.direccion || '';
-
-    // Bloquear amort nuevo crédito hasta crear
-    $('#refiAmortGuard').classList.remove('hidden');
-    $('#refiAmortPanel').classList.add('hidden');
   }
 
   /* ============== MULTAS ============== */
@@ -908,7 +897,7 @@
       // Datos del crédito
       agenciaAsignada: ($('#r_agencia').value || '').trim(),
       asignadoA: ($('#r_asesor').value || '').trim(),
-      lineaDeCredito: $('#r_linea').value, // <-- ahora toma la seleccionada
+      lineaDeCredito: $('#r_linea').value,
       estadoCredito: $('#r_estado').value,
       montoAprobado: monto,
       saldoInicial: Number($('#r_saldoIni').value || 0),
@@ -1092,6 +1081,18 @@
       body.appendChild(tr);
     });
   }
+
+  // NUEVO: marcar todas como pagadas
+  function marcarTodasPagadas(){
+    if(!state.amort?.length){
+      alert('Sin cuotas','Este crédito no tiene cuotas para marcar.','info');
+      return;
+    }
+    state.amort = state.amort.map(row => ({ ...row, estado: 'Pagado' }));
+    renderEstados();
+    alert('Listo','Todas las cuotas quedaron con estado "Pagado" en pantalla. No olvides "Guardar estados".','success');
+  }
+  document.getElementById('btnMarcarTodasPagadas').addEventListener('click', marcarTodasPagadas);
 
   async function guardarEstados(){
     if(!state.creditoID) return alert('Sin crédito','Carga un crédito primero','warning');

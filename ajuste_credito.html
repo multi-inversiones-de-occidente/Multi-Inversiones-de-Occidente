@@ -25,7 +25,7 @@
     .field{display:flex;flex-direction:column;gap:6px}
     label{font-size:12px;color:#b7c2d1}
     input,select,textarea{background:#0f1318;color:var(--text);border:1px solid #273041;border-radius:12px;padding:10px 12px;font-size:14px;outline:none}
-    input:focus,select:focus,textarea:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.2)}
+    input:focus,select:focus,textarea:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba[59,130,246,.2]}
     .col-12{grid-column:span 12}.col-10{grid-column:span 10}.col-8{grid-column:span 8}.col-6{grid-column:span 6}.col-4{grid-column:span 4}.col-3{grid-column:span 3}.col-2{grid-column:span 2}
     .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
     button{background:#1d2939;color:#e9eef5;border:1px solid #2a3444;border-radius:12px;padding:10px 14px;font-weight:600;cursor:pointer}
@@ -38,7 +38,6 @@
     th,td{font-size:13px;padding:8px;border-bottom:1px solid #263144;vertical-align:top}
     th{color:#c9d2df;text-align:left;position:sticky;top:0;background:#182029;z-index:1}
     .tag{display:inline-flex;align-items:center;gap:6px;background:#141a22;border:1px solid #263144;color:#b9c3d0;border-radius:999px;padding:4px 8px;font-size:12px}
-    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
     .hidden{display:none}
     .kbd{font-family:ui-monospace,Consolas,Menlo,monospace;background:#0f1318;border:1px solid #273041;border-radius:8px;padding:2px 6px}
     .badge-warn{background:#2a1f12;border:1px solid #5a421e;color:#ffd89c;border-radius:999px;padding:2px 8px;font-size:11px}
@@ -83,7 +82,6 @@
         <button id="btnBuscarPorNombre">Buscar cliente</button>
       </div>
     </div>
-
     <div id="listaCreditos" class="results"></div>
     <div class="muted">Frecuencia respeta: <span class="kbd">Semanal=7d</span>, <span class="kbd">Catorcenal=14d</span>, <span class="kbd">Quincenal=15d</span>, <span class="kbd">Mensual=+1 mes</span>.</div>
   </section>
@@ -179,6 +177,56 @@
       </table>
     </div>
   </section>
+
+  <!-- PAGOS -->
+  <section class="card hidden" id="panelPagos">
+    <h2>Agregar pagos</h2>
+    <div class="muted">Carga pagos por CSV o agrégalos manualmente. Al guardar se crearán documentos en <b>pagos</b> vinculados al <b>creditoID</b> cargado.</div>
+
+    <!-- Opciones generales -->
+    <div class="row">
+      <div class="field col-3"><label>Sucursal</label><input id="p_sucursal" placeholder="Ahuachapán / Sonsonate…"></div>
+      <div class="field col-3"><label>UsuarioID (quien registra)</label><input id="p_usuario" placeholder="uid del operador (opcional)"></div>
+      <div class="field col-3">
+        <label>Retroactivo</label>
+        <select id="p_retro">
+          <option value="false">No</option>
+          <option value="true">Sí</option>
+        </select>
+      </div>
+      <div class="field col-3"><label>CSV de pagos (opcional)</label><input id="p_csv" type="file" accept=".csv"></div>
+    </div>
+    <div class="actions">
+      <button id="btnCargarPagosCSV">Cargar CSV</button>
+    </div>
+
+    <!-- Form manual -->
+    <h3>Agregar pago manual</h3>
+    <div class="row">
+      <div class="field col-2"><label>Fecha de pago</label><input id="pm_fecha" type="date"></div>
+      <div class="field col-2"><label>Monto pagado ($)</label><input id="pm_monto" type="number" step="0.01"></div>
+      <div class="field col-2"><label>Capital ($)</label><input id="pm_capital" type="number" step="0.01" value="0"></div>
+      <div class="field col-2"><label>Interés ($)</label><input id="pm_interes" type="number" step="0.01" value="0"></div>
+      <div class="field col-2"><label>Multa ($)</label><input id="pm_multa" type="number" step="0.01" value="0"></div>
+      <div class="field col-2"><label>Correlativo</label><input id="pm_corr" type="number" min="0" value="0"></div>
+
+      <div class="field col-4"><label>Motivo</label><input id="pm_motivo" placeholder="motivo / nota (opcional)"></div>
+      <div class="field col-4"><label>Saldo restante ($)</label><input id="pm_saldo" type="number" step="0.01" value="0"></div>
+      <div class="field col-4" style="align-self:end"><button id="btnAgregarPago" class="primary">Agregar a la lista</button></div>
+    </div>
+
+    <div class="table-wrap" style="max-height:280px">
+      <table>
+        <thead><tr><th>#</th><th>Fecha Pago</th><th>Monto</th><th>Capital</th><th>Interés</th><th>Multa</th><th>Motivo</th><th>Correlativo</th><th>Acciones</th></tr></thead>
+        <tbody id="pagosBody"></tbody>
+      </table>
+    </div>
+
+    <div class="actions">
+      <button id="btnGuardarPagos" class="success">Guardar pagos</button>
+      <span id="lblGuardadoPagos" class="muted"></span>
+    </div>
+  </section>
 </div>
 
 <script type="module">
@@ -187,7 +235,7 @@
   import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
   import {
     getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs,
-    orderBy, startAt, endAt, serverTimestamp
+    orderBy, startAt, endAt, serverTimestamp, writeBatch
   } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
 
   /* ===== Configuración Firebase (tu proyecto) ===== */
@@ -235,13 +283,16 @@
   }
 
   /* ============== Estado ============== */
-  const state = { creditoID:null, credito:null, amort:[], multas:[] };
+  const state = { 
+    creditoID:null, 
+    credito:null, 
+    amort:[], 
+    multas:[],
+    pagos:[] // nuevos pagos en la lista (antes de persistir)
+  };
 
   /* ============== Gate opcional ============== */
-  onAuthStateChanged(auth, async (user) => {
-    if(!user) return;
-    // Validación de rol admin si se requiere
-  });
+  onAuthStateChanged(auth, async (user) => { /* si quieres validar rol aquí */ });
 
   /* ============== BUSCAR ============== */
   async function loadCreditoById(id){
@@ -256,44 +307,23 @@
     renderCreditosListFromSnapshot(snap, `Resultados por DUI: ${dui}`);
   }
 
-  // NUEVO: buscar por nombre o apellido (prefix)
   async function listCreditosByNombre(termRaw){
     const term = (termRaw || '').trim();
     if(!term){ alert('Falta nombre','Escribe un nombre o apellido','warning'); return; }
-
-    // 1) Buscar usuarios cuyo nombre comience con term
-    // 2) Buscar usuarios cuyo apellido comience con term
-    // Nota: requiere índices para orderBy('nombre')/orderBy('apellido') si no existen Firestore los pedirá.
     const usersCol = collection(db,'users');
     const qNombre   = query(usersCol, orderBy('nombre'),   startAt(term), endAt(term + '\uf8ff'));
     const qApellido = query(usersCol, orderBy('apellido'), startAt(term), endAt(term + '\uf8ff'));
-
     const [snN, snA] = await Promise.all([getDocs(qNombre), getDocs(qApellido)]);
-
-    // Unir users por id (evitar duplicados)
-    const userMap = new Map();
-    snN.forEach(d=> userMap.set(d.id, d.data()));
-    snA.forEach(d=> userMap.set(d.id, d.data()));
-
+    const userMap = new Map(); snN.forEach(d=> userMap.set(d.id, d.data())); snA.forEach(d=> userMap.set(d.id, d.data()));
     const wrap = $('#listaCreditos'); wrap.innerHTML='';
-    if(userMap.size===0){
-      wrap.innerHTML = `<div class="muted">No hay clientes que empiecen con “${term}”.</div>`;
-      return;
-    }
-
-    // Por cada user encontrado, listar sus créditos
+    if(userMap.size===0){ wrap.innerHTML = `<div class="muted">No hay clientes que empiecen con “${term}”.</div>`; return; }
     for (const [uid, udata] of userMap.entries()){
       const qCreds = query(collection(db,'creditos'), where('clienteID','==',uid));
       const credSnap = await getDocs(qCreds);
       if(credSnap.empty){
-        // Mostrar el cliente aunque no tenga créditos (informativo)
         const card = document.createElement('div');
         card.className='result-card';
-        card.innerHTML = `
-          <div>
-            <div><b>${udata.nombre||''} ${udata.apellido||''}</b> <small class="muted">(${udata.numeroDui||'sin DUI'})</small></div>
-            <small>Sin créditos registrados</small>
-          </div>`;
+        card.innerHTML = `<div><div><b>${udata.nombre||''} ${udata.apellido||''}</b> <small class="muted">(${udata.numeroDui||'sin DUI'})</small></div><small>Sin créditos registrados</small></div>`;
         wrap.appendChild(card);
         continue;
       }
@@ -311,8 +341,6 @@
         wrap.appendChild(card);
       });
     }
-
-    // Bind abrir
     wrap.querySelectorAll('button[data-open]').forEach(btn=>{
       btn.addEventListener('click', async (e)=>{
         const id = e.target.getAttribute('data-open');
@@ -324,19 +352,8 @@
 
   function renderCreditosListFromSnapshot(snap, titleText){
     const wrap = $('#listaCreditos'); wrap.innerHTML='';
-    if(titleText){
-      const title = document.createElement('div');
-      title.className = 'muted';
-      title.textContent = titleText;
-      wrap.appendChild(title);
-    }
-    if(snap.empty){
-      const empty = document.createElement('div');
-      empty.className='muted';
-      empty.textContent = 'No se encontraron créditos';
-      wrap.appendChild(empty);
-      return;
-    }
+    if(titleText){ const t=document.createElement('div'); t.className='muted'; t.textContent=titleText; wrap.appendChild(t); }
+    if(snap.empty){ const empty=document.createElement('div'); empty.className='muted'; empty.textContent='No se encontraron créditos'; wrap.appendChild(empty); return; }
     snap.forEach(d=>{
       const c = d.data();
       const card = document.createElement('div');
@@ -381,11 +398,15 @@
     state.credito = data || {};
     state.amort = Array.isArray(data?.amortizacion) ? JSON.parse(JSON.stringify(data.amortizacion)) : [];
     state.multas = Array.isArray(data?.historialMultas) ? JSON.parse(JSON.stringify(data.historialMultas)) : [];
+    state.pagos = []; // limpiar lista local de nuevos pagos
 
+    // Mostrar paneles
     $('#panelGeneral').classList.remove('hidden');
     $('#panelAmort').classList.remove('hidden');
     $('#panelMultas').classList.remove('hidden');
+    $('#panelPagos').classList.remove('hidden');
 
+    // Tag
     $('#tagCredito').textContent = `creditoID: ${id}`;
 
     // Generales
@@ -408,6 +429,7 @@
 
     renderMultas();
     renderAmort();
+    renderPagos();
   }
 
   /* ============== MULTAS ============== */
@@ -543,6 +565,139 @@
     alert('Crédito actualizado','Se guardaron los datos generales.','success');
   }
   $('#btnGuardarGeneral').addEventListener('click', guardarGenerales);
+
+  /* ============== PAGOS (CSV + Manual) ============== */
+  function renderPagos(){
+    const body = $('#pagosBody'); body.innerHTML='';
+    if(!state.pagos.length){
+      body.innerHTML = `<tr><td colspan="9" class="muted">Sin pagos en la lista.</td></tr>`;
+      return;
+    }
+    state.pagos.forEach((p,i)=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i+1}</td>
+        <td>${p.fechaPago || ''}</td>
+        <td>${fmt2(p.montoPagado)}</td>
+        <td>${fmt2(p.pagoCapital)}</td>
+        <td>${fmt2(p.pagoInteres)}</td>
+        <td>${fmt2(p.pagoMulta)}</td>
+        <td>${p.motivo||''}</td>
+        <td>${p.correlativo??0}</td>
+        <td><button class="danger" data-del="${i}">Eliminar</button></td>
+      `;
+      body.appendChild(tr);
+    });
+    body.querySelectorAll('button[data-del]').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        const idx = Number(e.target.getAttribute('data-del'));
+        state.pagos.splice(idx,1);
+        renderPagos();
+      });
+    });
+  }
+
+  function parsePagosCSV(text){
+    const lines = text.trim().split(/\r?\n/);
+    const hdr = lines.shift().split(',').map(s=>s.trim().toLowerCase());
+    const g = k=> hdr.indexOf(k);
+    const out=[]; let i=1;
+    for(const line of lines){
+      if(!line.trim()) continue;
+      const c=line.split(',');
+      out.push({
+        idx:i++,
+        fechaPago:(c[g('fechapago')]||c[g('fecha')]||'').trim(),
+        montoPagado:Number(c[g('montopagado')]||c[g('monto')]||0),
+        pagoCapital:Number(c[g('pagocapital')]||0),
+        pagoInteres:Number(c[g('pagointeres')]||0),
+        pagoMulta:Number(c[g('pagomulta')]||0),
+        motivo: c[g('motivo')]||'',
+        correlativo: Number(c[g('correlativo')]||0),
+        saldoRestante: Number(c[g('saldorestante')]||0)
+      });
+    }
+    return out;
+  }
+
+  $('#btnCargarPagosCSV').addEventListener('click', async ()=>{
+    const f = $('#p_csv').files?.[0];
+    if(!f) return alert('Sin archivo','Selecciona un CSV','warning');
+    const text = await f.text();
+    const rows = parsePagosCSV(text);
+    state.pagos.push(...rows);
+    renderPagos();
+  });
+
+  $('#btnAgregarPago').addEventListener('click', ()=>{
+    const row = {
+      fechaPago: $('#pm_fecha').value,
+      montoPagado: Number($('#pm_monto').value||0),
+      pagoCapital: Number($('#pm_capital').value||0),
+      pagoInteres: Number($('#pm_interes').value||0),
+      pagoMulta: Number($('#pm_multa').value||0),
+      correlativo: Number($('#pm_corr').value||0),
+      motivo: $('#pm_motivo').value.trim(),
+      saldoRestante: Number($('#pm_saldo').value||0)
+    };
+    if(!row.fechaPago || !row.montoPagado){
+      return alert('Datos incompletos','Fecha y monto pagado son obligatorios','warning');
+    }
+    state.pagos.push(row);
+    renderPagos();
+    // limpiar inputs clave
+    $('#pm_monto').value = '';
+    $('#pm_capital').value = '0';
+    $('#pm_interes').value = '0';
+    $('#pm_multa').value = '0';
+  });
+
+  async function guardarPagos(){
+    if(!state.creditoID) return alert('Sin crédito','Carga un crédito primero','warning');
+    if(!state.pagos.length) return alert('Sin pagos','No hay pagos para guardar.','info');
+
+    const suc = $('#p_sucursal').value.trim() || 'Ajuste';
+    const usuario = $('#p_usuario').value.trim() || '';
+    const retro = $('#p_retro').value === 'true';
+
+    // Datos del cliente desde el doc del crédito (si existen)
+    const nombres = [state.credito?.nombre||'', state.credito?.apellido||''].join(' ').trim();
+    const numeroDui = state.credito?.numeroDui || '';
+
+    const batch = writeBatch(db);
+    state.pagos.forEach((p,idx)=>{
+      const ref = doc(collection(db,'pagos'));
+      batch.set(ref, {
+        pagoID: ref.id,
+        creditoID: state.creditoID,
+        clienteID: state.credito?.clienteID || '',
+        sucursal: suc,
+        correlativo: Number(p.correlativo ?? idx+1),
+        fechaPago: p.fechaPago ? inputToISO_TZ(p.fechaPago) : inputToISO_TZ(new Date().toISOString().slice(0,10)),
+        fechaRegistro: inputToISO_TZ(new Date().toISOString().slice(0,10)),
+        montoPagado: Number(p.montoPagado||0),
+        // Igual que en migración: guardar como strings 2 decimales
+        pagoCapital: fmt2(p.pagoCapital||0),
+        pagoInteres: fmt2(p.pagoInteres||0),
+        pagoMulta: fmt2(p.pagoMulta||0),
+        saldoRestante: fmt2(p.saldoRestante||0),
+        motivo: p.motivo || '',
+        retroactivo: !!retro,
+        cierre: false,
+        anulado: false,
+        usuarioID: usuario,
+        nombres: nombres || '',
+        numeroDui: numeroDui || ''
+      });
+    });
+    await batch.commit();
+    $('#lblGuardadoPagos').textContent = `Pagos guardados ✓ (${state.pagos.length})`;
+    alert('Pagos registrados', `Se guardaron ${state.pagos.length} pagos.`, 'success');
+    state.pagos = [];
+    renderPagos();
+  }
+  $('#btnGuardarPagos').addEventListener('click', guardarPagos);
 </script>
 </body>
 </html>
+

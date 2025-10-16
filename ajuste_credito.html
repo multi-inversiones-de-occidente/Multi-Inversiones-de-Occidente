@@ -230,9 +230,10 @@
   <!-- REFINANCIAMIENTO (nuevo crédito para el mismo cliente) -->
   <!-- ===================================================== -->
   <section class="card hidden" id="panelRefi">
-    <h2>Refinanciamiento (crear nuevo crédito para este cliente)</h2>
+    <h2>Refinanciamiento / Nuevo crédito (mismo cliente)</h2>
     <div class="muted">
-      Crea un <b>nuevo crédito</b> con línea <span class="pill">Refinanciamiento</span> vinculado al <b>mismo cliente</b> del crédito cargado.
+      Crea un <b>nuevo crédito</b> vinculado al <b>mismo cliente</b> del crédito cargado. Puedes seleccionar la línea:
+      <span class="pill">Refinanciamiento</span>, <span class="pill">Estacionario</span>, <span class="pill">Credicel</span>, <span class="pill">Amuebla2</span>.
     </div>
 
     <div class="actions" style="margin-top:8px">
@@ -256,8 +257,12 @@
       <div class="field col-3"><label>Agencia asignada</label><input id="r_agencia"></div>
       <div class="field col-3"><label>Asesor (asignadoA)</label><input id="r_asesor"></div>
       <div class="field col-3"><label>Línea de crédito</label>
-        <select id="r_linea" disabled>
+        <!-- AHORA PERMITE MÁS LÍNEAS -->
+        <select id="r_linea">
           <option selected>Refinanciamiento</option>
+          <option>Estacionario</option>
+          <option>Credicel</option>
+          <option>Amuebla2</option>
         </select>
       </div>
       <div class="field col-3"><label>Estado crédito</label>
@@ -293,19 +298,19 @@
     </div>
 
     <div class="actions">
-      <button id="btnCrearRefi" class="primary">Crear refinanciamiento</button>
+      <button id="btnCrearRefi" class="primary">Crear nuevo crédito</button>
       <span id="lblRefi" class="muted"></span>
     </div>
 
     <div id="refiResult" class="muted"></div>
 
-    <!-- NUEVO: AMORTIZACIÓN DEL REFINANCIAMIENTO -->
+    <!-- AMORTIZACIÓN DEL NUEVO CRÉDITO -->
     <div class="divider"></div>
-    <h3>Amortización del refinanciamiento</h3>
-    <div id="refiAmortGuard" class="muted">Primero crea el refinanciamiento para habilitar esta sección.</div>
+    <h3>Amortización del nuevo crédito</h3>
+    <div id="refiAmortGuard" class="muted">Primero crea el nuevo crédito para habilitar esta sección.</div>
     <div id="refiAmortPanel" class="hidden">
       <div class="actions">
-        <button id="r_btnPrefillAmort">Prefill desde formulario del refinanciamiento</button>
+        <button id="r_btnPrefillAmort">Prefill desde formulario del nuevo crédito</button>
         <button id="r_btnGenerarAmort">Generar tabla</button>
         <button id="r_btnGuardarAmort" class="success">Guardar amortización</button>
         <span id="r_lblAmort" class="muted"></span>
@@ -338,7 +343,7 @@
   </section>
 
   <!-- ====================================== -->
-  <!-- NUEVO: ESTADOS DE CUOTAS (hasta abajo) -->
+  <!-- ESTADOS DE CUOTAS (hasta abajo) -->
   <!-- ====================================== -->
   <section class="card hidden" id="panelEstados">
     <h2>Estados de cuotas</h2>
@@ -420,7 +425,7 @@
     amort:[], 
     multas:[],
     pagos:[],
-    refi:{ id:null, amort:[] }  // refinanciamiento
+    refi:{ id:null, amort:[] }  // nuevo crédito
   };
 
   onAuthStateChanged(auth, async (user) => { /* rol opcional */ });
@@ -538,7 +543,7 @@
     $('#panelMultas').classList.remove('hidden');
     $('#panelPagos').classList.remove('hidden');
     $('#panelRefi').classList.remove('hidden');
-    $('#panelEstados').classList.remove('hidden'); // NUEVO
+    $('#panelEstados').classList.remove('hidden');
 
     // Tag
     $('#tagCredito').textContent = `creditoID: ${id}`;
@@ -564,16 +569,16 @@
     renderMultas();
     renderAmort();
     renderPagos();
-    renderEstados(); // NUEVO
+    renderEstados();
 
-    // Pre-cargar identidad cliente para refi
+    // Pre-cargar identidad cliente para nuevo crédito
     $('#r_nombre').value  = data.nombre || '';
     $('#r_apellido').value= data.apellido || '';
     $('#r_dui').value     = data.numeroDui || '';
     $('#r_tel').value     = data.telefono || '';
     $('#r_dir').value     = data.direccion || '';
 
-    // Bloquear amort refi hasta crear
+    // Bloquear amort nuevo crédito hasta crear
     $('#refiAmortGuard').classList.remove('hidden');
     $('#refiAmortPanel').classList.add('hidden');
   }
@@ -843,7 +848,7 @@
   }
   $('#btnGuardarPagos').addEventListener('click', guardarPagos);
 
-  /* ============== REFINANCIAMIENTO (nuevo crédito) ============== */
+  /* ============== NUEVO CRÉDITO (refi / otras líneas) ============== */
   function refiCalcTasaDiaria(){
     const a = Number($('#r_tasaAnual').value || 0) / 100;
     const diaria = a / 365;
@@ -863,6 +868,7 @@
     $('#r_agencia').value     = state.credito?.agenciaAsignada || '';
     $('#r_asesor').value      = state.credito?.asignadoA || '';
     $('#r_estado').value      = 'Activo';
+    $('#r_linea').value       = 'Refinanciamiento';
     $('#r_monto').value       = state.credito?.montoAprobado || '';
     $('#r_saldoIni').value    = state.credito?.montoAprobado || '';
     $('#r_saldoAct').value    = 0;
@@ -902,7 +908,7 @@
       // Datos del crédito
       agenciaAsignada: ($('#r_agencia').value || '').trim(),
       asignadoA: ($('#r_asesor').value || '').trim(),
-      lineaDeCredito: 'Refinanciamiento',
+      lineaDeCredito: $('#r_linea').value, // <-- ahora toma la seleccionada
       estadoCredito: $('#r_estado').value,
       montoAprobado: monto,
       saldoInicial: Number($('#r_saldoIni').value || 0),
@@ -931,11 +937,11 @@
     const ref = doc(collection(db,'creditos'));
     await setDoc(ref, datos, { merge:true });
 
-    // Guardar ID en estado y habilitar panel de amortización refi
+    // Guardar ID en estado y habilitar panel de amortización nuevo crédito
     state.refi.id = ref.id;
     $('#refiAmortGuard').classList.add('hidden');
     $('#refiAmortPanel').classList.remove('hidden');
-    $('#lblRefi').textContent = 'Refinanciamiento creado ✓';
+    $('#lblRefi').textContent = 'Nuevo crédito creado ✓';
 
     const result = document.getElementById('refiResult');
     result.innerHTML = `
@@ -951,11 +957,11 @@
       window.scrollTo({top:0,behavior:'smooth'});
     });
 
-    alert('Refinanciamiento creado','Se creó el nuevo crédito y quedó vinculado al mismo cliente.','success');
+    alert('Nuevo crédito creado','Se creó el crédito con la línea seleccionada y quedó vinculado al mismo cliente.','success');
   }
   $('#btnCrearRefi').addEventListener('click', crearRefinanciamiento);
 
-  /* ======= AMORTIZACIÓN DEL REFINANCIAMIENTO ======= */
+  /* ======= AMORTIZACIÓN DEL NUEVO CRÉDITO ======= */
   function r_prefillAmortFromForm(){
     $('#r_a_start').value = $('#r_fechaInicio').value || '';
     $('#r_a_freq').value  = $('#r_freq').value || 'Quincenal';
@@ -1033,7 +1039,7 @@
   }
 
   async function r_guardarAmort(){
-    if(!state.refi.id) return alert('Sin refinanciamiento','Primero crea el refinanciamiento.','warning');
+    if(!state.refi.id) return alert('Sin nuevo crédito','Primero crea el nuevo crédito.','warning');
     if(!state.refi.amort.length) return alert('Sin tabla','Genera la tabla antes de guardar.','warning');
     await updateDoc(doc(db,'creditos', state.refi.id), {
       amortizacion: state.refi.amort,
@@ -1044,7 +1050,7 @@
     alert('Amortización creada','Se guardó la amortización en el nuevo crédito.','success');
   }
 
-  // Listeners amort refi
+  // Listeners amort nuevo crédito
   $('#r_btnPrefillAmort').addEventListener('click', r_prefillAmortFromForm);
   $('#r_btnGenerarAmort').addEventListener('click', r_generarAmort);
   $('#r_btnGuardarAmort').addEventListener('click', r_guardarAmort);

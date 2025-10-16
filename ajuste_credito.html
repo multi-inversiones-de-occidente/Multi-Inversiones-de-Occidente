@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ajuste de Créditos – Puesta al día</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    :root{ --bg:#0f1216;--card:#161a20;--muted:#9aa4b2;--text:#e9eef5;--brand:#f8af40;--ok:#22c55e;--err:#ef4444; --radius:16px }
+    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+    body{margin:0;background:linear-gradient(180deg,#0d0f13,#11151b);color:var(--text)}
+    header{position:sticky;top:0;background:rgba(15,18,22,.8);backdrop-filter:saturate(140%) blur(6px);border-bottom:1px solid #22262d;z-index:10}
+    header .wrap{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:14px 20px}
+    .logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.3px}
+    .logo .dot{width:12px;height:12px;border-radius:999px;background:var(--brand)}
+    .container{max-width:1160px;margin:22px auto;padding:0 16px 80px}
+    .card{background:var(--card);border:1px solid #232833;border-radius:var(--radius);padding:18px}
+    h2{margin:0 0 10px 0;font-size:20px}
+    h3{margin:14px 0 8px 0;font-size:16px;color:#c9d2df}
+    .muted{color:var(--muted);font-size:13px}
+    .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+    .field{display:flex;flex-direction:column;gap:6px}
+    label{font-size:12px;color:#b7c2d1}
+    input,select,textarea{background:#0f1318;color:var(--text);border:1px solid #273041;border-radius:12px;padding:10px 12px;font-size:14px;outline:none}
+    input:focus,select:focus,textarea:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.2)}
+    .col-12{grid-column:span 12}.col-10{grid-column:span 10}.col-8{grid-column:span 8}.col-6{grid-column:span 6}.col-4{grid-column:span 4}.col-3{grid-column:span 3}.col-2{grid-column:span 2}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    button{background:#1d2939;color:#e9eef5;border:1px solid #2a3444;border-radius:12px;padding:10px 14px;font-weight:600;cursor:pointer}
+    button.primary{background:var(--brand);border-color:#c6892b;color:#1a1206}
+    button.success{background:var(--ok);border-color:#17a34a;color:#07140b}
+    button.danger{background:#2a1414;border-color:#542020;color:#ffdada}
+    .pill{padding:2px 8px;border-radius:999px;border:1px solid #2b3241;background:#121721;font-size:11px}
+    .table-wrap{max-height:360px;overflow:auto;border:1px solid #273041;border-radius:12px;margin-top:10px}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{font-size:13px;padding:8px;border-bottom:1px solid #263144;vertical-align:top}
+    th{color:#c9d2df;text-align:left;position:sticky;top:0;background:#182029;z-index:1}
+    .tag{display:inline-flex;align-items:center;gap:6px;background:#141a22;border:1px solid #263144;color:#b9c3d0;border-radius:999px;padding:4px 8px;font-size:12px}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .hidden{display:none}
+    .kbd{font-family:ui-monospace,Consolas,Menlo,monospace;background:#0f1318;border:1px solid #273041;border-radius:8px;padding:2px 6px}
+    .badge-warn{background:#2a1f12;border:1px solid #5a421e;color:#ffd89c;border-radius:999px;padding:2px 8px;font-size:11px}
+    .soft{opacity:.85}
+    .results{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+    .result-card{display:flex;justify-content:space-between;align-items:center;border:1px solid #2a3444;border-radius:12px;padding:8px 10px;background:#121721}
+    .result-card small{color:var(--muted)}
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="logo"><span class="dot"></span> Ajuste de Créditos – Puesta al día</div>
+    <div class="muted">Solo uso interno · Requiere admin</div>
+  </div>
+</header>
+
+<div class="container">
+  <!-- BUSCADOR -->
+  <section class="card">
+    <h2>Buscar crédito</h2>
+    <div class="row">
+      <div class="field col-4">
+        <label>Buscar por <b>creditoID</b></label>
+        <input id="b_creditoID" placeholder="Ej. ABC123...">
+      </div>
+      <div class="field col-2" style="align-self:end">
+        <button id="btnBuscarPorCredito" class="primary">Cargar crédito</button>
+      </div>
+      <div class="field col-3">
+        <label>O buscar por <b>DUI</b></label>
+        <input id="b_dui" placeholder="########-#" maxlength="10">
+      </div>
+      <div class="field col-3" style="align-self:end">
+        <button id="btnBuscarPorDui">Listar créditos</button>
+      </div>
+      <div class="field col-6">
+        <label>Buscar por <b>Nombre o Apellido</b> (prefijo)</label>
+        <input id="b_nombre" placeholder="Ej. Karina / Villeda">
+      </div>
+      <div class="field col-2" style="align-self:end">
+        <button id="btnBuscarPorNombre">Buscar cliente</button>
+      </div>
+    </div>
+
+    <div id="listaCreditos" class="results"></div>
+    <div class="muted">Frecuencia respeta: <span class="kbd">Semanal=7d</span>, <span class="kbd">Catorcenal=14d</span>, <span class="kbd">Quincenal=15d</span>, <span class="kbd">Mensual=+1 mes</span>.</div>
+  </section>
+
+  <!-- DATOS GENERALES -->
+  <section class="card hidden" id="panelGeneral">
+    <h2>Datos generales del crédito <span id="tagCredito" class="tag">creditoID: —</span></h2>
+    <div class="row">
+      <div class="field col-3"><label>Agencia asignada</label><input id="c_agencia"></div>
+      <div class="field col-3"><label>Asesor (asignadoA)</label><input id="c_asesor"></div>
+      <div class="field col-3"><label>Línea de crédito</label>
+        <select id="c_linea">
+          <option>Credicash</option>
+          <option>Credicel</option>
+          <option>Amuebla2</option>
+          <option>Estacionario</option>
+          <option>Refinanciamiento</option>
+        </select>
+      </div>
+      <div class="field col-3"><label>Estado crédito</label>
+        <select id="c_estado">
+          <option>Activo</option>
+          <option>Pagado</option>
+          <option>En Mora</option>
+          <option>Mora Severa</option>
+        </select>
+      </div>
+
+      <div class="field col-3"><label>Saldo inicial ($)</label><input id="c_saldoIni" type="number" step="0.01"></div>
+      <div class="field col-3"><label>Saldo actual ($)</label><input id="c_saldoAct" type="number" step="0.01"></div>
+      <div class="field col-3"><label>Para ponerse al día ($)</label><input id="c_ppaldia" type="number" step="0.01"></div>
+      <div class="field col-3"><label>Multas acumuladas ($)</label><input id="c_multas" type="number" step="0.01"></div>
+
+      <div class="field col-3"><label>Interés actual ($)</label><input id="c_interesActual" type="number" step="0.01"></div>
+      <div class="field col-3"><label>Capital atrasado ($)</label><input id="c_capAtras" type="number" step="0.01"></div>
+      <div class="field col-3"><label>Tasa anual (%)</label><input id="c_tasaAnual" type="number" step="0.01"></div>
+      <div class="field col-3"><label>Tasa diaria (auto)</label><input id="c_tasaDiaria" type="number" step="0.000000001" readonly></div>
+
+      <div class="field col-3"><label>Frecuencia de pago</label>
+        <select id="c_freq">
+          <option>Semanal</option>
+          <option>Catorcenal</option>
+          <option>Quincenal</option>
+          <option>Mensual</option>
+        </select>
+      </div>
+      <div class="field col-3"><label>Fecha inicio</label><input id="c_fechaInicio" type="date"></div>
+      <div class="field col-3"><label>Cuota aprobada ($)</label><input id="c_cuota" type="number" step="0.01" readonly></div>
+      <div class="field col-3"><label># de cuotas</label><input id="c_numCuotas" type="number" min="1" readonly></div>
+    </div>
+    <div class="actions">
+      <button id="btnTasaDiaria">Recalcular tasa diaria</button>
+      <button id="btnGuardarGeneral" class="primary">Guardar datos generales</button>
+      <span id="lblGuardadoGen" class="muted"></span>
+    </div>
+  </section>
+
+  <!-- MULTAS -->
+  <section class="card hidden" id="panelMultas">
+    <h2>Multas</h2>
+    <div class="muted">Quita una multa y se descuenta del total de <b>multasAcumuladas</b> en la UI; luego guarda para persistir.</div>
+    <div class="row">
+      <div class="field col-3"><label>Multas acumuladas ($)</label><input id="m_total" type="number" step="0.01" readonly></div>
+      <div class="field col-3" style="align-self:end"><button id="btnGuardarMultas" class="success">Guardar multas</button></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Fecha</th><th>Tipo</th><th>Cuota #</th><th>Estado</th><th>Monto ($)</th><th>Acción</th></tr></thead>
+        <tbody id="multasBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- AMORTIZACIÓN -->
+  <section class="card hidden" id="panelAmort">
+    <h2>Amortización (editar fechas)</h2>
+    <div class="muted">
+      Cambia la fecha de una cuota y <b>todas las siguientes</b> se ajustarán según la frecuencia del crédito.
+      <span class="soft">No altera montos (cuota/capital/interés/saldo).</span>
+    </div>
+    <div class="actions">
+      <button id="btnGuardarAmort" class="primary">Guardar amortización</button>
+      <span id="lblGuardadoAmort" class="muted"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Fecha</th><th>Cuota</th><th>Capital</th><th>Interés</th><th>Saldo</th><th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="amortBody"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script type="module">
+  /* ============== Firebase SDKs ============== */
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs,
+    orderBy, startAt, endAt, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+
+  /* ===== Configuración Firebase (tu proyecto) ===== */
+  const firebaseConfig = {
+    apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+    authDomain: "multinversiones-38e13.firebaseapp.com",
+    projectId: "multinversiones-38e13",
+    storageBucket: "multinversiones-38e13.appspot.com",
+    messagingSenderId: "380001917078",
+    appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+    measurementId: "G-H4E31XHG1Y"
+  };
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  /* ============== Helpers UI ============== */
+  const $ = s => document.querySelector(s);
+  const fmt2 = n => Number(n || 0).toFixed(2);
+  const alert = (title, text, icon='info')=>Swal.fire({title, text, icon, confirmButtonColor:'#f8af40'});
+
+  const TZ_OFFSET = '-06:00';
+  const pad2 = n => String(n).padStart(2,'0');
+  function dateToInput(dateStr){
+    if(!dateStr) return '';
+    const d = new Date(dateStr);
+    if(!isNaN(d)) return d.toISOString().slice(0,10);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+    return '';
+  }
+  function inputToISO_TZ(yyyy_mm_dd){
+    if(!yyyy_mm_dd) return '';
+    const [y,m,d] = yyyy_mm_dd.split('-').map(Number);
+    return `${y}-${pad2(m)}-${pad2(d)}T00:00:00.000${TZ_OFFSET}`;
+  }
+  function addDays(d, days){ const x=new Date(d); x.setDate(x.getDate()+days); return x; }
+  function addMonths(d, months){ const x=new Date(d); x.setMonth(x.getMonth()+months); return x; }
+  function nextFrom(baseISO, freq){
+    const d = new Date(baseISO);
+    if(freq==='Semanal') return addDays(d,7).toISOString().slice(0,10);
+    if(freq==='Catorcenal') return addDays(d,14).toISOString().slice(0,10);
+    if(freq==='Quincenal') return addDays(d,15).toISOString().slice(0,10);
+    if(freq==='Mensual') return addMonths(d,1).toISOString().slice(0,10);
+    return addDays(d,14).toISOString().slice(0,10);
+  }
+
+  /* ============== Estado ============== */
+  const state = { creditoID:null, credito:null, amort:[], multas:[] };
+
+  /* ============== Gate opcional ============== */
+  onAuthStateChanged(auth, async (user) => {
+    if(!user) return;
+    // Validación de rol admin si se requiere
+  });
+
+  /* ============== BUSCAR ============== */
+  async function loadCreditoById(id){
+    const snap = await getDoc(doc(db,'creditos', id));
+    if(!snap.exists()){ alert('No encontrado','No existe un crédito con ese ID','warning'); return; }
+    setCreditoLoaded(id, snap.data());
+  }
+
+  async function listCreditosByDui(dui){
+    const q = query(collection(db,'creditos'), where('numeroDui','==',dui));
+    const snap = await getDocs(q);
+    renderCreditosListFromSnapshot(snap, `Resultados por DUI: ${dui}`);
+  }
+
+  // NUEVO: buscar por nombre o apellido (prefix)
+  async function listCreditosByNombre(termRaw){
+    const term = (termRaw || '').trim();
+    if(!term){ alert('Falta nombre','Escribe un nombre o apellido','warning'); return; }
+
+    // 1) Buscar usuarios cuyo nombre comience con term
+    // 2) Buscar usuarios cuyo apellido comience con term
+    // Nota: requiere índices para orderBy('nombre')/orderBy('apellido') si no existen Firestore los pedirá.
+    const usersCol = collection(db,'users');
+    const qNombre   = query(usersCol, orderBy('nombre'),   startAt(term), endAt(term + '\uf8ff'));
+    const qApellido = query(usersCol, orderBy('apellido'), startAt(term), endAt(term + '\uf8ff'));
+
+    const [snN, snA] = await Promise.all([getDocs(qNombre), getDocs(qApellido)]);
+
+    // Unir users por id (evitar duplicados)
+    const userMap = new Map();
+    snN.forEach(d=> userMap.set(d.id, d.data()));
+    snA.forEach(d=> userMap.set(d.id, d.data()));
+
+    const wrap = $('#listaCreditos'); wrap.innerHTML='';
+    if(userMap.size===0){
+      wrap.innerHTML = `<div class="muted">No hay clientes que empiecen con “${term}”.</div>`;
+      return;
+    }
+
+    // Por cada user encontrado, listar sus créditos
+    for (const [uid, udata] of userMap.entries()){
+      const qCreds = query(collection(db,'creditos'), where('clienteID','==',uid));
+      const credSnap = await getDocs(qCreds);
+      if(credSnap.empty){
+        // Mostrar el cliente aunque no tenga créditos (informativo)
+        const card = document.createElement('div');
+        card.className='result-card';
+        card.innerHTML = `
+          <div>
+            <div><b>${udata.nombre||''} ${udata.apellido||''}</b> <small class="muted">(${udata.numeroDui||'sin DUI'})</small></div>
+            <small>Sin créditos registrados</small>
+          </div>`;
+        wrap.appendChild(card);
+        continue;
+      }
+      credSnap.forEach(c=>{
+        const d = c.data();
+        const card = document.createElement('div');
+        card.className='result-card';
+        card.innerHTML = `
+          <div>
+            <div><b>${udata.nombre||d.nombre||''} ${udata.apellido||d.apellido||''}</b> <small class="muted">DUI: ${udata.numeroDui||d.numeroDui||'—'}</small></div>
+            <small>Crédito: <span class="pill">${c.id}</span> · Línea: ${d.lineaDeCredito||'—'} · Estado: ${d.estadoCredito||'—'} · Asesor: ${d.asignadoA||'—'}</small>
+          </div>
+          <button class="primary" data-open="${c.id}">Abrir</button>
+        `;
+        wrap.appendChild(card);
+      });
+    }
+
+    // Bind abrir
+    wrap.querySelectorAll('button[data-open]').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        const id = e.target.getAttribute('data-open');
+        await loadCreditoById(id);
+        window.scrollTo({top:0,behavior:'smooth'});
+      });
+    });
+  }
+
+  function renderCreditosListFromSnapshot(snap, titleText){
+    const wrap = $('#listaCreditos'); wrap.innerHTML='';
+    if(titleText){
+      const title = document.createElement('div');
+      title.className = 'muted';
+      title.textContent = titleText;
+      wrap.appendChild(title);
+    }
+    if(snap.empty){
+      const empty = document.createElement('div');
+      empty.className='muted';
+      empty.textContent = 'No se encontraron créditos';
+      wrap.appendChild(empty);
+      return;
+    }
+    snap.forEach(d=>{
+      const c = d.data();
+      const card = document.createElement('div');
+      card.className='result-card';
+      card.innerHTML = `
+        <div>
+          <div><b>${c.nombre||'—'} ${c.apellido||''}</b> <small class="muted">DUI: ${c.numeroDui||'—'}</small></div>
+          <small>Crédito: <span class="pill">${d.id}</span> · Línea: ${c.lineaDeCredito||'—'} · Estado: ${c.estadoCredito||'—'} · Asesor: ${c.asignadoA||'—'}</small>
+        </div>
+        <button class="primary" data-open="${d.id}">Abrir</button>
+      `;
+      wrap.appendChild(card);
+    });
+    wrap.querySelectorAll('button[data-open]').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        const id = e.target.getAttribute('data-open');
+        await loadCreditoById(id);
+        window.scrollTo({top:0,behavior:'smooth'});
+      });
+    });
+  }
+
+  // Eventos buscador
+  $('#btnBuscarPorCredito').addEventListener('click', ()=>{
+    const id = $('#b_creditoID').value.trim();
+    if(!id) return alert('Falta dato','Ingresa un creditoID','warning');
+    loadCreditoById(id);
+  });
+  $('#btnBuscarPorDui').addEventListener('click', ()=>{
+    const dui = $('#b_dui').value.trim();
+    if(!dui) return alert('Falta dato','Ingresa un DUI','warning');
+    listCreditosByDui(dui);
+  });
+  $('#btnBuscarPorNombre').addEventListener('click', ()=>{
+    const name = $('#b_nombre').value.trim();
+    listCreditosByNombre(name);
+  });
+
+  /* ============== CARGA y RENDER ============== */
+  function setCreditoLoaded(id, data){
+    state.creditoID = id;
+    state.credito = data || {};
+    state.amort = Array.isArray(data?.amortizacion) ? JSON.parse(JSON.stringify(data.amortizacion)) : [];
+    state.multas = Array.isArray(data?.historialMultas) ? JSON.parse(JSON.stringify(data.historialMultas)) : [];
+
+    $('#panelGeneral').classList.remove('hidden');
+    $('#panelAmort').classList.remove('hidden');
+    $('#panelMultas').classList.remove('hidden');
+
+    $('#tagCredito').textContent = `creditoID: ${id}`;
+
+    // Generales
+    $('#c_agencia').value     = data.agenciaAsignada || '';
+    $('#c_asesor').value      = data.asignadoA || '';
+    $('#c_linea').value       = data.lineaDeCredito || 'Credicash';
+    $('#c_estado').value      = data.estadoCredito || 'Activo';
+    $('#c_saldoIni').value    = (data.saldoInicial ?? '') === '' ? '' : data.saldoInicial;
+    $('#c_saldoAct').value    = (data.saldoActual ?? '') === '' ? '' : data.saldoActual;
+    $('#c_ppaldia').value     = (data.paraPonerseAlDia ?? '') === '' ? '' : data.paraPonerseAlDia;
+    $('#c_multas').value      = (data.multasAcumuladas ?? '') === '' ? '' : data.multasAcumuladas;
+    $('#c_interesActual').value = (data.interesActual ?? '') === '' ? '' : data.interesActual;
+    $('#c_capAtras').value    = (data.capitalAtrasado ?? '') === '' ? '' : data.capitalAtrasado;
+    $('#c_tasaAnual').value   = (data.tasaAnualCredito ?? '') === '' ? '' : data.tasaAnualCredito;
+    $('#c_tasaDiaria').value  = (data.tasaDiariaCredito ?? '') === '' ? '' : data.tasaDiariaCredito;
+    $('#c_freq').value        = data.frecuenciaPago || 'Quincenal';
+    $('#c_fechaInicio').value = dateToInput(data.fechaInicio || '');
+    $('#c_cuota').value       = (data.cuotaAprobada ?? '') === '' ? '' : data.cuotaAprobada;
+    $('#c_numCuotas').value   = (data.numeroCuotas ?? '') === '' ? '' : data.numeroCuotas;
+
+    renderMultas();
+    renderAmort();
+  }
+
+  /* ============== MULTAS ============== */
+  function renderMultas(){
+    const body = $('#multasBody'); body.innerHTML = '';
+    const total = Number($('#c_multas').value || 0);
+    $('#m_total').value = fmt2(total);
+
+    if(!state.multas?.length){
+      body.innerHTML = `<tr><td colspan="7" class="muted">Sin historial de multas.</td></tr>`;
+      return;
+    }
+    state.multas.forEach((m,i)=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i+1}</td>
+        <td>${m.fecha || ''}</td>
+        <td>${m.tipo || ''}</td>
+        <td>${m.cuotaNumero ?? '—'}</td>
+        <td>${m.estadoCuota || '—'}</td>
+        <td>${fmt2(m.monto || 0)}</td>
+        <td><button class="danger" data-del="${i}">Quitar multa</button></td>
+      `;
+      body.appendChild(tr);
+    });
+    body.querySelectorAll('button[data-del]').forEach(btn=>{
+      btn.addEventListener('click', e=>{
+        const idx = Number(e.target.getAttribute('data-del'));
+        const monto = Number(state.multas[idx]?.monto || 0);
+        state.multas.splice(idx,1);
+        const cur = Number($('#c_multas').value || 0);
+        const nuevo = Math.max(0, +(cur - monto).toFixed(2));
+        $('#c_multas').value = nuevo;
+        $('#m_total').value = fmt2(nuevo);
+        renderMultas();
+      });
+    });
+  }
+
+  async function guardarMultas(){
+    if(!state.creditoID) return;
+    const update = {
+      historialMultas: state.multas,
+      multasAcumuladas: Number($('#c_multas').value || 0),
+      ultimaActualizacion: serverTimestamp()
+    };
+    await updateDoc(doc(db,'creditos',state.creditoID), update);
+    alert('Multas actualizadas','Se guardaron los cambios en multas.','success');
+  }
+  $('#btnGuardarMultas').addEventListener('click', guardarMultas);
+
+  /* ============== AMORTIZACIÓN (editar fechas) ============== */
+  function renderAmort(){
+    const body = $('#amortBody'); body.innerHTML = '';
+    if(!state.amort?.length){
+      body.innerHTML = `<tr><td colspan="7" class="muted">Este crédito no tiene tabla de amortización.</td></tr>`;
+      return;
+    }
+    state.amort.forEach((r,i)=>{
+      const tr = document.createElement('tr');
+      const fechaInp = `<input type="date" data-idx="${i}" value="${dateToInput(r.fecha || '')}">`;
+      tr.innerHTML = `
+        <td>${r.numeroCuota ?? (i+1)}</td>
+        <td>${fechaInp}</td>
+        <td>${fmt2(r.cuota)}</td>
+        <td>${fmt2(r.capital)}</td>
+        <td>${fmt2(r.interes)}</td>
+        <td>${fmt2(r.saldo)}</td>
+        <td>${r.estado || 'Pendiente'}</td>
+      `;
+      body.appendChild(tr);
+    });
+
+    body.querySelectorAll('input[type="date"]').forEach(inp=>{
+      inp.addEventListener('change', (e)=>{
+        const idx = Number(e.target.getAttribute('data-idx'));
+        const nueva = e.target.value;
+        if(!nueva) return;
+        state.amort[idx].fecha = nueva;
+        const freq = $('#c_freq').value || state.credito?.frecuenciaPago || 'Quincenal';
+        let last = nueva;
+        for(let j=idx+1; j<state.amort.length; j++){
+          last = nextFrom(`${last}T00:00:00.000${TZ_OFFSET}`, freq);
+          state.amort[j].fecha = last;
+          const nextInp = document.querySelector(`input[type="date"][data-idx="${j}"]`);
+          if(nextInp) nextInp.value = state.amort[j].fecha;
+        }
+      });
+    });
+  }
+
+  async function guardarAmort(){
+    if(!state.creditoID) return alert('Sin crédito','Carga un crédito primero','warning');
+    await updateDoc(doc(db,'creditos',state.creditoID), {
+      amortizacion: state.amort,
+      ultimaActualizacion: serverTimestamp()
+    });
+    $('#lblGuardadoAmort').textContent = 'Amortización guardada ✓';
+    setTimeout(()=> $('#lblGuardadoAmort').textContent='', 2000);
+    alert('Amortización actualizada','Fechas guardadas correctamente.','success');
+  }
+  $('#btnGuardarAmort').addEventListener('click', guardarAmort);
+
+  /* ============== GENERALES ============== */
+  $('#btnTasaDiaria').addEventListener('click', ()=>{
+    const a = Number($('#c_tasaAnual').value || 0)/100;
+    const diaria = a/365;
+    $('#c_tasaDiaria').value = diaria.toFixed(9);
+  });
+
+  async function guardarGenerales(){
+    if(!state.creditoID) return alert('Sin crédito','Carga un crédito primero','warning');
+    const update = {
+      agenciaAsignada: $('#c_agencia').value.trim(),
+      asignadoA: $('#c_asesor').value.trim(),
+      lineaDeCredito: $('#c_linea').value,
+      estadoCredito: $('#c_estado').value,
+      saldoInicial: Number($('#c_saldoIni').value || 0),
+      saldoActual: Number($('#c_saldoAct').value || 0),
+      paraPonerseAlDia: Number($('#c_ppaldia').value || 0),
+      multasAcumuladas: Number($('#c_multas').value || 0),
+      interesActual: Number($('#c_interesActual').value || 0),
+      capitalAtrasado: Number($('#c_capAtras').value || 0),
+      tasaAnualCredito: Number($('#c_tasaAnual').value || 0),
+      tasaDiariaCredito: Number($('#c_tasaDiaria').value || 0),
+      frecuenciaPago: $('#c_freq').value,
+      fechaInicio: inputToISO_TZ($('#c_fechaInicio').value),
+      ultimaActualizacion: serverTimestamp()
+    };
+    await updateDoc(doc(db,'creditos', state.creditoID), update);
+    $('#lblGuardadoGen').textContent = 'Datos generales guardados ✓';
+    setTimeout(()=> $('#lblGuardadoGen').textContent='', 2000);
+    alert('Crédito actualizado','Se guardaron los datos generales.','success');
+  }
+  $('#btnGuardarGeneral').addEventListener('click', guardarGenerales);
+</script>
+</body>
+</html>

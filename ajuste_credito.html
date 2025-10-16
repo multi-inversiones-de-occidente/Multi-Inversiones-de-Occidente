@@ -16,7 +16,7 @@
     header .wrap{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:14px 20px}
     .logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.3px}
     .logo .dot{width:12px;height:12px;border-radius:999px;background:var(--brand)}
-    .container{max-width:1160px;margin:22px auto;padding:0 16px 80px}
+    .container{max-width:1160px;margin:22px auto;padding:0 16px 120px}
     .card{background:var(--card);border:1px solid #232833;border-radius:var(--radius);padding:18px}
     h2{margin:0 0 10px 0;font-size:20px}
     h3{margin:14px 0 8px 0;font-size:16px;color:#c9d2df}
@@ -25,7 +25,7 @@
     .field{display:flex;flex-direction:column;gap:6px}
     label{font-size:12px;color:#b7c2d1}
     input,select,textarea{background:#0f1318;color:var(--text);border:1px solid #273041;border-radius:12px;padding:10px 12px;font-size:14px;outline:none}
-    input:focus,select:focus,textarea:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba[59,130,246,.2]}
+    input:focus,select:focus,textarea:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.2)}
     .col-12{grid-column:span 12}.col-10{grid-column:span 10}.col-8{grid-column:span 8}.col-6{grid-column:span 6}.col-4{grid-column:span 4}.col-3{grid-column:span 3}.col-2{grid-column:span 2}
     .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
     button{background:#1d2939;color:#e9eef5;border:1px solid #2a3444;border-radius:12px;padding:10px 14px;font-weight:600;cursor:pointer}
@@ -40,11 +40,11 @@
     .tag{display:inline-flex;align-items:center;gap:6px;background:#141a22;border:1px solid #263144;color:#b9c3d0;border-radius:999px;padding:4px 8px;font-size:12px}
     .hidden{display:none}
     .kbd{font-family:ui-monospace,Consolas,Menlo,monospace;background:#0f1318;border:1px solid #273041;border-radius:8px;padding:2px 6px}
-    .badge-warn{background:#2a1f12;border:1px solid #5a421e;color:#ffd89c;border-radius:999px;padding:2px 8px;font-size:11px}
     .soft{opacity:.85}
     .results{display:flex;flex-direction:column;gap:8px;margin-top:10px}
     .result-card{display:flex;justify-content:space-between;align-items:center;border:1px solid #2a3444;border-radius:12px;padding:8px 10px;background:#121721}
     .result-card small{color:var(--muted)}
+    .divider{height:1px;background:#263144;margin:18px 0}
   </style>
 </head>
 <body>
@@ -183,7 +183,6 @@
     <h2>Agregar pagos</h2>
     <div class="muted">Carga pagos por CSV o agrégalos manualmente. Al guardar se crearán documentos en <b>pagos</b> vinculados al <b>creditoID</b> cargado.</div>
 
-    <!-- Opciones generales -->
     <div class="row">
       <div class="field col-3"><label>Sucursal</label><input id="p_sucursal" placeholder="Ahuachapán / Sonsonate…"></div>
       <div class="field col-3"><label>UsuarioID (quien registra)</label><input id="p_usuario" placeholder="uid del operador (opcional)"></div>
@@ -200,7 +199,6 @@
       <button id="btnCargarPagosCSV">Cargar CSV</button>
     </div>
 
-    <!-- Form manual -->
     <h3>Agregar pago manual</h3>
     <div class="row">
       <div class="field col-2"><label>Fecha de pago</label><input id="pm_fecha" type="date"></div>
@@ -226,6 +224,80 @@
       <button id="btnGuardarPagos" class="success">Guardar pagos</button>
       <span id="lblGuardadoPagos" class="muted"></span>
     </div>
+  </section>
+
+  <!-- ===================================================== -->
+  <!-- REFINANCIAMIENTO (nuevo crédito para el mismo cliente) -->
+  <!-- ===================================================== -->
+  <section class="card hidden" id="panelRefi">
+    <h2>Refinanciamiento (crear nuevo crédito para este cliente)</h2>
+    <div class="muted">
+      Usa este formulario para crear un <b>nuevo crédito</b> con línea <span class="pill">Refinanciamiento</span> vinculado al <b>mismo cliente</b> del crédito cargado.
+    </div>
+
+    <div class="actions" style="margin-top:8px">
+      <button id="btnRefiPrefill">Prefill con datos del crédito actual</button>
+      <button id="btnRefiTasaDiaria">Calcular tasa diaria</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <h3>Identidad del cliente (se guarda dentro del doc del crédito)</h3>
+    <div class="row">
+      <div class="field col-3"><label>Nombres</label><input id="r_nombre"></div>
+      <div class="field col-3"><label>Apellidos</label><input id="r_apellido"></div>
+      <div class="field col-3"><label>DUI</label><input id="r_dui" placeholder="########-#"></div>
+      <div class="field col-3"><label>Teléfono</label><input id="r_tel" placeholder="####-####" maxlength="9"></div>
+      <div class="field col-12"><label>Dirección</label><input id="r_dir" placeholder="Dirección del cliente"></div>
+    </div>
+
+    <h3>Datos del nuevo crédito</h3>
+    <div class="row">
+      <div class="field col-3"><label>Agencia asignada</label><input id="r_agencia"></div>
+      <div class="field col-3"><label>Asesor (asignadoA)</label><input id="r_asesor"></div>
+      <div class="field col-3"><label>Línea de crédito</label>
+        <select id="r_linea" disabled>
+          <option selected>Refinanciamiento</option>
+        </select>
+      </div>
+      <div class="field col-3"><label>Estado crédito</label>
+        <select id="r_estado">
+          <option>Activo</option>
+          <option>Pagado</option>
+          <option>En Mora</option>
+          <option>Mora Severa</option>
+        </select>
+      </div>
+
+      <div class="field col-3"><label>Monto aprobado ($)</label><input id="r_monto" type="number" step="0.01"></div>
+      <div class="field col-3"><label>Saldo inicial ($)</label><input id="r_saldoIni" type="number" step="0.01"></div>
+      <div class="field col-3"><label>Saldo actual ($)</label><input id="r_saldoAct" type="number" step="0.01" value="0"></div>
+      <div class="field col-3"><label>Cuota aprobada ($)</label><input id="r_cuota" type="number" step="0.01"></div>
+
+      <div class="field col-3"><label># de cuotas</label><input id="r_numCuotas" type="number" min="1"></div>
+      <div class="field col-3"><label>Frecuencia</label>
+        <select id="r_freq">
+          <option>Semanal</option>
+          <option>Catorcenal</option>
+          <option>Quincenal</option>
+          <option>Mensual</option>
+        </select>
+      </div>
+      <div class="field col-3"><label>Tasa anual (%)</label><input id="r_tasaAnual" type="number" step="0.01" value="180"></div>
+      <div class="field col-3"><label>Tasa diaria (auto)</label><input id="r_tasaDiaria" type="number" step="0.000000001" readonly></div>
+
+      <div class="field col-3"><label>Fecha inicio</label><input id="r_fechaInicio" type="date"></div>
+      <div class="field col-3"><label>Interés actual ($)</label><input id="r_interesActual" type="number" step="0.01" value="0"></div>
+      <div class="field col-3"><label>Multas acumuladas ($)</label><input id="r_multas" type="number" step="0.01" value="0"></div>
+      <div class="field col-3"><label>Para ponerse al día ($)</label><input id="r_ppaldia" type="number" step="0.01" value="0"></div>
+    </div>
+
+    <div class="actions">
+      <button id="btnCrearRefi" class="primary">Crear refinanciamiento</button>
+      <span id="lblRefi" class="muted"></span>
+    </div>
+
+    <div id="refiResult" class="muted"></div>
   </section>
 </div>
 
@@ -288,11 +360,10 @@
     credito:null, 
     amort:[], 
     multas:[],
-    pagos:[] // nuevos pagos en la lista (antes de persistir)
+    pagos:[]
   };
 
-  /* ============== Gate opcional ============== */
-  onAuthStateChanged(auth, async (user) => { /* si quieres validar rol aquí */ });
+  onAuthStateChanged(auth, async (user) => { /* rol opcional */ });
 
   /* ============== BUSCAR ============== */
   async function loadCreditoById(id){
@@ -398,13 +469,14 @@
     state.credito = data || {};
     state.amort = Array.isArray(data?.amortizacion) ? JSON.parse(JSON.stringify(data.amortizacion)) : [];
     state.multas = Array.isArray(data?.historialMultas) ? JSON.parse(JSON.stringify(data.historialMultas)) : [];
-    state.pagos = []; // limpiar lista local de nuevos pagos
+    state.pagos = [];
 
     // Mostrar paneles
     $('#panelGeneral').classList.remove('hidden');
     $('#panelAmort').classList.remove('hidden');
     $('#panelMultas').classList.remove('hidden');
     $('#panelPagos').classList.remove('hidden');
+    $('#panelRefi').classList.remove('hidden');
 
     // Tag
     $('#tagCredito').textContent = `creditoID: ${id}`;
@@ -430,6 +502,13 @@
     renderMultas();
     renderAmort();
     renderPagos();
+
+    // Pre-cargar identidad cliente para refi
+    $('#r_nombre').value  = data.nombre || '';
+    $('#r_apellido').value= data.apellido || '';
+    $('#r_dui').value     = data.numeroDui || '';
+    $('#r_tel').value     = data.telefono || '';
+    $('#r_dir').value     = data.direccion || '';
   }
 
   /* ============== MULTAS ============== */
@@ -645,7 +724,6 @@
     }
     state.pagos.push(row);
     renderPagos();
-    // limpiar inputs clave
     $('#pm_monto').value = '';
     $('#pm_capital').value = '0';
     $('#pm_interes').value = '0';
@@ -660,7 +738,6 @@
     const usuario = $('#p_usuario').value.trim() || '';
     const retro = $('#p_retro').value === 'true';
 
-    // Datos del cliente desde el doc del crédito (si existen)
     const nombres = [state.credito?.nombre||'', state.credito?.apellido||''].join(' ').trim();
     const numeroDui = state.credito?.numeroDui || '';
 
@@ -676,7 +753,6 @@
         fechaPago: p.fechaPago ? inputToISO_TZ(p.fechaPago) : inputToISO_TZ(new Date().toISOString().slice(0,10)),
         fechaRegistro: inputToISO_TZ(new Date().toISOString().slice(0,10)),
         montoPagado: Number(p.montoPagado||0),
-        // Igual que en migración: guardar como strings 2 decimales
         pagoCapital: fmt2(p.pagoCapital||0),
         pagoInteres: fmt2(p.pagoInteres||0),
         pagoMulta: fmt2(p.pagoMulta||0),
@@ -697,6 +773,115 @@
     renderPagos();
   }
   $('#btnGuardarPagos').addEventListener('click', guardarPagos);
+
+  /* ============== REFINANCIAMIENTO (nuevo crédito) ============== */
+  function refiCalcTasaDiaria(){
+    const a = Number($('#r_tasaAnual').value || 0) / 100;
+    const diaria = a / 365;
+    $('#r_tasaDiaria').value = diaria.toFixed(9);
+  }
+  $('#btnRefiTasaDiaria').addEventListener('click', refiCalcTasaDiaria);
+
+  $('#btnRefiPrefill').addEventListener('click', ()=>{
+    if(!state.credito) return;
+    // Identidad
+    $('#r_nombre').value   = state.credito?.nombre || '';
+    $('#r_apellido').value = state.credito?.apellido || '';
+    $('#r_dui').value      = state.credito?.numeroDui || '';
+    $('#r_tel').value      = state.credito?.telefono || '';
+    $('#r_dir').value      = state.credito?.direccion || '';
+    // Datos
+    $('#r_agencia').value     = state.credito?.agenciaAsignada || '';
+    $('#r_asesor').value      = state.credito?.asignadoA || '';
+    $('#r_estado').value      = 'Activo';
+    $('#r_monto').value       = state.credito?.montoAprobado || '';
+    $('#r_saldoIni').value    = state.credito?.montoAprobado || '';
+    $('#r_saldoAct').value    = 0;
+    $('#r_cuota').value       = state.credito?.cuotaAprobada || '';
+    $('#r_numCuotas').value   = state.credito?.numeroCuotas || '';
+    $('#r_freq').value        = state.credito?.frecuenciaPago || 'Quincenal';
+    $('#r_tasaAnual').value   = state.credito?.tasaAnualCredito ?? 180;
+    refiCalcTasaDiaria();
+    $('#r_fechaInicio').value = ''; // se define nueva fecha de inicio
+    $('#r_interesActual').value = 0;
+    $('#r_multas').value = 0;
+    $('#r_ppaldia').value = 0;
+  });
+
+  async function crearRefinanciamiento(){
+    if(!state.creditoID || !state.credito?.clienteID){
+      return alert('Falta cliente','Carga primero un crédito para heredar el clienteID.','warning');
+    }
+    // Validación mínima
+    const monto = Number($('#r_monto').value || 0);
+    const numCuotas = Number($('#r_numCuotas').value || 0);
+    const cuota = Number($('#r_cuota').value || 0);
+    if(!monto || !numCuotas || !cuota){
+      return alert('Datos insuficientes','Monto, #cuotas y cuota son obligatorios.','warning');
+    }
+
+    const datos = {
+      // Identidad del cliente
+      nombre: ($('#r_nombre').value || '').trim(),
+      apellido: ($('#r_apellido').value || '').trim(),
+      numeroDui: ($('#r_dui').value || '').trim(),
+      telefono: ($('#r_tel').value || '').trim(),
+      direccion: ($('#r_dir').value || '').trim(),
+
+      // Vínculo
+      clienteID: state.credito.clienteID,
+
+      // Datos del crédito
+      agenciaAsignada: ($('#r_agencia').value || '').trim(),
+      asignadoA: ($('#r_asesor').value || '').trim(),
+      lineaDeCredito: 'Refinanciamiento',
+      estadoCredito: $('#r_estado').value,
+      montoAprobado: monto,
+      saldoInicial: Number($('#r_saldoIni').value || 0),
+      saldoActual: Number($('#r_saldoAct').value || 0),
+      cuotaAprobada: cuota,
+      numeroCuotas: numCuotas,
+      frecuenciaPago: $('#r_freq').value,
+      tasaAnualCredito: Number($('#r_tasaAnual').value || 0),
+      tasaDiariaCredito: Number($('#r_tasaDiaria').value || 0),
+      fechaInicio: inputToISO_TZ($('#r_fechaInicio').value),
+      interesActual: Number($('#r_interesActual').value || 0),
+      multasAcumuladas: Number($('#r_multas').value || 0),
+      paraPonerseAlDia: Number($('#r_ppaldia').value || 0),
+
+      // Defaults
+      fechaUltimoCalculoIntereses: serverTimestamp(),
+      capitalAtrasado: 0,
+      cuotasAtrasadas: 0,
+      diasMora: 0,
+      diasIntereses: 0,
+      amortizacion: [],
+      historialMultas: [],
+      ultimaActualizacion: serverTimestamp()
+    };
+
+    const ref = doc(collection(db,'creditos'));
+    await setDoc(ref, datos, { merge:true });
+
+    // Feedback
+    $('#lblRefi').textContent = 'Refinanciamiento creado ✓';
+    const result = document.getElementById('refiResult');
+    result.innerHTML = `
+      <div style="margin-top:8px">
+        Nuevo crédito creado: <span class="pill">${ref.id}</span>
+        <div class="actions" style="margin-top:8px">
+          <button id="btnAbrirNuevo" class="primary">Abrir este crédito</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('btnAbrirNuevo').addEventListener('click', async ()=>{
+      await loadCreditoById(ref.id);
+      window.scrollTo({top:0,behavior:'smooth'});
+    });
+
+    alert('Refinanciamiento creado','Se creó el nuevo crédito y quedó vinculado al mismo cliente.','success');
+  }
+  $('#btnCrearRefi').addEventListener('click', crearRefinanciamiento);
 </script>
 </body>
 </html>

@@ -215,7 +215,7 @@
 
     <div class="table-wrap" style="max-height:280px">
       <table>
-        <thead><tr><th>#</th><th>Fecha Pago</th><th>Monto</th><th>Capital</th><th>Interés</th><th>Multa</th><th>Motivo</th><th>Correlativo</th><th>Acciones</th></tr></thead>
+        <thead><tr><th>#</th><th>Fecha Pago</th><th>Montón</th><th>Capital</th><th>Interés</th><th>Multa</th><th>Motivo</th><th>Correlativo</th><th>Acciones</th></tr></thead>
         <tbody id="pagosBody"></tbody>
       </table>
     </div>
@@ -224,6 +224,19 @@
       <button id="btnGuardarPagos" class="success">Guardar pagos</button>
       <span id="lblGuardadoPagos" class="muted"></span>
     </div>
+
+    <div class="divider"></div>
+    <h3>Pagos existentes</h3>
+    <div class="muted">Estos son los pagos que ya están registrados en Firestore para este crédito. Puedes eliminarlos individualmente.</div>
+    <div class="table-wrap" style="max-height:300px">
+      <table>
+        <thead>
+          <tr><th>#</th><th>PagoID</th><th>Fecha Pago</th><th>Monto</th><th>Capital</th><th>Interés</th><th>Multa</th><th>Motivo</th><th>Correlativo</th><th>Acción</th></tr>
+        </thead>
+        <tbody id="pagosExistBody"></tbody>
+      </table>
+    </div>
+    <div class="muted" id="lblPagosExist"></div>
   </section>
 
   <!-- ===================================================== -->
@@ -370,8 +383,9 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
   import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
   import {
-    getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs,
-    orderBy, startAt, endAt, serverTimestamp, writeBatch
+    getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
+    collection, query, where, getDocs, orderBy, startAt, endAt,
+    serverTimestamp, writeBatch
   } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
 
   /* ===== Configuración Firebase (tu proyecto) ===== */
@@ -424,7 +438,8 @@
     credito:null, 
     amort:[], 
     multas:[],
-    pagos:[],
+    pagos:[],        // pagos a insertar (lista local)
+    pagosDB:[],      // pagos existentes en Firestore
     refi:{ id:null, amort:[] }  // nuevo crédito
   };
 
@@ -535,6 +550,7 @@
     state.amort = Array.isArray(data?.amortizacion) ? JSON.parse(JSON.stringify(data.amortizacion)) : [];
     state.multas = Array.isArray(data?.historialMultas) ? JSON.parse(JSON.stringify(data.historialMultas)) : [];
     state.pagos = [];
+    state.pagosDB = [];
     state.refi = { id:null, amort:[] };
 
     // Mostrar paneles
@@ -568,8 +584,11 @@
 
     renderMultas();
     renderAmort();
-    renderPagos();
+    renderPagos();        // lista para agregar
     renderEstados();
+
+    // Cargar pagos existentes en DB
+    loadPagosExistentes(id);
   }
 
   /* ============== MULTAS ============== */
@@ -834,8 +853,100 @@
     alert('Pagos registrados', `Se guardaron ${state.pagos.length} pagos.`, 'success');
     state.pagos = [];
     renderPagos();
+    // refrescar pagos existentes
+    await loadPagosExistentes(state.creditoID);
   }
   $('#btnGuardarPagos').addEventListener('click', guardarPagos);
+
+  /* ======== NUEVO: PAGOS EXISTENTES (leer y eliminar) ======== */
+  async function loadPagosExistentes(creditoID){
+    const body = $('#pagosExistBody'); body.innerHTML = '';
+    $('#lblPagosExist').textContent = 'Cargando pagos…';
+    try{
+      // Intento ordenar por fechaPago; si requiere índice y falla, caigo al orden por fechaRegistro
+      let snap;
+      try{
+        const q1 = query(collection(db,'pagos'), where('creditoID','==',creditoID), orderBy('fechaPago','asc'));
+        snap = await getDocs(q1);
+      }catch(e){
+        const q2 = query(collection(db,'pagos'), where('creditoID','==',creditoID));
+        snap = await getDocs(q2);
+      }
+      state.pagosDB = [];
+      if(snap.empty){
+        body.innerHTML = `<tr><td colspan="10" class="muted">Este crédito no tiene pagos registrados.</td></tr>`;
+        $('#lblPagosExist').textContent = '';
+        return;
+      }
+      snap.forEach(d=>{
+        const x = d.data();
+        state.pagosDB.push({
+          pagoID: d.id,
+          ...x
+        });
+      });
+      renderPagosExistentes();
+    }catch(err){
+      body.innerHTML = `<tr><td colspan="10" class="muted">Error al cargar pagos.</td></tr>`;
+      console.error(err);
+    }finally{
+      $('#lblPagosExist').textContent = '';
+    }
+  }
+
+  function renderPagosExistentes(){
+    const body = $('#pagosExistBody'); body.innerHTML = '';
+    if(!state.pagosDB.length){
+      body.innerHTML = `<tr><td colspan="10" class="muted">Este crédito no tiene pagos registrados.</td></tr>`;
+      return;
+    }
+    state.pagosDB
+      .sort((a,b)=> (a.fechaPago||'').localeCompare(b.fechaPago||''))
+      .forEach((p, i)=>{
+        const tr = document.createElement('tr');
+        const fecha = p.fechaPago ? dateToInput(p.fechaPago) : '';
+        tr.innerHTML = `
+          <td>${i+1}</td>
+          <td class="soft">${p.pagoID}</td>
+          <td>${fecha}</td>
+          <td>${fmt2(p.montoPagado)}</td>
+          <td>${fmt2(p.pagoCapital)}</td>
+          <td>${fmt2(p.pagoInteres)}</td>
+          <td>${fmt2(p.pagoMulta)}</td>
+          <td>${p.motivo || ''}</td>
+          <td>${p.correlativo ?? 0}</td>
+          <td><button class="danger" data-del="${p.pagoID}">Eliminar</button></td>
+        `;
+        body.appendChild(tr);
+      });
+
+    body.querySelectorAll('button[data-del]').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        const id = e.target.getAttribute('data-del');
+        const pago = state.pagosDB.find(x=>x.pagoID===id);
+        const res = await Swal.fire({
+          title: 'Eliminar pago',
+          text: `¿Eliminar el pago ${id}? Esta acción no se puede deshacer.`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor:'#ef4444',
+          cancelButtonColor:'#1f2937',
+          confirmButtonText: 'Sí, eliminar'
+        });
+        if(!res.isConfirmed) return;
+        try{
+          await deleteDoc(doc(db,'pagos', id));
+          // quita local y refresca
+          state.pagosDB = state.pagosDB.filter(x=>x.pagoID!==id);
+          renderPagosExistentes();
+          alert('Pago eliminado','Se borró el pago correctamente.','success');
+        }catch(err){
+          console.error(err);
+          alert('Error','No se pudo eliminar el pago.','error');
+        }
+      });
+    });
+  }
 
   /* ============== NUEVO CRÉDITO (refi / otras líneas) ============== */
   function refiCalcTasaDiaria(){

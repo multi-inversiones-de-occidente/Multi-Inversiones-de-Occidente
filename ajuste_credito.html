@@ -16,7 +16,7 @@
     header .wrap{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:14px 20px}
     .logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.3px}
     .logo .dot{width:12px;height:12px;border-radius:999px;background:var(--brand)}
-    .container{max-width:1160px;margin:22px auto;padding:0 16px 140px}
+    .container{max-width:1160px;margin:22px auto;padding:0 16px 160px}
     .card{background:var(--card);border:1px solid #232833;border-radius:var(--radius);padding:18px}
     h2{margin:0 0 10px 0;font-size:20px}
     h3{margin:14px 0 8px 0;font-size:16px;color:#c9d2df}
@@ -155,7 +155,7 @@
     </div>
   </section>
 
-  <!-- AMORTIZACIÓN -->
+  <!-- AMORTIZACIÓN (FECHAS) -->
   <section class="card hidden" id="panelAmort">
     <h2>Amortización (editar fechas)</h2>
     <div class="muted">
@@ -336,6 +336,28 @@
       </div>
     </div>
   </section>
+
+  <!-- ====================================== -->
+  <!-- NUEVO: ESTADOS DE CUOTAS (hasta abajo) -->
+  <!-- ====================================== -->
+  <section class="card hidden" id="panelEstados">
+    <h2>Estados de cuotas</h2>
+    <div class="muted">Visualiza todas las cuotas del crédito y cambia el <b>estado</b> de cada una. Opciones: <span class="pill">Pendiente</span>, <span class="pill">Atrasado</span>, <span class="pill">Pagado</span>, <span class="pill">Parcial</span>. No altera montos ni fechas.</div>
+    <div class="actions">
+      <button id="btnGuardarEstados" class="primary">Guardar estados</button>
+      <span id="lblGuardadoEstados" class="muted"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Fecha</th><th>Cuota</th><th>Capital</th><th>Interés</th><th>Saldo</th><th>Cambiar estado</th>
+          </tr>
+        </thead>
+        <tbody id="estadosBody"></tbody>
+      </table>
+    </div>
+  </section>
 </div>
 
 <script type="module">
@@ -398,7 +420,7 @@
     amort:[], 
     multas:[],
     pagos:[],
-    refi:{ id:null, amort:[] }  // NUEVO: estado del refinanciamiento
+    refi:{ id:null, amort:[] }  // refinanciamiento
   };
 
   onAuthStateChanged(auth, async (user) => { /* rol opcional */ });
@@ -516,6 +538,7 @@
     $('#panelMultas').classList.remove('hidden');
     $('#panelPagos').classList.remove('hidden');
     $('#panelRefi').classList.remove('hidden');
+    $('#panelEstados').classList.remove('hidden'); // NUEVO
 
     // Tag
     $('#tagCredito').textContent = `creditoID: ${id}`;
@@ -541,6 +564,7 @@
     renderMultas();
     renderAmort();
     renderPagos();
+    renderEstados(); // NUEVO
 
     // Pre-cargar identidad cliente para refi
     $('#r_nombre').value  = data.nombre || '';
@@ -639,6 +663,8 @@
           const nextInp = document.querySelector(`input[type="date"][data-idx="${j}"]`);
           if(nextInp) nextInp.value = state.amort[j].fecha;
         }
+        // Sincroniza vista de estados
+        renderEstados();
       });
     });
   }
@@ -845,7 +871,7 @@
     $('#r_freq').value        = state.credito?.frecuenciaPago || 'Quincenal';
     $('#r_tasaAnual').value   = state.credito?.tasaAnualCredito ?? 180;
     refiCalcTasaDiaria();
-    $('#r_fechaInicio').value = ''; // se define nueva fecha de inicio
+    $('#r_fechaInicio').value = ''; // nueva fecha de inicio
     $('#r_interesActual').value = 0;
     $('#r_multas').value = 0;
     $('#r_ppaldia').value = 0;
@@ -971,7 +997,6 @@
     if(!start || !n || !cuota || !monto){
       return alert('Datos incompletos','Fecha, N° cuotas, cuota y monto son obligatorios','warning');
     }
-    // Periodos por año (igual que en tu generador original: Semanal=52, Mensual=12, y el resto 26)
     const periods = (freq==='Mensual')?12:(freq==='Semanal'?52:26);
 
     let saldo = monto;
@@ -998,7 +1023,6 @@
     }
     state.refi.amort = rows;
 
-    // Chequeo
     const sumCap = rows.reduce((s,r)=> s + Number(r.capital||0), 0);
     const lastSaldo = rows.length? rows[rows.length-1].saldo : 0;
     const ok = Math.abs(sumCap - monto)<=0.02 && Math.abs(lastSaldo-0)<=0.02;
@@ -1024,6 +1048,56 @@
   $('#r_btnPrefillAmort').addEventListener('click', r_prefillAmortFromForm);
   $('#r_btnGenerarAmort').addEventListener('click', r_generarAmort);
   $('#r_btnGuardarAmort').addEventListener('click', r_guardarAmort);
+
+  /* ============== ESTADOS DE CUOTAS (nuevo panel) ============== */
+  function renderEstados(){
+    const body = $('#estadosBody'); body.innerHTML = '';
+    if(!state.amort?.length){
+      body.innerHTML = `<tr><td colspan="7" class="muted">Este crédito no tiene tabla de amortización.</td></tr>`;
+      return;
+    }
+    const opciones = ['Pendiente','Atrasado','Pagado','Parcial'];
+    state.amort.forEach((r,i)=>{
+      const tr = document.createElement('tr');
+      const sel = document.createElement('select');
+      sel.setAttribute('data-idx', String(i));
+      opciones.forEach(op=>{
+        const o = document.createElement('option');
+        o.value = op; o.textContent = op;
+        sel.appendChild(o);
+      });
+      sel.value = r.estado || 'Pendiente';
+      sel.addEventListener('change', (e)=>{
+        const idx = Number(e.target.getAttribute('data-idx'));
+        state.amort[idx].estado = e.target.value;
+      });
+
+      tr.innerHTML = `
+        <td>${r.numeroCuota ?? (i+1)}</td>
+        <td>${dateToInput(r.fecha || '')}</td>
+        <td>${fmt2(r.cuota)}</td>
+        <td>${fmt2(r.capital)}</td>
+        <td>${fmt2(r.interes)}</td>
+        <td>${fmt2(r.saldo)}</td>
+      `;
+      const tdSel = document.createElement('td');
+      tdSel.appendChild(sel);
+      tr.appendChild(tdSel);
+      body.appendChild(tr);
+    });
+  }
+
+  async function guardarEstados(){
+    if(!state.creditoID) return alert('Sin crédito','Carga un crédito primero','warning');
+    await updateDoc(doc(db,'creditos', state.creditoID), {
+      amortizacion: state.amort,
+      ultimaActualizacion: serverTimestamp()
+    });
+    $('#lblGuardadoEstados').textContent = 'Estados guardados ✓';
+    setTimeout(()=> $('#lblGuardadoEstados').textContent='', 2000);
+    alert('Estados actualizados','Se guardaron los estados de cuotas.','success');
+  }
+  $('#btnGuardarEstados').addEventListener('click', guardarEstados);
 </script>
 </body>
 </html>

@@ -235,20 +235,7 @@
     const CLOSE_TOL = 0.05; // tolerancia para cerrar capital/estado
 
     const nowISO = () => new Date().toISOString();
-
-    // --- NUEVO: clave local YYYY-MM-DD (no UTC) ---
-    function todayKeyLocal(){
-      const t = new Date(); t.setHours(0,0,0,0);
-      const y = t.getFullYear(), m = String(t.getMonth()+1).padStart(2,'0'), d = String(t.getDate()).padStart(2,'0');
-      return `${y}-${m}-${d}`;
-    }
-    // Convierte ISO a Y-M-D local (para comparar “pagos de hoy”)
-    function isoToLocalYMD(iso){
-      if(!iso) return "";
-      const d = new Date(iso);
-      const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), da = String(d.getDate()).padStart(2,'0');
-      return `${y}-${m}-${da}`;
-    }
+    const todayKey = () => nowISO().substring(0, 10); // "YYYY-MM-DD"
 
     const n = (x) => {
       if (typeof x === "number" && Number.isFinite(x)) return x;
@@ -505,10 +492,8 @@
             </div>
           </div>`;
         document.getElementById("cancelar-pago").onclick = closeModal;
-        document.getElementById("pagar-btn").onclick = async (ev) => {
+        document.getElementById("pagar-btn").onclick = async () => {
           try{
-            const btn = ev.currentTarget;
-            btn.disabled = true; // anti doble clic
             const montoValue = document.getElementById("monto-input").value.trim();
             const montoNum = n(montoValue);
             if (!(montoValue.length) || !Number.isFinite(montoNum) || montoNum <= 0) {
@@ -528,31 +513,31 @@
       render();
     }
 
-    /* =================== ANTI-DUPLICADO (Advertencia + Idempotencia) =================== */
+    /* =================== ANTI-DUPLICADO: Solo ADVERTENCIA =================== */
     async function verificarPagoDuplicadoYConfirmar({ cliente, creditoData, montoNum, closeModal }) {
-      const fechaHoyLocal = todayKeyLocal();
+      const fechaHoy = todayKey();
 
-      // Buscar pagos existentes para este crédito (filtramos en cliente por día local)
+      // Buscar pagos existentes de HOY para este crédito (comparación por YYYY-MM-DD)
       const pagosSnap = await getDocs(query(collection(db, "pagos"), where("creditoID", "==", cliente.id)));
       const pagosHoy = pagosSnap.docs
         .map(d => d.data())
-        .filter(p => isoToLocalYMD(p.fechaPago) === fechaHoyLocal);
+        .filter(p => String(p.fechaPago || "").substring(0,10) === fechaHoy);
 
       const hayPagoHoy = pagosHoy.length > 0;
       const hayMismoMonto = pagosHoy.some(p => Math.abs(n(p.montoPagado) - n(montoNum)) < 0.01);
 
       if (hayPagoHoy) {
-        // Mostrar advertencia con lista de pagos de hoy
+        // Mostrar advertencia con lista de pagos de hoy (SOLO informa; NO bloquea)
         const modalRoot = document.getElementById("modal-root");
         const lista = pagosHoy.map(p => `• $${round2(n(p.montoPagado)).toFixed(2)} (correlativo: ${p.correlativo ?? "s/d"})`).join("<br/>");
         const msgExtra = hayMismoMonto
-          ? `<div style="margin-top:8px;color:#b71c1c;font-weight:800">Se detectó un pago HOY por <u>el mismo monto</u>. Esto podría ser un duplicado.</div>`
-          : `<div style="margin-top:8px;color:#8a6d3b">Ya existe un pago HOY para este crédito.</div>`;
+          ? `<div style="margin-top:8px;color:#b71c1c;font-weight:800">Ya existe un pago HOY por <u>el mismo monto</u>. Revisa antes de continuar.</div>`
+          : `<div style="margin-top:8px;color:#8a6d3b">Ya existe al menos un pago HOY para este crédito.</div>`;
         modalRoot.innerHTML = `
           <div class="modal-bg">
             <div class="modal">
-              <div class="modal-title"><i class="fas fa-exclamation-triangle" style="color:#e67e22"></i> Advertencia de posible duplicado</div>
-              <div class="modal-sub">Pagos detectados hoy (${fechaHoyLocal}):</div>
+              <div class="modal-title"><i class="fas fa-exclamation-triangle" style="color:#e67e22"></i> Posible pago duplicado</div>
+              <div class="modal-sub">Pagos detectados hoy (${fechaHoy}):</div>
               <div class="muted" style="background:rgba(36,59,134,.06);border:1px solid rgba(36,59,134,.18);padding:10px;border-radius:10px;">
                 ${lista || "—"}
               </div>
@@ -560,54 +545,31 @@
               ${msgExtra}
               <div class="modal-btns" style="margin-top:14px;">
                 <button class="modal-btn-cancel" id="cancelar-dup">Cancelar</button>
-                <button class="modal-btn-pay" id="continuar-dup">Pagar de todas formas</button>
+                <button class="modal-btn-pay" id="continuar-dup">Registrar de todas formas</button>
               </div>
             </div>
           </div>`;
         document.getElementById("cancelar-dup").onclick = () => { modalRoot.innerHTML = ""; };
         document.getElementById("continuar-dup").onclick = async () => {
           modalRoot.innerHTML = "";
-          await realizarPago(cliente, montoNum); // idempotencia dentro
+          await realizarPago(cliente, montoNum); // SIN bloqueo
           closeModal();
         };
       } else {
         // No hay pagos hoy: proceder directo
-        await realizarPago(cliente, montoNum); // idempotencia dentro
+        await realizarPago(cliente, montoNum);
         closeModal();
       }
     }
 
-    /* =================== LÓGICA DE PAGO =================== */
+    /* =================== LÓGICA DE PAGO (SIN BLOQUEO) =================== */
     async function realizarPago(cliente, montoNum){
       const fechaPago = nowISO();
-
-      // --- NUEVO: llave idempotente local (por día local) ---
-      const idempotKey = `${cliente.id}|${round2(montoNum).toFixed(2)}|${todayKeyLocal()}`;
-      const guardRef = doc(db, "payment_guard", idempotKey);
-
       try{
         const user = auth.currentUser;
         if(!user) throw new Error("Sesión inválida. Inicia sesión.");
 
-        // ---------- Idempotencia robusta ----------
-        await runTransaction(db, async (tx) => {
-          const guardSnap = await tx.get(guardRef);
-          if (guardSnap.exists()) {
-            const s = guardSnap.data()?.status || "pending";
-            if (s === "pending" || s === "committed") {
-              throw new Error("Pago duplicado detectado por idempotencia. Operación cancelada.");
-            }
-            // status = failed -> reintento
-            tx.update(guardRef, { status: "pending", retriedAt: new Date() });
-          } else {
-            tx.set(guardRef, {
-              status: "pending",
-              createdAt: new Date(),
-              creditoID: cliente.id,
-              monto: round2(montoNum)
-            });
-          }
-        });
+        // ---------- (Eliminado) Guard de idempotencia que bloqueaba ----------
 
         // Datos del cajero / sucursal
         const userSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
@@ -618,7 +580,7 @@
         // Traer crédito
         const { data: creditoData } = await fetchCreditoById(cliente.id);
 
-        // ======== 0) Correlativo seguro (después del guard) ========
+        // ======== 0) Correlativo seguro ========
         const correlativoStr = await obtenerCorrelativoUnicoPagos();
 
         // ======== 0.1) Guardar snapshot previo para reversión ========
@@ -749,7 +711,7 @@
         let saldoNuevo = round2(saldoAnterior - pagoCapital);
         if (saldoNuevo < 0) saldoNuevo = 0;
 
-        // PARCHE B: residuo minúsculo -> empujar a capital
+        // PARCHE B: Si queda un residuo minúsculo, empújalo a capital y cierra en 0.00
         if (saldoNuevo <= TOL || saldoNuevo <= CLOSE_TOL) {
           let faltaPendiente = saldoNuevo;
           for (let i = amortizacion.length - 1; i >= 0 && faltaPendiente > EPS; i--) {
@@ -762,6 +724,7 @@
               faltaPendiente = round2(faltaPendiente - abono);
             }
           }
+          // Recalcular saldoNuevo después de empujar a capital
           saldoNuevo = round2(saldoAnterior - pagoCapital);
           if (saldoNuevo < TOL) saldoNuevo = 0;
         }
@@ -788,7 +751,7 @@
           apellido: creditoData.apellido || "",
           numeroDui: creditoData.numeroDui || "",
           montoPagado: round2(montoNum),
-          fechaPago: fechaPago,                           // ISO utc (se muestra con conversión local)
+          fechaPago: fechaPago,                           // ISO string
           pagoMultas: round2(pagoMultas),
           pagoInteres: round2(pagoInteres),
           pagoCapital: round2(pagoCapital),
@@ -811,6 +774,7 @@
           multasAcumuladas: round2(multasAcumuladas),
           cuotasAtrasadas: cuotasAtrasadas,
           ultimaActualizacion: fechaPago,
+          // SIN tocar fechaUltimoCalculoIntereses: la maneja el CRON
           estadoCredito: nuevoEstado,
           amortizacion: amortizacion,
           historialMultas: historialMultas,
@@ -820,9 +784,6 @@
           saldoAncla: round2(saldoNuevo),
           interesPendienteAncla: round2(interesActual)
         });
-
-        // --- Marcar guard como comprometido ---
-        await setDoc(guardRef, { status: "committed", committedAt: new Date(), correlativo: correlativoStr }, { merge: true });
 
         // ======== 11) Redirigir a ticket ========
         const url = `ticket_page.html?correlativo=${encodeURIComponent(correlativoStr)}` +
@@ -840,10 +801,6 @@
 
       }catch(e){
         console.error(e);
-        // Marcar guard como failed para permitir reintento controlado
-        try{
-          await setDoc(guardRef, { status: "failed", failedAt: new Date(), error: String(e?.message || e) }, { merge: true });
-        }catch(_){}
         alert("Error al realizar el pago: " + (e?.message || e));
         throw e;
       }
@@ -863,11 +820,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-

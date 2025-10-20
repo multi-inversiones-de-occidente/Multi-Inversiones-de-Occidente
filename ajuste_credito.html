@@ -142,11 +142,38 @@
   <!-- MULTAS -->
   <section class="card hidden" id="panelMultas">
     <h2>Multas</h2>
-    <div class="muted">Quita una multa y se descuenta del total de <b>multasAcumuladas</b> en la UI; luego guarda para persistir.</div>
+    <div class="muted">Quita o agrega una multa. Al guardar se persiste en <b>historialMultas</b> y <b>multasAcumuladas</b> del crédito.</div>
+
+    <!-- NUEVO: formulario para AGREGAR multa con el formato requerido -->
+    <h3>Agregar multa</h3>
     <div class="row">
+      <div class="field col-2"><label>Fecha</label><input id="m_fecha" type="date"></div>
+      <div class="field col-3"><label>Tipo</label>
+        <select id="m_tipo">
+          <option selected>por cuota atrasada</option>
+          <option>ajuste manual</option>
+        </select>
+      </div>
+      <div class="field col-2"><label>Cuota #</label><input id="m_cuota" type="number" min="1" value="1"></div>
+      <div class="field col-3"><label>Estado cuota</label>
+        <select id="m_estado">
+          <option>Pagada</option>
+          <option>No Pagada</option>
+          <option>Pendiente</option>
+          <option>Atrasada</option>
+        </select>
+      </div>
+      <div class="field col-2"><label>Monto ($)</label><input id="m_monto" type="number" step="0.01" value="0"></div>
+    </div>
+    <div class="actions">
+      <button id="btnAgregarMulta" class="primary">Agregar multa a la lista</button>
+    </div>
+
+    <div class="row" style="margin-top:10px">
       <div class="field col-3"><label>Multas acumuladas ($)</label><input id="m_total" type="number" step="0.01" readonly></div>
       <div class="field col-3" style="align-self:end"><button id="btnGuardarMultas" class="success">Guardar multas</button></div>
     </div>
+
     <div class="table-wrap">
       <table>
         <thead><tr><th>#</th><th>Fecha</th><th>Tipo</th><th>Cuota #</th><th>Estado</th><th>Monto ($)</th><th>Acción</th></tr></thead>
@@ -602,10 +629,12 @@
       return;
     }
     state.multas.forEach((m,i)=>{
+      // m.fecha puede venir en ISO o yyyy-mm-dd; mostramos como input-friendly
+      const fechaCorta = dateToInput(m.fecha || '');
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${i+1}</td>
-        <td>${m.fecha || ''}</td>
+        <td>${fechaCorta}</td>
         <td>${m.tipo || ''}</td>
         <td>${m.cuotaNumero ?? '—'}</td>
         <td>${m.estadoCuota || '—'}</td>
@@ -628,15 +657,59 @@
     });
   }
 
+  // NUEVO: Agregar multa respetando el formato exacto
+  function agregarMulta(){
+    const fecha = $('#m_fecha').value;
+    const tipo = $('#m_tipo').value || 'por cuota atrasada';
+    const cuotaNumero = Number($('#m_cuota').value || 0);
+    const estadoCuota = $('#m_estado').value || 'No Pagada';
+    const monto = Number($('#m_monto').value || 0);
+
+    if(!fecha || !monto){
+      return alert('Datos incompletos','Fecha y monto son obligatorios','warning');
+    }
+
+    const multa = {
+      cuotaNumero,
+      estadoCuota,
+      fecha: inputToISO_TZ(fecha),   // Se guarda en ISO con TZ -06:00
+      monto,
+      tipo
+    };
+
+    state.multas.push(multa);
+
+    // actualizar totales UI
+    const cur = Number($('#c_multas').value || 0);
+    const nuevo = +(cur + monto).toFixed(2);
+    $('#c_multas').value = nuevo;
+    $('#m_total').value = fmt2(nuevo);
+
+    // limpiar inputs rápidos
+    $('#m_monto').value = '0';
+
+    renderMultas();
+  }
+  document.getElementById('btnAgregarMulta').addEventListener('click', agregarMulta);
+
   async function guardarMultas(){
     if(!state.creditoID) return;
+    // Asegurar que todas las fechas queden en ISO con TZ
+    const normalizadas = (state.multas || []).map(m => ({
+      cuotaNumero: Number(m.cuotaNumero ?? 0),
+      estadoCuota: String(m.estadoCuota || ''),
+      fecha: /^\d{4}-\d{2}-\d{2}$/.test(m.fecha||'') ? inputToISO_TZ(m.fecha) : String(m.fecha || ''),
+      monto: Number(m.monto || 0),
+      tipo: String(m.tipo || 'por cuota atrasada')
+    }));
+
     const update = {
-      historialMultas: state.multas,
+      historialMultas: normalizadas,
       multasAcumuladas: Number($('#c_multas').value || 0),
       ultimaActualizacion: serverTimestamp()
     };
     await updateDoc(doc(db,'creditos',state.creditoID), update);
-    alert('Multas actualizadas','Se guardaron los cambios en multas.','success');
+    alert('Multas actualizadas','Se guardaron los cambios en multas con el formato estándar.','success');
   }
   $('#btnGuardarMultas').addEventListener('click', guardarMultas);
 
@@ -1175,7 +1248,14 @@
       sel.value = r.estado || 'Pendiente';
       sel.addEventListener('change', (e)=>{
         const idx = Number(e.target.getAttribute('data-idx'));
-        state.amort[idx].estado = e.target.value;
+        const nuevoEstado = e.target.value;
+        state.amort[idx].estado = nuevoEstado;
+
+        // NUEVO: si se marca Pagado, setear montoPagado = capital
+        if(nuevoEstado === 'Pagado'){
+          const cap = Number(state.amort[idx].capital || 0);
+          state.amort[idx].montoPagado = cap;
+        }
       });
 
       tr.innerHTML = `
@@ -1193,15 +1273,19 @@
     });
   }
 
-  // NUEVO: marcar todas como pagadas
+  // NUEVO: marcar todas como pagadas y setear montoPagado = capital
   function marcarTodasPagadas(){
     if(!state.amort?.length){
       alert('Sin cuotas','Este crédito no tiene cuotas para marcar.','info');
       return;
     }
-    state.amort = state.amort.map(row => ({ ...row, estado: 'Pagado' }));
+    state.amort = state.amort.map(row => ({
+      ...row,
+      estado: 'Pagado',
+      montoPagado: Number(row.capital || 0)
+    }));
     renderEstados();
-    alert('Listo','Todas las cuotas quedaron con estado "Pagado" en pantalla. No olvides "Guardar estados".','success');
+    alert('Listo','Todas las cuotas quedaron "Pagado" y montoPagado=capital (en pantalla). No olvides "Guardar estados".','success');
   }
   document.getElementById('btnMarcarTodasPagadas').addEventListener('click', marcarTodasPagadas);
 
@@ -1219,3 +1303,5 @@
 </script>
 </body>
 </html>
+
+

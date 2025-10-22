@@ -386,7 +386,7 @@
   <!-- ====================================== -->
   <section class="card hidden" id="panelEstados">
     <h2>Estados de cuotas</h2>
-    <div class="muted">Visualiza todas las cuotas del crédito y cambia el <b>estado</b> de cada una. Opciones: <span class="pill">Pendiente</span>, <span class="pill">Atrasado</span>, <span class="pill">Pagado</span>, <span class="pill">Parcial</span>. No altera montos ni fechas.</div>
+    <div class="muted">Visualiza todas las cuotas del crédito y cambia el <b>estado</b> de cada una. Opciones: <span class="pill">Pendiente</span>, <span class="pill">Atrasada</span>, <span class="pill">Pagada</span>, <span class="pill">Parcial</span>. No altera montos ni fechas.</div>
     <div class="actions">
       <button id="btnMarcarTodasPagadas">Marcar todas como pagadas</button>
       <button id="btnGuardarEstados" class="primary">Guardar estados</button>
@@ -1235,7 +1235,7 @@
       body.innerHTML = `<tr><td colspan="7" class="muted">Este crédito no tiene tabla de amortización.</td></tr>`;
       return;
     }
-    const opciones = ['Pendiente','Atrasado','Pagado','Parcial'];
+    const opciones = ['Pendiente','Atrasada','Pagada','Parcial'];
     state.amort.forEach((r,i)=>{
       const tr = document.createElement('tr');
       const sel = document.createElement('select');
@@ -1252,7 +1252,7 @@
         state.amort[idx].estado = nuevoEstado;
 
         // NUEVO: si se marca Pagado, setear montoPagado = capital
-        if(nuevoEstado === 'Pagado'){
+        if(nuevoEstado === 'Pagada'){
           const cap = Number(state.amort[idx].capital || 0);
           state.amort[idx].montoPagado = cap;
         }
@@ -1281,7 +1281,7 @@
     }
     state.amort = state.amort.map(row => ({
       ...row,
-      estado: 'Pagado',
+      estado: 'Pagada',
       montoPagado: Number(row.capital || 0)
     }));
     renderEstados();
@@ -1303,5 +1303,6 @@
 </script>
 </body>
 </html>
+
 
 

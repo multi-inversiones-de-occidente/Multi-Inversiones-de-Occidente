@@ -205,6 +205,45 @@
     </div>
   </section>
 
+  <!-- NUEVO: GENERAR AMORTIZACIÓN CUANDO EL CRÉDITO NO POSEE -->
+  <section class="card hidden" id="panelAmortCrear">
+    <h2>Generar tabla de amortización – <span class="pill">Crédito no posee</span></h2>
+    <div class="muted">
+      Si este crédito no tiene tabla de amortización, puedes generarla aquí. Luego podrás <b>editar las fechas</b> en el apartado “Amortización (editar fechas)” de arriba y guardar.
+    </div>
+    <div class="actions" style="margin-top:8px">
+      <button id="a_btnPrefillAmort">Prefill desde “Datos generales”</button>
+      <button id="a_btnGenerarAmort">Generar tabla</button>
+      <button id="a_btnGuardarAmort" class="success">Guardar amortización</button>
+      <span id="a_lblAmort" class="muted"></span>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <div class="field col-3"><label>Fecha inicio</label><input id="a_start" type="date"></div>
+      <div class="field col-3"><label>Frecuencia</label>
+        <select id="a_freq">
+          <option>Semanal</option>
+          <option>Catorcenal</option>
+          <option>Quincenal</option>
+          <option>Mensual</option>
+        </select>
+      </div>
+      <div class="field col-2"><label>N° de cuotas</label><input id="a_n" type="number" min="1"></div>
+      <div class="field col-2"><label>Cuota ($)</label><input id="a_cuota" type="number" step="0.01"></div>
+      <div class="field col-2"><label>Monto aprobado ($)</label><input id="a_monto" type="number" step="0.01"></div>
+      <div class="field col-2"><label>Tasa anual (%)</label><input id="a_tasa" type="number" step="0.01"></div>
+    </div>
+    <div class="muted">Chequeo: <span id="a_chkAmort" class="tag">Pendiente</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Fecha</th><th>Cuota</th><th>Capital</th><th>Interés</th><th>Saldo</th><th>Estado</th></tr>
+        </thead>
+        <tbody id="a_amortBody"></tbody>
+      </table>
+    </div>
+    <div class="muted soft">Tip: después de generar, podrás ajustar fechas en el panel de arriba y luego “Guardar amortización”.</div>
+  </section>
+
   <!-- PAGOS -->
   <section class="card hidden" id="panelPagos">
     <h2>Agregar pagos</h2>
@@ -467,7 +506,8 @@
     multas:[],
     pagos:[],        // pagos a insertar (lista local)
     pagosDB:[],      // pagos existentes en Firestore
-    refi:{ id:null, amort:[] }  // nuevo crédito
+    refi:{ id:null, amort:[] },  // nuevo crédito
+    crear:{ amort:[] }           // amortización generada para crédito actual (si no posee)
   };
 
   onAuthStateChanged(auth, async (user) => { /* rol opcional */ });
@@ -579,6 +619,7 @@
     state.pagos = [];
     state.pagosDB = [];
     state.refi = { id:null, amort:[] };
+    state.crear = { amort:[] };
 
     // Mostrar paneles
     $('#panelGeneral').classList.remove('hidden');
@@ -587,6 +628,13 @@
     $('#panelPagos').classList.remove('hidden');
     $('#panelRefi').classList.remove('hidden');
     $('#panelEstados').classList.remove('hidden');
+
+    // NUEVO: mostrar/ocultar panel para crear amortización si no existe
+    if(!state.amort.length){
+      $('#panelAmortCrear').classList.remove('hidden');
+    }else{
+      $('#panelAmortCrear').classList.add('hidden');
+    }
 
     // Tag
     $('#tagCredito').textContent = `creditoID: ${id}`;
@@ -1300,9 +1348,124 @@
     alert('Estados actualizados','Se guardaron los estados de cuotas.','success');
   }
   $('#btnGuardarEstados').addEventListener('click', guardarEstados);
+
+  /* ============================= */
+  /* NUEVO: CREAR AMORTIZACIÓN PARA EL CRÉDITO ACTUAL (NO POSEE) */
+  /* ============================= */
+  function a_prefillAmortFromGeneral(){
+    // Prefill a partir de los datos generales visibles
+    $('#a_start').value = $('#c_fechaInicio').value || '';
+    $('#a_freq').value  = $('#c_freq').value || 'Quincenal';
+    $('#a_n').value     = $('#c_numCuotas').value || '';
+    $('#a_cuota').value = $('#c_cuota').value || '';
+    // Tomar monto aprobado/saldo inicial si existe, de lo contrario 0
+    const monto = (state.credito?.montoAprobado ?? state.credito?.saldoInicial ?? 0);
+    $('#a_monto').value = monto || 0;
+    $('#a_tasa').value  = $('#c_tasaAnual').value || (state.credito?.tasaAnualCredito ?? 0);
+  }
+
+  function a_renderAmortTemp(){
+    const body = $('#a_amortBody'); body.innerHTML='';
+    const rows = state.crear.amort || [];
+    if(!rows.length){
+      body.innerHTML = `<tr><td colspan="7" class="muted">Sin filas. Genera la tabla.</td></tr>`;
+      return;
+    }
+    rows.forEach(r=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${r.numeroCuota}</td>
+        <td>${r.fecha}</td>
+        <td>${fmt2(r.cuota)}</td>
+        <td>${fmt2(r.capital)}</td>
+        <td>${fmt2(r.interes)}</td>
+        <td>${fmt2(r.saldo)}</td>
+        <td>${r.estado}</td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+
+  function a_generarAmort(){
+    const start = $('#a_start').value;
+    const n = Number($('#a_n').value || 0);
+    const cuota = Number($('#a_cuota').value || 0);
+    const monto = Number($('#a_monto').value || 0);
+    const tasaAnual = Number($('#a_tasa').value || 0)/100;
+    const freq = $('#a_freq').value;
+
+    if(!start || !n || !cuota || !monto){
+      return alert('Datos incompletos','Fecha, N° cuotas, cuota y monto son obligatorios','warning');
+    }
+
+    const periods = (freq==='Mensual')?12:(freq==='Semanal'?52:26);
+    let saldo = monto;
+    let date = new Date(start);
+    const rows=[];
+    for(let i=1;i<=n;i++){
+      const interes = Math.max(0, +(saldo * (tasaAnual / periods)).toFixed(2));
+      let capital = +(cuota - interes).toFixed(2);
+      if(capital > saldo) capital = saldo;
+      saldo = +(saldo - capital).toFixed(2);
+      rows.push({
+        numeroCuota:i,
+        fecha: new Date(date).toISOString().slice(0,10),
+        cuota:+cuota.toFixed(2),
+        capital:+capital.toFixed(2),
+        interes:+interes.toFixed(2),
+        saldo:+saldo.toFixed(2),
+        estado:'Pendiente',
+        montoPagado:0,
+        montoPagadoInteres:0,
+        fechaPagoReal:null
+      });
+      date = new Date(nextFrom(`${rows[rows.length-1].fecha}T00:00:00.000${TZ_OFFSET}`, freq));
+    }
+
+    state.crear.amort = rows;
+
+    const sumCap = rows.reduce((s,r)=> s + Number(r.capital||0), 0);
+    const lastSaldo = rows.length? rows[rows.length-1].saldo : 0;
+    const ok = Math.abs(sumCap - monto)<=0.02 && Math.abs(lastSaldo-0)<=0.02;
+    $('#a_chkAmort').textContent = ok ? `OK · capital=${fmt2(sumCap)} saldo final=${fmt2(lastSaldo)}` : `Revisar · capital=${fmt2(sumCap)} saldo final=${fmt2(lastSaldo)}`;
+    $('#a_chkAmort').style.background = ok? '#0f2c16':'#2a1414';
+
+    a_renderAmortTemp();
+
+    // También pre-cargamos en state.amort para que aparezca editable en el panel de arriba
+    state.amort = JSON.parse(JSON.stringify(rows));
+    renderAmort();
+    renderEstados();
+  }
+
+  async function a_guardarAmort(){
+    if(!state.creditoID) return alert('Sin crédito','Carga un crédito primero','warning');
+    if(!state.crear.amort.length) return alert('Sin tabla','Genera la tabla antes de guardar.','warning');
+    await updateDoc(doc(db,'creditos', state.creditoID), {
+      amortizacion: state.crear.amort,
+      numeroCuotas: Number($('#a_n').value || state.credito?.numeroCuotas || 0),
+      cuotaAprobada: Number($('#a_cuota').value || state.credito?.cuotaAprobada || 0),
+      tasaAnualCredito: Number($('#a_tasa').value || state.credito?.tasaAnualCredito || 0),
+      fechaInicio: inputToISO_TZ($('#a_start').value || $('#c_fechaInicio').value || ''),
+      frecuenciaPago: $('#a_freq').value || state.credito?.frecuenciaPago || 'Quincenal',
+      ultimaActualizacion: serverTimestamp()
+    });
+    $('#a_lblAmort').textContent = 'Amortización guardada ✓';
+    setTimeout(()=> $('#a_lblAmort').textContent='', 2000);
+    alert('Amortización creada','Se guardó la amortización del crédito. Ahora puedes ajustar fechas en el panel de arriba si lo deseas.','success');
+
+    // Releer para mantener consistencia (opcional) o sincronizar estado local
+    state.amort = JSON.parse(JSON.stringify(state.crear.amort));
+    $('#panelAmortCrear').classList.add('hidden'); // ya tiene tabla
+    renderAmort();
+    renderEstados();
+  }
+
+  // Listeners nuevo panel "Crédito no posee"
+  document.getElementById('a_btnPrefillAmort').addEventListener('click', a_prefillAmortFromGeneral);
+  document.getElementById('a_btnGenerarAmort').addEventListener('click', a_generarAmort);
+  document.getElementById('a_btnGuardarAmort').addEventListener('click', a_guardarAmort);
+
 </script>
 </body>
 </html>
-
-
-

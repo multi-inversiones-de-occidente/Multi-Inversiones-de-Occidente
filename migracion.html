@@ -127,19 +127,8 @@
       <div class="muted">Se vincula a <span class="tag" id="clienteIDTag2">clienteID: —</span>. Incluye todos los datos que manejan actualmente.</div>
 
       <h3>Datos Generales de Solicitud</h3>
-
-      <!-- Fila 1: Analista + Línea + Estado -->
       <div class="row">
-        <div class="field col-3">
-          <label>Analista (nombre)</label>
-          <select id="s_analistaNombre">
-            <option value="">Selecciona…</option>
-          </select>
-        </div>
-        <div class="field col-3">
-          <label>Analista ID</label>
-          <input id="s_analistaID" placeholder="uid del analista" readonly>
-        </div>
+        <div class="field col-3"><label>Analista ID</label><input id="s_analistaID" placeholder="uid del analista"></div>
         <div class="field col-3"><label>Crédito (línea)</label>
           <select id="s_creditLine">
             <option>Credicash</option>
@@ -151,10 +140,6 @@
           </select>
         </div>
         <div class="field col-3"><label>Estado de solicitud</label><select id="s_estado"><option>Aprobado</option><option>Rechazado</option><option>Pendiente</option></select></div>
-      </div>
-
-      <!-- Fila 2: Fecha -->
-      <div class="row">
         <div class="field col-3"><label>Fecha de solicitud</label><input id="s_fechaSolicitud" type="date"></div>
       </div>
 
@@ -465,9 +450,6 @@
         main.classList.remove('hidden');
         // Inicializar selector multi-crédito
         initCreditSelectors();
-        // Cargar analistas y enlazar selector
-        await loadAnalistas();
-        bindAnalistaSelector();
       } catch (e) {
         console.error(e);
         authMsg.classList.remove('hidden');
@@ -484,9 +466,6 @@
       creditos: [ { creditoID:null, credito:{}, amortizacion:[], pagos:[] } ],
       activeCredit: 0
     };
-
-    // Lista de analistas para el selector
-    let ANALISTAS = []; // [{ id, nombre }]
 
     // Alias de compatibilidad (se sincronizan con el crédito activo)
     Object.defineProperties(state, {
@@ -775,84 +754,9 @@
     // Subidas a Storage
     async function uploadIfAny(file, path){ if(!file) return ''; const r = ref(storage, path); await uploadBytes(r, file); return await getDownloadURL(r); }
 
-    /* ================= Selector de Analista (nombre -> id) ================= */
-    async function loadAnalistas() {
-      try {
-        const roles = ['analista', 'Analista', 'Analista de Crédito', 'Analista de Credito'];
-        const q = query(collection(db, 'users'), where('rol', 'in', roles));
-        const snap = await getDocs(q);
-
-        ANALISTAS = [];
-        snap.forEach(d => {
-          const u = d.data() || {};
-          const nombre = (u.nombre?.trim() || '') + ' ' + (u.apellido?.trim() || '');
-          const display = (nombre || u.displayName || u.email || d.id).trim();
-          ANALISTAS.push({ id: d.id, nombre: display });
-        });
-
-        ANALISTAS.sort((a,b)=> a.nombre.localeCompare(b.nombre, 'es'));
-
-        const sel = document.getElementById('s_analistaNombre');
-        sel.innerHTML = '<option value="">Selecciona…</option>';
-        ANALISTAS.forEach(a => {
-          const opt = document.createElement('option');
-          opt.value = a.id;
-          opt.textContent = a.nombre;
-          sel.appendChild(opt);
-        });
-      } catch (err) {
-        console.error('Error cargando analistas', err);
-        // Fallback si falla el where 'in'
-        try {
-          ANALISTAS = [];
-          const rolesFallback = ['analista','Analista','Analista de Crédito','Analista de Credito'];
-          for (const r of rolesFallback) {
-            const q2 = query(collection(db, 'users'), where('rol','==', r));
-            const s2 = await getDocs(q2);
-            s2.forEach(d=>{
-              const u=d.data()||{};
-              const nombre=(u.nombre?.trim()||'')+' '+(u.apellido?.trim()||'');
-              const display=(nombre||u.displayName||u.email||d.id).trim();
-              ANALISTAS.push({ id:d.id, nombre:display });
-            });
-          }
-          const map = new Map(ANALISTAS.map(a=>[a.id,a]));
-          ANALISTAS = Array.from(map.values()).sort((a,b)=> a.nombre.localeCompare(b.nombre,'es'));
-
-          const sel = document.getElementById('s_analistaNombre');
-          sel.innerHTML = '<option value="">Selecciona…</option>';
-          ANALISTAS.forEach(a => {
-            const opt = document.createElement('option');
-            opt.value = a.id;
-            opt.textContent = a.nombre;
-            sel.appendChild(opt);
-          });
-        } catch(e2){
-          console.error('Fallback analistas también falló', e2);
-        }
-      }
-    }
-
-    function bindAnalistaSelector() {
-      const sel = document.getElementById('s_analistaNombre');
-      const idInput = document.getElementById('s_analistaID');
-      if (!sel || !idInput) return;
-
-      sel.addEventListener('change', () => {
-        const uid = sel.value || '';
-        idInput.value = uid;
-      });
-    }
-
     /* ================= Paso 1: Guardar Solicitud ================= */
     async function guardarSolicitud(){
       if(!state.clienteID) return alert('Falta cliente','Completa el Paso 0','warning');
-
-      // Analista seleccionado
-      const analistaID = document.getElementById('s_analistaID').value || '';
-      const analistaSel = document.getElementById('s_analistaNombre');
-      const analistaNombre = analistaSel?.options[analistaSel.selectedIndex]?.text || '';
-
       const datos = {
         clienteID: state.clienteID,
         fechaSolicitud: dateInputToISO_TZ(document.getElementById('s_fechaSolicitud').value) || nowISO_TZ(),
@@ -907,10 +811,7 @@
         numeroConyugue: document.getElementById('s_numeroConyugue').value||null,
         hijos: Number(document.getElementById('s_hijos').value||0),
         evidencias: {},
-        migratedAt: serverTimestamp(),
-        // NUEVO: Analista seleccionado
-        analistaID,
-        analistaNombre
+        migratedAt: serverTimestamp()
       };
       if(!datos.profesion||!datos.lugarTrabajo){
         return alert('Faltan datos','Profesión y Lugar de trabajo son obligatorios','warning');
@@ -1226,6 +1127,17 @@
   </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
 
 
 

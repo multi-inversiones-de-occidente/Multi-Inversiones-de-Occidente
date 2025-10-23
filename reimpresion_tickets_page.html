@@ -6,152 +6,148 @@
   <title>Reimpresión de Tickets – Multi Inversiones</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body {
-      background: #111314;
-      color: #fff;
-      font-family: 'Segoe UI', Arial, sans-serif;
-      margin: 0;
-      min-height: 100vh;
+    :root{
+      --bg:#0f1113; --bg2:#15181c; --card:#171a1f; --muted:#a1adbb; --text:#eef2f6;
+      --brand:#13b66b; --brand-2:#f8af40; --warn:#ffd600; --err:#ff6b6b; --line:#262b33;
+      --radius:18px;
     }
+    *{ box-sizing:border-box; font-family: 'Segoe UI', system-ui, -apple-system, Roboto, Arial }
+    body { background: radial-gradient(1200px 800px at 10% -5%, #1a1f27 0%, #0e1012 55%, #0b0d0f 100%); color: var(--text); margin: 0; min-height: 100vh; }
     header {
-      background: #191b21;
-      padding: 1.25rem 0 1.25rem 0;
+      background: linear-gradient(180deg, #191b21, #14161b);
+      padding: 20px 16px 24px;
       text-align: center;
-      font-size: 1.7rem;
-      letter-spacing: 1px;
-      font-weight: 800;
-      color: #ffe37a;
-      margin-bottom: 2.5rem;
+      font-size: 1.7rem; letter-spacing: .5px; font-weight: 800;
+      color: #ffe37a; box-shadow: 0 6px 30px #0006; position: sticky; top: 0; z-index: 5;
     }
-    .center-card {
-      max-width: 400px;
-      margin: 44px auto 0 auto;
-      background: #17191c;
-      border-radius: 18px;
-      box-shadow: 0 6px 32px #0005;
-      padding: 2.2rem 1.5rem 2.4rem 1.5rem;
-      min-height: 260px;
-      text-align: center;
+    .wrap { max-width: 1080px; margin: 28px auto 60px; padding: 0 18px; }
+    .grid { display: grid; gap: 22px; grid-template-columns: 1fr; }
+    @media (min-width: 900px){ .grid { grid-template-columns: 1fr 1fr; } }
+
+    .card {
+      background: linear-gradient(180deg, var(--card), #13171c);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 6px 28px #0006;
+      padding: 22px 18px 20px;
     }
-    .titulo-buscar {
-      font-size: 1.18rem;
-      font-weight: bold;
-      margin-bottom: 18px;
-      letter-spacing: .5px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      color: #fff;
+    .card.h-full { min-height: 260px; }
+    .card-header {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 1.12rem; font-weight: 800; margin-bottom: 14px; color: #fff;
     }
+    .desc { color: var(--muted); font-size: .95rem; line-height: 1.45; margin-bottom: 12px; }
+    .pill { display:inline-flex; gap:8px; align-items:center; background:#1e2229; color:#d9e1ea; border:1px solid #2a313b; border-radius: 999px; padding:6px 10px; font-size:.9rem; }
+
     .input-main {
-      width: 100%;
-      background: #262a31;
-      color: #fff;
-      border: 1.5px solid #32353b;
-      border-radius: 10px;
-      font-size: 1.07rem;
-      padding: 13px 12px;
-      margin-bottom: 1em;
-      outline: none;
-      box-sizing: border-box;
-      font-weight: 500;
-      letter-spacing: 1px;
-      transition: border-color .18s;
+      width: 100%; background: #1d2127; color: #fff;
+      border: 1.5px solid #2a2f37; border-radius: 12px;
+      font-size: 1.05rem; padding: 12px 12px; outline: none;
+      margin-top: 6px; transition: border-color .18s, box-shadow .18s;
     }
-    .input-main:focus { border-color: #FFD600; }
+    .input-main:focus { border-color: var(--warn); box-shadow: 0 0 0 3px rgba(255,214,0,.08); }
+
     .btn-main {
-      width: 100%;
-      background: #13b66b;
-      color: #fff;
-      font-size: 1.11rem;
-      font-weight: bold;
-      border: none;
-      border-radius: 9px;
-      padding: 13px 0;
-      cursor: pointer;
-      margin-top: 0.7em;
-      transition: background .17s;
+      width: 100%; background: var(--brand); color: #fff;
+      font-size: 1.05rem; font-weight: 800; border: none; border-radius: 12px;
+      padding: 12px 0; cursor: pointer; margin-top: 12px; transition: transform .05s ease, filter .18s;
     }
-    .btn-main:active,
-    .btn-main:hover { background: #0b854c; }
-    .ticket-box {
-      margin-top: 35px;
-    }
-    .ticket-header {
-      font-size: 1.12rem;
-      color: #13b66b;
-      font-weight: 600;
-      margin-bottom: 10px;
-    }
-    .ticket-details {
-      background: #fff;
-      color: #181818;
-      border-radius: 10px;
-      padding: 16px 15px 16px 15px;
-      box-shadow: 0 2px 12px #0003;
-      text-align: left;
-      font-size: 1.03rem;
-      margin-bottom: 22px;
-    }
-    .ticket-details strong { color: #111; min-width: 110px; display: inline-block; }
-    .btn-imprimir {
-      display: block;
-      margin: 0 auto 0 auto;
-      padding: 12px 28px;
-      background: #f8af40;
-      color: #232323;
-      font-size: 1.04rem;
-      font-weight: bold;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
+    .btn-main:hover { filter: brightness(.95); }
+    .btn-main:active { transform: translateY(1px); }
+
+    .btn-alt {
+      width: 100%; background: var(--brand-2); color: #232323;
+      font-size: 1.02rem; font-weight: 800; border: none; border-radius: 12px;
+      padding: 11px 0; cursor: pointer; margin-top: 10px; transition: transform .05s ease, filter .18s;
       box-shadow: 0 1px 10px #f8af4045;
-      transition: background .17s;
-      text-align: center;
-      margin-top: 6px;
     }
-    .btn-imprimir:hover {
-      background: #ffd600;
-      color: #232323;
+    .btn-alt:hover { filter: brightness(1.05); }
+    .btn-alt:active { transform: translateY(1px); }
+
+    .ticket-box { margin-top: 14px; }
+    .ticket-header { font-size: 1.06rem; color: var(--brand); font-weight: 700; margin: 6px 0 8px; }
+    .ticket-details {
+      background: #ffffff; color: #16181a; border-radius: 12px; padding: 14px 14px 14px 14px;
+      box-shadow: 0 2px 12px #0003; text-align: left; font-size: 1.01rem; margin-bottom: 16px;
+      border: 1px solid #e6ebf2;
     }
-    .error-msg {
-      color: #ff6363;
-      font-weight: bold;
-      margin-top: 18px;
-      font-size: 1.08rem;
+    .ticket-details strong { color: #0d0f11; min-width: 120px; display: inline-block; }
+    .error-msg { color: var(--err); font-weight: 800; margin-top: 12px; font-size: 1.02rem; display:none; }
+    .ok-msg { color: var(--brand); font-weight: 700; margin-top: 10px; display:none; }
+
+    .section-title {
+      font-size: 1.2rem; font-weight: 900; color: #fff; display:flex; align-items:center; gap:10px; margin: 8px 0 10px;
     }
-    @media (max-width: 540px) {
-      .center-card { max-width: 97vw; padding: 1.1rem 2vw;}
-      .ticket-details { font-size: .97rem;}
+    .subtle { color: var(--muted); font-size: .92rem; margin-bottom: 14px; }
+
+    .hr {
+      height: 1px; background: linear-gradient(90deg, transparent, #2b313a, transparent);
+      margin: 26px 0;
     }
+    .mini { font-size:.88rem; color:#cbd5e1; }
+    .badge-agencia { display:inline-flex; gap:8px; align-items:center; background:#0f141a; color:#b8c5d6; border:1px dashed #2a3340; border-radius: 999px; padding:6px 10px; font-size:.88rem; margin-top:6px; }
+    .flex { display:flex; gap:12px; align-items: center; flex-wrap: wrap; }
+    .stack { display:flex; flex-direction: column; gap: 12px; }
   </style>
 </head>
 <body>
   <header>Reimpresión de Tickets</header>
-  <div class="center-card">
-    <!-- BUSCAR POR CORRELATIVO -->
-    <form id="formBuscarTicket" autocomplete="off">
-      <div class="titulo-buscar">
-        <i class="fas fa-search"></i> Buscar Ticket por Correlativo
-      </div>
-      <input type="text" class="input-main" id="input-correlativo" placeholder="Correlativo..." maxlength="15" required />
-      <button class="btn-main" type="submit"><i class="fas fa-search"></i> Buscar Ticket</button>
-    </form>
-    <div id="ticket-container" class="ticket-box"></div>
-    <div id="error-msg" class="error-msg" style="display:none"></div>
 
-    <!-- BUSCAR POR DUI -->
-    <div style="margin-top:2.2em;">
-      <div class="titulo-buscar">
-        <i class="fas fa-id-card"></i> Buscar Tickets por DUI del Cliente
-      </div>
-      <form id="formBuscarDui" autocomplete="off" style="margin-bottom:1em;">
-        <input type="text" class="input-main" id="input-dui" placeholder="DUI del cliente..." maxlength="15" required />
-        <button class="btn-main" type="submit"><i class="fas fa-search"></i> Buscar por DUI</button>
-      </form>
-      <div id="tickets-dui-container"></div>
+  <div class="wrap">
+    <div class="flex">
+      <span class="pill"><i class="fa-solid fa-shield"></i> Acceso con sesión</span>
+      <span class="pill"><i class="fa-solid fa-location-dot"></i> Filtrado por agencia</span>
+      <span id="agencia-badge" class="badge-agencia" style="display:none;"><i class="fa-solid fa-store"></i> Agencia: <b id="agencia-text" style="margin-left:6px;"></b></span>
     </div>
+
+    <div class="hr"></div>
+
+    <div class="grid">
+      <!-- APARTADO 1: Buscar Ticket (Pagos / MovCaja / Mov_caja) por CORRELATIVO -->
+      <div class="card h-full">
+        <div class="card-header"><i class="fas fa-search"></i> Buscar Ticket por Correlativo (General)</div>
+        <p class="desc">Busca primero en <b>pagos</b> (comprobante de pago de cliente) y, si no existe, intenta en <b>movimientos de caja</b> de tu agencia. Recomendado cuando no estás seguro del origen del correlativo.</p>
+        <form id="formBuscarTicket" autocomplete="off">
+          <label class="mini" for="input-correlativo">Correlativo</label>
+          <input type="text" class="input-main" id="input-correlativo" placeholder="Ej. 000123 o 123" maxlength="20" required />
+          <button class="btn-main" type="submit"><i class="fas fa-search"></i> Buscar</button>
+        </form>
+        <div id="ticket-container" class="ticket-box"></div>
+        <div id="error-msg" class="error-msg"></div>
+      </div>
+
+      <!-- APARTADO 2: Buscar por DUI (solo Pagos de créditos activos) -->
+      <div class="card h-full">
+        <div class="card-header"><i class="fas fa-id-card"></i> Buscar Tickets por DUI del Cliente</div>
+        <p class="desc">Trae pagos asociados a créditos no anulados para el DUI indicado. Útil para reimprimir tickets de pagos realizados por el cliente.</p>
+        <form id="formBuscarDui" autocomplete="off">
+          <label class="mini" for="input-dui">DUI del cliente</label>
+          <input type="text" class="input-main" id="input-dui" placeholder="00000000-0" maxlength="15" required />
+          <button class="btn-main" type="submit"><i class="fas fa-search"></i> Buscar</button>
+        </form>
+        <div id="tickets-dui-container" class="ticket-box"></div>
+      </div>
+
+      <!-- APARTADO 3: NUEVO – Movimientos de Caja (SOLO movimientosCaja) por CORRELATIVO -->
+      <div class="card h-full" style="grid-column: 1 / -1;">
+        <div class="card-header"><i class="fa-solid fa-cash-register"></i> Movimientos de Caja por Correlativo (solo <code>movimientosCaja</code>)</div>
+        <p class="desc">Este apartado consulta exclusivamente la colección <b>movimientosCaja</b> (movimientos realizados por cajeros), evitando choques con correlativos de pagos.</p>
+        <form id="formBuscarMovCaja" autocomplete="off" class="stack">
+          <div>
+            <label class="mini" for="input-correlativo-caja">Correlativo de movimiento de caja</label>
+            <input type="text" class="input-main" id="input-correlativo-caja" placeholder="Ej. MC-04521 o 4521" maxlength="24" required />
+          </div>
+          <button class="btn-alt" type="submit"><i class="fas fa-magnifying-glass-dollar"></i> Buscar en movimientosCaja</button>
+        </form>
+        <div id="ticket-caja-container" class="ticket-box"></div>
+        <div id="error-caja-msg" class="error-msg"></div>
+      </div>
+    </div>
+
+    <div class="hr"></div>
+    <div class="mini">Consejo: Si no estás seguro del origen del correlativo, usa la búsqueda <b>General</b>. Si sabes que es un movimiento de caja del cajero, usa el apartado <b>Movimientos de Caja</b>.</div>
   </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, getDoc, doc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -175,11 +171,16 @@
     let usuario = null;
     let agenciaActual = "";
 
-    // Función para obtener la agencia/sucursal del usuario logeado
+    // Obtener agencia/sucursal del usuario logueado
     async function obtenerAgencia(user) {
       const userSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
       if (!userSnap.empty) {
-        agenciaActual = userSnap.docs[0].data().department || userSnap.docs[0].data().agencia || "";
+        const data = userSnap.docs[0].data();
+        agenciaActual = data.department || data.agencia || "";
+        // UI badge
+        const badge = document.getElementById("agencia-badge");
+        const t = document.getElementById("agencia-text");
+        if (agenciaActual) { t.textContent = agenciaActual; badge.style.display = "inline-flex"; }
       }
     }
 
@@ -189,91 +190,110 @@
       } else {
         usuarioListo = true;
         usuario = user;
-        await obtenerAgencia(user); // Obtenemos agencia al autenticar
+        await obtenerAgencia(user);
       }
     });
 
-    // --- BUSCAR POR CORRELATIVO ---
+    // Util: compone array [texto, numero] para 'in'
+    function parseCorrelativoList(valor) {
+      const v = (valor || "").trim();
+      const arr = [v];
+      const n = Number(v);
+      if (!isNaN(n) && v !== "") arr.push(n);
+      return arr;
+    }
+
+    // ========= APARTADO 1: Buscar por CORRELATIVO (General) =========
     document.getElementById('formBuscarTicket').onsubmit = async function(e) {
       e.preventDefault();
+
+      const err = document.getElementById("error-msg");
+      const box = document.getElementById("ticket-container");
+      err.style.display = "none"; err.textContent = "";
+      box.innerHTML = "";
+
       if (!usuarioListo || !agenciaActual) {
-        document.getElementById("error-msg").textContent = "Espera a que se inicie sesión...";
-        document.getElementById("error-msg").style.display = "block";
+        err.textContent = "Inicia sesión y espera a que cargue tu agencia…";
+        err.style.display = "block";
         return;
       }
-      document.getElementById("error-msg").style.display = "none";
-      document.getElementById("ticket-container").innerHTML = "";
 
       const correlativoInput = document.getElementById('input-correlativo').value.trim();
       if (!correlativoInput) return;
 
-      // Buscar como string y como número
-      let correlativoNum = Number(correlativoInput);
-      let correlativosBuscar = [correlativoInput];
-      if (!isNaN(correlativoNum) && correlativoInput !== "") correlativosBuscar.push(correlativoNum);
-
+      const correlativosBuscar = parseCorrelativoList(correlativoInput);
       let ticket = null;
       let creditoAnulado = false;
 
-      // Busca en pagos SOLO de la sucursal del usuario
-      const pagosQuery = query(
-        collection(db, "pagos"),
-        where("correlativo", "in", correlativosBuscar),
-        where("sucursal", "==", agenciaActual)
-      );
-      const pagosSnap = await getDocs(pagosQuery);
-      if (!pagosSnap.empty) {
-        ticket = { ...pagosSnap.docs[0].data(), tipo: "pago", id: pagosSnap.docs[0].id };
-        // Si es pago de crédito, revisar si el crédito está anulado
-        if (ticket.creditoID) {
-          const creditoDoc = await getDoc(doc(db, "creditos", ticket.creditoID));
-          if (creditoDoc.exists()) {
-            const dataCred = creditoDoc.data();
-            if (dataCred.anulado === true) creditoAnulado = true;
+      // 1) pagos (solo sucursal del usuario)
+      try {
+        const pagosQuery = query(
+          collection(db, "pagos"),
+          where("correlativo", "in", correlativosBuscar),
+          where("sucursal", "==", agenciaActual)
+        );
+        const pagosSnap = await getDocs(pagosQuery);
+        if (!pagosSnap.empty) {
+          ticket = { ...pagosSnap.docs[0].data(), tipo: "pago", id: pagosSnap.docs[0].id };
+          // ¿Crédito anulado?
+          if (ticket.creditoID) {
+            const creditoDoc = await getDoc(doc(db, "creditos", ticket.creditoID));
+            if (creditoDoc.exists()) {
+              const dataCred = creditoDoc.data();
+              if (dataCred.anulado === true) creditoAnulado = true;
+            }
           }
         }
+      } catch (e) {
+        console.error("Error buscando en pagos:", e);
       }
 
-      // Si no en pagos, busca en movimientosCaja (SOLO de la agencia del usuario)
+      // 2) movimientosCaja (agencia del usuario)
       if (!ticket && !creditoAnulado) {
-        const movCajaQuery = query(
-          collection(db, "movimientosCaja"),
-          where("correlativo", "in", correlativosBuscar),
-          where("agencia", "==", agenciaActual)
-        );
-        const movCajaSnap = await getDocs(movCajaQuery);
-        if (!movCajaSnap.empty) {
-          ticket = { ...movCajaSnap.docs[0].data(), tipo: "movimientoCaja" };
+        try {
+          const movCajaQuery = query(
+            collection(db, "movimientosCaja"),
+            where("correlativo", "in", correlativosBuscar),
+            where("agencia", "==", agenciaActual)
+          );
+          const movCajaSnap = await getDocs(movCajaQuery);
+          if (!movCajaSnap.empty) {
+            ticket = { ...movCajaSnap.docs[0].data(), tipo: "movimientoCaja" };
+          }
+        } catch (e) {
+          console.error("Error buscando en movimientosCaja:", e);
         }
       }
 
-      // Si no en movimientos_caja (SOLO de la agencia del usuario)
+      // 3) movimientos_caja (colección alternativa)
       if (!ticket && !creditoAnulado) {
-        const movCaja2Query = query(
-          collection(db, "movimientos_caja"),
-          where("correlativo", "in", correlativosBuscar),
-          where("agencia", "==", agenciaActual)
-        );
-        const movCaja2Snap = await getDocs(movCaja2Query);
-        if (!movCaja2Snap.empty) {
-          ticket = { ...movCaja2Snap.docs[0].data(), tipo: "movimientoCaja" };
+        try {
+          const movCaja2Query = query(
+            collection(db, "movimientos_caja"),
+            where("correlativo", "in", correlativosBuscar),
+            where("agencia", "==", agenciaActual)
+          );
+          const movCaja2Snap = await getDocs(movCaja2Query);
+          if (!movCaja2Snap.empty) {
+            ticket = { ...movCaja2Snap.docs[0].data(), tipo: "movimientoCaja" };
+          }
+        } catch (e) {
+          console.error("Error buscando en movimientos_caja:", e);
         }
       }
 
       if (creditoAnulado) {
-        document.getElementById("error-msg").textContent = "El crédito asociado a este ticket fue ANULADO. No se puede mostrar el comprobante.";
-        document.getElementById("error-msg").style.display = "block";
+        err.textContent = "El crédito asociado a este correlativo fue ANULADO. No se puede mostrar el comprobante.";
+        err.style.display = "block";
         return;
       }
-
       if (!ticket) {
-        document.getElementById("error-msg").textContent = "No se encontró ningún ticket con ese correlativo.";
-        document.getElementById("error-msg").style.display = "block";
+        err.textContent = "No se encontró ningún ticket con ese correlativo en tu agencia.";
+        err.style.display = "block";
         return;
       }
 
       let dui = "";
-      // Si es de pagos, intenta traer el DUI
       if (ticket.tipo === "pago" && ticket.creditoID) {
         const creditoDoc = await getDoc(doc(db, "creditos", ticket.creditoID));
         if (creditoDoc.exists()) {
@@ -281,7 +301,7 @@
         }
       }
 
-      let html = '';
+      let html = "";
       if (ticket.tipo === "pago") {
         html = `
           <div class="ticket-header"><i class="fas fa-receipt"></i> Comprobante de Pago</div>
@@ -297,13 +317,13 @@
             <div><strong>Fecha:</strong> ${(ticket.fechaPago || ticket.timestamp || '-').toString().slice(0,19).replace('T',' ')}</div>
             <div><strong>Agencia:</strong> ${ticket.sucursal || ticket.agencia || '-'}</div>
           </div>
-          <button class="btn-imprimir" onclick="window.imprimirTicketPorId && imprimirTicketPorId('${ticket.id}') || window.print()">
+          <button class="btn-alt" onclick="window.imprimirTicketPorId && imprimirTicketPorId('${ticket.id}')">
             <i class="fas fa-print"></i> Imprimir Ticket
           </button>
         `;
       } else {
         html = `
-          <div class="ticket-header"><i class="fas fa-receipt"></i> Comprobante de Movimiento de Caja</div>
+          <div class="ticket-header" style="color:var(--brand-2)"><i class="fas fa-receipt"></i> Comprobante de Movimiento de Caja</div>
           <div class="ticket-details">
             <div><strong>Correlativo:</strong> ${ticket.correlativo}</div>
             <div><strong>Tipo:</strong> ${ticket.descripcion || ticket.tipo || '-'}</div>
@@ -314,75 +334,70 @@
             <div><strong>Agencia:</strong> ${ticket.agencia || '-'}</div>
             <div><strong>Observaciones:</strong> ${ticket.observaciones || '-'}</div>
           </div>
-          <button class="btn-imprimir" onclick='window.imprimirMovimientoCajaTicket && imprimirMovimientoCajaTicket(${JSON.stringify(ticket)})'>
+          <button class="btn-alt" onclick='window.imprimirMovimientoCajaTicket && imprimirMovimientoCajaTicket(${JSON.stringify(ticket)})'>
             <i class="fas fa-print"></i> Imprimir Ticket
           </button>
         `;
       }
-
-      document.getElementById("ticket-container").innerHTML = html;
+      box.innerHTML = html;
     };
 
-    // --- BUSQUEDA DE TICKETS POR DUI ---
+    // ========= APARTADO 2: Buscar por DUI (Pagos activos) =========
     document.getElementById('formBuscarDui').onsubmit = async function(e) {
       e.preventDefault();
-      document.getElementById("tickets-dui-container").innerHTML = "";
+      const cont = document.getElementById("tickets-dui-container");
+      cont.innerHTML = "";
       const duiInput = document.getElementById('input-dui').value.trim();
       if (!duiInput) return;
 
-      // 1. Buscar todos los créditos con ese DUI
-      const creditosRef = collection(db, "creditos");
-      const qCred = query(creditosRef, where("numeroDui", "==", duiInput));
+      // 1. Créditos del DUI
+      const qCred = query(collection(db, "creditos"), where("numeroDui", "==", duiInput));
       const snapCred = await getDocs(qCred);
 
       if (snapCred.empty) {
-        document.getElementById("tickets-dui-container").innerHTML =
-          `<div style="color:#ff6363;text-align:center;padding:34px 0;">No se encontraron créditos con ese DUI.</div>`;
+        cont.innerHTML = `<div class="error-msg" style="display:block;">No se encontraron créditos con ese DUI.</div>`;
         return;
       }
 
-      // 2. Tomar solo los créditos NO ANULADOS
-      const creditosActivos = snapCred.docs.filter(doc => doc.data().anulado !== true);
+      // 2. Filtrar no anulados
+      const creditosActivos = snapCred.docs.filter(d => d.data().anulado !== true);
       if (creditosActivos.length === 0) {
-        document.getElementById("tickets-dui-container").innerHTML =
-          `<div style="color:#ff6363;text-align:center;padding:34px 0;">No se encontraron créditos activos con ese DUI.</div>`;
+        cont.innerHTML = `<div class="error-msg" style="display:block;">No se encontraron créditos activos con ese DUI.</div>`;
         return;
       }
 
-      // 2.1 Tomar los creditosID no anulados
-      const creditosIDs = creditosActivos.map(doc => doc.id);
+      const creditosIDs = creditosActivos.map(d => d.id);
 
-      // 3. Buscar pagos de esos creditos
+      // 3. Traer pagos por lotes de 10
       const pagosRef = collection(db, "pagos");
       let pagosAll = [];
       for (let i = 0; i < creditosIDs.length; i += 10) {
-        const creditosSlice = creditosIDs.slice(i, i+10);
-        const qPagos = query(pagosRef, where("creditoID", "in", creditosSlice));
+        const slice = creditosIDs.slice(i, i+10);
+        const qPagos = query(pagosRef, where("creditoID", "in", slice));
         const snapPagos = await getDocs(qPagos);
         pagosAll = pagosAll.concat(snapPagos.docs.map(doc => ({id: doc.id, ...doc.data()})));
       }
 
-      // 3.1 Filtrar anulados (solo mostrar si anulado !== true)
-      pagosAll = pagosAll.filter(pago => pago.anulado !== true);
+      // 4. Excluir pagos anulados
+      pagosAll = pagosAll.filter(p => p.anulado !== true);
 
       if (pagosAll.length === 0) {
-        document.getElementById("tickets-dui-container").innerHTML =
-          `<div style="color:#ff6363;text-align:center;padding:34px 0;">No se encontraron pagos para este DUI.</div>`;
+        cont.innerHTML = `<div class="error-msg" style="display:block;">No se encontraron pagos para este DUI.</div>`;
         return;
       }
 
-      // 4. Ordenar por fecha de pago descendente (más nuevos primero)
+      // 5. Ordenar por fecha desc
       pagosAll.sort((a, b) => {
         const fa = new Date(a.fechaPago || a.timestamp || 0).getTime();
         const fb = new Date(b.fechaPago || b.timestamp || 0).getTime();
         return fb - fa;
       });
 
-      // 5. Mostrar los tickets bonitos
+      // 6. Render
       let html = "";
       for (let pago of pagosAll) {
         html += `
-          <div class="ticket-details" style="margin-bottom:18px;">
+          <div class="ticket-details" style="margin-bottom:14px;">
             <div><strong>Fecha:</strong> ${(pago.fechaPago || pago.timestamp || '-').toString().slice(0,19).replace('T',' ')}</div>
             <div><strong>Correlativo:</strong> ${pago.correlativo || "<span style='color:#888'>Sin correlativo</span>"}</div>
             <div><strong>Cliente:</strong> ${(pago.nombres || "")}</div>
@@ -391,124 +406,189 @@
             <div><strong>Pago Interés:</strong> $${Number(pago.pagoInteres || 0).toFixed(2)}</div>
             <div><strong>Pago Multas:</strong> $${Number(pago.pagoMultas || pago.pagoMulta || 0).toFixed(2)}</div>
             <div><strong>Saldo Restante:</strong> $${Number(pago.saldoRestante || 0).toFixed(2)}</div>
-            <button class="btn-imprimir" onclick="imprimirTicketPorId('${pago.id}')">
+            <button class="btn-alt" onclick="imprimirTicketPorId('${pago.id}')">
               <i class="fas fa-print"></i> Imprimir Ticket
             </button>
           </div>
         `;
       }
-      document.getElementById("tickets-dui-container").innerHTML = html;
+      cont.innerHTML = html;
     };
 
-    // --- IMPRIMIR TICKET INDIVIDUAL POR ID ---
-    window.imprimirTicketPorId = async function(pagoId) {
-      const docRef = doc(db, "pagos", pagoId);
-      const docSnap = await getDoc(docRef);
-      if (!docSnap.exists()) {
-        alert("No se encontró el ticket.");
+    // ========= APARTADO 3: NUEVO – Movimientos de Caja por CORRELATIVO (solo movimientosCaja) =========
+    document.getElementById('formBuscarMovCaja').onsubmit = async function(e){
+      e.preventDefault();
+
+      const err = document.getElementById("error-caja-msg");
+      const box = document.getElementById("ticket-caja-container");
+      err.style.display = "none"; err.textContent = "";
+      box.innerHTML = "";
+
+      if (!usuarioListo || !agenciaActual) {
+        err.textContent = "Inicia sesión y espera a que cargue tu agencia…";
+        err.style.display = "block";
         return;
       }
-      const pago = docSnap.data();
 
-      // Buscar el DUI en el crédito y verificar si está anulado
-      let dui = "";
-      let anulado = false;
-      if (pago.creditoID) {
-        const creditoDoc = await getDoc(doc(db, "creditos", pago.creditoID));
-        if (creditoDoc.exists()) {
-          dui = creditoDoc.data().numeroDui || "";
-          if (creditoDoc.data().anulado === true) anulado = true;
+      const correlativo = document.getElementById('input-correlativo-caja').value.trim();
+      if (!correlativo) return;
+
+      const correlativosBuscar = parseCorrelativoList(correlativo);
+
+      try {
+        const qMov = query(
+          collection(db, "movimientosCaja"),
+          where("correlativo", "in", correlativosBuscar),
+          where("agencia", "==", agenciaActual)
+        );
+        const snap = await getDocs(qMov);
+
+        if (snap.empty) {
+          err.textContent = "No se encontró ningún movimiento de caja con ese correlativo en tu agencia.";
+          err.style.display = "block";
+          return;
         }
-      }
-      if (anulado) {
-        alert("El crédito asociado a este ticket fue ANULADO. No se puede imprimir el comprobante.");
-        return;
-      }
 
-      let printHtml = `
-        <html>
-        <head>
-          <title>Imprimir Ticket</title>
-          <style>
-            body { font-family: 'Segoe UI', Arial, sans-serif; background: #fff; color: #232323; margin:0; }
-            .ticket-container { max-width: 420px; margin: 28px auto; background: #fff; border-radius: 11px; box-shadow: 0 2px 14px #0002; padding: 2.2rem 1.6rem 1.3rem 1.6rem; }
-            .ticket-header { font-size: 1.22rem; color: #13b66b; font-weight: 700; margin-bottom: 9px; text-align:center; }
-            .ticket-details strong { color: #333; min-width: 110px; display: inline-block; }
-            .ticket-details { font-size: 1.04rem; padding:7px 0 0 0; }
-          </style>
-          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-        </head>
-        <body>
-          <div class="ticket-container">
-            <div class="ticket-header"><i class="fas fa-receipt"></i> Comprobante de Pago</div>
-            <div class="ticket-details">
-              <div><strong>Fecha:</strong> ${(pago.fechaPago || pago.timestamp || '-').toString().slice(0,19).replace('T',' ')}</div>
-              <div><strong>Correlativo:</strong> ${pago.correlativo || "<span style='color:#888'>Sin correlativo</span>"}</div>
-              <div><strong>Cliente:</strong> ${(pago.nombres || "")}</div>
-              <div><strong>DUI:</strong> ${dui || '-'}</div>
-              <div><strong>Monto Pagado:</strong> $${Number(pago.montoPagado).toFixed(2)}</div>
-              <div><strong>Pago Capital:</strong> $${Number(pago.pagoCapital || 0).toFixed(2)}</div>
-              <div><strong>Pago Interés:</strong> $${Number(pago.pagoInteres || 0).toFixed(2)}</div>
-              <div><strong>Pago Multas:</strong> $${Number(pago.pagoMultas || pago.pagoMulta || 0).toFixed(2)}</div>
-              <div><strong>Saldo Restante:</strong> $${Number(pago.saldoRestante || 0).toFixed(2)}</div>
-            </div>
-            <div style="text-align:center;margin-top:28px;">
-              <button onclick="window.print()" style="background:#13b66b;color:#fff;font-size:1.03rem;padding:10px 30px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">Imprimir</button>
-            </div>
+        // Tomamos el primero (si hubiera varios con el mismo correlativo)
+        const m = snap.docs[0].data();
+
+        const html = `
+          <div class="ticket-header" style="color:var(--brand-2)"><i class="fas fa-receipt"></i> Movimiento de Caja</div>
+          <div class="ticket-details">
+            <div><strong>Correlativo:</strong> ${m.correlativo}</div>
+            <div><strong>Tipo:</strong> ${m.tipo || m.descripcion || '-'}</div>
+            <div><strong>Nombre:</strong> ${m.nombre || '-'}</div>
+            <div><strong>Monto:</strong> $${Number(m.monto || 0).toFixed(2)}</div>
+            <div><strong>Usuario:</strong> ${m.usuario || '-'}</div>
+            <div><strong>Fecha:</strong> ${(m.fecha || m.timestamp || '-').toString().slice(0,19).replace('T',' ')}</div>
+            <div><strong>Agencia:</strong> ${m.agencia || '-'}</div>
+            <div><strong>Observaciones:</strong> ${m.observaciones || '-'}</div>
           </div>
-        </body>
-        </html>
-      `;
-      const printWindow = window.open('', '_blank', 'width=600,height=600');
-      printWindow.document.write(printHtml);
-      printWindow.document.close();
-      setTimeout(() => { printWindow.focus(); }, 500);
+          <button class="btn-alt" onclick='window.imprimirMovimientoCajaTicket && imprimirMovimientoCajaTicket(${JSON.stringify(m)})'>
+            <i class="fas fa-print"></i> Imprimir Ticket
+          </button>
+        `;
+        box.innerHTML = html;
+
+      } catch (e) {
+        console.error("Error en búsqueda exclusiva movimientosCaja:", e);
+        err.textContent = "Ocurrió un error al buscar. Intenta de nuevo.";
+        err.style.display = "block";
+      }
+    };
+
+    // --- IMPRIMIR TICKET INDIVIDUAL POR ID (Pagos) ---
+    window.imprimirTicketPorId = async function(pagoId) {
+      try{
+        const docRef = doc(db, "pagos", pagoId);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) { alert("No se encontró el ticket."); return; }
+        const pago = docSnap.data();
+
+        // Verificar crédito
+        let dui = "";
+        let anulado = false;
+        if (pago.creditoID) {
+          const creditoDoc = await getDoc(doc(db, "creditos", pago.creditoID));
+          if (creditoDoc.exists()) {
+            dui = creditoDoc.data().numeroDui || "";
+            if (creditoDoc.data().anulado === true) anulado = true;
+          }
+        }
+        if (anulado) {
+          alert("El crédito asociado a este ticket fue ANULADO. No se puede imprimir el comprobante.");
+          return;
+        }
+
+        const printHtml = `
+          <html>
+          <head>
+            <title>Imprimir Ticket</title>
+            <style>
+              body { font-family: 'Segoe UI', Arial, sans-serif; background: #fff; color: #232323; margin:0; }
+              .ticket-container { max-width: 420px; margin: 28px auto; background: #fff; border-radius: 11px; box-shadow: 0 2px 14px #0002; padding: 2.2rem 1.6rem 1.3rem 1.6rem; }
+              .ticket-header { font-size: 1.22rem; color: #13b66b; font-weight: 700; margin-bottom: 9px; text-align:center; }
+              .ticket-details strong { color: #333; min-width: 110px; display: inline-block; }
+              .ticket-details { font-size: 1.04rem; padding:7px 0 0 0; }
+            </style>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+          </head>
+          <body>
+            <div class="ticket-container">
+              <div class="ticket-header"><i class="fas fa-receipt"></i> Comprobante de Pago</div>
+              <div class="ticket-details">
+                <div><strong>Fecha:</strong> ${(pago.fechaPago || pago.timestamp || '-').toString().slice(0,19).replace('T',' ')}</div>
+                <div><strong>Correlativo:</strong> ${pago.correlativo || "<span style='color:#888'>Sin correlativo</span>"}</div>
+                <div><strong>Cliente:</strong> ${(pago.nombres || "")}</div>
+                <div><strong>DUI:</strong> ${dui || '-'}</div>
+                <div><strong>Monto Pagado:</strong> $${Number(pago.montoPagado).toFixed(2)}</div>
+                <div><strong>Pago Capital:</strong> $${Number(pago.pagoCapital || 0).toFixed(2)}</div>
+                <div><strong>Pago Interés:</strong> $${Number(pago.pagoInteres || 0).toFixed(2)}</div>
+                <div><strong>Pago Multas:</strong> $${Number(pago.pagoMultas || pago.pagoMulta || 0).toFixed(2)}</div>
+                <div><strong>Saldo Restante:</strong> $${Number(pago.saldoRestante || 0).toFixed(2)}</div>
+              </div>
+              <div style="text-align:center;margin-top:28px;">
+                <button onclick="window.print()" style="background:#13b66b;color:#fff;font-size:1.03rem;padding:10px 30px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">Imprimir</button>
+              </div>
+            </div>
+          </body>
+          </html>
+        `;
+        const w = window.open('', '_blank', 'width=600,height=600');
+        w.document.write(printHtml);
+        w.document.close();
+        setTimeout(() => { w.focus(); }, 300);
+      }catch(err){ console.error(err); alert("No se pudo imprimir el ticket."); }
     };
   </script>
+
   <!-- FUNCIÓN PARA IMPRIMIR MOVIMIENTOS DE CAJA -->
   <script>
     window.imprimirMovimientoCajaTicket = function(ticket) {
-      if (typeof ticket === 'string') ticket = JSON.parse(ticket);
-      const printHtml = `
-        <html>
-        <head>
-          <title>Imprimir Movimiento de Caja</title>
-          <style>
-            body { font-family: 'Segoe UI', Arial, sans-serif; background: #fff; color: #232323; margin:0; }
-            .ticket-container { max-width: 420px; margin: 28px auto; background: #fff; border-radius: 11px; box-shadow: 0 2px 14px #0002; padding: 2.2rem 1.6rem 1.3rem 1.6rem; }
-            .ticket-header { font-size: 1.22rem; color: #f8af40; font-weight: 700; margin-bottom: 9px; text-align:center; }
-            .ticket-details strong { color: #333; min-width: 110px; display: inline-block; }
-            .ticket-details { font-size: 1.04rem; padding:7px 0 0 0; }
-          </style>
-          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-        </head>
-        <body>
-          <div class="ticket-container">
-            <div class="ticket-header"><i class="fas fa-cash-register"></i> Movimiento de Caja</div>
-            <div class="ticket-details">
-              <div><strong>Correlativo:</strong> ${ticket.correlativo}</div>
-              <div><strong>Tipo:</strong> ${ticket.tipo || ticket.descripcion || '-'}</div>
-              <div><strong>Nombre:</strong> ${ticket.nombre || '-'}</div>
-              <div><strong>Monto:</strong> $${Number(ticket.monto || 0).toFixed(2)}</div>
-              <div><strong>Usuario:</strong> ${ticket.usuario || '-'}</div>
-              <div><strong>Fecha:</strong> ${(ticket.fecha || ticket.timestamp || '-').toString().slice(0,19).replace('T',' ')}</div>
-              <div><strong>Agencia:</strong> ${ticket.agencia || '-'}</div>
-              <div><strong>Observaciones:</strong> ${ticket.observaciones || '-'}</div>
+      try{
+        if (typeof ticket === 'string') ticket = JSON.parse(ticket);
+        const printHtml = `
+          <html>
+          <head>
+            <title>Imprimir Movimiento de Caja</title>
+            <style>
+              body { font-family: 'Segoe UI', Arial, sans-serif; background: #fff; color: #232323; margin:0; }
+              .ticket-container { max-width: 420px; margin: 28px auto; background: #fff; border-radius: 11px; box-shadow: 0 2px 14px #0002; padding: 2.2rem 1.6rem 1.3rem 1.6rem; }
+              .ticket-header { font-size: 1.22rem; color: #f8af40; font-weight: 700; margin-bottom: 9px; text-align:center; }
+              .ticket-details strong { color: #333; min-width: 110px; display: inline-block; }
+              .ticket-details { font-size: 1.04rem; padding:7px 0 0 0; }
+            </style>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+          </head>
+          <body>
+            <div class="ticket-container">
+              <div class="ticket-header"><i class="fas fa-cash-register"></i> Movimiento de Caja</div>
+              <div class="ticket-details">
+                <div><strong>Correlativo:</strong> ${ticket.correlativo}</div>
+                <div><strong>Tipo:</strong> ${ticket.tipo || ticket.descripcion || '-'}</div>
+                <div><strong>Nombre:</strong> ${ticket.nombre || '-'}</div>
+                <div><strong>Monto:</strong> $${Number(ticket.monto || 0).toFixed(2)}</div>
+                <div><strong>Usuario:</strong> ${ticket.usuario || '-'}</div>
+                <div><strong>Fecha:</strong> ${(ticket.fecha || ticket.timestamp || '-').toString().slice(0,19).replace('T',' ')}</div>
+                <div><strong>Agencia:</strong> ${ticket.agencia || '-'}</div>
+                <div><strong>Observaciones:</strong> ${ticket.observaciones || '-'}</div>
+              </div>
+              <div style="text-align:center;margin-top:28px;">
+                <button onclick="window.print()" style="background:#f8af40;color:#232323;font-size:1.03rem;padding:10px 30px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">Imprimir</button>
+              </div>
             </div>
-            <div style="text-align:center;margin-top:28px;">
-              <button onclick="window.print()" style="background:#f8af40;color:#232323;font-size:1.03rem;padding:10px 30px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">Imprimir</button>
-            </div>
-          </div>
-        </body>
-        </html>
-      `;
-      const printWindow = window.open('', '_blank', 'width=600,height=600');
-      printWindow.document.write(printHtml);
-      printWindow.document.close();
-      setTimeout(() => { printWindow.focus(); }, 500);
+          </body>
+          </html>
+        `;
+        const w = window.open('', '_blank', 'width=600,height=600');
+        w.document.write(printHtml);
+        w.document.close();
+        setTimeout(() => { w.focus(); }, 300);
+      }catch(err){ console.error(err); alert("No se pudo imprimir el movimiento."); }
     };
   </script>
 </body>
 </html>
+
 
 

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -563,7 +563,18 @@ Fecha;Monto;Capital;Interes;Multa;Correlativo;Motivo
       chip.addEventListener('click', ()=> setStep(Number(chip.dataset.step)));
     });
 
-    function maskTel(v){ v=(v||'').replace(/[^0-9]/g,'').slice(0,8); if(v.length>4) v=v.slice(0,4)+'-'+v.slice(4); return v; }
+    function maskTel(v){ 
+      // suelta el guion “en vivo” aunque haya menos de 8 dígitos (útil para tipeo manual)
+      v=(v||'').replace(/[^0-9]/g,'').slice(0,8); 
+      if(v.length>4) v=v.slice(0,4)+'-'+v.slice(4); 
+      return v; 
+    }
+    // Versión estricta para autollenado: solo acepta 8 dígitos válidos
+    function maskTelStrict(v){
+      const d = String(v||'').replace(/\D/g,'').slice(0,8);
+      return d.length===8 ? d.slice(0,4)+'-'+d.slice(4) : '';
+    }
+
     ['u_tel','s_telJefe','f1_tel','f2_tel','f3_tel','p1_tel','p2_tel','p3_tel','s_numeroConyugue']
       .forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('input', e=> e.target.value = maskTel(e.target.value)); });
 
@@ -650,7 +661,7 @@ Fecha;Monto;Capital;Interes;Multa;Correlativo;Motivo
       if(bar3) bar3.textContent = label;
       if(bar4) bar4.textContent = label;
       const tag = document.getElementById('creditoIDTag');
-      const id = state.creditoID || '—';
+      const id = state.creditos[idx]?.creditoID || state.creditoID || '—';
       if(tag) tag.textContent = `creditoID: ${id}`;
     }
     function loadCreditIntoForm(idx){
@@ -855,12 +866,19 @@ Fecha;Monto;Capital;Interes;Multa;Correlativo;Motivo
 
     /* ================== Helpers de parseo comunes ================== */
     function toDateInputFromDMY(dmy){
-      const m = (dmy||'').match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/); if(!m) return '';
-      const [_,d,mn,y]=m; const p=n=>String(n).padStart(2,'0');
+      const m = (dmy||'').match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+      if(!m) return '';
+      let [_,d,mn,y]=m;
+      if(String(y).length===2) y = '20'+y;
+      const p=n=>String(n).padStart(2,'0');
       return `${y}-${p(mn)}-${p(d)}`;
     }
     function scrubNum(s){ return +(String(s||'').replace(/[^0-9.\-]/g,''))||0; }
     function norm(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
+    function cleanPlaceholder(v){
+      const s = String(v||'').trim();
+      return (s==='—' || s==='-' || s.toLowerCase()==='na') ? '' : s;
+    }
 
     // Busca por label (varias alternativas) y devuelve la 1ra coincidencia
     function pick(raw, labels){
@@ -918,19 +936,19 @@ Fecha;Monto;Capital;Interes;Multa;Correlativo;Motivo
     function parseSolicitudRaw(raw){
       const o = {};
       // Generales
-      o.analistaID = pick(raw,['Analista','Analista ID','ID Analista']);
-      o.creditLine = pick(raw,['Linea de credito','Línea de crédito','Linea','Línea']);
-      o.estado     = pick(raw,['Estado de solicitud','Estado']);
-      o.fechaSolic = pick(raw,['Fecha de solicitud','Fecha solicitud','F. Solicitud']);
+      o.analistaID = cleanPlaceholder(pick(raw,['Analista','Analista ID','ID Analista']));
+      o.creditLine = cleanPlaceholder(pick(raw,['Linea de credito','Línea de crédito','Linea','Línea']));
+      o.estado     = cleanPlaceholder(pick(raw,['Estado de solicitud','Estado']));
+      o.fechaSolic = cleanPlaceholder(pick(raw,['Fecha de solicitud','Fecha solicitud','F. Solicitud']));
       // Laborales
-      o.profesion  = pick(raw,['Profesion','Profesión','Ocupacion','Ocupación']);
-      o.lugar      = pick(raw,['Lugar de trabajo','Trabajo','Empresa']);
-      o.dirTrabajo = pick(raw,['Direccion de trabajo','Dirección de trabajo']);
-      o.tiempo     = pick(raw,['Tiempo de servicio','Antiguedad','Antigüedad']);
-      o.jefe       = pick(raw,['Jefe inmediato','Jefe']);
-      o.telJefe    = pick(raw,['Tel Jefe','Telefono Jefe','Teléfono Jefe']);
-      o.pagoSueldo = pick(raw,['Pago de sueldo','Periodicidad de pago']);
-      o.vivienda   = pick(raw,['Tipo de vivienda','Vivienda']);
+      o.profesion  = cleanPlaceholder(pick(raw,['Profesion','Profesión','Ocupacion','Ocupación']));
+      o.lugar      = cleanPlaceholder(pick(raw,['Lugar de trabajo','Trabajo','Empresa']));
+      o.dirTrabajo = cleanPlaceholder(pick(raw,['Direccion de trabajo','Dirección de trabajo']));
+      o.tiempo     = cleanPlaceholder(pick(raw,['Tiempo de servicio','Antiguedad','Antigüedad']));
+      o.jefe       = cleanPlaceholder(pick(raw,['Jefe inmediato','Jefe']));
+      o.telJefe    = cleanPlaceholder(pick(raw,['Tel Jefe','Telefono Jefe','Teléfono Jefe']));
+      o.pagoSueldo = cleanPlaceholder(pick(raw,['Pago de sueldo','Periodicidad de pago']));
+      o.vivienda   = cleanPlaceholder(pick(raw,['Tipo de vivienda','Vivienda']));
       // Ingresos
       o.sueldo     = scrubNum(pick(raw,['Sueldo']));
       o.comisiones = scrubNum(pick(raw,['Comisiones']));
@@ -948,33 +966,35 @@ Fecha;Monto;Capital;Interes;Multa;Correlativo;Motivo
       // Monto solicitado
       o.montoSol   = scrubNum(pick(raw,['Monto a solicitar','Monto solicitado']));
       o.plazoSol   = scrubNum(pick(raw,['Plazo solicitado','Plazo']));
-      o.freqSol    = pick(raw,['Frecuencia solicitada','Frecuencia']);
-      o.obs        = pick(raw,['Observaciones','Comentario']);
+      o.freqSol    = cleanPlaceholder(pick(raw,['Frecuencia solicitada','Frecuencia']));
+      o.obs        = cleanPlaceholder(pick(raw,['Observaciones','Comentario']));
       // Referencias F1..F3
       for(let i=1;i<=3;i++){
-        o[`f${i}_nombre`]     = pick(raw,[`F${i}\\s*Nombre`,`Familiar ${i} Nombre`]);
-        o[`f${i}_parentesco`] = pick(raw,[`F${i}\\s*Parentesco`,`Familiar ${i} Parentesco`]);
-        o[`f${i}_tel`]        = pick(raw,[`F${i}\\s*Tel(efono|éfono)?`,`Familiar ${i} Telefono`]);
-        o[`f${i}_dir`]        = pick(raw,[`F${i}\\s*Direccion|F${i}\\s*Dirección`,`Familiar ${i} Direccion`]);
+        o[`f${i}_nombre`]     = cleanPlaceholder(pick(raw,[`F${i}\\s*Nombre`,`Familiar ${i} Nombre`]));
+        o[`f${i}_parentesco`] = cleanPlaceholder(pick(raw,[`F${i}\\s*Parentesco`,`Familiar ${i} Parentesco`]));
+        o[`f${i}_tel`]        = cleanPlaceholder(pick(raw,[`F${i}\\s*Tel(efono|éfono)?`,`Familiar ${i} Telefono`]));
+        o[`f${i}_dir`]        = cleanPlaceholder(pick(raw,[`F${i}\\s*Direccion|F${i}\\s*Dirección`,`Familiar ${i} Direccion`]));
       }
       // Referencias P1..P3
       for(let i=1;i<=3;i++){
-        o[`p${i}_nombre`]     = pick(raw,[`P${i}\\s*Nombre`,`Personal ${i} Nombre`]);
-        o[`p${i}_parentesco`] = pick(raw,[`P${i}\\s*Parentesco`,`Personal ${i} Parentesco`]);
-        o[`p${i}_tel`]        = pick(raw,[`P${i}\\s*Tel(efono|éfono)?`,`Personal ${i} Telefono`]);
-        o[`p${i}_dir`]        = pick(raw,[`P${i}\\s*Direccion|P${i}\\s*Dirección`,`Personal ${i} Direccion`]);
+        o[`p${i}_nombre`]     = cleanPlaceholder(pick(raw,[`P${i}\\s*Nombre`,`Personal ${i} Nombre`]));
+        o[`p${i}_parentesco`] = cleanPlaceholder(pick(raw,[`P${i}\\s*Parentesco`,`Personal ${i} Parentesco`]));
+        o[`p${i}_tel`]        = cleanPlaceholder(pick(raw,[`P${i}\\s*Tel(efono|éfono)?`,`Personal ${i} Telefono`]));
+        o[`p${i}_dir`]        = cleanPlaceholder(pick(raw,[`P${i}\\s*Direccion|P${i}\\s*Dirección`,`Personal ${i} Direccion`]));
       }
       // Cónyuge
-      o.conyugeNom = pick(raw,['Nombre de conyuge','Nombre de cónyuge','Conyuge','Cónyuge']);
-      o.conyugeTel = pick(raw,['Telefono de conyuge','Teléfono de cónyuge','Tel Cónyuge']);
+      o.conyugeNom = cleanPlaceholder(pick(raw,['Nombre de conyuge','Nombre de cónyuge','Conyuge','Cónyuge']));
+      o.conyugeTel = cleanPlaceholder(pick(raw,['Telefono de conyuge','Teléfono de cónyuge','Tel Cónyuge']));
       o.hijos      = scrubNum(pick(raw,['Hijos']));
       return o;
     }
+
     function applySolicitudParsed(o){
       // Generales
       if(o.analistaID) document.getElementById('s_analistaID').value = o.analistaID;
       if(o.creditLine){
-        const val = ['Credicash','Credicel','Amuebla2','Estacionario','Refinanciamiento'].find(x=> norm(x)===norm(o.creditLine)) || 'Credicash';
+        const val = ['Credicash','Credicel','Amuebla2','Estacionario','Refinanciamiento']
+          .find(x=> norm(o.creditLine).includes(norm(x))) || 'Credicash';
         document.getElementById('s_creditLine').value = val;
       }
       if(o.estado){
@@ -991,7 +1011,10 @@ Fecha;Monto;Capital;Interes;Multa;Correlativo;Motivo
       if(o.dirTrabajo) document.getElementById('s_direccionTrabajo').value = o.dirTrabajo;
       if(o.tiempo)     document.getElementById('s_tiempoServicio').value = o.tiempo;
       if(o.jefe)       document.getElementById('s_jefe').value = o.jefe;
-      if(o.telJefe)    document.getElementById('s_telJefe').value = maskTel(o.telJefe);
+      if(o.telJefe){
+        const t = maskTelStrict(o.telJefe);
+        if(t) document.getElementById('s_telJefe').value = t;
+      }
       if(o.pagoSueldo){
         const val = ['Semanal','Quincenal','Catorcenal','Mensual'].find(x=> norm(x)===norm(o.pagoSueldo)) || 'Quincenal';
         document.getElementById('s_pagoSueldo').value = val;
@@ -1026,21 +1049,30 @@ Fecha;Monto;Capital;Interes;Multa;Correlativo;Motivo
       if(o.obs) document.getElementById('s_observaciones').value = o.obs;
       // Referencias familiares
       for(let i=1;i<=3;i++){
-        if(o[`f{i}_nombre`]) document.getElementById(`f${i}_nombre`).value = o[`f${i}_nombre`];
-        if(o[`f{i}_parentesco`]) document.getElementById(`f${i}_parentesco`).value = o[`f${i}_parentesco`];
-        if(o[`f{i}_tel`]) document.getElementById(`f${i}_tel`).value = maskTel(o[`f${i}_tel`]);
-        if(o[`f{i}_dir`]) document.getElementById(`f${i}_dir`).value = o[`f${i}_dir`];
+        if(o[`f${i}_nombre`])      document.getElementById(`f${i}_nombre`).value = o[`f${i}_nombre`];
+        if(o[`f${i}_parentesco`])  document.getElementById(`f${i}_parentesco`).value = o[`f${i}_parentesco`];
+        if(o[`f${i}_tel`]) {
+          const t = maskTelStrict(o[`f${i}_tel`]);
+          if(t) document.getElementById(`f${i}_tel`).value = t;
+        }
+        if(o[`f${i}_dir`])         document.getElementById(`f${i}_dir`).value = o[`f${i}_dir`];
       }
       // Referencias personales
       for(let i=1;i<=3;i++){
-        if(o[`p{i}_nombre`]) document.getElementById(`p${i}_nombre`).value = o[`p${i}_nombre`];
-        if(o[`p{i}_parentesco`]) document.getElementById(`p${i}_parentesco`).value = o[`p${i}_parentesco`];
-        if(o[`p{i}_tel`]) document.getElementById(`p${i}_tel`).value = maskTel(o[`p${i}_tel`]);
-        if(o[`p{i}_dir`]) document.getElementById(`p${i}_dir`).value = o[`p${i}_dir`];
+        if(o[`p${i}_nombre`])      document.getElementById(`p${i}_nombre`).value = o[`p${i}_nombre`];
+        if(o[`p${i}_parentesco`])  document.getElementById(`p${i}_parentesco`).value = o[`p${i}_parentesco`];
+        if(o[`p${i}_tel`]) {
+          const t = maskTelStrict(o[`p${i}_tel`]);
+          if(t) document.getElementById(`p${i}_tel`).value = t;
+        }
+        if(o[`p${i}_dir`])         document.getElementById(`p${i}_dir`).value = o[`p${i}_dir`];
       }
       // Cónyuge
       if(o.conyugeNom) document.getElementById('s_nombreConyugue').value = o.conyugeNom;
-      if(o.conyugeTel) document.getElementById('s_numeroConyugue').value = maskTel(o.conyugeTel);
+      if(o.conyugeTel){
+        const t = maskTelStrict(o.conyugeTel);
+        if(t) document.getElementById('s_numeroConyugue').value = t;
+      }
       if(Number.isFinite(o.hijos)) document.getElementById('s_hijos').value = o.hijos;
     }
     function renderPreviewSolicitud(o){
@@ -1094,7 +1126,7 @@ Fecha;Monto;Capital;Interes;Multa;Correlativo;Motivo
       o.clasificacionPantalla = g('Clasificación')||'';
       o.cuotasPagadasPantalla = +(String(g('Cuotas pagadas')||'').replace(/[^0-9]/g,''))||0;
       o.cuotasRestantesPantalla = +(String(g('Cuotas (pendientes|restantes)')||'').replace(/[^0-9]/g,''))||0;
-      o.asignadoA = (g('Ejecutivo.*|Cobrador.*')||'').replace(/^(Ejecutivo|Cobrador)[:\\s]*/i,'');
+      o.asignadoA = (g('Ejecutivo.*|Cobrador.*')||'').replace(/^(Ejecutivo|Cobrador)[:\s]*/i,'');
 
       return o;
     }
@@ -1296,7 +1328,7 @@ Fecha;Monto;Capital;Interes;Multa;Correlativo;Motivo
       }
       const dmy = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
       if(dmy){
-        let [,d,m,y] = dmy; if(y.length===2) y = '20'+y;
+        let [,d,m,y] = dmy; if(String(y).length===2) y = '20'+y;
         return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       }
       return '';
@@ -1565,7 +1597,7 @@ Fecha;Monto;Capital;Interes;Multa;Correlativo;Motivo
           creditoID: state.creditoID,
           clienteID: state.clienteID,
           sucursal: suc || 'Migracion',
-          correlativo: Number(p.correlativo ?? idx+1),
+          correlativo: Number(p.correlativo || idx+1),
           fechaPago: p.fechaPago ? dateInputToISO_TZ(p.fechaPago) : nowISO_TZ(),
           fechaRegistro: nowISO_TZ(),
           montoPagado: Number(p.montoPagado||0),

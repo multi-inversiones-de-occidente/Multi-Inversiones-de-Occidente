@@ -32,6 +32,31 @@
     .app p{margin:0;color:var(--muted);font-size:13px}
     .app .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
     .app a{display:inline-block;text-decoration:none;color:#0ea5e9;border:1px solid #1c2c3f;background:#0b1320;padding:8px 10px;border-radius:10px;font-weight:600}
+
+    /* === Botón llamativo (CTA) para el nuevo acceso === */
+    .cta-glow{
+      position:relative;
+      background:linear-gradient(135deg,#ffdd99,#f8af40,#ff7a18);
+      color:#1a1206 !important;
+      border:0 !important;
+      padding:10px 14px !important;
+      border-radius:12px !important;
+      box-shadow:0 8px 24px rgba(248,175,64,.35), inset 0 1px 0 #fff3;
+      font-weight:800 !important;
+      letter-spacing:.2px;
+      transform:translateZ(0);
+      transition:transform .12s ease, box-shadow .12s ease;
+    }
+    .cta-glow:hover{ transform:translateY(-1px); box-shadow:0 10px 28px rgba(248,175,64,.45), inset 0 1px 0 #fff6; }
+    .cta-glow:after{
+      content:"✨";
+      position:absolute; right:-8px; top:-8px; font-size:14px; filter:saturate(120%);
+      animation:twinkle 1.8s ease-in-out infinite;
+    }
+    @keyframes twinkle{
+      0%,100%{ transform:rotate(0deg) scale(1); opacity:.9 }
+      50%{ transform:rotate(12deg) scale(1.15); opacity:1 }
+    }
   </style>
 </head>
 <body>
@@ -63,6 +88,8 @@
           <p>Panel interno para cargar usuario, solicitud, crédito, amortización y pagos históricos.</p>
           <div class="row">
             <a href="./migracion.html">Abrir migración</a>
+            <!-- >>> Nuevo acceso llamativo al panel que creamos <<< -->
+            <a class="cta-glow" href="./panel-integracion-creditos.html" aria-label="Abrir Panel de Integración de Créditos">Nuevo: Panel Integración</a>
           </div>
         </div>
 
@@ -168,5 +195,6 @@
   </script>
 </body>
 </html>
+
 
 

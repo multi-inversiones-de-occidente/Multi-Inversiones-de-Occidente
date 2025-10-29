@@ -374,7 +374,7 @@
         return;
       }
       try{
-        const estadosPermitidos = ["Activo","Mora Temprana","Mora Moderada","Mora Severa","Riesgo Alto"];
+        const estadosPermitidos = ["Activo","Mora Temprana","Mora Moderada","Mora Severa","Riesgo Alto","En Mora"];
         const q = query(collection(db, "creditos"),
                         where("estadoCredito", "in", estadosPermitidos),
                         where("agenciaAsignada", "==", userDepartment));
@@ -434,7 +434,7 @@
       const ref = doc(db, "counters", "pagos");
       const num = await runTransaction(db, async (tx) => {
         const snap = await tx.get(ref);
-        if (!snap.exists()) {
+        if (!snap.exists) {
           tx.set(ref, { next: 2 }); // primer correlativo será 1
           return 1;
         } else {
@@ -820,3 +820,5 @@
   </script>
 </body>
 </html>
+
+

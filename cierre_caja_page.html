@@ -34,7 +34,7 @@
     let movimientosDelDia = [];
     let fechaSeleccionada = null;
     let saldoInicial = 0;
-    // NUEVO: para saber si lo que estamos viendo viene de un cierre real
+    // para saber si ya había cierre en DB
     let cierreExistenteActual = null;
 
     // ===== Utilidades =====
@@ -128,7 +128,7 @@
       return 0;
     }
 
-    // ===== NUEVO: obtener el cierre completo (como lo ve la página de caja) =====
+    // ===== obtener cierre existente (por si ya había) =====
     async function obtenerCierreCompleto(agencia, fechaOperacion /* "YYYY-MM-DD" */) {
       const q = query(
         collection(db, "cierres_caja"),
@@ -139,22 +139,6 @@
       const snap = await getDocs(q);
       if (!snap.empty) {
         return { id: snap.docs[0].id, ...snap.docs[0].data() };
-      }
-      return null;
-    }
-
-    // ===== NUEVO: leer saldo de un cierre existente para la misma fecha (si ya fue cerrado) =====
-    async function obtenerSaldoCierreSiExiste(agencia, fechaOperacion /* "YYYY-MM-DD" */) {
-      const q = query(
-        collection(db, "cierres_caja"),
-        where("agencia", "==", agencia),
-        where("fecha", "==", fechaOperacion),
-        limit(1)
-      );
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        const d = snap.docs[0].data();
-        return (d.saldo_siguiente ?? d.saldo_caja ?? null);
       }
       return null;
     }
@@ -200,7 +184,7 @@
           }
         }
 
-        // incluir pagos
+        // incluir pagos para que aparezcan días con solo depósitos
         {
           const agenciaActualNorm = (agenciaActual || "").toLowerCase().trim();
           const pagosQ = query(
@@ -264,7 +248,7 @@
       });
     }
 
-    // ===== Cargar movimientos + pagos =====
+    // ===== Cargar movimientos + pagos (ahora como la página de caja) =====
     async function cargarMovimientosYTotales(fecha /* "YYYY-MM-DD" */) {
       document.getElementById("tabla-movs").innerHTML =
         `<tr><td colspan="6" style="text-align:center">Cargando movimientos...</td></tr>`;
@@ -274,59 +258,16 @@
       let totalIngresos = 0;
       let totalEgresos = 0;
 
-      // saldo inicial
+      // saldo inicial igual que siempre
       saldoInicial = await obtenerSaldoInicial(agenciaActual, fecha);
 
-      // PRIMERO: ver si ya existe un cierre (AQUÍ ESTABA EL PROBLEMA)
+      // si ya hay cierre, lo anotamos pero NO devolvemos todavía (queremos reconstruir como caja)
       const cierreExistente = await obtenerCierreCompleto(agenciaActual, fecha);
       if (cierreExistente) {
         cierreExistenteActual = cierreExistente;
-
-        const movs = Array.isArray(cierreExistente.movimientos) ? cierreExistente.movimientos : [];
-
-        movimientosDelDia = movs.map(m => ({
-          id: m.id_movimiento || "",
-          coll: m.origen || "",
-          tipo: m.tipo,
-          descripcion: m.descripcion,
-          monto: Number(m.monto || 0),
-          usuario: m.usuario || "",
-          fecha: m.fecha || "",
-          cierre: true,
-          origen: m.origen || ""
-        }));
-
-        totalIngresos = Number(cierreExistente.total_ingresos || 0);
-        totalEgresos  = Number(cierreExistente.total_egresos  || 0);
-        const saldoMostrar = Number(cierreExistente.saldo_siguiente ?? cierreExistente.saldo_caja ?? (saldoInicial + totalIngresos - totalEgresos));
-
-        // pintar tabla
-        document.getElementById("tabla-movs").innerHTML =
-          movimientosDelDia.map(m =>
-            `<tr>
-              <td>${m.tipo || ""}</td>
-              <td>${m.descripcion || ""}</td>
-              <td class="num">${formatMoney(m.monto || 0)}</td>
-              <td>${m.usuario || ""}</td>
-              <td>${formatFechaHoraCompact(m.fecha)}</td>
-            </tr>`
-          ).join('');
-
-        // pintar totales del cierre (los buenos)
-        document.getElementById("totales").innerHTML =
-          `<div class="totals">
-            <div class="pill"><span>Saldo Inicial</span><b>${formatMoney(cierreExistente.saldo_inicial ?? saldoInicial)}</b></div>
-            <div class="pill green"><span>Total Ingresos</span><b>${formatMoney(totalIngresos)}</b></div>
-            <div class="pill gold"><span>Total Egresos</span><b>${formatMoney(totalEgresos)}</b></div>
-            <div class="pill focus"><span>Saldo de Caja (al cierre)</span><b>${formatMoney(saldoMostrar)}</b></div>
-          </div>`;
-
-        // ya no reconstruimos nada
-        return;
       }
 
-      // ===== SI NO HAY CIERRE: reconstruir (tu lógica original) =====
-
+      // Rango del día
       const [fechaInicioUTC, fechaFinUTC] = getDiaSVRange(fecha);
       const startTs = Timestamp.fromDate(new Date(fechaInicioUTC));
       const endTs   = Timestamp.fromDate(new Date(fechaFinUTC));
@@ -347,7 +288,7 @@
         if (m.correlativo && correlativosSumados.has(m.correlativo)) return;
         if (m.correlativo) correlativosSumados.add(m.correlativo);
 
-        // Fecha a mostrar
+        // Fecha a mostrar (preferencia: fecha_ts -> createdAt -> fecha)
         let iso = "";
         if (m.fecha_ts) iso = isoFromAny(m.fecha_ts);
         else if (m.createdAt) iso = isoFromAny(m.createdAt);
@@ -371,99 +312,100 @@
         if (tipo === "Egreso")  totalEgresos  += monto;
       }
 
-      // 1) Movimientos de caja – ambas colecciones
+      // 1) Movimientos de caja – ambas colecciones y tres campos de fecha (igual que caja)
       for (const coll of ["movimientosCaja", "movimientos_caja"]) {
-        // a) por 'fecha_ts'
+        // a) por Timestamp
         const qTs = query(
+          collection(db, coll),
+          where("agencia", "==", agenciaActual),
+          where("fecha", ">=", fechaInicioUTC),
+          where("fecha", "<=", fechaFinUTC)
+        );
+        // en tu otra página haces dos queries (TS e ISO); acá haremos tres como arriba:
+        // - fecha_ts TS
+        const qFechaTs = query(
           collection(db, coll),
           where("agencia", "==", agenciaActual),
           where("fecha_ts", ">=", startTs),
           where("fecha_ts", "<=", endTs)
         );
-        const snapTs = await getDocs(qTs);
-        snapTs.forEach(docMov => pushMovimiento(docMov, coll));
-
-        // b) por 'createdAt'
+        // - createdAt TS
         const qCreated = query(
           collection(db, coll),
           where("agencia", "==", agenciaActual),
           where("createdAt", ">=", startTs),
           where("createdAt", "<=", endTs)
         );
-        const snapCreated = await getDocs(qCreated);
-        snapCreated.forEach(docMov => pushMovimiento(docMov, coll));
 
-        // c) por 'fecha' string
-        const qStr = query(
-          collection(db, coll),
-          where("agencia", "==", agenciaActual),
-          where("fecha", ">=", fechaInicioUTC),
-          where("fecha", "<=", fechaFinUTC)
-        );
-        const snapStr = await getDocs(qStr);
+        const [snapFechaTs, snapCreated, snapStr] = await Promise.all([
+          getDocs(qFechaTs),
+          getDocs(qCreated),
+          getDocs(qTs)
+        ]);
+
+        snapFechaTs.forEach(docMov => pushMovimiento(docMov, coll));
+        snapCreated.forEach(docMov => pushMovimiento(docMov, coll));
         snapStr.forEach(docMov => pushMovimiento(docMov, coll));
       }
 
-      // 2) Pagos (ingresos)
-      const pagosSnap = await getDocs(
-        query(
-          collection(db, "pagos"),
-          where("sucursal", "==", agenciaActual),
-          where("fechaPago", ">=", fechaInicioUTC),
-          where("fechaPago", "<=", fechaFinUTC)
-        )
+      // 2) Pagos (ingresos) – AHORA IGUAL QUE LA PÁGINA DE CAJA
+      const pagosQ_TS = query(
+        collection(db, "pagos"),
+        where("sucursal", "==", agenciaActual),
+        where("fechaPago", ">=", startTs),
+        where("fechaPago", "<=", endTs)
       );
-      const pagosRetroSnap = await getDocs(
-        query(
-          collection(db, "pagos"),
-          where("sucursal", "==", agenciaActual),
-          where("retroactivo", "==", true),
-          where("fechaRegistro", ">=", fechaInicioUTC),
-          where("fechaRegistro", "<=", fechaFinUTC)
-        )
+      const pagosQ_ISO = query(
+        collection(db, "pagos"),
+        where("sucursal", "==", agenciaActual),
+        where("fechaPago", ">=", fechaInicioUTC),
+        where("fechaPago", "<=", fechaFinUTC)
+      );
+      const pagosR_TS = query(
+        collection(db, "pagos"),
+        where("sucursal", "==", agenciaActual),
+        where("retroactivo", "==", true),
+        where("fechaRegistro", ">=", startTs),
+        where("fechaRegistro", "<=", endTs)
+      );
+      const pagosR_ISO = query(
+        collection(db, "pagos"),
+        where("sucursal", "==", agenciaActual),
+        where("retroactivo", "==", true),
+        where("fechaRegistro", ">=", fechaInicioUTC),
+        where("fechaRegistro", "<=", fechaFinUTC)
       );
 
-      const pagosUnidos = [];
-      const pagosIds = new Set();
+      const resultsPagos = await Promise.allSettled([
+        getDocs(pagosQ_TS),
+        getDocs(pagosQ_ISO),
+        getDocs(pagosR_TS),
+        getDocs(pagosR_ISO)
+      ]);
 
-      for (const docPago of pagosSnap.docs) {
-        const d = docPago.data();
-        if (!("anulado" in d) || !d.anulado) {
-          const cierrePago = d.hasOwnProperty("cierre") ? d.cierre : false;
-          if (cierrePago === false || cierrePago === null) {
-            pagosUnidos.push({ ...d, id: docPago.id });
-            pagosIds.add(docPago.id);
-          }
-        }
-      }
-      for (const docPago of pagosRetroSnap.docs) {
-        if (pagosIds.has(docPago.id)) continue;
-        const d = docPago.data();
-        if (!("anulado" in d) || !d.anulado) {
-          const cierrePago = d.hasOwnProperty("cierre") ? d.cierre : false;
-          if (cierrePago === false || cierrePago === null) {
-            pagosUnidos.push({ ...d, id: docPago.id });
-            pagosIds.add(docPago.id);
-          }
-        }
-      }
+      const pagosVistos = new Set();
+      resultsPagos.forEach(r => {
+        if (r.status !== "fulfilled") return;
+        r.value.forEach(docPago => {
+          if (pagosVistos.has(docPago.id)) return;
+          pagosVistos.add(docPago.id);
+          const d = docPago.data() || {};
+          if (("anulado" in d) && d.anulado) return;
 
-      for (const d of pagosUnidos) {
-        const monto = Number(d.montoPagado) || 0;
-        const fechaIso = d.fechaRegistro || d.fechaPago || "";
-        movimientosDelDia.push({
-          id: d.id,
-          coll: "pagos",
-          tipo: "Ingreso",
-          descripcion: d.retroactivo ? "Pago retroactivo" : "Pago de cliente",
-          monto,
-          usuario: d.cajeroNombre || "",
-          fecha: fechaIso,
-          cierre: d.cierre || false,
-          origen: "pago"
+          movimientosDelDia.push({
+            id: docPago.id,
+            coll: "pagos",
+            tipo: "Ingreso",
+            descripcion: d.retroactivo ? "Pago retroactivo" : "Pago de cliente",
+            monto: Number(d.montoPagado || 0),
+            usuario: d.cajeroNombre || "",
+            fecha: d.fechaRegistro || d.fechaPago || "",
+            cierre: d.cierre || false,
+            origen: "pago"
+          });
+          totalIngresos += Number(d.montoPagado || 0);
         });
-        totalIngresos += monto;
-      }
+      });
 
       // Orden cronológico
       movimientosDelDia.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
@@ -486,17 +428,21 @@
       }
 
       const saldoFinalProyectado = saldoInicial + totalIngresos - totalEgresos;
-      const saldoCierreExistente = await obtenerSaldoCierreSiExiste(agenciaActual, fecha);
-      const saldoParaMostrar = (saldoCierreExistente !== null && !isNaN(Number(saldoCierreExistente)))
-        ? Number(saldoCierreExistente)
-        : saldoFinalProyectado;
+
+      // Mostramos los reconstruidos (los buenos)
+      const avisoCierre = cierreExistenteActual
+        ? `<div style="grid-column:1/-1;background:#fff3cd;border:1px solid #ffeeba;border-radius:8px;padding:.4rem 1rem;font-size:.85rem;color:#8a6d3b;">
+            Ya existe un cierre guardado para este día. Se está mostrando la reconstrucción exacta (método caja) para comparar.
+           </div>`
+        : "";
 
       document.getElementById("totales").innerHTML =
         `<div class="totals">
+          ${avisoCierre}
           <div class="pill"><span>Saldo Inicial</span><b>${formatMoney(saldoInicial)}</b></div>
           <div class="pill green"><span>Total Ingresos</span><b>${formatMoney(totalIngresos)}</b></div>
           <div class="pill gold"><span>Total Egresos</span><b>${formatMoney(totalEgresos)}</b></div>
-          <div class="pill focus"><span>Saldo de Caja (al cierre)</span><b>${formatMoney(saldoParaMostrar)}</b></div>
+          <div class="pill focus"><span>Saldo de Caja (al cierre)</span><b>${formatMoney(saldoFinalProyectado)}</b></div>
         </div>`;
     }
 
@@ -512,7 +458,7 @@
     async function cerrarCajaDelDia() {
       if (!fechaSeleccionada) return alert("Selecciona un día válido");
       if (cierreExistenteActual) {
-        alert("Este día ya tiene cierre registrado. Si necesitan corregir, háganlo directamente en Firestore o habiliten un flujo de reapertura.");
+        alert("Este día ya tiene cierre registrado. Si necesitan corregirlo, háganlo directo en Firestore o creen un flujo de reapertura.");
         return;
       }
       if (movimientosDelDia.length === 0) return alert("No hay movimientos para este día.");
@@ -764,6 +710,7 @@
   </div>
 </body>
 </html>
+
 
 
 

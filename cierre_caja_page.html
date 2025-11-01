@@ -34,6 +34,8 @@
     let movimientosDelDia = [];
     let fechaSeleccionada = null;
     let saldoInicial = 0;
+    // NUEVO: para saber si lo que estamos viendo viene de un cierre real
+    let cierreExistenteActual = null;
 
     // ===== Utilidades =====
     function toDateString(date) { return date.toISOString().slice(0,10); } // YYYY-MM-DD
@@ -126,6 +128,21 @@
       return 0;
     }
 
+    // ===== NUEVO: obtener el cierre completo (como lo ve la página de caja) =====
+    async function obtenerCierreCompleto(agencia, fechaOperacion /* "YYYY-MM-DD" */) {
+      const q = query(
+        collection(db, "cierres_caja"),
+        where("agencia", "==", agencia),
+        where("fecha", "==", fechaOperacion),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        return { id: snap.docs[0].id, ...snap.docs[0].data() };
+      }
+      return null;
+    }
+
     // ===== NUEVO: leer saldo de un cierre existente para la misma fecha (si ya fue cerrado) =====
     async function obtenerSaldoCierreSiExiste(agencia, fechaOperacion /* "YYYY-MM-DD" */) {
       const q = query(
@@ -142,7 +159,7 @@
       return null;
     }
 
-    // ===== Cargar gerente y fechas con pendientes (ambas colecciones/fechas) =====
+    // ===== Cargar gerente y fechas con pendientes =====
     async function cargarGerenteYFechas() {
       document.getElementById("select-fecha").innerHTML = `<option>Cargando...</option>`;
       document.getElementById("tabla-movs").innerHTML = "";
@@ -162,7 +179,7 @@
         gerenteNombre = `${gerenteData.nombre || ""} ${gerenteData.apellido || ""}`.trim();
         document.getElementById("gerente-nombre").innerText = gerenteNombre || user.email;
 
-        // Fechas con movimientos sin cerrar (ambas colecciones; fecha_ts/createdAt/fecha texto)
+        // Fechas con movimientos sin cerrar (ambas colecciones/fechas)
         let movDatesSet = new Set();
 
         for (const coll of ["movimientosCaja", "movimientos_caja"]) {
@@ -183,12 +200,12 @@
           }
         }
 
-        // +++ NUEVO: incluir pagos (aunque no tengan 'cierre') para poblar el selector
+        // incluir pagos
         {
           const agenciaActualNorm = (agenciaActual || "").toLowerCase().trim();
           const pagosQ = query(
             collection(db, "pagos"),
-            where("sucursal", "==", agenciaActual) // nombre tal cual
+            where("sucursal", "==", agenciaActual)
           );
           const pagosSnap = await getDocs(pagosQ);
 
@@ -196,21 +213,17 @@
             const d = docPago.data();
 
             if (d.anulado === true) continue;
-            // si existe 'cierre' y es true => ya cerrado, no contarlo
             if (Object.prototype.hasOwnProperty.call(d, "cierre") && d.cierre === true) continue;
 
-            // seguridad por mayúsculas/espacios en sucursal
             const sucNorm = (d.sucursal || "").toString().toLowerCase().trim();
             if (sucNorm !== agenciaActualNorm) continue;
 
-            // Fecha operativa principal: fechaPago
             if (typeof d.fechaPago === "string" && d.fechaPago.length >= 10) {
               movDatesSet.add(d.fechaPago.slice(0,10));
             } else if (d.fechaPago?.toDate) {
               movDatesSet.add(yyyymmdd(d.fechaPago.toDate()));
             }
 
-            // Si es retroactivo, también considerar fechaRegistro
             if (d.retroactivo) {
               if (typeof d.fechaRegistro === "string" && d.fechaRegistro.length >= 10) {
                 movDatesSet.add(d.fechaRegistro.slice(0,10));
@@ -251,18 +264,69 @@
       });
     }
 
-    // ===== Cargar movimientos + pagos (compatible y deduplicado) =====
+    // ===== Cargar movimientos + pagos =====
     async function cargarMovimientosYTotales(fecha /* "YYYY-MM-DD" */) {
       document.getElementById("tabla-movs").innerHTML =
         `<tr><td colspan="6" style="text-align:center">Cargando movimientos...</td></tr>`;
 
       movimientosDelDia = [];
+      cierreExistenteActual = null;
       let totalIngresos = 0;
       let totalEgresos = 0;
 
+      // saldo inicial
       saldoInicial = await obtenerSaldoInicial(agenciaActual, fecha);
 
-      // Rango del día (SV) en ISO UTC y como Timestamps
+      // PRIMERO: ver si ya existe un cierre (AQUÍ ESTABA EL PROBLEMA)
+      const cierreExistente = await obtenerCierreCompleto(agenciaActual, fecha);
+      if (cierreExistente) {
+        cierreExistenteActual = cierreExistente;
+
+        const movs = Array.isArray(cierreExistente.movimientos) ? cierreExistente.movimientos : [];
+
+        movimientosDelDia = movs.map(m => ({
+          id: m.id_movimiento || "",
+          coll: m.origen || "",
+          tipo: m.tipo,
+          descripcion: m.descripcion,
+          monto: Number(m.monto || 0),
+          usuario: m.usuario || "",
+          fecha: m.fecha || "",
+          cierre: true,
+          origen: m.origen || ""
+        }));
+
+        totalIngresos = Number(cierreExistente.total_ingresos || 0);
+        totalEgresos  = Number(cierreExistente.total_egresos  || 0);
+        const saldoMostrar = Number(cierreExistente.saldo_siguiente ?? cierreExistente.saldo_caja ?? (saldoInicial + totalIngresos - totalEgresos));
+
+        // pintar tabla
+        document.getElementById("tabla-movs").innerHTML =
+          movimientosDelDia.map(m =>
+            `<tr>
+              <td>${m.tipo || ""}</td>
+              <td>${m.descripcion || ""}</td>
+              <td class="num">${formatMoney(m.monto || 0)}</td>
+              <td>${m.usuario || ""}</td>
+              <td>${formatFechaHoraCompact(m.fecha)}</td>
+            </tr>`
+          ).join('');
+
+        // pintar totales del cierre (los buenos)
+        document.getElementById("totales").innerHTML =
+          `<div class="totals">
+            <div class="pill"><span>Saldo Inicial</span><b>${formatMoney(cierreExistente.saldo_inicial ?? saldoInicial)}</b></div>
+            <div class="pill green"><span>Total Ingresos</span><b>${formatMoney(totalIngresos)}</b></div>
+            <div class="pill gold"><span>Total Egresos</span><b>${formatMoney(totalEgresos)}</b></div>
+            <div class="pill focus"><span>Saldo de Caja (al cierre)</span><b>${formatMoney(saldoMostrar)}</b></div>
+          </div>`;
+
+        // ya no reconstruimos nada
+        return;
+      }
+
+      // ===== SI NO HAY CIERRE: reconstruir (tu lógica original) =====
+
       const [fechaInicioUTC, fechaFinUTC] = getDiaSVRange(fecha);
       const startTs = Timestamp.fromDate(new Date(fechaInicioUTC));
       const endTs   = Timestamp.fromDate(new Date(fechaFinUTC));
@@ -283,7 +347,7 @@
         if (m.correlativo && correlativosSumados.has(m.correlativo)) return;
         if (m.correlativo) correlativosSumados.add(m.correlativo);
 
-        // Fecha a mostrar (preferencia: fecha_ts -> createdAt -> fecha)
+        // Fecha a mostrar
         let iso = "";
         if (m.fecha_ts) iso = isoFromAny(m.fecha_ts);
         else if (m.createdAt) iso = isoFromAny(m.createdAt);
@@ -307,9 +371,9 @@
         if (tipo === "Egreso")  totalEgresos  += monto;
       }
 
-      // 1) Movimientos de caja – ambas colecciones y tres campos de fecha
+      // 1) Movimientos de caja – ambas colecciones
       for (const coll of ["movimientosCaja", "movimientos_caja"]) {
-        // a) por 'fecha_ts' (Timestamp)
+        // a) por 'fecha_ts'
         const qTs = query(
           collection(db, coll),
           where("agencia", "==", agenciaActual),
@@ -319,7 +383,7 @@
         const snapTs = await getDocs(qTs);
         snapTs.forEach(docMov => pushMovimiento(docMov, coll));
 
-        // b) por 'createdAt' (Timestamp)
+        // b) por 'createdAt'
         const qCreated = query(
           collection(db, coll),
           where("agencia", "==", agenciaActual),
@@ -329,7 +393,7 @@
         const snapCreated = await getDocs(qCreated);
         snapCreated.forEach(docMov => pushMovimiento(docMov, coll));
 
-        // c) por 'fecha' (string ISO, si alguna vez la guardas así)
+        // c) por 'fecha' string
         const qStr = query(
           collection(db, coll),
           where("agencia", "==", agenciaActual),
@@ -421,10 +485,7 @@
           ).join('');
       }
 
-      // Saldo proyectado
       const saldoFinalProyectado = saldoInicial + totalIngresos - totalEgresos;
-
-      // Si ya existe un cierre para esa fecha, mostrar ese saldo; de lo contrario, el proyectado
       const saldoCierreExistente = await obtenerSaldoCierreSiExiste(agenciaActual, fecha);
       const saldoParaMostrar = (saldoCierreExistente !== null && !isNaN(Number(saldoCierreExistente)))
         ? Number(saldoCierreExistente)
@@ -450,6 +511,10 @@
     // ===== Cerrar caja =====
     async function cerrarCajaDelDia() {
       if (!fechaSeleccionada) return alert("Selecciona un día válido");
+      if (cierreExistenteActual) {
+        alert("Este día ya tiene cierre registrado. Si necesitan corregir, háganlo directamente en Firestore o habiliten un flujo de reapertura.");
+        return;
+      }
       if (movimientosDelDia.length === 0) return alert("No hay movimientos para este día.");
 
       const pin = prompt("Por seguridad, ingresa tu PIN de gerente:");
@@ -473,7 +538,7 @@
 
       await addDoc(collection(db, "cierres_caja"), {
         agencia: agenciaActual,
-        fecha: fechaSeleccionada,  // YYYY-MM-DD operativo
+        fecha: fechaSeleccionada,
         total_ingresos: totalIngresos,
         total_egresos: totalEgresos,
         saldo_inicial: saldoInicial,
@@ -518,7 +583,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
 
   <style>
-    /* ===== Línea gráfica clara (glass) ===== */
     :root{
       --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --muted:#5b6776; --white:#ffffff;
       --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
@@ -569,7 +633,6 @@
     .logo-plate img{ height:28px; width:auto; display:block }
     .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
 
-    /* ===== Container ===== */
     .container{
       position:relative; z-index:1;
       max-width:min(96vw, 1100px);
@@ -605,7 +668,6 @@
       color:var(--text); outline:none; box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
     }
 
-    /* ===== Table ===== */
     .scroll-table-wrap{
       width:100%; overflow:auto; border-radius:14px;
       background:var(--white); border:1px solid var(--glass-brd); box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
@@ -625,7 +687,6 @@
     tbody tr:hover{ background: #f7fbff; }
     .num{ text-align:right; font-variant-numeric: tabular-nums; }
 
-    /* ===== Totales ===== */
     .totals{
       display:grid; grid-template-columns: repeat(2, minmax(220px,1fr)); gap:10px;
       margin: 14px 0 8px;
@@ -643,7 +704,6 @@
     .pill.focus{ background:linear-gradient(180deg,#fff8e8,#fff); border-color:#ffe3a6; }
     .pill.focus b{ color:#9a6d00; }
 
-    /* ===== Botón ===== */
     .btn-main{
       width:100%; margin-top:12px; padding:1rem 0; border:none; border-radius:12px;
       background: linear-gradient(90deg, #67C8F1, #243b86);
@@ -652,7 +712,6 @@
       transition:transform .12s ease, box-shadow .2s ease, opacity .2s ease;
     }
     .btn-main:hover{ transform:translateY(-1px); box-shadow:0 18px 36px rgba(36,59,134,.3); }
-
   </style>
 </head>
 <body>
@@ -705,5 +764,6 @@
   </div>
 </body>
 </html>
+
 
 

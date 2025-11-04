@@ -212,7 +212,7 @@
 
     <div class="searchbar">
       <i class="fas fa-search"></i>
-      <input id="buscador" type="text" placeholder="Buscar por nombre o DUI..."/>
+      <input id="buscador" type="text" placeholder="Buscar por nombre, apellido o DUI..."/>
     </div>
 
     <div id="clientes-list" class="w-100"></div>
@@ -383,8 +383,13 @@
         snap.forEach(s => {
           const d = s.data();
           const nombre = (d.nombre || '').toLowerCase();
+          const apellido = (d.apellido || '').toLowerCase(); // <-- añadido para buscar por apellido
           const dui = (d.numeroDui || '').toLowerCase();
-          if (nombre.includes(term.toLowerCase()) || dui.includes(term.toLowerCase())) {
+          if (
+            nombre.includes(term.toLowerCase()) ||
+            apellido.includes(term.toLowerCase()) ||
+            dui.includes(term.toLowerCase())
+          ) {
             clientes.push({ id: s.id, ...d });
           }
         });
@@ -396,13 +401,13 @@
           <div class="cliente-card">
             <div>
               <div class="cliente-info">
-                <b>${c.nombre}</b>
+                <b>${c.nombre} ${c.apellido || ""}</b>  <!-- mostrar Nombre + Apellido -->
                 ${c.estadoCredito !== "Activo"
                   ? `<span class="estado-mora" title="Estado: ${c.estadoCredito}">
                       <i class="fas fa-exclamation-triangle"></i>${c.estadoCredito}
                     </span>` : ""}
               </div>
-              <div class="cliente-dui">DUI: ${c.numeroDui}</div>
+              <div class="cliente-dui">DUI: ${c.numeroDui} • Línea: ${c.lineaDeCredito || "-"}</div> <!-- añadir lineaDeCredito -->
               <div class="muted">Saldo: $${n(c.saldoActual).toFixed(2)} • Interés: $${n(c.interesActual).toFixed(2)} • Al día: $${n(c.paraPonerseAlDia).toFixed(2)}</div>
             </div>
             <button class="btn-pagar" data-id="${c.id}" data-nombre="${c.nombre}" data-dui="${c.numeroDui}">
@@ -820,5 +825,6 @@
   </script>
 </body>
 </html>
+
 
 

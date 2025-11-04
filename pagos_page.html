@@ -240,7 +240,7 @@
     const n = (x) => {
       if (typeof x === "number" && Number.isFinite(x)) return x;
       if (x === null || x === undefined) return 0;
-      const v = parseFloat(String(x).replace(",", "."));
+      const v = parseFloat(String(x).replace(",", ".")); 
       return Number.isFinite(v) ? v : 0;
     };
     const add = (a,b)=> n(a)+n(b);
@@ -401,13 +401,13 @@
           <div class="cliente-card">
             <div>
               <div class="cliente-info">
-                <b>${c.nombre} ${c.apellido || ""}</b>  <!-- mostrar Nombre + Apellido -->
+                <b>${c.nombre} ${c.apellido || ""}</b>
                 ${c.estadoCredito !== "Activo"
                   ? `<span class="estado-mora" title="Estado: ${c.estadoCredito}">
                       <i class="fas fa-exclamation-triangle"></i>${c.estadoCredito}
                     </span>` : ""}
               </div>
-              <div class="cliente-dui">DUI: ${c.numeroDui} • Línea: ${c.lineaDeCredito || "-"}</div> <!-- añadir lineaDeCredito -->
+              <div class="cliente-dui">DUI: ${c.numeroDui} • Línea: ${c.lineaDeCredito || "-"}</div>
               <div class="muted">Saldo: $${n(c.saldoActual).toFixed(2)} • Interés: $${n(c.interesActual).toFixed(2)} • Al día: $${n(c.paraPonerseAlDia).toFixed(2)}</div>
             </div>
             <button class="btn-pagar" data-id="${c.id}" data-nombre="${c.nombre}" data-dui="${c.numeroDui}">
@@ -574,8 +574,6 @@
         const user = auth.currentUser;
         if(!user) throw new Error("Sesión inválida. Inicia sesión.");
 
-        // ---------- (Eliminado) Guard de idempotencia que bloqueaba ----------
-
         // Datos del cajero / sucursal
         const userSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
         const userData = userSnap?.docs?.[0]?.data() || {};
@@ -613,8 +611,8 @@
           interes: n(c.interes),
           cuota: n(c.cuota),
           saldo: n(c.saldo),
-          montoPagado: n(c.montoPagado),                  // usado como capital pagado
-          montoPagadoInteres: n(c.montoPagadoInteres),    // legacy/visual
+          montoPagado: n(c.montoPagado),
+          montoPagadoInteres: n(c.montoPagadoInteres),
           estado: c.estado || "Pendiente",
           fecha: c.fecha,
           fechaPagoReal: c.fechaPagoReal || null,
@@ -680,7 +678,6 @@
           const c = amortizacion[i];
           const capOk = n(c.montoPagado) + CLOSE_TOL >= n(c.capital);
           if (capOk){
-            // PARCHE A: cuando cierres por tolerancia, cuadra el capital exactamente
             c.montoPagado = round2(n(c.capital));
             c.estado = "Pagada";
             if (!c.fechaPagoReal) c.fechaPagoReal = fechaPago;
@@ -729,7 +726,6 @@
               faltaPendiente = round2(faltaPendiente - abono);
             }
           }
-          // Recalcular saldoNuevo después de empujar a capital
           saldoNuevo = round2(saldoAnterior - pagoCapital);
           if (saldoNuevo < TOL) saldoNuevo = 0;
         }
@@ -756,7 +752,7 @@
           apellido: creditoData.apellido || "",
           numeroDui: creditoData.numeroDui || "",
           montoPagado: round2(montoNum),
-          fechaPago: fechaPago,                           // ISO string
+          fechaPago: fechaPago,
           pagoMultas: round2(pagoMultas),
           pagoInteres: round2(pagoInteres),
           pagoCapital: round2(pagoCapital),
@@ -771,6 +767,14 @@
         });
 
         // ======== 10) Persistir crédito actualizado ========
+        // FIX: Evitar reacumulación del cron -> anclar la fecha al inicio del día local del pago
+        const fechaPagoDate = new Date(fechaPago);
+        const pagoDiaLocal = new Date(
+          fechaPagoDate.getFullYear(),
+          fechaPagoDate.getMonth(),
+          fechaPagoDate.getDate(), 0, 0, 0, 0
+        );
+
         await window.firebaseUpdateDoc("creditos", cliente.id, {
           saldoActual: round2(saldoNuevo),
           interesActual: round2(interesActual),
@@ -779,13 +783,13 @@
           multasAcumuladas: round2(multasAcumuladas),
           cuotasAtrasadas: cuotasAtrasadas,
           ultimaActualizacion: fechaPago,
-          // SIN tocar fechaUltimoCalculoIntereses: la maneja el CRON
           estadoCredito: nuevoEstado,
           amortizacion: amortizacion,
           historialMultas: historialMultas,
 
-          // ======== NUEVOS CAMPOS ÁNCLA (SOLO ESCRITURA) ========
-          fechaAnclaInteres: new Date(fechaPago),
+          // ======== ANCLAS: cron arrancará desde el día del pago ========
+          fechaUltimoCalculoIntereses: pagoDiaLocal,     // ⬅️ clave para no reacumular días previos
+          fechaAnclaInteres: new Date(fechaPago),        // auxiliar (ya lo usabas)
           saldoAncla: round2(saldoNuevo),
           interesPendienteAncla: round2(interesActual)
         });
@@ -825,6 +829,7 @@
   </script>
 </body>
 </html>
+
 
 
 

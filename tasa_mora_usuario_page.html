@@ -141,7 +141,7 @@
         ? todosCreditosDeAgencia
         : todosCreditosDeAgencia.filter(x => x.asignadoA === nombreSeleccionado);
 
-      // Items morosos: SOLO créditos con mora (para Capital en Mora y detalle)
+      // Items morosos: SOLO créditos con mora (para numerador y detalle)
       const itemsMorosos = (nombreSeleccionado === "__todos__")
         ? morososDeAgencia
         : morososDeAgencia.filter(x => x.asignadoA === nombreSeleccionado);
@@ -151,9 +151,10 @@
         .filter(x => x.estadoCredito !== "Revertido")
         .reduce((acc, x) => acc + asNumber(x.saldoActual), 0);
 
-      // Capital en Mora
+      // *** CAMBIO SOLICITADO ***
+      // Numerador: suma del saldoActual de los créditos en mora (PAR)
       const capitalEnMora = itemsMorosos
-        .reduce((acc, x) => acc + asNumber(x.capitalAtrasado), 0);
+        .reduce((acc, x) => acc + asNumber(x.saldoActual), 0);
 
       // % de Mora
       const moraPct = carteraTotal > 0 ? (capitalEnMora / carteraTotal) * 100 : 0;
@@ -172,7 +173,7 @@
       if (!nombreSeleccionado) { resBox.innerHTML = ""; return; }
       resBox.innerHTML = `<div class="cargando">Calculando...</div>`;
 
-      // Cálculo de métricas (Cartera Total real, Capital en Mora, %)
+      // Cálculo de métricas (con el cambio solicitado)
       const { carteraTotal, capitalEnMora, moraPct, itemsMorosos } = calcularMetricas(nombreSeleccionado);
 
       const tituloUsuario = (nombreSeleccionado === "__todos__") ? "Todos (con mora)" : nombreSeleccionado;
@@ -485,6 +486,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </body>
 </html>
+
 
 
 

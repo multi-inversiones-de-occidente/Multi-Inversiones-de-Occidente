@@ -107,7 +107,7 @@
       border-left: 6px solid #16b0bb55;
       transition: box-shadow .15s;
     }
-    .ref-card:hover { box-shadow: 0 5px 16px #16b0bb22; }
+    .ref-card:hover { box-shadow: 0 5px 16px #16d0bb22; }
     .ref-label { font-weight: 500; color: #099aa7; }
     .ref-dato { font-weight: 600; color: #25485a; margin-left: 4px;}
     .doc-links {
@@ -156,6 +156,51 @@
       text-align: center;
       padding: 30px 0 16px 0;
     }
+
+    /* ==== NUEVO: estilos para la ficha seccionada del cliente ==== */
+    .info-header-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #158196;
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .info-header-title i {
+      color: #16b0bb;
+    }
+    .info-section {
+      margin-top: 0.6rem;
+      padding-top: 0.5rem;
+      border-top: 1px dashed #d3e3f5;
+    }
+    .info-section-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #16b0bb;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 0.3rem;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 4px 14px;
+    }
+    .info-row {
+      font-size: 0.95rem;
+    }
+    .info-label {
+      font-weight: 600;
+      color: #5578a0;
+    }
+    .info-value {
+      font-weight: 600;
+      color: #244057;
+      margin-left: 3px;
+    }
+
     @media (max-width: 900px) {
       .container { max-width: 98vw; }
       .referencia-lista { flex-direction: column; }
@@ -302,18 +347,142 @@
       return imgs.join('');
     }
 
-    // Info simple: mezcla users + solicitud
+    // ===== NUEVO: Info simple, ahora completa y seccionada =====
     function renderInfoSimple(user, solicitud) {
+      // Nombre y DUI: priorizar datos de la solicitud (por si están más actualizados)
+      const nombre   = (solicitud.nombre || user.nombre || "-").trim();
+      const apellido = (solicitud.apellido || user.apellido || "-").trim();
+      const nombreCompleto = `${nombre} ${apellido}`.trim() || "-";
+
+      const dui       = solicitud.numeroDui || user.numeroDui || "-";
+      const telefono  = solicitud.telefono || user.telefono || "-";
+      const direccion = solicitud.direccion || user.direccion || "-";
+
+      // Campos de Archivo Solicitudes
+      const sexo            = solicitud.sexo || "-";
+      const estadoCivil     = solicitud.estadoCivil || "-";
+      const tipoVivienda    = solicitud.tipoVivienda || "-";
+      const departamento    = solicitud.departamento || "-";
+      const municipio       = solicitud.municipio || "-";
+      const profesion       = solicitud.profesion || "-";
+      const creditLine      = solicitud.creditLine || "-";
+      const estadoSolicitud = solicitud.estado || "-";
+
+      const puntoReferencia = solicitud.puntoReferencia || "-";
+
+      const tipoNegocio      = solicitud.tipoNegocio || "-";
+      const direccionNegocio = solicitud.direccionNegocio || "-";
+      const tiempoNegocio    = solicitud.tiempoNegocio || "-";
+      const ventasNetas      = solicitud.ventasNetas || "-";
+      const comprasNetas     = solicitud.comprasNetas || "-";
+
+      const ingresosMensuales = solicitud.ingresosMensuales || "-";
+      const ingresosTotales   = (solicitud.ingresosTotales ?? "-");
+      const egresosTotales    = (solicitud.egresosTotales ?? "-");
+      const sueldo            = solicitud.sueldo || "-";
+      const pagoCreditos      = solicitud.pagoCreditos || "-";
+      const ayudaFamiliar     = solicitud.ayudaFamiliar || "-";
+      const alquiler          = solicitud.alquiler || "-";
+      const serviciosBasicos  = solicitud.serviciosBasicos || "-";
+      const gastosAlimenticios= solicitud.gastosAlimenticios || "-";
+      const solvenciaEconomica= (solicitud.solvenciaEconomica ?? "-");
+
+      const montoSolicitar      = solicitud.montoSolicitar || "-";
+      const montoAprobado       = solicitud.montoAprobado || "-";
+      const tiempoRespuesta     = (solicitud.tiempoRespuesta ?? "-");
+      const calificacionCliente = (solicitud.calificacionCliente ?? "-");
+      const calificacionTiempo  = solicitud.calificacionTiempo || "-";
+
+      const observaciones = (solicitud.observaciones && solicitud.observaciones.trim() !== "")
+        ? solicitud.observaciones
+        : "-";
+
+      // Fecha de solicitud (si es Timestamp de Firestore)
+      let fechaSolicitud = "-";
+      if (solicitud.fechaSolicitud && typeof solicitud.fechaSolicitud.toDate === "function") {
+        const f = solicitud.fechaSolicitud.toDate();
+        fechaSolicitud = f.toLocaleString("es-SV");
+      }
+
       return `
         <div>
-          <b>Nombre:</b> ${(user.nombre || "-")} ${(user.apellido || "-")}<br>
-          <b>DUI:</b> ${user.numeroDui || "-"}<br>
-          <b>Teléfono:</b> ${user.telefono || "-"}<br>
-          <b>Dirección:</b> ${user.direccion || "-"}<br>
-          <b>Profesión:</b> ${solicitud.profesion || "-"}<br>
-          <b>Estado civil:</b> ${solicitud.estadoCivil || "-"}<br>
-          <b>Tipo de vivienda:</b> ${solicitud.tipoVivienda || "-"}<br>
-          <b>Departamento:</b> ${solicitud.departamento || "-"}, <b>Municipio:</b> ${solicitud.municipio || "-"}
+          <div class="info-header-title">
+            <i class="fas fa-id-card"></i>
+            <span>Ficha del cliente</span>
+          </div>
+
+          <!-- Datos personales -->
+          <div class="info-section">
+            <div class="info-section-title">Datos personales</div>
+            <div class="info-grid">
+              <div class="info-row"><span class="info-label">Nombre:</span><span class="info-value">${nombreCompleto}</span></div>
+              <div class="info-row"><span class="info-label">DUI:</span><span class="info-value">${dui}</span></div>
+              <div class="info-row"><span class="info-label">Sexo:</span><span class="info-value">${sexo}</span></div>
+              <div class="info-row"><span class="info-label">Teléfono:</span><span class="info-value">${telefono}</span></div>
+              <div class="info-row"><span class="info-label">Profesión:</span><span class="info-value">${profesion}</span></div>
+              <div class="info-row"><span class="info-label">Estado civil:</span><span class="info-value">${estadoCivil}</span></div>
+            </div>
+          </div>
+
+          <!-- Domicilio -->
+          <div class="info-section">
+            <div class="info-section-title">Domicilio</div>
+            <div class="info-grid">
+              <div class="info-row"><span class="info-label">Dirección:</span><span class="info-value">${direccion}</span></div>
+              <div class="info-row"><span class="info-label">Punto de referencia:</span><span class="info-value">${puntoReferencia}</span></div>
+              <div class="info-row"><span class="info-label">Departamento:</span><span class="info-value">${departamento}</span></div>
+              <div class="info-row"><span class="info-label">Municipio:</span><span class="info-value">${municipio}</span></div>
+              <div class="info-row"><span class="info-label">Tipo de vivienda:</span><span class="info-value">${tipoVivienda}</span></div>
+              <div class="info-row"><span class="info-label">Alquiler:</span><span class="info-value">${alquiler}</span></div>
+              <div class="info-row"><span class="info-label">Ayuda familiar:</span><span class="info-value">${ayudaFamiliar}</span></div>
+              <div class="info-row"><span class="info-label">Servicios básicos:</span><span class="info-value">${serviciosBasicos}</span></div>
+              <div class="info-row"><span class="info-label">Gastos alimenticios:</span><span class="info-value">${gastosAlimenticios}</span></div>
+            </div>
+          </div>
+
+          <!-- Negocio -->
+          <div class="info-section">
+            <div class="info-section-title">Negocio</div>
+            <div class="info-grid">
+              <div class="info-row"><span class="info-label">Tipo de negocio:</span><span class="info-value">${tipoNegocio}</span></div>
+              <div class="info-row"><span class="info-label">Dirección del negocio:</span><span class="info-value">${direccionNegocio}</span></div>
+              <div class="info-row"><span class="info-label">Tiempo de negocio:</span><span class="info-value">${tiempoNegocio}</span></div>
+              <div class="info-row"><span class="info-label">Ventas netas:</span><span class="info-value">${ventasNetas}</span></div>
+              <div class="info-row"><span class="info-label">Compras netas:</span><span class="info-value">${comprasNetas}</span></div>
+            </div>
+          </div>
+
+          <!-- Ingresos y egresos -->
+          <div class="info-section">
+            <div class="info-section-title">Ingresos y egresos</div>
+            <div class="info-grid">
+              <div class="info-row"><span class="info-label">Ingresos mensuales (declarados):</span><span class="info-value">${ingresosMensuales}</span></div>
+              <div class="info-row"><span class="info-label">Ingresos totales:</span><span class="info-value">${ingresosTotales}</span></div>
+              <div class="info-row"><span class="info-label">Egresos totales:</span><span class="info-value">${egresosTotales}</span></div>
+              <div class="info-row"><span class="info-label">Sueldo fijo:</span><span class="info-value">${sueldo}</span></div>
+              <div class="info-row"><span class="info-label">Pago a créditos:</span><span class="info-value">${pagoCreditos}</span></div>
+              <div class="info-row"><span class="info-label">Solvencia económica:</span><span class="info-value">${solvenciaEconomica}</span></div>
+            </div>
+          </div>
+
+          <!-- Detalle de crédito -->
+          <div class="info-section">
+            <div class="info-section-title">Detalle del crédito</div>
+            <div class="info-grid">
+              <div class="info-row"><span class="info-label">Línea de crédito:</span><span class="info-value">${creditLine}</span></div>
+              <div class="info-row"><span class="info-label">Estado de la solicitud:</span><span class="info-value">${estadoSolicitud}</span></div>
+              <div class="info-row"><span class="info-label">Monto solicitado:</span><span class="info-value">${montoSolicitar}</span></div>
+              <div class="info-row"><span class="info-label">Monto aprobado:</span><span class="info-value">${montoAprobado}</span></div>
+              <div class="info-row"><span class="info-label">Tiempo de respuesta (minutos):</span><span class="info-value">${tiempoRespuesta}</span></div>
+              <div class="info-row"><span class="info-label">Calificación del cliente:</span><span class="info-value">${calificacionCliente}</span></div>
+              <div class="info-row"><span class="info-label">Calificación del tiempo:</span><span class="info-value">${calificacionTiempo}</span></div>
+              <div class="info-row"><span class="info-label">Fecha de solicitud:</span><span class="info-value">${fechaSolicitud}</span></div>
+            </div>
+            <div class="info-row" style="margin-top:6px;">
+              <span class="info-label">Observaciones:</span>
+              <span class="info-value">${observaciones}</span>
+            </div>
+          </div>
         </div>
       `;
     }
@@ -386,7 +555,7 @@
           if (uSnap.exists()) userData = uSnap.data();
         } catch {}
 
-        // 3) Info simple (mezcla users + solicitud)
+        // 3) Info simple (mezcla users + solicitud) — más completa
         document.getElementById('info-simple').innerHTML = renderInfoSimple(userData, data);
 
         // 4) Referencias (arrays migradas o legacy)
@@ -431,4 +600,3 @@
   </script>
 </body>
 </html>
-

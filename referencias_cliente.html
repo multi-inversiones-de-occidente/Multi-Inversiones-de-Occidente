@@ -157,7 +157,7 @@
       padding: 30px 0 16px 0;
     }
 
-    /* ==== NUEVO: estilos para la ficha seccionada del cliente ==== */
+    /* ==== Estilos para la ficha seccionada del cliente ==== */
     .info-header-title {
       font-size: 1.15rem;
       font-weight: 700;
@@ -165,11 +165,37 @@
       margin-bottom: 0.6rem;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    .info-header-title-left {
+      display:flex;
+      align-items:center;
+      gap:8px;
     }
     .info-header-title i {
       color: #16b0bb;
     }
+    .info-email-highlight {
+      font-size: 0.96rem;
+      color: #0c4c7a;
+      background: #e3f2ff;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 11px;
+      font-weight: 600;
+      border: 1px solid #c3ddff;
+      box-shadow: 0 1px 4px #145a9c1f;
+      max-width: 100%;
+      word-break: break-all;
+    }
+    .info-email-highlight i {
+      color:#145a9c;
+    }
+
     .info-section {
       margin-top: 0.6rem;
       padding-top: 0.5rem;
@@ -212,6 +238,7 @@
       .input-group { flex-direction: column; align-items: stretch; gap: 9px;}
       .doc-links { flex-direction: column; gap: 7px;}
       .img-doc { max-width: 95vw; }
+      .info-header-title { flex-direction: column; align-items:flex-start; gap:6px; }
     }
   </style>
 </head>
@@ -347,8 +374,15 @@
       return imgs.join('');
     }
 
-    // ===== NUEVO: Info simple, ahora completa y seccionada =====
+    // ===== Info simple, completa y seccionada =====
     function renderInfoSimple(user, solicitud) {
+      // Email prioritario: users.email, luego otros posibles campos
+      const email =
+        (user.email && String(user.email).trim() !== "") ? user.email :
+        (user.correo && String(user.correo).trim() !== "") ? user.correo :
+        (solicitud.email && String(solicitud.email).trim() !== "") ? solicitud.email :
+        "N/D";
+
       // Nombre y DUI: priorizar datos de la solicitud (por si están más actualizados)
       const nombre   = (solicitud.nombre || user.nombre || "-").trim();
       const apellido = (solicitud.apellido || user.apellido || "-").trim();
@@ -369,6 +403,14 @@
       const estadoSolicitud = solicitud.estado || "-";
 
       const puntoReferencia = solicitud.puntoReferencia || "-";
+
+      // Cónyuge
+      const nombreConyugueRaw = solicitud.nombreConyugue;
+      const numeroConyugueRaw = solicitud.numeroConyugue;
+      const nombreConyugue =
+        (nombreConyugueRaw && String(nombreConyugueRaw).trim() !== "") ? nombreConyugueRaw : "N/D";
+      const numeroConyugue =
+        (numeroConyugueRaw && String(numeroConyugueRaw).trim() !== "") ? numeroConyugueRaw : "N/D";
 
       const tipoNegocio      = solicitud.tipoNegocio || "-";
       const direccionNegocio = solicitud.direccionNegocio || "-";
@@ -407,8 +449,14 @@
       return `
         <div>
           <div class="info-header-title">
-            <i class="fas fa-id-card"></i>
-            <span>Ficha del cliente</span>
+            <div class="info-header-title-left">
+              <i class="fas fa-id-card"></i>
+              <span>Ficha del cliente</span>
+            </div>
+            <div class="info-email-highlight" title="Correo principal del cliente">
+              <i class="fas fa-envelope"></i>
+              <span>${email}</span>
+            </div>
           </div>
 
           <!-- Datos personales -->
@@ -421,6 +469,8 @@
               <div class="info-row"><span class="info-label">Teléfono:</span><span class="info-value">${telefono}</span></div>
               <div class="info-row"><span class="info-label">Profesión:</span><span class="info-value">${profesion}</span></div>
               <div class="info-row"><span class="info-label">Estado civil:</span><span class="info-value">${estadoCivil}</span></div>
+              <div class="info-row"><span class="info-label">Cónyuge:</span><span class="info-value">${nombreConyugue}</span></div>
+              <div class="info-row"><span class="info-label">Teléfono cónyuge:</span><span class="info-value">${numeroConyugue}</span></div>
             </div>
           </div>
 
@@ -600,3 +650,5 @@
   </script>
 </body>
 </html>
+
+

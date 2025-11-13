@@ -129,13 +129,13 @@
         <div class="fields">
           <div class="field">
             <label>Línea de Crédito</label>
-            <input type="text" value="\${solicitudData.creditLine ?? ''}" disabled class="input"/>
+            <input type="text" value="${solicitudData.creditLine ?? ''}" disabled class="input"/>
           </div>
 
           <div class="info-grid">
-            <div class="info-row"><span>Nombre:</span> \${solicitudData.nombre ?? ''}</div>
-            <div class="info-row"><span>Apellido:</span> \${solicitudData.apellido ?? ''}</div>
-            <div class="info-row"><span>Monto Solicitado:</span> $\${(solicitudData.montoAprobado ?? '').toString()}</div>
+            <div class="info-row"><span>Nombre:</span> ${solicitudData.nombre ?? ''}</div>
+            <div class="info-row"><span>Apellido:</span> ${solicitudData.apellido ?? ''}</div>
+            <div class="info-row"><span>Monto Solicitado:</span> $${(solicitudData.montoAprobado ?? '').toString()}</div>
           </div>
         </div>
       `;
@@ -145,9 +145,9 @@
       } else {
         html += `
           <div class="info-grid">
-            <div class="info-row"><span>Frecuencia de Pago:</span> \${asignacionData.frecuenciaPago ?? ''}</div>
-            <div class="info-row"><span>Número de Cuotas:</span> \${asignacionData.numeroCuotas ?? ''}</div>
-            <div class="info-row"><span>Cuota Aprobada:</span> $\${asignacionData.cuota ?? ''}</div>
+            <div class="info-row"><span>Frecuencia de Pago:</span> ${asignacionData.frecuenciaPago ?? ''}</div>
+            <div class="info-row"><span>Número de Cuotas:</span> ${asignacionData.numeroCuotas ?? ''}</div>
+            <div class="info-row"><span>Cuota Aprobada:</span> $${asignacionData.cuota ?? ''}</div>
           </div>
         `;
       }
@@ -157,11 +157,11 @@
         html += `
           <div class="neto-box">
             <div class="neto-title"><i class="fa-solid fa-sack-dollar"></i> Efectivo a entregar al cliente</div>
-            <div class="neto-value">$\${desembolsoNeto.toFixed(2)}</div>
+            <div class="neto-value">$${desembolsoNeto.toFixed(2)}</div>
             <div class="neto-sub">
-              (Nuevo aprobado: $\${Number(asignacionData.montoAprobado).toFixed(2)} ·
-              Menos saldo anterior: $\${creditoAnteriorInfo.saldoActual.toFixed(2)} ·
-              Menos intereses pendientes: $\${creditoAnteriorInfo.interesActual.toFixed(2)})
+              (Nuevo aprobado: $${Number(asignacionData.montoAprobado).toFixed(2)} ·
+              Menos saldo anterior: $${creditoAnteriorInfo.saldoActual.toFixed(2)} ·
+              Menos intereses pendientes: $${creditoAnteriorInfo.interesActual.toFixed(2)})
             </div>
           </div>
         `;
@@ -188,12 +188,12 @@
                 ${
                   amortizacion.map(row => `
                     <tr>
-                      <td>\${row.numeroCuota ?? ''}</td>
-                      <td>\${row.fecha}</td>
-                      <td>$\${row.cuota}</td>
-                      <td>$\${row.interes}</td>
-                      <td>$\${row.capital}</td>
-                      <td>$\${row.saldo}</td>
+                      <td>${row.numeroCuota ?? ''}</td>
+                      <td>${row.fecha}</td>
+                      <td>$${row.cuota}</td>
+                      <td>$${row.interes}</td>
+                      <td>$${row.capital}</td>
+                      <td>$${row.saldo}</td>
                     </tr>
                   `).join('')
                 }
@@ -216,8 +216,8 @@
 
       html += `
         <div style="margin:20px 0 10px 0;">
-          <button id="guardar-credito-btn" \${guardando || !asignacionData || asignacionAperturada ? "disabled" : ""} class="btn-guardar">
-            \${guardando ? "Guardando..." : (asignacionAperturada ? "Ya aperturado" : "Guardar Crédito")}
+          <button id="guardar-credito-btn" ${guardando || !asignacionData || asignacionAperturada ? "disabled" : ""} class="btn-guardar">
+            ${guardando ? "Guardando..." : (asignacionAperturada ? "Ya aperturado" : "Guardar Crédito")}
           </button>
         </div>
       `;
@@ -606,10 +606,3 @@
   </div>
 </body>
 </html>
-
-
-
-
-
-
-

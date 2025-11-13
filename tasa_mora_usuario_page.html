@@ -53,32 +53,66 @@
       const full = `${d?.nombre ?? ""} ${d?.apellido ?? ""}`.trim();
       return full || d?.displayName || "Sin nombre";
     }
+
+    // 🔹 NUEVO: resolver nombre y teléfono del cliente
     async function resolverNombreCliente(d) {
-      const candidatos = [
+      // Intentar primero con lo que venga en el crédito
+      const candidatosNombreCredito = [
         d.nombreCliente && d.apellidoCliente ? `${d.nombreCliente} ${d.apellidoCliente}` : null,
         d.clienteNombre && d.clienteApellidos ? `${d.clienteNombre} ${d.clienteApellidos}` : null,
         d.titularNombre && d.titularApellido ? `${d.titularNombre} ${d.titularApellido}` : null,
         d.nombreCompleto ? d.nombreCompleto : null,
         d.nombre ? d.nombre : null
       ].filter(Boolean);
-      if (candidatos.length > 0) return candidatos[0];
+
+      let nombre   = candidatosNombreCredito.length > 0 ? candidatosNombreCredito[0] : null;
+      let telefono =
+        d.telefonoCliente  ||
+        d.celularCliente   ||
+        d.telefono         ||
+        d.celular          ||
+        d.cel              ||
+        d.phone            ||
+        null;
 
       const cid = d.clienteID || d.idCliente || d.clienteUid || d.userId || null;
-      if (!cid) return "Sin nombre";
-      try {
-        const cliRef = doc(db, "clientes", cid);
-        const cliSnap = await getDoc(cliRef);
-        if (cliSnap.exists()) {
-          const c = cliSnap.data();
-          const alias = [
-            c.nombre && c.apellido ? `${c.nombre} ${c.apellido}` : null,
-            c.nombres && c.apellidos ? `${c.nombres} ${c.apellidos}` : null,
-            c.nombreCompleto ? c.nombreCompleto : null
-          ].filter(Boolean);
-          return alias[0] || "Sin nombre";
+      if (cid) {
+        try {
+          const cliRef = doc(db, "clientes", cid);
+          const cliSnap = await getDoc(cliRef);
+          if (cliSnap.exists()) {
+            const c = cliSnap.data();
+
+            if (!nombre) {
+              const alias = [
+                c.nombre && c.apellido ? `${c.nombre} ${c.apellido}` : null,
+                c.nombres && c.apellidos ? `${c.nombres} ${c.apellidos}` : null,
+                c.nombreCompleto ? c.nombreCompleto : null
+              ].filter(Boolean);
+              if (alias.length > 0) {
+                nombre = alias[0];
+              }
+            }
+
+            if (!telefono) {
+              telefono =
+                c.telefono   ||
+                c.celular    ||
+                c.cel        ||
+                c.phone      ||
+                c.telefono1  ||
+                null;
+            }
+          }
+        } catch (e) {
+          // silencioso
         }
-      } catch {}
-      return "Sin nombre";
+      }
+
+      if (!nombre)   nombre   = "Sin nombre";
+      if (!telefono) telefono = "—";
+
+      return { nombre, telefono };
     }
 
     // ===== Carga base: TODOS los créditos de la agencia + morosos =====
@@ -151,7 +185,6 @@
         .filter(x => x.estadoCredito !== "Revertido")
         .reduce((acc, x) => acc + asNumber(x.saldoActual), 0);
 
-      // *** CAMBIO SOLICITADO ***
       // Numerador: suma del saldoActual de los créditos en mora (PAR)
       const capitalEnMora = itemsMorosos
         .reduce((acc, x) => acc + asNumber(x.saldoActual), 0);
@@ -167,13 +200,15 @@
       const resBox = document.getElementById('resultado');
       const detBox = document.getElementById('detalle-box');
       const tbody  = document.getElementById('detalle-body');
+      const tabla  = document.getElementById("tabla-detalle");
+
       tbody.innerHTML = "";
       detBox.style.display = "none";
 
       if (!nombreSeleccionado) { resBox.innerHTML = ""; return; }
       resBox.innerHTML = `<div class="cargando">Calculando...</div>`;
 
-      // Cálculo de métricas (con el cambio solicitado)
+      // Cálculo de métricas
       const { carteraTotal, capitalEnMora, moraPct, itemsMorosos } = calcularMetricas(nombreSeleccionado);
 
       const tituloUsuario = (nombreSeleccionado === "__todos__") ? "Todos (con mora)" : nombreSeleccionado;
@@ -188,12 +223,22 @@
 
       // Detalle (ordenado por mayor capital atrasado)
       itemsMorosos.sort((a, b) => b.capitalAtrasado - a.capitalAtrasado);
+
+      // Arreglo que usaremos para Excel, con lo mismo que se ve en la tabla
+      const datasetExport = [];
+
       for (const it of itemsMorosos) {
-        const nombreCliente = await resolverNombreCliente(it.raw);
+        const { nombre, telefono } = await resolverNombreCliente(it.raw);
+
+        // Guardamos en el item para futuro, por si se necesita
+        it._clienteNombre = nombre;
+        it._telefono      = telefono;
+
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td title="${it.idCredito}" class="mono">${it.idCredito}</td>
-          <td title="${nombreCliente}">${nombreCliente}</td>
+          <td title="${nombre}">${nombre}</td>
+          <td title="${telefono}">${telefono}</td>
           <td title="${it.estadoCredito}">${it.estadoCredito}</td>
           <td class="num" title="${formatoDinero(it.saldoActual)}">${formatoDinero(it.saldoActual)}</td>
           <td class="num imp" title="${formatoDinero(it.capitalAtrasado)}">${formatoDinero(it.capitalAtrasado)}</td>
@@ -201,28 +246,39 @@
           <td class="num" title="${it.cuotasAtrasadas}">${it.cuotasAtrasadas}</td>
         `;
         tbody.appendChild(tr);
+
+        datasetExport.push({
+          idCredito:       it.idCredito,
+          cliente:         nombre,
+          telefono:        telefono,
+          estadoCredito:   it.estadoCredito,
+          saldoActual:     it.saldoActual,
+          capitalAtrasado: it.capitalAtrasado,
+          paraPonerseAlDia:it.paraPonerseAlDia,
+          cuotasAtrasadas: it.cuotasAtrasadas
+        });
       }
 
-      // dataset para exportar Excel (exportamos los morosos mostrados)
+      // dataset para exportar Excel (lo mismo que vemos en la tabla)
       document.getElementById("total-registros").textContent = String(itemsMorosos.length);
-      document.getElementById("tabla-detalle").dataset.json = JSON.stringify(itemsMorosos);
+      tabla.dataset.json = JSON.stringify(datasetExport);
       document.getElementById("btn-exportar").style.display = itemsMorosos.length ? "inline-flex" : "none";
       detBox.style.display = "block";
     }
 
-    // ===== Exportar Excel =====
+    // ===== Exportar Excel (igual que tabla) =====
     function exportarExcel() {
       const tabla = document.getElementById("tabla-detalle");
       const raw = tabla.dataset.json ? JSON.parse(tabla.dataset.json) : [];
       if (!raw || raw.length === 0) return;
 
       const ws_data = [
-        ["ID Credito","Asignado A","Cliente","Estado","Saldo Actual","Capital Atrasado","Para Ponerse Al Dia","Cuotas Atrasadas"],
+        ["ID Credito","Cliente","Telefono","Estado","Saldo Actual","Capital Atrasado","Para Ponerse Al Dia","Cuotas Atrasadas"],
       ];
       const rows = raw.map(r => ([
         r.idCredito,
-        r.asignadoA,
-        "", // cliente (omitimos re-resolver aquí)
+        r.cliente || "",
+        r.telefono || "",
         r.estadoCredito,
         r.saldoActual,
         r.capitalAtrasado,
@@ -233,8 +289,14 @@
 
       const ws = XLSX.utils.aoa_to_sheet(ws_data);
       ws['!cols'] = [
-        { wch: 22 }, { wch: 28 }, { wch: 28 }, { wch: 14 },
-        { wch: 16 }, { wch: 18 }, { wch: 20 }, { wch: 16 }
+        { wch: 22 }, // ID Credito
+        { wch: 28 }, // Cliente
+        { wch: 16 }, // Telefono
+        { wch: 14 }, // Estado
+        { wch: 16 }, // Saldo Actual
+        { wch: 18 }, // Capital Atrasado
+        { wch: 20 }, // Para ponerse al dia
+        { wch: 16 }  // Cuotas Atrasadas
       ];
 
       const wb = XLSX.utils.book_new();
@@ -392,13 +454,16 @@
       box-shadow:0 8px 22px rgba(10,20,40,.08), inset 0 1px 0 rgba(255,255,255,.7);
       table-layout:fixed;            /* permite elipsis consistente */
     }
-    table#tabla-detalle colgroup col:nth-child(1){ width:14%; }
-    table#tabla-detalle colgroup col:nth-child(2){ width:23%; }
-    table#tabla-detalle colgroup col:nth-child(3){ width:10%; }
-    table#tabla-detalle colgroup col:nth-child(4){ width:13%; }
-    table#tabla-detalle colgroup col:nth-child(5){ width:14%; }
-    table#tabla-detalle colgroup col:nth-child(6){ width:16%; }
-    table#tabla-detalle colgroup col:nth-child(7){ width:10%; }
+
+    /* Ajustamos proporciones de 8 columnas */
+    table#tabla-detalle colgroup col:nth-child(1){ width:14%; } /* ID Crédito */
+    table#tabla-detalle colgroup col:nth-child(2){ width:20%; } /* Cliente */
+    table#tabla-detalle colgroup col:nth-child(3){ width:14%; } /* Teléfono */
+    table#tabla-detalle colgroup col:nth-child(4){ width:10%; } /* Estado */
+    table#tabla-detalle colgroup col:nth-child(5){ width:14%; } /* Saldo Actual */
+    table#tabla-detalle colgroup col:nth-child(6){ width:14%; } /* Capital Atrasado */
+    table#tabla-detalle colgroup col:nth-child(7){ width:14%; } /* Para ponerse al día */
+    table#tabla-detalle colgroup col:nth-child(8){ width:10%; } /* Cuotas Atrasadas */
 
     thead th{
       text-align:left; font-size:.9rem; color:var(--brand-blue);
@@ -461,14 +526,15 @@
 
       <div class="table-wrap">
         <table id="tabla-detalle">
-          <!-- Definimos proporciones de columnas para mantener una sola línea por fila -->
+          <!-- Definimos proporciones de columnas -->
           <colgroup>
-            <col/><col/><col/><col/><col/><col/><col/>
+            <col/><col/><col/><col/><col/><col/><col/><col/>
           </colgroup>
           <thead>
             <tr>
               <th>ID Crédito</th>
               <th>Cliente</th>
+              <th>Teléfono</th>
               <th>Estado</th>
               <th class="num">Saldo Actual</th>
               <th class="num">Capital Atrasado</th>
@@ -486,7 +552,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </body>
 </html>
-
 
 
 

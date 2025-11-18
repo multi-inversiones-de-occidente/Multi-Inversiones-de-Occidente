@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reasignación de Créditos – Multi Inversiones</title>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      query,
+      where,
+      getDocs,
+      doc,
+      updateDoc,
+      deleteDoc
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import {
+      getAuth,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const db   = getFirestore(app);
+    const auth = getAuth(app);
+
+    // --- Estado en memoria ---
+    let EJECUTIVOS = [];          // [{id, nombreMostrar, agencia, email}]
+    let EJECUTIVO_ACTUAL = null;  // objeto del ejecutivo seleccionado
+    let CREDITOS_ACTUALES = [];   // créditos de ese ejecutivo
+
+    function nombreDesdeUser(u){
+      return (
+        u.nombre ||
+        u.nombreCompleto ||
+        u.displayName ||
+        u.nombres ||
+        u.email ||
+        "Sin nombre"
+      );
+    }
+
+    function fmtMonto(v){
+      const n = Number(v);
+      if (isNaN(n)) return "-";
+      return "$" + n.toFixed(2);
+    }
+
+    function fmt(v){
+      if (v === undefined || v === null || v === "") return "-";
+      return v;
+    }
+
+    async function cargarEjecutivos() {
+      try {
+        // Ajusta "ejecutivo_credito" si tu campo rol usa otro valor
+        const qExec = query(
+          collection(db, "users"),
+          where("rol", "==", "ejecutivo_credito")
+        );
+        const snap = await getDocs(qExec);
+
+        EJECUTIVOS = snap.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            nombreMostrar: nombreDesdeUser(data),
+            agencia: data.agenciaAsignada || "Sin agencia",
+            email: data.email || ""
+          };
+        });
+
+        poblarSelectAgencias();
+      } catch (e) {
+        console.error("Error cargando ejecutivos:", e);
+        alert("Error cargando ejecutivos. Revisa la consola.");
+      }
+    }
+
+    function poblarSelectAgencias() {
+      const selectAg = document.getElementById("select-agencia");
+      selectAg.innerHTML = '<option value="">Selecciona una agencia…</option>';
+
+      const agencias = Array.from(new Set(EJECUTIVOS.map(e => e.agencia))).sort();
+      for (const ag of agencias) {
+        const opt = document.createElement("option");
+        opt.value = ag;
+        opt.textContent = ag;
+        selectAg.appendChild(opt);
+      }
+
+      // Limpia info dependiente
+      document.getElementById("select-ejecutivo-actual").innerHTML =
+        '<option value="">Selecciona un ejecutivo…</option>';
+      document.getElementById("select-ejecutivo-nuevo").innerHTML =
+        '<option value="">Selecciona nuevo ejecutivo…</option>';
+      document.getElementById("tabla-creditos-body").innerHTML = "";
+      document.getElementById("resumen-ejecutivo").textContent =
+        "Selecciona una agencia y un ejecutivo para ver sus créditos.";
+      document.getElementById("btn-eliminar-ejecutivo").disabled = true;
+    }
+
+    function onAgenciaChange() {
+      const agencia = document.getElementById("select-agencia").value;
+      const selectEj = document.getElementById("select-ejecutivo-actual");
+      const selectNuevo = document.getElementById("select-ejecutivo-nuevo");
+
+      EJECUTIVO_ACTUAL = null;
+      CREDITOS_ACTUALES = [];
+      document.getElementById("tabla-creditos-body").innerHTML = "";
+      document.getElementById("resumen-ejecutivo").textContent =
+        "Selecciona un ejecutivo para ver sus créditos.";
+      document.getElementById("btn-eliminar-ejecutivo").disabled = true;
+
+      selectEj.innerHTML = '<option value="">Selecciona un ejecutivo…</option>';
+      selectNuevo.innerHTML = '<option value="">Selecciona nuevo ejecutivo…</option>';
+
+      if (!agencia) return;
+
+      const ejecutivosAgencia = EJECUTIVOS.filter(e => e.agencia === agencia);
+
+      ejecutivosAgencia.forEach(e => {
+        const opt1 = document.createElement("option");
+        opt1.value = e.id;
+        opt1.textContent = e.nombreMostrar + " (" + (e.email || e.id) + ")";
+        selectEj.appendChild(opt1);
+      });
+
+      // El select de "nuevo ejecutivo" lo llenamos dinámicamente al elegir el actual
+    }
+
+    async function onEjecutivoActualChange() {
+      const id = document.getElementById("select-ejecutivo-actual").value;
+      const agencia = document.getElementById("select-agencia").value;
+      const selectNuevo = document.getElementById("select-ejecutivo-nuevo");
+
+      EJECUTIVO_ACTUAL = null;
+      CREDITOS_ACTUALES = [];
+      document.getElementById("tabla-creditos-body").innerHTML = "";
+      document.getElementById("resumen-ejecutivo").textContent =
+        "Selecciona un ejecutivo para ver sus créditos.";
+      document.getElementById("btn-eliminar-ejecutivo").disabled = true;
+
+      selectNuevo.innerHTML = '<option value="">Selecciona nuevo ejecutivo…</option>';
+
+      if (!id || !agencia) return;
+
+      const ej = EJECUTIVOS.find(e => e.id === id);
+      if (!ej) return;
+
+      EJECUTIVO_ACTUAL = ej;
+
+      // Llenar select de nuevo ejecutivo (misma agencia, excepto el actual)
+      const ejecutivosAgencia = EJECUTIVOS.filter(
+        e => e.agencia === agencia && e.id !== ej.id
+      );
+      ejecutivosAgencia.forEach(e => {
+        const opt = document.createElement("option");
+        opt.value = e.id;
+        opt.textContent = e.nombreMostrar + " (" + (e.email || e.id) + ")";
+        selectNuevo.appendChild(opt);
+      });
+
+      await cargarCreditosEjecutivo(ej, agencia);
+    }
+
+    async function cargarCreditosEjecutivo(ej, agencia) {
+      try {
+        // Aquí asumimos que:
+        // - creditos.asignadoA = uid del ejecutivo
+        // - creditos.agenciaAsignada = agencia
+        const qCred = query(
+          collection(db, "creditos"),
+          where("asignadoA", "==", ej.id),
+          where("agenciaAsignada", "==", agencia)
+        );
+        const snap = await getDocs(qCred);
+
+        CREDITOS_ACTUALES = snap.docs.map(d => ({
+          id: d.id,
+          ...d.data()
+        }));
+
+        renderTablaCreditos();
+      } catch (e) {
+        console.error("Error cargando créditos:", e);
+        alert("Error cargando créditos asignados. Revisa la consola.");
+      }
+    }
+
+    function renderTablaCreditos() {
+      const tbody = document.getElementById("tabla-creditos-body");
+      tbody.innerHTML = "";
+
+      if (!EJECUTIVO_ACTUAL) {
+        document.getElementById("resumen-ejecutivo").textContent =
+          "Selecciona un ejecutivo para ver sus créditos.";
+        document.getElementById("btn-eliminar-ejecutivo").disabled = true;
+        return;
+      }
+
+      if (CREDITOS_ACTUALES.length === 0) {
+        document.getElementById("resumen-ejecutivo").textContent =
+          `El ejecutivo ${EJECUTIVO_ACTUAL.nombreMostrar} no tiene créditos asignados.`;
+        // Si está en cero, permitimos eliminarlo
+        document.getElementById("btn-eliminar-ejecutivo").disabled = false;
+        return;
+      }
+
+      document.getElementById("btn-eliminar-ejecutivo").disabled = true;
+
+      let totalMonto = 0;
+      CREDITOS_ACTUALES.forEach(c => {
+        const tr = document.createElement("tr");
+
+        const nombre = c.nombre || c.nombreCliente || "-";
+        const dui    = c.numeroDui || "-";
+        const linea  = c.lineaDeCredito || c.creditLine || "-";
+        const monto  = Number(c.montoAprobado || c.monto || 0);
+        const estado = c.estadoCredito || c.estado || "-";
+        const saldo  = Number(c.saldoActual || 0);
+
+        totalMonto += isNaN(monto) ? 0 : monto;
+
+        tr.innerHTML = `
+          <td><input type="checkbox" class="chk-credito" data-id="${c.id}"></td>
+          <td>${fmt(c.id)}</td>
+          <td>${fmt(nombre)}</td>
+          <td>${fmt(dui)}</td>
+          <td>${fmt(linea)}</td>
+          <td>${fmtMonto(monto)}</td>
+          <td>${fmt(estado)}</td>
+          <td>${fmtMonto(saldo)}</td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById("resumen-ejecutivo").textContent =
+        `Ejecutivo: ${EJECUTIVO_ACTUAL.nombreMostrar} – Créditos asignados: ${CREDITOS_ACTUALES.length} – Monto total aprobado: ${fmtMonto(totalMonto)}.`;
+    }
+
+    async function onReasignarClick() {
+      if (!EJECUTIVO_ACTUAL) {
+        alert("Primero selecciona un ejecutivo actual.");
+        return;
+      }
+
+      const nuevoId = document.getElementById("select-ejecutivo-nuevo").value;
+      if (!nuevoId) {
+        alert("Selecciona el nuevo ejecutivo al que deseas reasignar los créditos.");
+        return;
+      }
+
+      const nuevoEj = EJECUTIVOS.find(e => e.id === nuevoId);
+      if (!nuevoEj) {
+        alert("No se encontró la información del nuevo ejecutivo.");
+        return;
+      }
+
+      const checks = Array.from(document.querySelectorAll(".chk-credito:checked"));
+      if (checks.length === 0) {
+        alert("Selecciona al menos un crédito para reasignar.");
+        return;
+      }
+
+      const confirmar = confirm(
+        `Vas a reasignar ${checks.length} crédito(s) de ${EJECUTIVO_ACTUAL.nombreMostrar} a ${nuevoEj.nombreMostrar}. ¿Deseas continuar?`
+      );
+      if (!confirmar) return;
+
+      try {
+        await Promise.all(
+          checks.map(chk => {
+            const creditoId = chk.dataset.id;
+            const creditoRef = doc(db, "creditos", creditoId);
+
+            // Además de asignadoA, puedes guardar asignadoANombre si quieres
+            return updateDoc(creditoRef, {
+              asignadoA: nuevoEj.id,
+              asignadoANombre: nuevoEj.nombreMostrar
+            });
+          })
+        );
+
+        alert("Créditos reasignados correctamente.");
+        // Recargar créditos del ejecutivo actual (que ahora tendrá menos o cero)
+        const agencia = document.getElementById("select-agencia").value;
+        await cargarCreditosEjecutivo(EJECUTIVO_ACTUAL, agencia);
+      } catch (e) {
+        console.error("Error reasignando créditos:", e);
+        alert("Ocurrió un error al reasignar los créditos. Revisa la consola.");
+      }
+    }
+
+    async function onEliminarEjecutivoClick() {
+      if (!EJECUTIVO_ACTUAL) return;
+
+      if (CREDITOS_ACTUALES.length > 0) {
+        alert("El ejecutivo aún tiene créditos asignados. No se puede eliminar.");
+        return;
+      }
+
+      const confirmar = confirm(
+        `¿Seguro que deseas eliminar al ejecutivo ${EJECUTIVO_ACTUAL.nombreMostrar}? Esta acción no se puede deshacer.`
+      );
+      if (!confirmar) return;
+
+      try {
+        const ref = doc(db, "users", EJECUTIVO_ACTUAL.id);
+        await deleteDoc(ref);
+
+        alert("Ejecutivo eliminado correctamente.");
+
+        // Quitarlo de la lista y refrescar selects
+        EJECUTIVOS = EJECUTIVOS.filter(e => e.id !== EJECUTIVO_ACTUAL.id);
+        EJECUTIVO_ACTUAL = null;
+        CREDITOS_ACTUALES = [];
+
+        poblarSelectAgencias();
+      } catch (e) {
+        console.error("Error eliminando ejecutivo:", e);
+        alert("Ocurrió un error al eliminar el ejecutivo. Revisa la consola.");
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      onAuthStateChanged(auth, user => {
+        if (!user) return location.href = "login.html";
+
+        const emailSpan = document.getElementById("usuario-email");
+        if (emailSpan) emailSpan.textContent = user.email || "Gerente";
+
+        cargarEjecutivos();
+      });
+
+      document
+        .getElementById("select-agencia")
+        .addEventListener("change", onAgenciaChange);
+
+      document
+        .getElementById("select-ejecutivo-actual")
+        .addEventListener("change", onEjecutivoActualChange);
+
+      document
+        .getElementById("btn-reasignar")
+        .addEventListener("click", onReasignarClick);
+
+      document
+        .getElementById("btn-eliminar-ejecutivo")
+        .addEventListener("click", onEliminarEjecutivoClick);
+    });
+  </script>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root{
+      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --muted:#5b6776;
+      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#8bd13a; --brand-gold:#F8AF40;
+      --glass-bg:rgba(255,255,255,.7); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 18px 50px rgba(12,20,40,.14);
+      --radius-2xl:26px;
+    }
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+      min-height:100vh;
+    }
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(1.2) blur(8px); -webkit-backdrop-filter:saturate(1.2) blur(8px);
+      background:linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,.35));
+      border-bottom:1px solid var(--glass-brd);
+    }
+    .topbar{
+      max-width:1100px; margin:0 auto; display:flex; align-items:center;
+      gap:14px; padding:.7rem 16px;
+    }
+    .logo-plate{
+      display:inline-flex; align-items:center; gap:10px;
+      background:var(--glass-bg); border:1px solid var(--glass-brd);
+      padding:7px 12px; border-radius:16px; box-shadow:var(--glass-shadow);
+    }
+    .logo-plate img{ height:26px; width:auto; }
+    .brand-name{ font-weight:800; font-size:.86rem; letter-spacing:.2px; color:var(--brand-blue); }
+    .topbar-right{
+      margin-left:auto; font-weight:700; color:var(--muted); font-size:.9rem;
+      display:flex; align-items:center; gap:8px;
+    }
+    .pill-email{
+      padding:6px 10px; border-radius:999px; background:rgba(36,59,134,.06);
+      border:1px solid rgba(36,59,134,.14); font-size:.8rem;
+      display:inline-flex; align-items:center; gap:6px; color:var(--brand-blue);
+    }
+
+    .container{
+      max-width:1100px; margin:0 auto; padding:1.6rem 16px 2.4rem;
+    }
+    h1{
+      margin:0 0 1.1rem; font-size:1.6rem; font-weight:800; color:var(--brand-blue);
+      letter-spacing:.2px;
+    }
+    .sub{
+      margin-bottom:1.4rem; color:var(--muted); font-size:.95rem;
+    }
+
+    .panel{
+      display:grid; grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+      gap:18px; align-items:flex-start;
+    }
+    @media (max-width:840px){
+      .panel{ grid-template-columns:1fr; }
+    }
+
+    .card{
+      background:var(--glass-bg); border-radius:var(--radius-2xl);
+      border:1px solid var(--glass-brd); box-shadow:var(--glass-shadow);
+      padding:16px 16px 14px; position:relative; overflow:hidden;
+    }
+    .card h2{
+      margin:0 0 .6rem; font-size:1.05rem; font-weight:800; color:var(--brand-blue);
+      display:flex; align-items:center; gap:8px;
+    }
+    .card h2 i{ color:var(--brand-cel); }
+
+    .field{
+      display:flex; flex-direction:column; gap:4px; margin-bottom:10px;
+      font-size:.9rem;
+    }
+    .field label{
+      font-weight:600; color:var(--muted); font-size:.85rem;
+    }
+    select{
+      border-radius:12px; border:1px solid rgba(15,23,42,.12);
+      padding:8px 10px; font-size:.9rem; outline:none;
+      background:#fff;
+    }
+    select:focus{
+      border-color:var(--brand-cel);
+      box-shadow:0 0 0 1px rgba(103,200,241,.5);
+    }
+
+    .acciones{
+      margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;
+      align-items:center; justify-content:flex-start;
+    }
+    button.btn{
+      border:none; border-radius:999px; padding:8px 14px;
+      display:inline-flex; align-items:center; gap:6px;
+      font-size:.86rem; font-weight:700; cursor:pointer;
+      background:linear-gradient(135deg, var(--brand-blue), #1e293b);
+      color:#fff; box-shadow:0 8px 18px rgba(15,23,42,.25);
+    }
+    button.btn:disabled{
+      opacity:.4; cursor:not-allowed; box-shadow:none;
+    }
+    button.btn-danger{
+      background:linear-gradient(135deg, #ef4444, #b91c1c);
+      box-shadow:0 8px 18px rgba(239,68,68,.3);
+    }
+
+    .resumen{
+      margin-top:8px; font-size:.85rem; color:var(--muted);
+    }
+
+    table{
+      width:100%; border-collapse:collapse; font-size:.85rem;
+      background:#fff; border-radius:18px; overflow:hidden;
+    }
+    thead{
+      background:linear-gradient(90deg, rgba(36,59,134,.06), rgba(36,59,134,.02));
+    }
+    th, td{
+      padding:7px 8px; border-bottom:1px solid rgba(15,23,42,.05);
+      text-align:left; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;
+    }
+    th{
+      font-weight:700; font-size:.8rem; color:var(--muted);
+    }
+    tbody tr:nth-child(even){
+      background:rgba(15,23,42,.01);
+    }
+    tbody tr:hover{
+      background:rgba(103,200,241,.08);
+    }
+    td.monto{
+      text-align:right; font-variant-numeric:tabular-nums;
+    }
+    td.estado{
+      font-weight:600;
+    }
+    .table-wrapper{
+      max-height:520px; overflow:auto; border-radius:18px; border:1px solid rgba(15,23,42,.08);
+      background:rgba(255,255,255,.85);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <div class="logo-plate">
+        <img src="assets/logo_mi_bw.png" alt="Logo Multi Inversiones">
+        <span class="brand-name">MULTI INVERSIONES DE OCCIDENTE</span>
+      </div>
+      <div class="topbar-right">
+        <span>Reasignación de Créditos</span>
+        <span class="pill-email">
+          <i class="fa-solid fa-user"></i>
+          <span id="usuario-email">gerente@multi.com</span>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <h1>Reasignación de Créditos entre Ejecutivos</h1>
+    <p class="sub">
+      Usa esta herramienta para mover créditos de un ejecutivo a otro, manteniendo siempre la misma agencia.
+      Si un ejecutivo queda sin créditos, podrás eliminar su usuario del sistema.
+    </p>
+
+    <section class="panel">
+      <!-- Columna izquierda: filtros y acciones -->
+      <div class="card">
+        <h2><i class="fa-solid fa-user-tie"></i> Ejecutivos y Agencia</h2>
+
+        <div class="field">
+          <label for="select-agencia">Agencia</label>
+          <select id="select-agencia">
+            <option value="">Cargando agencias…</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="select-ejecutivo-actual">Ejecutivo actual (origen)</label>
+          <select id="select-ejecutivo-actual">
+            <option value="">Selecciona una agencia primero…</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="select-ejecutivo-nuevo">Nuevo ejecutivo (destino, misma agencia)</label>
+          <select id="select-ejecutivo-nuevo">
+            <option value="">Selecciona un ejecutivo actual primero…</option>
+          </select>
+        </div>
+
+        <div class="acciones">
+          <button id="btn-reasignar" class="btn" type="button">
+            <i class="fa-solid fa-random"></i>
+            Reasignar créditos seleccionados
+          </button>
+
+          <button id="btn-eliminar-ejecutivo" class="btn btn-danger" type="button" disabled>
+            <i class="fa-solid fa-user-slash"></i>
+            Eliminar ejecutivo (sin créditos)
+          </button>
+        </div>
+
+        <p id="resumen-ejecutivo" class="resumen">
+          Selecciona una agencia y un ejecutivo para ver sus créditos asignados.
+        </p>
+      </div>
+
+      <!-- Columna derecha: tabla de créditos -->
+      <div class="card">
+        <h2><i class="fa-solid fa-file-invoice-dollar"></i> Créditos asignados al ejecutivo</h2>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th></th>
+                <th>ID Crédito</th>
+                <th>Cliente</th>
+                <th>DUI</th>
+                <th>Línea</th>
+                <th>Monto Aprobado</th>
+                <th>Estado</th>
+                <th>Saldo Actual</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-creditos-body">
+              <!-- se llena por JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

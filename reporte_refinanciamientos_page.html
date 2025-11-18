@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Reporte de Refinanciamientos – Multi Inversiones</title>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      query,
+      where,
+      getDocs,
+      doc,
+      getDoc,
+      updateDoc,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import {
+      getAuth,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    const userCache = new Map();
+
+    function generarRecomendacion(totalMultas) {
+      if (totalMultas === 0) {
+        return "Excelente comportamiento. Refinanciamiento altamente recomendado.";
+      }
+      if (totalMultas <= 2) {
+        return "Algunos atrasos puntuales. Revisar situación actual antes de aprobar.";
+      }
+      return "Historial de varias multas. Recomendar evaluación en comité antes de aprobar.";
+    }
+
+    async function obtenerCliente(clienteID) {
+      if (!clienteID) return null;
+      if (userCache.has(clienteID)) return userCache.get(clienteID);
+      try {
+        const snap = await getDoc(doc(db, "users", clienteID));
+        if (snap.exists()) {
+          const data = snap.data();
+          userCache.set(clienteID, data);
+          return data;
+        }
+      } catch (e) {
+        console.error("Error obteniendo cliente:", e);
+      }
+      return null;
+    }
+
+    async function cargarCreditosAptos(departamentoUsuario) {
+      const tbody = document.querySelector("#tabla-refinanciamientos tbody");
+      const totalSpan        = document.getElementById("resumen-total");
+      const sinMultasSpan    = document.getElementById("resumen-sin-multas");
+      const conMultasSpan    = document.getElementById("resumen-con-multas");
+
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" style="text-align:center; padding:0.8rem;">
+            Cargando créditos aptos para refinanciamiento...
+          </td>
+        </tr>
+      `;
+
+      totalSpan.textContent     = "0";
+      sinMultasSpan.textContent = "0";
+      conMultasSpan.textContent = "0";
+
+      try {
+        const creditosRef = collection(db, "creditos");
+        let q;
+
+        if (departamentoUsuario) {
+          q = query(creditosRef, where("agenciaAsignada", "==", departamentoUsuario));
+        } else {
+          // Si no hay departamento en el perfil, carga todos (modo gerencial global)
+          q = creditosRef;
+        }
+
+        const snapshot = await getDocs(q);
+
+        tbody.innerHTML = "";
+        let totalAptos        = 0;
+        let aptosSinMultas    = 0;
+        let aptosConMultas    = 0;
+
+        for (const docSnap of snapshot.docs) {
+          const cred = docSnap.data();
+
+          // Evitar refinanciamientos de refinanciamientos
+          if (cred.lineaDeCredito === "Refinanciamiento") continue;
+          if (!Array.isArray(cred.amortizacion) || !cred.numeroCuotas) continue;
+
+          const amortizacion = cred.amortizacion;
+          const pagadas      = amortizacion.filter(c => c.estado === "Pagada").length;
+          const porcentaje   = (pagadas / cred.numeroCuotas) * 100;
+
+          // Política: mínimo 60% de cuotas pagadas
+          if (porcentaje < 60) continue;
+
+          const historialMultas = Array.isArray(cred.historialMultas) ? cred.historialMultas : [];
+          const totalMultas     = historialMultas.length;
+
+          totalAptos++;
+          if (totalMultas > 0) {
+            aptosConMultas++;
+          } else {
+            aptosSinMultas++;
+          }
+
+          const clienteInfo   = await obtenerCliente(cred.clienteID);
+          const telefonoCred  = cred.telefono || "";
+          const telefonoUser  = clienteInfo ? (clienteInfo.telefono || "") : "";
+          const telefonoFinal = telefonoCred || telefonoUser || "";
+          const nombreCliente = cred.nombre || (clienteInfo ? (clienteInfo.nombre || "") : "");
+          const duiCliente    = cred.numeroDui || (clienteInfo ? (clienteInfo.numeroDui || "") : "");
+          const recomendacion = generarRecomendacion(totalMultas);
+
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${nombreCliente || "-"}</td>
+            <td>${duiCliente || "-"}</td>
+            <td>${telefonoFinal || "-"}</td>
+            <td>${cred.lineaDeCredito || "-"}</td>
+            <td>${pagadas}/${cred.numeroCuotas} (${porcentaje.toFixed(0)}%)</td>
+            <td>
+              ${
+                totalMultas === 0
+                  ? "Sin multas"
+                  : `<button class="tag-btn multas-btn" type="button" data-id="${docSnap.id}">
+                      ${totalMultas} multa(s)
+                    </button>`
+              }
+            </td>
+            <td>${recomendacion}</td>
+            <td>
+              <button
+                class="primary-btn"
+                type="button"
+                data-accion="apto"
+                data-credito="${docSnap.id}"
+                data-cliente="${cred.clienteID || ""}"
+              >
+                Marcar apto y enviar notificación
+              </button>
+            </td>
+          `;
+          tr.dataset.multas = JSON.stringify(historialMultas);
+          tbody.appendChild(tr);
+        }
+
+        if (totalAptos === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="8" style="text-align:center; padding:0.8rem;">
+                No hay créditos aptos para refinanciamiento con las condiciones actuales.
+              </td>
+            </tr>
+          `;
+        }
+
+        totalSpan.textContent     = String(totalAptos);
+        sinMultasSpan.textContent = String(aptosSinMultas);
+        conMultasSpan.textContent = String(aptosConMultas);
+
+      } catch (e) {
+        console.error("Error al cargar créditos aptos:", e);
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" style="text-align:center; padding:0.8rem;">
+              Ocurrió un error al cargar los datos. Intenta nuevamente.
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    function inicializarEventos() {
+      document.addEventListener("click", async (e) => {
+        // Botón: marcar apto y enviar notificación
+        if (e.target.matches("button.primary-btn[data-accion='apto']")) {
+          const btn        = e.target;
+          const creditoId  = btn.dataset.credito;
+          const clienteId  = btn.dataset.cliente;
+
+          if (!clienteId) {
+            alert("No se encontró el ID del cliente asociado a este crédito.");
+            return;
+          }
+
+          btn.disabled   = true;
+          const oldText  = btn.textContent;
+          btn.textContent = "Marcando...";
+
+          try {
+            await updateDoc(doc(db, "users", clienteId), {
+              aptoRefinanciamiento: true,
+              aptoRefinanciamientoCreditoId: creditoId,
+              aptoRefinanciamientoAt: serverTimestamp()
+            });
+
+            alert("Cliente marcado como apto. La notificación push se enviará automáticamente.");
+            btn.textContent = "Apto marcado";
+          } catch (err) {
+            console.error("Error al marcar apto:", err);
+            alert("Ocurrió un error al marcar como apto. Intenta nuevamente.");
+            btn.disabled   = false;
+            btn.textContent = oldText;
+          }
+        }
+
+        // Botón: ver historial de multas
+        if (e.target.matches(".multas-btn")) {
+          const tr        = e.target.closest("tr");
+          const multasStr = tr.dataset.multas;
+
+          if (!multasStr || multasStr === "[]") {
+            alert("Sin multas registradas para este crédito.");
+            return;
+          }
+
+          let detalle = "";
+          try {
+            const multas = JSON.parse(multasStr);
+            detalle = multas.map(m => {
+              const tipo        = m.tipo || "Multa";
+              const cuota       = m.cuotaNumero != null ? `Cuota ${m.cuotaNumero}` : "";
+              const fecha       = m.fecha || "";
+              const estadoCuota = m.estadoCuota || "";
+              const monto       = (typeof m.monto === "number")
+                ? `$${m.monto.toFixed(2)}`
+                : (m.monto || "");
+
+              return `• ${tipo} ${cuota ? "– " + cuota : ""} – ${fecha} – ${monto} ${estadoCuota ? "– " + estadoCuota : ""}`;
+            }).join("\n");
+          } catch (err) {
+            console.error("Error parseando multas:", err);
+            detalle = "No se pudo leer el detalle de las multas.";
+          }
+
+          alert("Historial de multas:\n\n" + detalle);
+        }
+      });
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      inicializarEventos();
+
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) return location.href = "login.html";
+        document.getElementById("usuario-nombre").textContent = user.email;
+
+        let departamento = null;
+        try {
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            departamento = data.department || null;
+          }
+        } catch (e) {
+          console.error("Error obteniendo perfil de usuario:", e);
+        }
+
+        const agenciaSpan = document.getElementById("agencia-usuario");
+        agenciaSpan.textContent = departamento || "Todas";
+
+        await cargarCreditosAptos(departamento);
+      });
+    });
+  </script>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      background: #181a1b;
+      color: #fff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+    }
+    header {
+      background: #000;
+      padding: 1.1rem 0;
+      text-align: center;
+      font-size: 1.43rem;
+      letter-spacing: 1px;
+      font-weight: 700;
+      color: #67C8F1;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 3.2rem auto 2.5rem auto;
+      background: #232324;
+      border-radius: 20px;
+      box-shadow: 0 2px 32px #0006;
+      padding: 2.3rem 1.6rem 2.7rem 1.6rem;
+    }
+    #usuario-nombre {
+      color: #F8AF40;
+      font-size: 1.0rem;
+      text-align: right;
+      margin-bottom: 0.3rem;
+      font-weight: 600;
+    }
+    .sub-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.7rem;
+      gap: 0.7rem;
+    }
+    h1 {
+      font-size: 1.65rem;
+      font-weight: 800;
+      margin: 0;
+      color: #fff;
+      letter-spacing: 0.5px;
+    }
+    .agencia-info {
+      font-size: 0.95rem;
+      color: #c5c5c5;
+    }
+    .agencia-info span {
+      color: #67C8F1;
+      font-weight: 600;
+    }
+
+    .summary-cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.9rem;
+      margin-bottom: 1.6rem;
+    }
+    .summary-card {
+      flex: 1 1 180px;
+      background: #191b1d;
+      border-radius: 14px;
+      padding: 0.9rem 1rem;
+      border: 1px solid #2a2b2d;
+      box-shadow: 0 2px 12px #0003;
+    }
+    .summary-title {
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      color: #9f9f9f;
+      margin-bottom: 0.35rem;
+      letter-spacing: 0.8px;
+    }
+    .summary-value {
+      font-size: 1.35rem;
+      font-weight: 800;
+    }
+    .summary-value.total { color: #67C8F1; }
+    .summary-value.sin   { color: #19c388; }
+    .summary-value.con   { color: #f3a13b; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border-spacing: 0;
+      background: #191b1d;
+      border-radius: 16px;
+      overflow: hidden;
+      font-size: 0.92rem;
+    }
+    thead {
+      background: #141516;
+    }
+    th, td {
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid #2a2b2d;
+      text-align: left;
+    }
+    th {
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.9px;
+      color: #b9b9b9;
+    }
+    tbody tr:nth-child(even) {
+      background: #1d1f21;
+    }
+    tbody tr:hover {
+      background: #222427;
+    }
+
+    .primary-btn {
+      background: linear-gradient(90deg, #67C8F1 0%, #13b66b 100%);
+      border: none;
+      border-radius: 999px;
+      padding: 0.4rem 0.9rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: #111;
+      box-shadow: 0 2px 10px #0007;
+      white-space: nowrap;
+    }
+    .primary-btn:disabled {
+      opacity: 0.65;
+      cursor: default;
+    }
+
+    .tag-btn {
+      background: #292b2e;
+      border: 1px solid #3a3c3f;
+      border-radius: 999px;
+      padding: 0.22rem 0.7rem;
+      font-size: 0.78rem;
+      color: #f3a13b;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .tag-btn:hover {
+      background: #33363a;
+    }
+
+    @media (max-width: 900px) {
+      .container { padding: 1.4rem 1rem; }
+      table { font-size: 0.84rem; }
+      th, td { padding: 0.45rem 0.55rem; }
+      h1 { font-size: 1.25rem; }
+    }
+
+    @media (max-width: 680px) {
+      .sub-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      #usuario-nombre {
+        text-align: left;
+      }
+      .container {
+        margin-top: 1.6rem;
+      }
+      table {
+        display: block;
+        overflow-x: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>Reportes Gerenciales</header>
+  <div class="container">
+    <div id="usuario-nombre"></div>
+
+    <div class="sub-header">
+      <h1>Créditos aptos para refinanciamiento</h1>
+      <div class="agencia-info">
+        Agencia / Departamento: <span id="agencia-usuario">-</span>
+      </div>
+    </div>
+
+    <div class="summary-cards">
+      <div class="summary-card">
+        <div class="summary-title">Total clientes aptos</div>
+        <div class="summary-value total" id="resumen-total">0</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-title">Aptos sin multas</div>
+        <div class="summary-value sin" id="resumen-sin-multas">0</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-title">Aptos con multas</div>
+        <div class="summary-value con" id="resumen-con-multas">0</div>
+      </div>
+    </div>
+
+    <table id="tabla-refinanciamientos">
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>DUI</th>
+          <th>Teléfono</th>
+          <th>Línea</th>
+          <th>Avance de cuotas</th>
+          <th>Multas</th>
+          <th>Recomendación</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Filas generadas por JavaScript -->
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

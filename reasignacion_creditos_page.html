@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Reasignación de Créditos – Multi Inversiones</title>
 
+  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import {
@@ -14,12 +15,13 @@
       where,
       getDocs,
       doc,
+      getDoc,
       updateDoc,
-      deleteDoc
+      deleteDoc,
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import {
       getAuth,
-      onAuthStateChanged
+      onAuthStateChanged,
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -29,558 +31,762 @@
       storageBucket: "multinversiones-38e13.appspot.com",
       messagingSenderId: "380001917078",
       appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
-      measurementId: "G-H4E31XHG1Y"
+      measurementId: "G-H4E31XHG1Y",
     };
 
-    const app  = initializeApp(firebaseConfig);
-    const db   = getFirestore(app);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // --- Estado en memoria ---
-    let EJECUTIVOS = [];          // [{id, nombreMostrar, agencia, email}]
-    let EJECUTIVO_ACTUAL = null;  // objeto del ejecutivo seleccionado
-    let CREDITOS_ACTUALES = [];   // créditos de ese ejecutivo
+    // Estado en memoria
+    let gerenteDept = null;         // agencia detectada desde el usuario (department)
+    let ejecutivos = [];            // [{id, nombre, email}]
+    let ejecutivosMap = {};         // id -> datos
+    let creditosActuales = [];      // créditos del ejecutivo seleccionado
 
-    function nombreDesdeUser(u){
-      return (
-        u.nombre ||
-        u.nombreCompleto ||
-        u.displayName ||
-        u.nombres ||
-        u.email ||
-        "Sin nombre"
+    // Helpers UI
+    function setLoading(text) {
+      const status = document.getElementById("status-text");
+      if (status) status.textContent = text || "";
+    }
+
+    function showToast(msg, type = "ok") {
+      const toast = document.getElementById("toast");
+      const toastText = document.getElementById("toast-text");
+      if (!toast || !toastText) return;
+      toastText.textContent = msg;
+      toast.className = "toast " + (type === "error" ? "toast-error" : "toast-ok");
+      toast.style.opacity = "1";
+      setTimeout(() => { toast.style.opacity = "0"; }, 3200);
+    }
+
+    // Cargar ejecutivos de la agencia del gerente
+    async function cargarEjecutivosDeAgencia() {
+      if (!gerenteDept) return;
+
+      const selectAgencia = document.getElementById("select-agencia");
+      const selectOrigen = document.getElementById("select-ejecutivo-origen");
+      const selectDestino = document.getElementById("select-ejecutivo-destino");
+
+      // Mostrar agencia detectada y dejar el select bloqueado
+      selectAgencia.innerHTML = "";
+      const opt = document.createElement("option");
+      opt.value = gerenteDept;
+      opt.textContent = gerenteDept;
+      selectAgencia.appendChild(opt);
+      selectAgencia.disabled = true;
+
+      setLoading("Cargando ejecutivos de " + gerenteDept + "…");
+
+      // Buscamos ejecutivos (analistas) de esa agencia
+      const qEj = query(
+        collection(db, "users"),
+        where("rol", "==", "analista_credito"),
+        where("department", "==", gerenteDept)
       );
-    }
 
-    function fmtMonto(v){
-      const n = Number(v);
-      if (isNaN(n)) return "-";
-      return "$" + n.toFixed(2);
-    }
+      const snap = await getDocs(qEj);
+      ejecutivos = [];
+      ejecutivosMap = {};
 
-    function fmt(v){
-      if (v === undefined || v === null || v === "") return "-";
-      return v;
-    }
+      snap.forEach((d) => {
+        const u = d.data();
+        const nombre =
+          (u.nombre && u.apellido
+            ? `${u.nombre} ${u.apellido}`.trim()
+            : u.nombre || u.displayName || u.email || "Sin nombre").trim();
+        const item = {
+          id: d.id,
+          nombre,
+          email: u.email || "",
+        };
+        ejecutivos.push(item);
+        ejecutivosMap[d.id] = item;
+      });
 
-    async function cargarEjecutivos() {
-      try {
-        // Ajusta "ejecutivo_credito" si tu campo rol usa otro valor
-        const qExec = query(
-          collection(db, "users"),
-          where("rol", "==", "ejecutivo_credito")
-        );
-        const snap = await getDocs(qExec);
+      // Limpiar selects de ejecutivos
+      selectOrigen.innerHTML = '<option value="">Selecciona un ejecutivo…</option>';
+      selectDestino.innerHTML = '<option value="">Selecciona nuevo ejecutivo…</option>';
 
-        EJECUTIVOS = snap.docs.map(d => {
-          const data = d.data();
-          return {
-            id: d.id,
-            nombreMostrar: nombreDesdeUser(data),
-            agencia: data.agenciaAsignada || "Sin agencia",
-            email: data.email || ""
-          };
-        });
-
-        poblarSelectAgencias();
-      } catch (e) {
-        console.error("Error cargando ejecutivos:", e);
-        alert("Error cargando ejecutivos. Revisa la consola.");
-      }
-    }
-
-    function poblarSelectAgencias() {
-      const selectAg = document.getElementById("select-agencia");
-      selectAg.innerHTML = '<option value="">Selecciona una agencia…</option>';
-
-      const agencias = Array.from(new Set(EJECUTIVOS.map(e => e.agencia))).sort();
-      for (const ag of agencias) {
-        const opt = document.createElement("option");
-        opt.value = ag;
-        opt.textContent = ag;
-        selectAg.appendChild(opt);
-      }
-
-      // Limpia info dependiente
-      document.getElementById("select-ejecutivo-actual").innerHTML =
-        '<option value="">Selecciona un ejecutivo…</option>';
-      document.getElementById("select-ejecutivo-nuevo").innerHTML =
-        '<option value="">Selecciona nuevo ejecutivo…</option>';
-      document.getElementById("tabla-creditos-body").innerHTML = "";
-      document.getElementById("resumen-ejecutivo").textContent =
-        "Selecciona una agencia y un ejecutivo para ver sus créditos.";
-      document.getElementById("btn-eliminar-ejecutivo").disabled = true;
-    }
-
-    function onAgenciaChange() {
-      const agencia = document.getElementById("select-agencia").value;
-      const selectEj = document.getElementById("select-ejecutivo-actual");
-      const selectNuevo = document.getElementById("select-ejecutivo-nuevo");
-
-      EJECUTIVO_ACTUAL = null;
-      CREDITOS_ACTUALES = [];
-      document.getElementById("tabla-creditos-body").innerHTML = "";
-      document.getElementById("resumen-ejecutivo").textContent =
-        "Selecciona un ejecutivo para ver sus créditos.";
-      document.getElementById("btn-eliminar-ejecutivo").disabled = true;
-
-      selectEj.innerHTML = '<option value="">Selecciona un ejecutivo…</option>';
-      selectNuevo.innerHTML = '<option value="">Selecciona nuevo ejecutivo…</option>';
-
-      if (!agencia) return;
-
-      const ejecutivosAgencia = EJECUTIVOS.filter(e => e.agencia === agencia);
-
-      ejecutivosAgencia.forEach(e => {
+      ejecutivos.forEach((e) => {
         const opt1 = document.createElement("option");
         opt1.value = e.id;
-        opt1.textContent = e.nombreMostrar + " (" + (e.email || e.id) + ")";
-        selectEj.appendChild(opt1);
+        opt1.textContent = `${e.nombre} (${e.email || "sin correo"})`;
+
+        const opt2 = opt1.cloneNode(true);
+
+        selectOrigen.appendChild(opt1);
+        selectDestino.appendChild(opt2);
       });
 
-      // El select de "nuevo ejecutivo" lo llenamos dinámicamente al elegir el actual
-    }
-
-    async function onEjecutivoActualChange() {
-      const id = document.getElementById("select-ejecutivo-actual").value;
-      const agencia = document.getElementById("select-agencia").value;
-      const selectNuevo = document.getElementById("select-ejecutivo-nuevo");
-
-      EJECUTIVO_ACTUAL = null;
-      CREDITOS_ACTUALES = [];
-      document.getElementById("tabla-creditos-body").innerHTML = "";
-      document.getElementById("resumen-ejecutivo").textContent =
-        "Selecciona un ejecutivo para ver sus créditos.";
-      document.getElementById("btn-eliminar-ejecutivo").disabled = true;
-
-      selectNuevo.innerHTML = '<option value="">Selecciona nuevo ejecutivo…</option>';
-
-      if (!id || !agencia) return;
-
-      const ej = EJECUTIVOS.find(e => e.id === id);
-      if (!ej) return;
-
-      EJECUTIVO_ACTUAL = ej;
-
-      // Llenar select de nuevo ejecutivo (misma agencia, excepto el actual)
-      const ejecutivosAgencia = EJECUTIVOS.filter(
-        e => e.agencia === agencia && e.id !== ej.id
+      setLoading(
+        ejecutivos.length
+          ? `Ejecutivos cargados: ${ejecutivos.length}`
+          : "No hay ejecutivos registrados en esta agencia."
       );
-      ejecutivosAgencia.forEach(e => {
-        const opt = document.createElement("option");
-        opt.value = e.id;
-        opt.textContent = e.nombreMostrar + " (" + (e.email || e.id) + ")";
-        selectNuevo.appendChild(opt);
-      });
-
-      await cargarCreditosEjecutivo(ej, agencia);
     }
 
-    async function cargarCreditosEjecutivo(ej, agencia) {
-      try {
-        // Aquí asumimos que:
-        // - creditos.asignadoA = uid del ejecutivo
-        // - creditos.agenciaAsignada = agencia
-        const qCred = query(
-          collection(db, "creditos"),
-          where("asignadoA", "==", ej.id),
-          where("agenciaAsignada", "==", agencia)
-        );
-        const snap = await getDocs(qCred);
-
-        CREDITOS_ACTUALES = snap.docs.map(d => ({
-          id: d.id,
-          ...d.data()
-        }));
-
-        renderTablaCreditos();
-      } catch (e) {
-        console.error("Error cargando créditos:", e);
-        alert("Error cargando créditos asignados. Revisa la consola.");
-      }
-    }
-
-    function renderTablaCreditos() {
+    // Cargar créditos asignados a un ejecutivo
+    async function cargarCreditosDeEjecutivo(ejecutivoId) {
       const tbody = document.getElementById("tabla-creditos-body");
       tbody.innerHTML = "";
+      creditosActuales = [];
 
-      if (!EJECUTIVO_ACTUAL) {
-        document.getElementById("resumen-ejecutivo").textContent =
-          "Selecciona un ejecutivo para ver sus créditos.";
-        document.getElementById("btn-eliminar-ejecutivo").disabled = true;
+      if (!ejecutivoId) {
+        setLoading("Selecciona un ejecutivo para ver sus créditos.");
         return;
       }
 
-      if (CREDITOS_ACTUALES.length === 0) {
-        document.getElementById("resumen-ejecutivo").textContent =
-          `El ejecutivo ${EJECUTIVO_ACTUAL.nombreMostrar} no tiene créditos asignados.`;
-        // Si está en cero, permitimos eliminarlo
-        document.getElementById("btn-eliminar-ejecutivo").disabled = false;
+      setLoading("Cargando créditos asignados…");
+
+      const qCred = query(
+        collection(db, "creditos"),
+        where("AsignacionID", "==", ejecutivoId),
+        where("agenciaAsignada", "==", gerenteDept)
+      );
+
+      const snap = await getDocs(qCred);
+
+      if (snap.empty) {
+        setLoading("Este ejecutivo no tiene créditos en esta agencia.");
         return;
       }
 
-      document.getElementById("btn-eliminar-ejecutivo").disabled = true;
+      snap.forEach((d) => {
+        const c = d.data();
+        creditosActuales.push({ id: d.id, ...c });
+      });
 
-      let totalMonto = 0;
-      CREDITOS_ACTUALES.forEach(c => {
+      // Pintar filas
+      creditosActuales.forEach((c) => {
         const tr = document.createElement("tr");
 
-        const nombre = c.nombre || c.nombreCliente || "-";
-        const dui    = c.numeroDui || "-";
-        const linea  = c.lineaDeCredito || c.creditLine || "-";
-        const monto  = Number(c.montoAprobado || c.monto || 0);
-        const estado = c.estadoCredito || c.estado || "-";
-        const saldo  = Number(c.saldoActual || 0);
-
-        totalMonto += isNaN(monto) ? 0 : monto;
+        const saldo = Number(c.saldoActual || 0);
+        const monto = Number(c.montoAprobado || 0);
 
         tr.innerHTML = `
-          <td><input type="checkbox" class="chk-credito" data-id="${c.id}"></td>
-          <td>${fmt(c.id)}</td>
-          <td>${fmt(nombre)}</td>
-          <td>${fmt(dui)}</td>
-          <td>${fmt(linea)}</td>
-          <td>${fmtMonto(monto)}</td>
-          <td>${fmt(estado)}</td>
-          <td>${fmtMonto(saldo)}</td>
+          <td>
+            <label class="check-wrap">
+              <input type="checkbox" class="chk-credito" data-id="${c.id}">
+              <span></span>
+            </label>
+          </td>
+          <td class="mono">${c.id}</td>
+          <td>${(c.nombre || "").trim()}</td>
+          <td class="mono">${c.numeroDui || ""}</td>
+          <td>${c.lineaDeCredito || ""}</td>
+          <td>$ ${monto.toFixed ? monto.toFixed(2) : monto}</td>
+          <td>${c.estadoCredito || ""}</td>
+          <td>$ ${saldo.toFixed ? saldo.toFixed(2) : saldo}</td>
         `;
-
         tbody.appendChild(tr);
       });
 
-      document.getElementById("resumen-ejecutivo").textContent =
-        `Ejecutivo: ${EJECUTIVO_ACTUAL.nombreMostrar} – Créditos asignados: ${CREDITOS_ACTUALES.length} – Monto total aprobado: ${fmtMonto(totalMonto)}.`;
+      setLoading(`Créditos cargados: ${creditosActuales.length}`);
     }
 
-    async function onReasignarClick() {
-      if (!EJECUTIVO_ACTUAL) {
-        alert("Primero selecciona un ejecutivo actual.");
+    // Reasignar créditos seleccionados
+    async function reasignarCreditos() {
+      const selectOrigen = document.getElementById("select-ejecutivo-origen");
+      const selectDestino = document.getElementById("select-ejecutivo-destino");
+
+      const origenId = selectOrigen.value;
+      const destinoId = selectDestino.value;
+
+      if (!origenId) {
+        showToast("Selecciona el ejecutivo actual.", "error");
+        return;
+      }
+      if (!destinoId) {
+        showToast("Selecciona el nuevo ejecutivo destino.", "error");
+        return;
+      }
+      if (origenId === destinoId) {
+        showToast("El ejecutivo origen y destino no pueden ser el mismo.", "error");
         return;
       }
 
-      const nuevoId = document.getElementById("select-ejecutivo-nuevo").value;
-      if (!nuevoId) {
-        alert("Selecciona el nuevo ejecutivo al que deseas reasignar los créditos.");
-        return;
-      }
-
-      const nuevoEj = EJECUTIVOS.find(e => e.id === nuevoId);
-      if (!nuevoEj) {
-        alert("No se encontró la información del nuevo ejecutivo.");
-        return;
-      }
-
-      const checks = Array.from(document.querySelectorAll(".chk-credito:checked"));
-      if (checks.length === 0) {
-        alert("Selecciona al menos un crédito para reasignar.");
-        return;
-      }
-
-      const confirmar = confirm(
-        `Vas a reasignar ${checks.length} crédito(s) de ${EJECUTIVO_ACTUAL.nombreMostrar} a ${nuevoEj.nombreMostrar}. ¿Deseas continuar?`
+      const checkboxes = Array.from(
+        document.querySelectorAll(".chk-credito:checked")
       );
-      if (!confirmar) return;
+      if (!checkboxes.length) {
+        showToast("Selecciona al menos un crédito para reasignar.", "error");
+        return;
+      }
+
+      const destino = ejecutivosMap[destinoId];
+      const nombreDestino = destino?.nombre || "Ejecutivo";
+
+      if (!confirm(`¿Reasignar ${checkboxes.length} crédito(s) a ${nombreDestino}?`)) {
+        return;
+      }
+
+      setLoading("Reasignando créditos…");
 
       try {
         await Promise.all(
-          checks.map(chk => {
-            const creditoId = chk.dataset.id;
-            const creditoRef = doc(db, "creditos", creditoId);
-
-            // Además de asignadoA, puedes guardar asignadoANombre si quieres
-            return updateDoc(creditoRef, {
-              asignadoA: nuevoEj.id,
-              asignadoANombre: nuevoEj.nombreMostrar
+          checkboxes.map((chk) => {
+            const id = chk.getAttribute("data-id");
+            const ref = doc(db, "creditos", id);
+            return updateDoc(ref, {
+              AsignacionID: destinoId,
+              asignadoA: nombreDestino,
             });
           })
         );
 
-        alert("Créditos reasignados correctamente.");
-        // Recargar créditos del ejecutivo actual (que ahora tendrá menos o cero)
-        const agencia = document.getElementById("select-agencia").value;
-        await cargarCreditosEjecutivo(EJECUTIVO_ACTUAL, agencia);
+        showToast("Créditos reasignados correctamente.");
+        await cargarCreditosDeEjecutivo(origenId);
       } catch (e) {
-        console.error("Error reasignando créditos:", e);
-        alert("Ocurrió un error al reasignar los créditos. Revisa la consola.");
+        console.error(e);
+        showToast("Ocurrió un error al reasignar créditos.", "error");
+      } finally {
+        setLoading("");
       }
     }
 
-    async function onEliminarEjecutivoClick() {
-      if (!EJECUTIVO_ACTUAL) return;
+    // Eliminar ejecutivo (solo si no tiene créditos)
+    async function eliminarEjecutivo() {
+      const selectOrigen = document.getElementById("select-ejecutivo-origen");
+      const origenId = selectOrigen.value;
 
-      if (CREDITOS_ACTUALES.length > 0) {
-        alert("El ejecutivo aún tiene créditos asignados. No se puede eliminar.");
+      if (!origenId) {
+        showToast("Selecciona un ejecutivo para eliminar.", "error");
         return;
       }
 
-      const confirmar = confirm(
-        `¿Seguro que deseas eliminar al ejecutivo ${EJECUTIVO_ACTUAL.nombreMostrar}? Esta acción no se puede deshacer.`
-      );
-      if (!confirmar) return;
+      if (creditosActuales.length > 0) {
+        showToast(
+          "El ejecutivo todavía tiene créditos asignados. No se puede eliminar.",
+          "error"
+        );
+        return;
+      }
+
+      const ejecutivo = ejecutivosMap[origenId];
+      const nombre = ejecutivo?.nombre || "este ejecutivo";
+
+      if (!confirm(`¿Eliminar definitivamente a ${nombre} de la agencia?`)) {
+        return;
+      }
+
+      setLoading("Eliminando ejecutivo…");
 
       try {
-        const ref = doc(db, "users", EJECUTIVO_ACTUAL.id);
-        await deleteDoc(ref);
+        await deleteDoc(doc(db, "users", origenId));
+        showToast("Ejecutivo eliminado correctamente.");
 
-        alert("Ejecutivo eliminado correctamente.");
+        // Volver a cargar lista de ejecutivos
+        await cargarEjecutivosDeAgencia();
 
-        // Quitarlo de la lista y refrescar selects
-        EJECUTIVOS = EJECUTIVOS.filter(e => e.id !== EJECUTIVO_ACTUAL.id);
-        EJECUTIVO_ACTUAL = null;
-        CREDITOS_ACTUALES = [];
-
-        poblarSelectAgencias();
+        // Limpiar tabla
+        document.getElementById("tabla-creditos-body").innerHTML = "";
+        creditosActuales = [];
+        setLoading("");
       } catch (e) {
-        console.error("Error eliminando ejecutivo:", e);
-        alert("Ocurrió un error al eliminar el ejecutivo. Revisa la consola.");
+        console.error(e);
+        showToast("Error al eliminar el ejecutivo.", "error");
       }
     }
 
+    // Inicializar
     window.addEventListener("DOMContentLoaded", () => {
-      onAuthStateChanged(auth, user => {
-        if (!user) return location.href = "login.html";
+      const selectOrigen = document.getElementById("select-ejecutivo-origen");
+      const btnReasignar = document.getElementById(
+        "btn-reasignar-creditos"
+      );
+      const btnEliminar = document.getElementById("btn-eliminar-ejecutivo");
 
-        const emailSpan = document.getElementById("usuario-email");
-        if (emailSpan) emailSpan.textContent = user.email || "Gerente";
+      // Auth
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+          location.href = "login.html";
+          return;
+        }
 
-        cargarEjecutivos();
+        document.getElementById("usuario-email").textContent = user.email || "";
+
+        // Obtener agencia / department del gerente
+        try {
+          const userRef = doc(db, "users", user.uid);
+          const snap = await getDoc(userRef);
+          if (!snap.exists()) {
+            setLoading("No se encontró el perfil del usuario.");
+            return;
+          }
+          const data = snap.data();
+          gerenteDept = data.department || data.agenciaAsignada || "";
+
+          if (!gerenteDept) {
+            setLoading(
+              "Este usuario no tiene un department/agencia asignada en la base de datos."
+            );
+            return;
+          }
+
+          await cargarEjecutivosDeAgencia();
+        } catch (e) {
+          console.error(e);
+          setLoading("Error al cargar la agencia del usuario.");
+        }
       });
 
-      document
-        .getElementById("select-agencia")
-        .addEventListener("change", onAgenciaChange);
+      // Eventos
+      selectOrigen.addEventListener("change", (e) => {
+        const ejecutivoId = e.target.value;
+        cargarCreditosDeEjecutivo(ejecutivoId);
+      });
 
-      document
-        .getElementById("select-ejecutivo-actual")
-        .addEventListener("change", onEjecutivoActualChange);
-
-      document
-        .getElementById("btn-reasignar")
-        .addEventListener("click", onReasignarClick);
-
-      document
-        .getElementById("btn-eliminar-ejecutivo")
-        .addEventListener("click", onEliminarEjecutivoClick);
+      btnReasignar.addEventListener("click", reasignarCreditos);
+      btnEliminar.addEventListener("click", eliminarEjecutivo);
     });
   </script>
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+  />
+
   <style>
-    :root{
-      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --muted:#5b6776;
-      --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#8bd13a; --brand-gold:#F8AF40;
-      --glass-bg:rgba(255,255,255,.7); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 18px 50px rgba(12,20,40,.14);
-      --radius-2xl:26px;
+    :root {
+      --bg: #f7f9fc;
+      --bg-2: #eef2f7;
+      --text: #0d1b2a;
+      --muted: #5b6776;
+      --white: #ffffff;
+      --brand-blue: #243b86;
+      --brand-cel: #67c8f1;
+      --brand-gold: #f8af40;
+      --radius-xl: 26px;
+      --radius-lg: 18px;
+      --shadow-soft: 0 20px 60px rgba(15, 23, 42, 0.18);
     }
-    body{
-      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
-      color:var(--text);
-      background:
-        radial-gradient(1200px 600px at 10% -10%, rgba(36,59,134,.12), transparent 60%),
-        radial-gradient(900px 500px at 100% 0%, rgba(248,175,64,.10), transparent 55%),
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: radial-gradient(
+          1200px 600px at 10% -10%,
+          rgba(36, 59, 134, 0.12),
+          transparent 60%
+        ),
+        radial-gradient(
+          900px 500px at 100% 0%,
+          rgba(248, 175, 64, 0.1),
+          transparent 55%
+        ),
         linear-gradient(180deg, var(--bg), var(--bg-2));
-      min-height:100vh;
-    }
-    header{
-      position:sticky; top:0; z-index:10;
-      backdrop-filter:saturate(1.2) blur(8px); -webkit-backdrop-filter:saturate(1.2) blur(8px);
-      background:linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,.35));
-      border-bottom:1px solid var(--glass-brd);
-    }
-    .topbar{
-      max-width:1100px; margin:0 auto; display:flex; align-items:center;
-      gap:14px; padding:.7rem 16px;
-    }
-    .logo-plate{
-      display:inline-flex; align-items:center; gap:10px;
-      background:var(--glass-bg); border:1px solid var(--glass-brd);
-      padding:7px 12px; border-radius:16px; box-shadow:var(--glass-shadow);
-    }
-    .logo-plate img{ height:26px; width:auto; }
-    .brand-name{ font-weight:800; font-size:.86rem; letter-spacing:.2px; color:var(--brand-blue); }
-    .topbar-right{
-      margin-left:auto; font-weight:700; color:var(--muted); font-size:.9rem;
-      display:flex; align-items:center; gap:8px;
-    }
-    .pill-email{
-      padding:6px 10px; border-radius:999px; background:rgba(36,59,134,.06);
-      border:1px solid rgba(36,59,134,.14); font-size:.8rem;
-      display:inline-flex; align-items:center; gap:6px; color:var(--brand-blue);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
     }
 
-    .container{
-      max-width:1100px; margin:0 auto; padding:1.6rem 16px 2.4rem;
-    }
-    h1{
-      margin:0 0 1.1rem; font-size:1.6rem; font-weight:800; color:var(--brand-blue);
-      letter-spacing:.2px;
-    }
-    .sub{
-      margin-bottom:1.4rem; color:var(--muted); font-size:.95rem;
-    }
-
-    .panel{
-      display:grid; grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-      gap:18px; align-items:flex-start;
-    }
-    @media (max-width:840px){
-      .panel{ grid-template-columns:1fr; }
+    header {
+      padding: 1rem 6vw;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(12px);
+      background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.9),
+        rgba(255, 255, 255, 0.7)
+      );
+      border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
 
-    .card{
-      background:var(--glass-bg); border-radius:var(--radius-2xl);
-      border:1px solid var(--glass-brd); box-shadow:var(--glass-shadow);
-      padding:16px 16px 14px; position:relative; overflow:hidden;
-    }
-    .card h2{
-      margin:0 0 .6rem; font-size:1.05rem; font-weight:800; color:var(--brand-blue);
-      display:flex; align-items:center; gap:8px;
-    }
-    .card h2 i{ color:var(--brand-cel); }
-
-    .field{
-      display:flex; flex-direction:column; gap:4px; margin-bottom:10px;
-      font-size:.9rem;
-    }
-    .field label{
-      font-weight:600; color:var(--muted); font-size:.85rem;
-    }
-    select{
-      border-radius:12px; border:1px solid rgba(15,23,42,.12);
-      padding:8px 10px; font-size:.9rem; outline:none;
-      background:#fff;
-    }
-    select:focus{
-      border-color:var(--brand-cel);
-      box-shadow:0 0 0 1px rgba(103,200,241,.5);
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
     }
 
-    .acciones{
-      margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;
-      align-items:center; justify-content:flex-start;
-    }
-    button.btn{
-      border:none; border-radius:999px; padding:8px 14px;
-      display:inline-flex; align-items:center; gap:6px;
-      font-size:.86rem; font-weight:700; cursor:pointer;
-      background:linear-gradient(135deg, var(--brand-blue), #1e293b);
-      color:#fff; box-shadow:0 8px 18px rgba(15,23,42,.25);
-    }
-    button.btn:disabled{
-      opacity:.4; cursor:not-allowed; box-shadow:none;
-    }
-    button.btn-danger{
-      background:linear-gradient(135deg, #ef4444, #b91c1c);
-      box-shadow:0 8px 18px rgba(239,68,68,.3);
+    .logo-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.45rem 0.9rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.16);
     }
 
-    .resumen{
-      margin-top:8px; font-size:.85rem; color:var(--muted);
+    .logo-chip img {
+      height: 26px;
+      width: auto;
+      display: block;
     }
 
-    table{
-      width:100%; border-collapse:collapse; font-size:.85rem;
-      background:#fff; border-radius:18px; overflow:hidden;
+    .logo-chip span {
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      font-size: 0.9rem;
+      color: var(--brand-blue);
+      text-transform: uppercase;
     }
-    thead{
-      background:linear-gradient(90deg, rgba(36,59,134,.06), rgba(36,59,134,.02));
+
+    .header-title {
+      font-weight: 700;
+      color: var(--muted);
+      font-size: 0.95rem;
     }
-    th, td{
-      padding:7px 8px; border-bottom:1px solid rgba(15,23,42,.05);
-      text-align:left; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;
+
+    .user-pill {
+      padding: 0.45rem 0.9rem;
+      border-radius: 999px;
+      background: rgba(36, 59, 134, 0.06);
+      border: 1px solid rgba(36, 59, 134, 0.2);
+      font-size: 0.9rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
     }
-    th{
-      font-weight:700; font-size:.8rem; color:var(--muted);
+
+    .user-pill i {
+      color: var(--brand-blue);
     }
-    tbody tr:nth-child(even){
-      background:rgba(15,23,42,.01);
+
+    .container {
+      max-width: 1180px;
+      margin: 1.8rem auto 3rem auto;
+      padding: 0 1.5rem;
     }
-    tbody tr:hover{
-      background:rgba(103,200,241,.08);
+
+    h1 {
+      font-size: clamp(1.8rem, 2.3vw + 1rem, 2.4rem);
+      margin: 0 0 0.4rem;
+      font-weight: 800;
+      color: var(--brand-blue);
+      letter-spacing: 0.02em;
     }
-    td.monto{
-      text-align:right; font-variant-numeric:tabular-nums;
+
+    .subtitle {
+      margin-bottom: 2rem;
+      color: var(--muted);
+      font-size: 0.98rem;
+      max-width: 720px;
     }
-    td.estado{
-      font-weight:600;
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+      gap: 1.8rem;
+      align-items: flex-start;
     }
-    .table-wrapper{
-      max-height:520px; overflow:auto; border-radius:18px; border:1px solid rgba(15,23,42,.08);
-      background:rgba(255,255,255,.85);
+
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: var(--radius-xl);
+      padding: 1.4rem 1.4rem 1.3rem 1.4rem;
+      box-shadow: var(--shadow-soft);
+      border: 1px solid rgba(15, 23, 42, 0.04);
+    }
+
+    .card-title {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+      font-weight: 700;
+      color: var(--brand-blue);
+    }
+
+    .card-title i {
+      color: var(--brand-cel);
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    label {
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    select {
+      width: 100%;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      padding: 0.6rem 0.9rem;
+      font-size: 0.95rem;
+      outline: none;
+      background: rgba(255, 255, 255, 0.94);
+      appearance: none;
+      position: relative;
+    }
+
+    select:disabled {
+      background: rgba(243, 244, 246, 0.85);
+      color: #6b7280;
+      cursor: not-allowed;
+    }
+
+    .hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.3rem;
+    }
+
+    .btn {
+      border-radius: 999px;
+      padding: 0.65rem 1rem;
+      border: none;
+      font-size: 0.93rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      transition: transform 0.12s ease, box-shadow 0.15s ease, opacity 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #1d3557, #14213d);
+      color: #fff;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.35);
+      width: 100%;
+      margin-bottom: 0.5rem;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.45);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #f97373, #e11d48);
+      color: #fff;
+      box-shadow: 0 10px 26px rgba(248, 113, 113, 0.45);
+      width: 100%;
+    }
+
+    .btn-danger:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 38px rgba(248, 113, 113, 0.6);
+    }
+
+    .status-text {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.4rem;
+    }
+
+    /* Tabla */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    thead {
+      background: linear-gradient(
+        90deg,
+        rgba(36, 59, 134, 0.06),
+        rgba(103, 200, 241, 0.1)
+      );
+    }
+
+    th,
+    td {
+      padding: 0.55rem 0.6rem;
+      text-align: left;
+    }
+
+    th {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(249, 250, 251, 0.85);
+    }
+
+    tbody tr:hover {
+      background: rgba(219, 234, 254, 0.6);
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        "Liberation Mono", "Courier New", monospace;
+      font-size: 0.82rem;
+    }
+
+    .check-wrap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 6px;
+      border: 1px solid rgba(15, 23, 42, 0.3);
+      background: #fff;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .check-wrap input {
+      position: absolute;
+      opacity: 0;
+      inset: 0;
+      cursor: pointer;
+    }
+
+    .check-wrap span::after {
+      content: "";
+      width: 11px;
+      height: 11px;
+      border-radius: 4px;
+      background: linear-gradient(135deg, #1d4ed8, #22c55e);
+      opacity: 0;
+      transform: scale(0.8);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      display: block;
+    }
+
+    .check-wrap input:checked + span::after {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .tabla-wrapper {
+      max-height: 480px;
+      overflow: auto;
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      background: #fff;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 1.4rem;
+      right: 1.4rem;
+      padding: 0.7rem 1rem;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.35);
+      color: #fff;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      z-index: 30;
+    }
+
+    .toast-ok {
+      background: linear-gradient(135deg, #16a34a, #4ade80);
+    }
+
+    .toast-error {
+      background: linear-gradient(135deg, #ef4444, #fb7185);
     }
   </style>
 </head>
 <body>
   <header>
-    <div class="topbar">
-      <div class="logo-plate">
-        <img src="assets/logo_mi_bw.png" alt="Logo Multi Inversiones">
-        <span class="brand-name">MULTI INVERSIONES DE OCCIDENTE</span>
+    <div class="header-left">
+      <div class="logo-chip">
+        <img src="assets/logo_mi_bw.png" alt="Logo Multi Inversiones" />
+        <span>MULTI INVERSIONES DE OCCIDENTE</span>
       </div>
-      <div class="topbar-right">
-        <span>Reasignación de Créditos</span>
-        <span class="pill-email">
-          <i class="fa-solid fa-user"></i>
-          <span id="usuario-email">gerente@multi.com</span>
-        </span>
-      </div>
+      <div class="header-title">Reasignación de Créditos</div>
+    </div>
+    <div class="user-pill">
+      <i class="fa-solid fa-user"></i>
+      <span id="usuario-email">usuario@correo.com</span>
     </div>
   </header>
 
   <main class="container">
     <h1>Reasignación de Créditos entre Ejecutivos</h1>
-    <p class="sub">
-      Usa esta herramienta para mover créditos de un ejecutivo a otro, manteniendo siempre la misma agencia.
-      Si un ejecutivo queda sin créditos, podrás eliminar su usuario del sistema.
+    <p class="subtitle">
+      Usa esta herramienta para mover créditos de un ejecutivo a otro,
+      manteniendo siempre la misma agencia. Si un ejecutivo queda sin créditos,
+      podrás eliminar su usuario del sistema.
     </p>
 
-    <section class="panel">
+    <section class="layout">
       <!-- Columna izquierda: filtros y acciones -->
       <div class="card">
-        <h2><i class="fa-solid fa-user-tie"></i> Ejecutivos y Agencia</h2>
-
-        <div class="field">
-          <label for="select-agencia">Agencia</label>
-          <select id="select-agencia">
-            <option value="">Cargando agencias…</option>
-          </select>
+        <div class="card-title">
+          <i class="fa-solid fa-users-gear"></i>
+          <span>Ejecutivos y Agencia</span>
         </div>
 
-        <div class="field">
-          <label for="select-ejecutivo-actual">Ejecutivo actual (origen)</label>
-          <select id="select-ejecutivo-actual">
-            <option value="">Selecciona una agencia primero…</option>
-          </select>
+        <div class="field-group">
+          <div>
+            <label for="select-agencia">Agencia</label>
+            <select id="select-agencia" disabled>
+              <option value="">Detectando agencia…</option>
+            </select>
+            <div class="hint">
+              La agencia se toma automáticamente del perfil del gerente.
+            </div>
+          </div>
+
+          <div>
+            <label for="select-ejecutivo-origen">Ejecutivo actual (origen)</label>
+            <select id="select-ejecutivo-origen">
+              <option value="">Selecciona un ejecutivo…</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="select-ejecutivo-destino">
+              Nuevo ejecutivo (destino, misma agencia)
+            </label>
+            <select id="select-ejecutivo-destino">
+              <option value="">Selecciona nuevo ejecutivo…</option>
+            </select>
+            <div class="hint">
+              Solo aparecen ejecutivos registrados en la misma agencia.
+            </div>
+          </div>
         </div>
 
-        <div class="field">
-          <label for="select-ejecutivo-nuevo">Nuevo ejecutivo (destino, misma agencia)</label>
-          <select id="select-ejecutivo-nuevo">
-            <option value="">Selecciona un ejecutivo actual primero…</option>
-          </select>
+        <button id="btn-reasignar-creditos" class="btn btn-primary">
+          <i class="fa-solid fa-shuffle"></i>
+          <span>Reasignar créditos seleccionados</span>
+        </button>
+
+        <button id="btn-eliminar-ejecutivo" class="btn btn-danger">
+          <i class="fa-solid fa-user-slash"></i>
+          <span>Eliminar ejecutivo (sin créditos)</span>
+        </button>
+
+        <div class="status-text" id="status-text">
+          Cargando información…
         </div>
-
-        <div class="acciones">
-          <button id="btn-reasignar" class="btn" type="button">
-            <i class="fa-solid fa-random"></i>
-            Reasignar créditos seleccionados
-          </button>
-
-          <button id="btn-eliminar-ejecutivo" class="btn btn-danger" type="button" disabled>
-            <i class="fa-solid fa-user-slash"></i>
-            Eliminar ejecutivo (sin créditos)
-          </button>
-        </div>
-
-        <p id="resumen-ejecutivo" class="resumen">
-          Selecciona una agencia y un ejecutivo para ver sus créditos asignados.
-        </p>
       </div>
 
       <!-- Columna derecha: tabla de créditos -->
       <div class="card">
-        <h2><i class="fa-solid fa-file-invoice-dollar"></i> Créditos asignados al ejecutivo</h2>
-        <div class="table-wrapper">
+        <div class="card-title">
+          <i class="fa-solid fa-file-invoice-dollar"></i>
+          <span>Créditos asignados al ejecutivo</span>
+        </div>
+        <div class="tabla-wrapper">
           <table>
             <thead>
               <tr>
@@ -595,12 +801,17 @@
               </tr>
             </thead>
             <tbody id="tabla-creditos-body">
-              <!-- se llena por JS -->
+              <!-- filas dinámicas -->
             </tbody>
           </table>
         </div>
       </div>
     </section>
   </main>
+
+  <div id="toast" class="toast toast-ok">
+    <i class="fa-solid fa-circle-info"></i>
+    <span id="toast-text"></span>
+  </div>
 </body>
 </html>

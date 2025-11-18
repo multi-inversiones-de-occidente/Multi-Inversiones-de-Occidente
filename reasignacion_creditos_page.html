@@ -38,13 +38,13 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // Estado en memoria
-    let gerenteDept = null;         // agencia detectada desde el usuario (department)
-    let ejecutivos = [];            // [{id, nombre, email}]
-    let ejecutivosMap = {};         // id -> datos
-    let creditosActuales = [];      // créditos del ejecutivo seleccionado
+    // === ESTADO EN MEMORIA ===
+    let gerenteDept = null;        // Agencia detectada desde department
+    let ejecutivos = [];           // [{ key, nombre, asignacionID }]
+    let ejecutivosMap = {};        // key -> objeto anterior
+    let creditosActuales = [];     // Créditos del ejecutivo seleccionado
 
-    // Helpers UI
+    // === HELPERS UI ===
     function setLoading(text) {
       const status = document.getElementById("status-text");
       if (status) status.textContent = text || "";
@@ -57,10 +57,12 @@
       toastText.textContent = msg;
       toast.className = "toast " + (type === "error" ? "toast-error" : "toast-ok");
       toast.style.opacity = "1";
-      setTimeout(() => { toast.style.opacity = "0"; }, 3200);
+      setTimeout(() => {
+        toast.style.opacity = "0";
+      }, 3200);
     }
 
-    // Cargar ejecutivos de la agencia del gerente
+    // === CARGAR EJECUTIVOS DESDE 'asignadoA' EN CREDITOS ===
     async function cargarEjecutivosDeAgencia() {
       if (!gerenteDept) return;
 
@@ -68,50 +70,50 @@
       const selectOrigen = document.getElementById("select-ejecutivo-origen");
       const selectDestino = document.getElementById("select-ejecutivo-destino");
 
-      // Mostrar agencia detectada y dejar el select bloqueado
+      // Mostrar agencia detectada y bloquear el select
       selectAgencia.innerHTML = "";
-      const opt = document.createElement("option");
-      opt.value = gerenteDept;
-      opt.textContent = gerenteDept;
-      selectAgencia.appendChild(opt);
+      const optAg = document.createElement("option");
+      optAg.value = gerenteDept;
+      optAg.textContent = gerenteDept;
+      selectAgencia.appendChild(optAg);
       selectAgencia.disabled = true;
 
-      setLoading("Cargando ejecutivos de " + gerenteDept + "…");
+      setLoading("Cargando ejecutivos (asignadoA) de " + gerenteDept + "…");
 
-      // Buscamos ejecutivos (analistas) de esa agencia
-      const qEj = query(
-        collection(db, "users"),
-        where("rol", "==", "analista_credito"),
-        where("department", "==", gerenteDept)
+      // Tomamos todos los créditos de esa agencia y agrupamos por 'asignadoA'
+      const qCreds = query(
+        collection(db, "creditos"),
+        where("agenciaAsignada", "==", gerenteDept)
       );
+      const snap = await getDocs(qCreds);
 
-      const snap = await getDocs(qEj);
       ejecutivos = [];
       ejecutivosMap = {};
 
       snap.forEach((d) => {
-        const u = d.data();
-        const nombre =
-          (u.nombre && u.apellido
-            ? `${u.nombre} ${u.apellido}`.trim()
-            : u.nombre || u.displayName || u.email || "Sin nombre").trim();
-        const item = {
-          id: d.id,
-          nombre,
-          email: u.email || "",
-        };
-        ejecutivos.push(item);
-        ejecutivosMap[d.id] = item;
+        const c = d.data();
+        const nombre = (c.asignadoA || "").trim();
+        if (!nombre) return;
+
+        const key = nombre; // usamos el nombre como clave visual
+        if (!ejecutivosMap[key]) {
+          ejecutivosMap[key] = {
+            key,
+            nombre,
+            asignacionID: c.AsignacionID || c.asignacionID || null,
+          };
+          ejecutivos.push(ejecutivosMap[key]);
+        }
       });
 
-      // Limpiar selects de ejecutivos
+      // Limpiar selects
       selectOrigen.innerHTML = '<option value="">Selecciona un ejecutivo…</option>';
       selectDestino.innerHTML = '<option value="">Selecciona nuevo ejecutivo…</option>';
 
-      ejecutivos.forEach((e) => {
+      ejecutivos.forEach((ej) => {
         const opt1 = document.createElement("option");
-        opt1.value = e.id;
-        opt1.textContent = `${e.nombre} (${e.email || "sin correo"})`;
+        opt1.value = ej.key;
+        opt1.textContent = ej.nombre;
 
         const opt2 = opt1.cloneNode(true);
 
@@ -119,30 +121,30 @@
         selectDestino.appendChild(opt2);
       });
 
-      setLoading(
-        ejecutivos.length
-          ? `Ejecutivos cargados: ${ejecutivos.length}`
-          : "No hay ejecutivos registrados en esta agencia."
-      );
+      if (ejecutivos.length) {
+        setLoading("Ejecutivos encontrados en esta agencia: " + ejecutivos.length);
+      } else {
+        setLoading("No se encontraron ejecutivos con créditos en esta agencia.");
+      }
     }
 
-    // Cargar créditos asignados a un ejecutivo
-    async function cargarCreditosDeEjecutivo(ejecutivoId) {
+    // === CARGAR CREDITOS DE UN EJECUTIVO (por asignadoA) ===
+    async function cargarCreditosDeEjecutivo(nombreEjecutivo) {
       const tbody = document.getElementById("tabla-creditos-body");
       tbody.innerHTML = "";
       creditosActuales = [];
 
-      if (!ejecutivoId) {
+      if (!nombreEjecutivo) {
         setLoading("Selecciona un ejecutivo para ver sus créditos.");
         return;
       }
 
-      setLoading("Cargando créditos asignados…");
+      setLoading("Cargando créditos asignados a " + nombreEjecutivo + "…");
 
       const qCred = query(
         collection(db, "creditos"),
-        where("AsignacionID", "==", ejecutivoId),
-        where("agenciaAsignada", "==", gerenteDept)
+        where("agenciaAsignada", "==", gerenteDept),
+        where("asignadoA", "==", nombreEjecutivo)
       );
 
       const snap = await getDocs(qCred);
@@ -157,7 +159,6 @@
         creditosActuales.push({ id: d.id, ...c });
       });
 
-      // Pintar filas
       creditosActuales.forEach((c) => {
         const tr = document.createElement("tr");
 
@@ -185,23 +186,23 @@
       setLoading(`Créditos cargados: ${creditosActuales.length}`);
     }
 
-    // Reasignar créditos seleccionados
+    // === REASIGNAR CREDITOS SELECCIONADOS (CAMBIA asignadoA y opcional AsignacionID) ===
     async function reasignarCreditos() {
       const selectOrigen = document.getElementById("select-ejecutivo-origen");
       const selectDestino = document.getElementById("select-ejecutivo-destino");
 
-      const origenId = selectOrigen.value;
-      const destinoId = selectDestino.value;
+      const origenKey = selectOrigen.value;
+      const destinoKey = selectDestino.value;
 
-      if (!origenId) {
+      if (!origenKey) {
         showToast("Selecciona el ejecutivo actual.", "error");
         return;
       }
-      if (!destinoId) {
+      if (!destinoKey) {
         showToast("Selecciona el nuevo ejecutivo destino.", "error");
         return;
       }
-      if (origenId === destinoId) {
+      if (origenKey === destinoKey) {
         showToast("El ejecutivo origen y destino no pueden ser el mismo.", "error");
         return;
       }
@@ -214,8 +215,9 @@
         return;
       }
 
-      const destino = ejecutivosMap[destinoId];
-      const nombreDestino = destino?.nombre || "Ejecutivo";
+      const destino = ejecutivosMap[destinoKey];
+      const nombreDestino = destino?.nombre || destinoKey;
+      const asignacionDestino = destino?.asignacionID || null;
 
       if (!confirm(`¿Reasignar ${checkboxes.length} crédito(s) a ${nombreDestino}?`)) {
         return;
@@ -228,15 +230,18 @@
           checkboxes.map((chk) => {
             const id = chk.getAttribute("data-id");
             const ref = doc(db, "creditos", id);
-            return updateDoc(ref, {
-              AsignacionID: destinoId,
+            const dataUpdate = {
               asignadoA: nombreDestino,
-            });
+            };
+            if (asignacionDestino) {
+              dataUpdate.AsignacionID = asignacionDestino;
+            }
+            return updateDoc(ref, dataUpdate);
           })
         );
 
         showToast("Créditos reasignados correctamente.");
-        await cargarCreditosDeEjecutivo(origenId);
+        await cargarCreditosDeEjecutivo(origenKey);
       } catch (e) {
         console.error(e);
         showToast("Ocurrió un error al reasignar créditos.", "error");
@@ -245,12 +250,12 @@
       }
     }
 
-    // Eliminar ejecutivo (solo si no tiene créditos)
+    // === ELIMINAR EJECUTIVO (SI YA NO TIENE CREDITOS) ===
     async function eliminarEjecutivo() {
       const selectOrigen = document.getElementById("select-ejecutivo-origen");
-      const origenId = selectOrigen.value;
+      const origenKey = selectOrigen.value;
 
-      if (!origenId) {
+      if (!origenKey) {
         showToast("Selecciona un ejecutivo para eliminar.", "error");
         return;
       }
@@ -263,8 +268,17 @@
         return;
       }
 
-      const ejecutivo = ejecutivosMap[origenId];
+      const ejecutivo = ejecutivosMap[origenKey];
       const nombre = ejecutivo?.nombre || "este ejecutivo";
+      const asignID = ejecutivo?.asignacionID || null;
+
+      if (!asignID) {
+        showToast(
+          "No se encontró AsignacionID para este ejecutivo en los créditos.",
+          "error"
+        );
+        return;
+      }
 
       if (!confirm(`¿Eliminar definitivamente a ${nombre} de la agencia?`)) {
         return;
@@ -273,13 +287,13 @@
       setLoading("Eliminando ejecutivo…");
 
       try {
-        await deleteDoc(doc(db, "users", origenId));
+        await deleteDoc(doc(db, "users", asignID));
         showToast("Ejecutivo eliminado correctamente.");
 
-        // Volver a cargar lista de ejecutivos
+        // Volver a cargar lista de ejecutivos desde creditos
         await cargarEjecutivosDeAgencia();
 
-        // Limpiar tabla
+        // Limpiar tabla y estado local
         document.getElementById("tabla-creditos-body").innerHTML = "";
         creditosActuales = [];
         setLoading("");
@@ -289,12 +303,10 @@
       }
     }
 
-    // Inicializar
+    // === INICIALIZACIÓN ===
     window.addEventListener("DOMContentLoaded", () => {
       const selectOrigen = document.getElementById("select-ejecutivo-origen");
-      const btnReasignar = document.getElementById(
-        "btn-reasignar-creditos"
-      );
+      const btnReasignar = document.getElementById("btn-reasignar-creditos");
       const btnEliminar = document.getElementById("btn-eliminar-ejecutivo");
 
       // Auth
@@ -306,7 +318,6 @@
 
         document.getElementById("usuario-email").textContent = user.email || "";
 
-        // Obtener agencia / department del gerente
         try {
           const userRef = doc(db, "users", user.uid);
           const snap = await getDoc(userRef);
@@ -333,8 +344,8 @@
 
       // Eventos
       selectOrigen.addEventListener("change", (e) => {
-        const ejecutivoId = e.target.value;
-        cargarCreditosDeEjecutivo(ejecutivoId);
+        const nombreEjecutivo = e.target.value;
+        cargarCreditosDeEjecutivo(nombreEjecutivo);
       });
 
       btnReasignar.addEventListener("click", reasignarCreditos);
@@ -588,7 +599,6 @@
       margin-top: 0.4rem;
     }
 
-    /* Tabla */
     table {
       width: 100%;
       border-collapse: collapse;
@@ -676,7 +686,6 @@
       background: #fff;
     }
 
-    /* Toast */
     .toast {
       position: fixed;
       bottom: 1.4rem;
@@ -721,13 +730,12 @@
   <main class="container">
     <h1>Reasignación de Créditos entre Ejecutivos</h1>
     <p class="subtitle">
-      Usa esta herramienta para mover créditos de un ejecutivo a otro,
-      manteniendo siempre la misma agencia. Si un ejecutivo queda sin créditos,
-      podrás eliminar su usuario del sistema.
+      Usa esta herramienta para mover créditos de un ejecutivo a otro dentro de la
+      misma agencia. Los ejecutivos se obtienen desde el campo <strong>asignadoA</strong>
+      de los créditos registrados.
     </p>
 
     <section class="layout">
-      <!-- Columna izquierda: filtros y acciones -->
       <div class="card">
         <div class="card-title">
           <i class="fa-solid fa-users-gear"></i>
@@ -741,7 +749,8 @@
               <option value="">Detectando agencia…</option>
             </select>
             <div class="hint">
-              La agencia se toma automáticamente del perfil del gerente.
+              La agencia se toma automáticamente del perfil del gerente
+              (department).
             </div>
           </div>
 
@@ -760,7 +769,7 @@
               <option value="">Selecciona nuevo ejecutivo…</option>
             </select>
             <div class="hint">
-              Solo aparecen ejecutivos registrados en la misma agencia.
+              Solo aparecen ejecutivos que ya tienen créditos en esta agencia.
             </div>
           </div>
         </div>
@@ -780,7 +789,6 @@
         </div>
       </div>
 
-      <!-- Columna derecha: tabla de créditos -->
       <div class="card">
         <div class="card-title">
           <i class="fa-solid fa-file-invoice-dollar"></i>
@@ -801,7 +809,6 @@
               </tr>
             </thead>
             <tbody id="tabla-creditos-body">
-              <!-- filas dinámicas -->
             </tbody>
           </table>
         </div>

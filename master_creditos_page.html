@@ -35,22 +35,46 @@
     let creditos = [];
     let creditosFiltrados = [];
     let loading = true;
+    const MAX_CARDS = 300; // límite de cards para no reventar el DOM
 
     // --- UI functions ---
     function mostrarCreditos() {
       const contenedor = document.getElementById("creditos-list");
       contenedor.innerHTML = "";
+
       if (loading) {
         contenedor.innerHTML = `<div class="loader"></div>`;
         return;
       }
-      if (creditosFiltrados.length === 0) {
+      if (!creditosFiltrados || creditosFiltrados.length === 0) {
         contenedor.innerHTML = `<div class="noresult">No se encontraron créditos.</div>`;
         return;
       }
-      for (const c of creditosFiltrados) {
+
+      const total = creditosFiltrados.length;
+      const toShow = creditosFiltrados.slice(0, MAX_CARDS);
+
+      for (const c of toShow) {
+        const estado = (c.estadoCredito || "").toLowerCase();
+        const esPagado = estado === "pagado";
+
+        const cardClass = esPagado ? "card-credito pagado" : "card-credito";
+
+        const estadoMarkup = esPagado
+          ? `
+            <span class="tag">Estado</span> 
+            <b class="estado-text estado-pagado">
+              ${c.estadoCredito || "-"}
+              <span class="material-icons check-pagado">check_circle</span>
+            </b>
+          `
+          : `
+            <span class="tag">Estado</span> 
+            <b class="estado-text">${c.estadoCredito || "-"}</b>
+          `;
+
         contenedor.innerHTML += `
-          <div class="card-credito" onclick="verDetalleCredito('${c.id}')">
+          <div class="${cardClass}" onclick="verDetalleCredito('${c.id}')">
             <div class="icon"><span class="material-icons">credit_score</span></div>
             <div class="card-body">
               <div class="nombre">${c.nombre || ""} ${c.apellido || ""}</div>
@@ -59,12 +83,20 @@
                 <span class="sep">•</span>
                 <span class="tag">Monto</span> <b>${money(c.montoAprobado)}</b>
                 <span class="sep">•</span>
-                <span class="tag">Estado</span> <b>${c.estadoCredito || '-'}</b>
+                ${estadoMarkup}
                 <span class="sep">•</span>
                 <span class="tag">Línea</span> <b>${c.lineaDeCredito || '-'}</b>
               </div>
             </div>
             <div class="chev"><span class="material-icons">chevron_right</span></div>
+          </div>
+        `;
+      }
+
+      if (total > MAX_CARDS) {
+        contenedor.innerHTML += `
+          <div class="more-note">
+            Mostrando ${MAX_CARDS} de ${total} créditos. Refina la búsqueda para ver resultados más específicos.
           </div>
         `;
       }
@@ -75,14 +107,20 @@
     };
 
     function aplicarFiltro(term) {
-      term = (term || "").toLowerCase();
+      term = (term || "").toLowerCase().trim();
+
       creditosFiltrados = creditos.filter(c => {
         // Excluir “Revertido”
         if (c.estadoCredito === "Revertido") return false;
-        return (c.nombre || "").toLowerCase().includes(term)
-          || (c.apellido || "").toLowerCase().includes(term)
-          || (c.numeroDui || "").toLowerCase().includes(term);
+
+        const nombre = (c.nombre || "").toLowerCase();
+        const apellido = (c.apellido || "").toLowerCase();
+        const dui = (c.numeroDui || "").toLowerCase();
+
+        if (!term) return true; // si no hay término, mostramos todos (hasta MAX_CARDS)
+        return nombre.includes(term) || apellido.includes(term) || dui.includes(term);
       });
+
       mostrarCreditos();
     }
 
@@ -123,7 +161,17 @@
         await cargarCreditos(department);
       });
 
-      document.getElementById("busqueda").addEventListener("input", e => aplicarFiltro(e.target.value));
+      // Búsqueda con debounce para no recalcular en cada tecla
+      const input = document.getElementById("busqueda");
+      let debounceTimer = null;
+
+      input.addEventListener("input", e => {
+        const value = e.target.value;
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          aplicarFiltro(value);
+        }, 300); // 300ms de espera
+      });
     });
   </script>
 
@@ -225,17 +273,30 @@
 
     /* ===== LISTA EN COLUMNA (una card debajo de otra) ===== */
     .creditos-list{
-      display:flex; flex-direction:column; gap:14px; align-items:center; /* centra y apila */
+      display:flex; flex-direction:column; gap:14px; align-items:center;
       margin-top:12px;
     }
 
     .card-credito{
-      width:min(860px, 100%);  /* ancho cómodo en desktop, full en móvil */
+      width:min(860px, 100%);
       display:flex; align-items:center; gap:14px; cursor:pointer; padding:14px 12px;
       background:var(--white); border:1px solid var(--glass-brd); border-radius:16px;
-      box-shadow:var(--glass-shadow); transition:transform .12s ease, box-shadow .2s ease;
+      box-shadow:var(--glass-shadow); transition:transform .12s ease, box-shadow .2s ease, border-color .15s ease;
     }
-    .card-credito:hover{ transform: translateY(-2px); box-shadow:0 20px 45px rgba(12,20,40,.16); }
+    .card-credito:hover{
+      transform: translateY(-2px);
+      box-shadow:0 20px 45px rgba(12,20,40,.16);
+    }
+
+    /* Estilo especial para créditos Pagados */
+    .card-credito.pagado{
+      border-color: rgba(19,182,107,.55);
+      box-shadow:
+        0 0 0 1px rgba(19,182,107,.10),
+        var(--glass-shadow);
+      background: linear-gradient(135deg, rgba(19,182,107,.06), rgba(255,255,255,1));
+    }
+
     .card-credito .icon{
       flex:0 0 auto; width:46px; height:46px; display:grid; place-items:center; border-radius:50%;
       background: conic-gradient(from 210deg, var(--brand-cel), var(--brand-gold), var(--brand-green), var(--brand-cel));
@@ -249,8 +310,30 @@
     .sep{ color:#aab4c2; margin:0 8px; }
     .chev{ margin-left:auto; color:#7b8bb4; }
 
+    .estado-text{
+      font-weight:800;
+    }
+    .estado-pagado{
+      color:var(--brand-green);
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+    }
+    .check-pagado{
+      font-size:18px;
+      vertical-align:middle;
+    }
+
     .noresult{
       text-align:center; color:#7b8bb4; font-size:1.05rem; padding:1.6rem 0;
+    }
+
+    .more-note{
+      margin-top:10px;
+      font-size:.9rem;
+      color:#7b8bb4;
+      text-align:center;
+      max-width:860px;
     }
 
     /* Loader */
@@ -292,8 +375,6 @@
   </div>
 </body>
 </html>
-
-
 
 
 

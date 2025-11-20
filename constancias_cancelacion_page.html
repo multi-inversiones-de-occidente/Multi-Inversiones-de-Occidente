@@ -1,0 +1,539 @@
+<!-- constancias_cancelacion_page.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Constancias de Cancelación – Multi Inversiones</title>
+
+  <!-- Firebase SDK (v9 modular) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      query,
+      where,
+      onSnapshot,
+      doc,
+      getDoc
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import {
+      getAuth,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    // ---------------- CONFIG FIREBASE ----------------
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const db   = getFirestore(app);
+    const auth = getAuth(app);
+
+    // ----------------- HELPERS -----------------
+
+    // Normaliza texto para búsqueda (minúsculas, sin tildes)
+    function normText(str = "") {
+      return String(str)
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    }
+
+    // Formato fecha corto DD/MM/YYYY
+    function formatDateShort(d) {
+      if (!d) return "---";
+      const date = (d instanceof Date) ? d : new Date(d);
+      if (Number.isNaN(date.getTime())) return "---";
+      const dd = String(date.getDate()).padStart(2, "0");
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const yyyy = date.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    }
+
+    // Saca la fecha de cancelación del crédito (última cuota Pagada)
+    function getFechaCancelacion(amortizacion) {
+      if (!Array.isArray(amortizacion)) return null;
+      let ultima = null;
+
+      for (const cuota of amortizacion) {
+        if (cuota.estado !== "Pagada") continue;
+
+        let f = cuota.fechaPagoReal || cuota.fecha;
+        if (!f) continue;
+
+        let date;
+        if (f && typeof f.toDate === "function") {
+          date = f.toDate();
+        } else {
+          // asume string ISO/fecha
+          date = new Date(f);
+        }
+        if (!ultima || date > ultima) ultima = date;
+      }
+      return ultima;
+    }
+
+    // ----------------- ESTADO EN MEMORIA -----------------
+    let CREDITOS_ORIGINALES = [];
+    let AGENCIA_USUARIO = "";
+
+    function renderCreditos(lista) {
+      const tbody = document.getElementById("tbody-creditos");
+      const vacioMsg = document.getElementById("mensaje-vacio");
+      tbody.innerHTML = "";
+
+      if (!lista.length) {
+        vacioMsg.style.display = "block";
+        return;
+      }
+      vacioMsg.style.display = "none";
+
+      for (const c of lista) {
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+          <td class="cell-id">${c.id}</td>
+          <td>${c.nombreCompleto}</td>
+          <td>${c.numeroDui || ""}</td>
+          <td>${c.lineaDeCredito || ""}</td>
+          <td>$ ${c.montoAprobado.toFixed(2)}</td>
+          <td>${formatDateShort(c.fechaInicioDate)}</td>
+          <td>${formatDateShort(c.fechaCancelacionDate)}</td>
+          <td><span class="badge-estado">Pagado</span></td>
+          <td>
+            <button class="btn-mini btn-constancia" data-id="${c.id}">
+              Generar constancia
+            </button>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      }
+    }
+
+    function aplicarFiltroBusqueda() {
+      const input = document.getElementById("buscador");
+      const termo = normText(input.value.trim());
+
+      if (!termo) {
+        renderCreditos(CREDITOS_ORIGINALES);
+        return;
+      }
+
+      const filtrados = CREDITOS_ORIGINALES.filter(c => {
+        const nombre = normText(c.nombreCompleto);
+        const dui    = normText(c.numeroDui || "");
+        return (
+          nombre.includes(termo) ||
+          dui.includes(termo)
+        );
+      });
+
+      renderCreditos(filtrados);
+    }
+
+    // ----------------- CARGA PRINCIPAL -----------------
+    async function cargarCreditosPagadosParaUsuario(user) {
+      const emailEl = document.getElementById("usuario-email");
+      const agenciaEl = document.getElementById("etiqueta-agencia");
+      const estadoCarga = document.getElementById("estado-carga");
+
+      emailEl.textContent = user.email || "";
+
+      // Traemos datos del usuario para conocer su departamento/agencia
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        estadoCarga.textContent = "No se encontraron datos del usuario en la base.";
+        return;
+      }
+
+      const udata = userSnap.data() || {};
+      const department = udata.department || udata.departamento || "";
+      if (!department) {
+        estadoCarga.textContent = "Tu usuario no tiene una agencia/departamento asignado.";
+        return;
+      }
+
+      AGENCIA_USUARIO = department;
+      agenciaEl.textContent = `Agencia: ${department}`;
+
+      // Query: créditos de esa agencia en estado Pagado
+      estadoCarga.textContent = "Cargando créditos pagados…";
+
+      const qCred = query(
+        collection(db, "creditos"),
+        where("agenciaAsignada", "==", department),
+        where("estadoCredito", "==", "Pagado")
+      );
+
+      onSnapshot(qCred, (snap) => {
+        const lista = [];
+
+        snap.forEach((docSnap) => {
+          const c = docSnap.data();
+
+          const fechaInicio =
+            (c.fechaInicio && typeof c.fechaInicio.toDate === "function")
+              ? c.fechaInicio.toDate()
+              : new Date(c.fechaInicio || null);
+
+          const fechaCancelacion = getFechaCancelacion(c.amortizacion);
+
+          const nombreCompleto = `${c.nombre || ""} ${c.apellido || ""}`.trim();
+
+          lista.push({
+            id: docSnap.id,
+            nombreCompleto,
+            numeroDui: c.numeroDui || "",
+            lineaDeCredito: c.lineaDeCredito || "",
+            montoAprobado: Number(c.montoAprobado || 0),
+            fechaInicioDate: fechaInicio,
+            fechaCancelacionDate: fechaCancelacion || fechaInicio,
+          });
+        });
+
+        // Ordenar: más recientes primero (por fechaCancelacion; si no hay, por fechaInicio)
+        lista.sort((a, b) => {
+          const fa = a.fechaCancelacionDate?.getTime() || 0;
+          const fb = b.fechaCancelacionDate?.getTime() || 0;
+          return fb - fa;
+        });
+
+        CREDITOS_ORIGINALES = lista;
+        estadoCarga.textContent = "";
+
+        // Render inicial
+        renderCreditos(CREDITOS_ORIGINALES);
+      }, (err) => {
+        console.error(err);
+        estadoCarga.textContent = "Ocurrió un error al cargar los créditos.";
+      });
+    }
+
+    // ----------------- INIT DOM -----------------
+    window.addEventListener("DOMContentLoaded", () => {
+      // Auth
+      onAuthStateChanged(auth, (user) => {
+        if (!user) {
+          location.href = "login.html";
+          return;
+        }
+        cargarCreditosPagadosParaUsuario(user);
+      });
+
+      // Búsqueda
+      const buscador = document.getElementById("buscador");
+      buscador.addEventListener("input", aplicarFiltroBusqueda);
+
+      // Delegación para botones "Generar constancia"
+      const tbody = document.getElementById("tbody-creditos");
+      tbody.addEventListener("click", (e) => {
+        const btn = e.target.closest(".btn-constancia");
+        if (!btn) return;
+        const creditoId = btn.dataset.id;
+        if (!creditoId) return;
+
+        // Enlazamos a la página del documento (la haremos luego)
+        // Puedes cambiar el nombre del archivo si lo decides diferente.
+        const url = `constancia_cancelacion_documento.html?creditoId=${encodeURIComponent(creditoId)}`;
+        window.open(url, "_blank");
+      });
+    });
+  </script>
+
+  <!-- Estilos simples pero bonitos -->
+  <style>
+    :root{
+      --bg:#f7f9fc;
+      --bg-2:#eef2f7;
+      --white:#ffffff;
+      --text:#0d1b2a;
+      --muted:#5b6776;
+      --brand-blue:#243b86;
+      --brand-cel:#67C8F1;
+      --brand-gold:#F8AF40;
+      --radius-2xl:24px;
+    }
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+      background:linear-gradient(180deg,var(--bg),var(--bg-2));
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+    }
+    header{
+      position:sticky;
+      top:0;
+      z-index:20;
+      background:rgba(255,255,255,.85);
+      backdrop-filter:blur(10px);
+      border-bottom:1px solid rgba(15,23,42,.1);
+    }
+    .topbar{
+      max-width:1100px;
+      margin:0 auto;
+      padding:.8rem 16px;
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+    .topbar img{
+      height:30px;
+    }
+    .topbar-title{
+      font-weight:800;
+      letter-spacing:.2px;
+      color:var(--brand-blue);
+    }
+    .topbar-user{
+      margin-left:auto;
+      font-size:.9rem;
+      color:var(--muted);
+      display:flex;
+      flex-direction:column;
+      align-items:flex-end;
+      gap:2px;
+    }
+
+    .container{
+      max-width:1100px;
+      margin:0 auto;
+      padding:1.6rem 16px 2.4rem;
+    }
+    h1{
+      margin:0 0 .5rem;
+      font-size:1.8rem;
+      font-weight:800;
+      color:var(--brand-blue);
+    }
+    .sub{
+      margin:0 0 1.4rem;
+      color:var(--muted);
+      font-size:.98rem;
+    }
+
+    .panel{
+      background:var(--white);
+      border-radius:var(--radius-2xl);
+      box-shadow:0 18px 40px rgba(15,23,42,.10);
+      padding:1.4rem 1.4rem 1.7rem;
+      border:1px solid rgba(148,163,184,.25);
+    }
+
+    .panel-header{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin-bottom:1rem;
+    }
+    .panel-header h2{
+      margin:0;
+      font-size:1.1rem;
+      font-weight:700;
+    }
+    #etiqueta-agencia{
+      margin-left:auto;
+      font-size:.9rem;
+      color:var(--brand-blue);
+      background:rgba(103,200,241,.12);
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid rgba(103,200,241,.4);
+    }
+
+    .search-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin-bottom:1rem;
+    }
+
+    .search-input{
+      flex:1 1 260px;
+      display:flex;
+      align-items:center;
+      background:#f1f5f9;
+      border-radius:999px;
+      padding:6px 10px;
+      border:1px solid rgba(148,163,184,.5);
+    }
+    .search-input input{
+      border:none;
+      background:transparent;
+      outline:none;
+      flex:1;
+      font-size:.95rem;
+    }
+    .search-input span{
+      margin-right:6px;
+      font-size:.9rem;
+      color:var(--muted);
+    }
+
+    .estado-carga{
+      font-size:.85rem;
+      color:var(--muted);
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:.9rem;
+    }
+    thead{
+      background:#e2e8f0;
+    }
+    th, td{
+      padding:8px 10px;
+      text-align:left;
+      border-bottom:1px solid #e5e7eb;
+    }
+    th{
+      font-weight:700;
+      font-size:.82rem;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      color:#475569;
+    }
+    tbody tr:hover{
+      background:#f8fafc;
+    }
+    .cell-id{
+      font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,"Liberation Mono","Courier New", monospace;
+      font-size:.78rem;
+      color:#64748b;
+    }
+
+    .badge-estado{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:2px 8px;
+      border-radius:999px;
+      font-size:.75rem;
+      font-weight:700;
+      color:#166534;
+      background:#bbf7d0;
+    }
+
+    .btn-mini{
+      border:none;
+      border-radius:999px;
+      padding:6px 10px;
+      font-size:.78rem;
+      font-weight:600;
+      cursor:pointer;
+      background:linear-gradient(135deg,var(--brand-blue),#1d4ed8);
+      color:#fff;
+      box-shadow:0 6px 16px rgba(37,99,235,.35);
+      white-space:nowrap;
+    }
+    .btn-mini:hover{
+      filter:brightness(1.05);
+      transform:translateY(-1px);
+    }
+    .btn-mini:active{
+      transform:translateY(0);
+      box-shadow:none;
+    }
+
+    #mensaje-vacio{
+      display:none;
+      margin-top:1rem;
+      font-size:.9rem;
+      color:var(--muted);
+      text-align:center;
+    }
+
+    @media (max-width:768px){
+      .panel{
+        padding:1rem;
+      }
+      table{
+        font-size:.82rem;
+      }
+      th,td{
+        padding:6px 6px;
+      }
+      .topbar-user{
+        align-items:flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <img src="assets/logo_mi_bw.png" alt="Multi Inversiones">
+      <div class="topbar-title">MULTI INVERSIONES DE OCCIDENTE</div>
+      <div class="topbar-user">
+        <span id="usuario-email">usuario@correo.com</span>
+        <span style="font-size:.8rem;">Constancias de Cancelación</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <h1>Constancias de Cancelación</h1>
+    <p class="sub">
+      Aquí encontrarás todos los créditos <strong>Pagados</strong> de tu agencia.
+      Desde esta pantalla podrás generar la constancia de cancelación para cada cliente.
+    </p>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Créditos Pagados</h2>
+        <div id="etiqueta-agencia">Agencia: —</div>
+      </div>
+
+      <div class="search-row">
+        <div class="search-input">
+          <span>🔎</span>
+          <input
+            id="buscador"
+            type="text"
+            placeholder="Buscar por nombre, apellido o DUI…">
+        </div>
+        <div id="estado-carga" class="estado-carga"></div>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>ID Crédito</th>
+              <th>Cliente</th>
+              <th>DUI</th>
+              <th>Línea</th>
+              <th>Monto</th>
+              <th>Fecha Otorgamiento</th>
+              <th>Fecha Cancelación</th>
+              <th>Estado</th>
+              <th>Constancia</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-creditos">
+          </tbody>
+        </table>
+      </div>
+
+      <div id="mensaje-vacio">
+        No hay créditos pagados registrados para tu agencia en este momento.
+      </div>
+    </section>
+  </main>
+</body>
+</html>

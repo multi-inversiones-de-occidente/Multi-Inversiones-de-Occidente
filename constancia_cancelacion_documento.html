@@ -1,0 +1,452 @@
+<!-- constancia_cancelacion_documento.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Constancia de Cancelación de Crédito</title>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
+    import {
+      getFirestore,
+      doc,
+      getDoc,
+      runTransaction
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
+    import {
+      getAuth,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+
+    // ---------------- CONFIG FIREBASE ----------------
+    const firebaseConfig = {
+      apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
+      authDomain: "multinversiones-38e13.firebaseapp.com",
+      projectId: "multinversiones-38e13",
+      storageBucket: "multinversiones-38e13.appspot.com",
+      messagingSenderId: "380001917078",
+      appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
+      measurementId: "G-H4E31XHG1Y"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const db   = getFirestore(app);
+    const auth = getAuth(app);
+
+    // --------------- HELPERS FECHAS / TEXTO ----------------
+
+    function getQueryParam(name) {
+      return new URLSearchParams(window.location.search).get(name);
+    }
+
+    const MESES = [
+      "enero","febrero","marzo","abril","mayo","junio",
+      "julio","agosto","septiembre","octubre","noviembre","diciembre"
+    ];
+
+    function toDateOrNull(v){
+      if(!v) return null;
+      if (v instanceof Date) return v;
+      if (v && typeof v.toDate === "function") return v.toDate();
+      const d = new Date(v);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+
+    // Formato: 19 de noviembre de 2025
+    function fechaLarga(d){
+      const date = toDateOrNull(d);
+      if (!date) return "---";
+      const dia = date.getDate();
+      const mes = MESES[date.getMonth()];
+      const anio = date.getFullYear();
+      return `${dia} de ${mes} de ${anio}`;
+    }
+
+    // Obtiene la última fecha de pago REAL/PAGADA del crédito
+    function obtenerFechaCancelacion(amortizacion){
+      if (!Array.isArray(amortizacion)) return null;
+      let ultima = null;
+
+      for (const cuota of amortizacion){
+        if (cuota.estado !== "Pagada") continue;
+
+        let f = cuota.fechaPagoReal || cuota.fecha;
+        const d = toDateOrNull(f);
+        if (!d) continue;
+
+        if (!ultima || d > ultima) ultima = d;
+      }
+      return ultima;
+    }
+
+    // Número de constancia formateado, ej: 000000123
+    function formatearNumeroConstancia(n){
+      const num = Number(n) || 0;
+      return String(num).padStart(9,"0");
+    }
+
+    // Mapea agencia a texto de ciudad/departamento (puedes ajustar si luego
+    // quieres algo diferente para algunas agencias).
+    function ciudadDepartamentoDesdeAgencia(agencia){
+      if (!agencia) return {
+        ciudad: "Ahuachapán",
+        departamento: "Ahuachapán"
+      };
+      // Aquí podrías mapear distinto si alguna agencia no coincide con el depto
+      return {
+        ciudad: agencia,
+        departamento: agencia
+      };
+    }
+
+    // --------------- LÓGICA CONSTANCIA ----------------
+
+    async function obtenerOCrearConstancia(creditoId){
+      const constanciaRef = doc(db, "constancias_creditos", creditoId);
+      const contadorRef   = doc(db, "contador_constancias", "general");
+
+      // Primero vemos si ya existe una constancia para este crédito
+      const snapExistente = await getDoc(constanciaRef);
+      if (snapExistente.exists()){
+        const data = snapExistente.data();
+        return {
+          numeroConstancia: data.numeroConstancia,
+          fechaEmision: toDateOrNull(data.fechaEmision) || new Date()
+        };
+      }
+
+      // Si no existe, creamos una nueva usando transacción
+      const resultado = await runTransaction(db, async (tx)=>{
+        const contadorSnap = await tx.get(contadorRef);
+        let siguienteNumero = 1;
+
+        if (!contadorSnap.exists()){
+          tx.set(contadorRef, { ultimoNumero: 1 });
+        }else{
+          const actual = Number(contadorSnap.data().ultimoNumero || 0);
+          siguienteNumero = actual + 1;
+          tx.update(contadorRef, { ultimoNumero: siguienteNumero });
+        }
+
+        const fechaEmision = new Date();
+
+        tx.set(constanciaRef, {
+          creditoID: creditoId,
+          numeroConstancia: siguienteNumero,
+          fechaEmision: fechaEmision.toISOString()
+        });
+
+        return {
+          numeroConstancia: siguienteNumero,
+          fechaEmision
+        };
+      });
+
+      return resultado;
+    }
+
+    async function cargarDocumento(user){
+      const estadoEl    = document.getElementById("estado-carga");
+      const contenedor  = document.getElementById("hoja");
+      const numEl       = document.getElementById("numero-constancia");
+      const cuerpo1El   = document.getElementById("parrafo-1");
+      const cuerpo2El   = document.getElementById("parrafo-2");
+      const firmaAgenciaEl = document.getElementById("firma-agencia");
+
+      const creditoId = getQueryParam("creditoId");
+      if (!creditoId){
+        estadoEl.textContent = "No se recibió un ID de crédito en la URL.";
+        return;
+      }
+
+      estadoEl.textContent = "Cargando información del crédito…";
+
+      // Traer usuario para saber departamento/agencia
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()){
+        estadoEl.textContent = "No se encontraron datos del usuario.";
+        return;
+      }
+      const datosUsuario = userSnap.data() || {};
+      const department   = datosUsuario.department || datosUsuario.departamento || "";
+
+      // Traer crédito
+      const creditoRef = doc(db, "creditos", creditoId);
+      const creditoSnap = await getDoc(creditoRef);
+      if (!creditoSnap.exists()){
+        estadoEl.textContent = "El crédito indicado no existe.";
+        return;
+      }
+      const c = creditoSnap.data() || {};
+
+      if (c.estadoCredito !== "Pagado"){
+        estadoEl.textContent = "El crédito aún no está en estado Pagado.";
+        return;
+      }
+
+      // Validación de agencia
+      const agenciaAsignada = c.agenciaAsignada || "";
+      if (department && agenciaAsignada && department !== agenciaAsignada){
+        estadoEl.textContent = "No tienes permiso para emitir constancia de un crédito de otra agencia.";
+        return;
+      }
+
+      // Datos principales
+      const nombreCompleto = `${c.nombre || ""} ${c.apellido || ""}`.trim();
+      const montoAprobado  = Number(c.montoAprobado || 0);
+      const numeroCuotas   = Number(c.numeroCuotas || (Array.isArray(c.amortizacion) ? c.amortizacion.length : 0));
+      const frecuencia     = c.frecuenciaPago || "";
+      const cuota          = Number(c.cuotaAprobada || 0);
+
+      const fechaInicio    = toDateOrNull(c.fechaInicio);
+      const fechaCancel    = obtenerFechaCancelacion(c.amortizacion) || fechaInicio;
+
+      // Ciudad/Depto
+      const { ciudad, departamento } = ciudadDepartamentoDesdeAgencia(agenciaAsignada || department);
+
+      // Número de constancia + fecha de emisión (new Date() la primera vez)
+      const { numeroConstancia, fechaEmision } = await obtenerOCrearConstancia(creditoId);
+
+      // Construcción de texto (puedes tunear las frases cuando definamos todos los parámetros)
+      const fraseOtorgamiento =
+        `se le otorgó un crédito el día ${fechaLarga(fechaInicio)}, ` +
+        `por un monto de $ ${montoAprobado.toFixed(2)}, ` +
+        `a un plazo de ${numeroCuotas} cuotas, con pagos ${frecuencia.toLowerCase()}s ` +
+        `de $ ${cuota.toFixed(2)}, cancelándolo en su totalidad el día ${fechaLarga(fechaCancel)}.`;
+
+      const fraseCiudadFecha =
+        `Y para los usos que estime conveniente se extiende la presente en la ciudad de ${ciudad} ` +
+        `departamento de ${departamento}, a los ${fechaEmision.getDate()} días del mes de ` +
+        `${MESES[fechaEmision.getMonth()]} de ${fechaEmision.getFullYear()}.`;
+
+      // Pinta documento
+      numEl.textContent = formatearNumeroConstancia(numeroConstancia);
+      cuerpo1El.innerHTML =
+        `Se hace constar que a el(la) Señor(a): <span class="nombre-cliente">${nombreCompleto}</span>, ` +
+        fraseOtorgamiento;
+      cuerpo2El.textContent = fraseCiudadFecha;
+      firmaAgenciaEl.textContent = ciudad;
+
+      estadoEl.textContent = "";
+      contenedor.style.display = "block";
+    }
+
+    // ----------------- INIT -----------------
+    window.addEventListener("DOMContentLoaded", () => {
+      onAuthStateChanged(auth, (user)=>{
+        if (!user){
+          location.href = "login.html";
+          return;
+        }
+        document.getElementById("usuario-email").textContent = user.email || "";
+        cargarDocumento(user).catch(err=>{
+          console.error(err);
+          document.getElementById("estado-carga").textContent =
+            "Ocurrió un error al generar la constancia.";
+        });
+      });
+
+      document.getElementById("btn-imprimir").addEventListener("click", ()=>{
+        window.print();
+      });
+    });
+  </script>
+
+  <style>
+    :root{
+      --bg:#e5e7eb;
+      --white:#ffffff;
+      --text:#111827;
+      --muted:#6b7280;
+      --brand-blue:#1f2937;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: "Times New Roman", Georgia, "Segoe UI", system-ui, serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+    header{
+      background:#111827;
+      color:#f9fafb;
+      padding:8px 16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    }
+    header span{
+      font-size:.85rem;
+    }
+    main{
+      max-width:900px;
+      margin:18px auto 32px;
+      padding:0 12px 24px;
+    }
+    .barra-superior{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:12px;
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    }
+    #estado-carga{
+      font-size:.85rem;
+      color:var(--muted);
+    }
+    #btn-imprimir{
+      border:none;
+      border-radius:999px;
+      background:#111827;
+      color:#f9fafb;
+      padding:6px 14px;
+      font-size:.85rem;
+      font-weight:600;
+      cursor:pointer;
+    }
+    #btn-imprimir:hover{
+      filter:brightness(1.1);
+    }
+
+    /* Hoja estilo constancia */
+    .hoja{
+      display:none;
+      background:var(--white);
+      padding:40px 50px 60px;
+      border-radius:6px;
+      box-shadow:0 10px 30px rgba(15,23,42,.35);
+      min-height:600px;
+      position:relative;
+    }
+
+    .encabezado{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      margin-bottom:26px;
+    }
+    .encabezado-izq{
+      font-size:.9rem;
+      text-transform:uppercase;
+      text-align:left;
+      font-weight:700;
+    }
+    .nombre-empresa{
+      display:block;
+      font-size:1rem;
+      margin-top:4px;
+    }
+    .numero-constancia{
+      font-size:.9rem;
+      font-weight:700;
+    }
+
+    h1.titulo{
+      text-align:center;
+      text-transform:uppercase;
+      font-size:1.2rem;
+      margin:0 0 26px;
+      text-decoration:underline;
+    }
+
+    .cuerpo{
+      font-size:1rem;
+      line-height:1.7;
+      text-align:justify;
+      margin-bottom:32px;
+    }
+    .cuerpo p{
+      margin:0 0 18px;
+      text-indent:2.5em;
+    }
+    .cuerpo p:first-child{
+      margin-top:4px;
+    }
+    .nombre-cliente{
+      text-transform:uppercase;
+      font-weight:700;
+    }
+
+    .firma{
+      margin-top:60px;
+      text-align:center;
+      font-size:.95rem;
+    }
+    .firma .linea{
+      width:220px;
+      margin:0 auto 4px;
+      border-bottom:1px solid #000;
+      height:24px;
+    }
+    .firma .cargo{
+      font-weight:700;
+      margin-bottom:2px;
+    }
+    .firma .agencia{
+      font-size:.85rem;
+      color:var(--muted);
+    }
+
+    @media print{
+      header, .barra-superior{ display:none !important; }
+      body{
+        background:#ffffff;
+      }
+      main{
+        margin:0;
+        padding:0;
+      }
+      .hoja{
+        box-shadow:none;
+        border-radius:0;
+        padding:40px 55px 60px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <span>MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.</span>
+    <span id="usuario-email"></span>
+  </header>
+
+  <main>
+    <div class="barra-superior">
+      <div id="estado-carga"></div>
+      <button id="btn-imprimir">Imprimir constancia</button>
+    </div>
+
+    <section id="hoja" class="hoja">
+      <div class="encabezado">
+        <div class="encabezado-izq">
+          <span>MULTI</span><br>
+          <span class="nombre-empresa">MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.</span>
+        </div>
+        <div class="numero-constancia">
+          No. <span id="numero-constancia">000000000</span>
+        </div>
+      </div>
+
+      <h1 class="titulo">CONSTANCIA DE CANCELACIÓN DE CRÉDITO</h1>
+
+      <div class="cuerpo">
+        <p id="parrafo-1">
+          <!-- Se rellena por JS -->
+        </p>
+        <p id="parrafo-2">
+          <!-- Se rellena por JS -->
+        </p>
+      </div>
+
+      <div class="firma">
+        <div class="linea"></div>
+        <div class="cargo">GERENTE GENERAL</div>
+        <div id="firma-agencia" class="agencia">Agencia</div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

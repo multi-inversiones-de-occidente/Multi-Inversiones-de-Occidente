@@ -53,14 +53,117 @@
       return Number.isNaN(d.getTime()) ? null : d;
     }
 
-    // Formato: 19 de noviembre de 2025
-    function fechaLarga(d){
+    // ---------- CONVERSOR NÚMEROS → LETRAS (ESPAÑOL) ----------
+
+    function numeroALetras(num, genero = "m"){
+      num = Math.round(Number(num) || 0);
+      if (num === 0) return "cero";
+      if (num < 0) return "menos " + numeroALetras(-num, genero);
+
+      const UNIDADES = ["","uno","dos","tres","cuatro","cinco","seis","siete","ocho","nueve"];
+      const DIEZ_DIECINUEVE = {
+        10:"diez",11:"once",12:"doce",13:"trece",14:"catorce",
+        15:"quince",16:"dieciséis",17:"diecisiete",18:"dieciocho",19:"diecinueve"
+      };
+      const DECENAS = ["","", "veinte","treinta","cuarenta","cincuenta",
+                       "sesenta","setenta","ochenta","noventa"];
+      const CENTENAS = ["","ciento","doscientos","trescientos","cuatrocientos",
+                        "quinientos","seiscientos","setecientos","ochocientos","novecientos"];
+
+      function menorQueCien(n){
+        if (n < 10) return UNIDADES[n];
+        if (n >= 10 && n < 20) return DIEZ_DIECINUEVE[n];
+
+        if (n < 30){
+          if (n === 20) return "veinte";
+          return "veinti" + UNIDADES[n - 20];
+        }
+
+        const d = Math.floor(n / 10);
+        const u = n % 10;
+        if (u === 0) return DECENAS[d];
+        return DECENAS[d] + " y " + UNIDADES[u];
+      }
+
+      function menorQueMil(n){
+        if (n === 100) return "cien";
+        if (n < 100) return menorQueCien(n);
+        const c = Math.floor(n / 100);
+        const resto = n % 100;
+        const cent = CENTENAS[c];
+        if (resto === 0) return cent;
+        return cent + " " + menorQueCien(resto);
+      }
+
+      let palabras = "";
+
+      if (num < 1000){
+        palabras = menorQueMil(num);
+      }else if (num < 1000000){
+        const miles = Math.floor(num / 1000);
+        const resto = num % 1000;
+        if (miles === 1){
+          palabras = "mil";
+        }else{
+          palabras = menorQueMil(miles) + " mil";
+        }
+        if (resto > 0){
+          palabras += " " + menorQueMil(resto);
+        }
+      }else{
+        // Para fines de este sistema (montos y años), no necesitamos más de 6 dígitos
+        palabras = String(num);
+      }
+
+      // Ajuste de género (para "una cuota", "veintiuna cuotas")
+      if (genero === "f"){
+        palabras = palabras
+          .replace(/\buno\b/g, "una")
+          .replace(/\bveintiuno\b/g, "veintiuna");
+      }
+
+      return palabras;
+    }
+
+    function montoEnLetrasDolares(monto){
+      const n = Number(monto) || 0;
+      const entero = Math.floor(n);
+      const centavos = Math.round((n - entero) * 100);
+      const centavosStr = String(centavos).padStart(2,"0");
+
+      const letrasEntero = numeroALetras(entero, "m").toUpperCase();
+      const numFormateado = n.toFixed(2);
+
+      // Ejemplo: CIENTO CINCUENTA 00/100 DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA (US$150.00)
+      return `${letrasEntero} ${centavosStr}/100 DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA (US$${numFormateado})`;
+    }
+
+    // Fecha para el cuerpo: "diecinueve (19) de noviembre de dos mil veinticinco (2025)"
+    function fechaCortaConNumero(d){
       const date = toDateOrNull(d);
       if (!date) return "---";
-      const dia = date.getDate();
-      const mes = MESES[date.getMonth()];
+      const dia  = date.getDate();
+      const mes  = MESES[date.getMonth()];
       const anio = date.getFullYear();
-      return `${dia} de ${mes} de ${anio}`;
+
+      const diaL  = numeroALetras(dia, "m");
+      const anioL = numeroALetras(anio, "m");
+
+      return `${diaL} (${dia}) de ${mes} de ${anioL} (${anio})`;
+    }
+
+    // Frase final: "... a los diecinueve (19) días del mes de noviembre de dos mil veinticinco (2025)."
+    function fraseCiudadFechaConNumero(fecha, ciudad, departamento){
+      const d = toDateOrNull(fecha) || new Date();
+      const dia  = d.getDate();
+      const mes  = MESES[d.getMonth()];
+      const anio = d.getFullYear();
+
+      const diaL  = numeroALetras(dia, "m");
+      const anioL = numeroALetras(anio, "m");
+
+      return `Y para los usos que estime conveniente se extiende la presente en la ciudad de ${ciudad} ` +
+             `departamento de ${departamento}, a los ${diaL} (${dia}) días del mes de ${mes} de ${anioL} (${anio}).`;
     }
 
     // Obtiene la última fecha de pago REAL/PAGADA del crédito
@@ -86,14 +189,12 @@
       return String(num).padStart(9,"0");
     }
 
-    // Mapea agencia a texto de ciudad/departamento (puedes ajustar si luego
-    // quieres algo diferente para algunas agencias).
+    // Mapea agencia a texto de ciudad/departamento
     function ciudadDepartamentoDesdeAgencia(agencia){
       if (!agencia) return {
         ciudad: "Ahuachapán",
         departamento: "Ahuachapán"
       };
-      // Aquí podrías mapear distinto si alguna agencia no coincide con el depto
       return {
         ciudad: agencia,
         departamento: agencia
@@ -209,17 +310,19 @@
       // Número de constancia + fecha de emisión (new Date() la primera vez)
       const { numeroConstancia, fechaEmision } = await obtenerOCrearConstancia(creditoId);
 
-      // Construcción de texto (puedes tunear las frases cuando definamos todos los parámetros)
-      const fraseOtorgamiento =
-        `se le otorgó un crédito el día ${fechaLarga(fechaInicio)}, ` +
-        `por un monto de $ ${montoAprobado.toFixed(2)}, ` +
-        `a un plazo de ${numeroCuotas} cuotas, con pagos ${frecuencia.toLowerCase()}s ` +
-        `de $ ${cuota.toFixed(2)}, cancelándolo en su totalidad el día ${fechaLarga(fechaCancel)}.`;
+      // Textos en letras + números
+      const montoTexto        = montoEnLetrasDolares(montoAprobado);
+      const cuotaTexto        = montoEnLetrasDolares(cuota);
+      const cuotasTexto       = `${numeroALetras(numeroCuotas, "f")} (${numeroCuotas})`;
+      const fechaInicioTexto  = fechaCortaConNumero(fechaInicio);
+      const fechaCancelTexto  = fechaCortaConNumero(fechaCancel);
+      const fraseCiudadFecha  = fraseCiudadFechaConNumero(fechaEmision, ciudad, departamento);
 
-      const fraseCiudadFecha =
-        `Y para los usos que estime conveniente se extiende la presente en la ciudad de ${ciudad} ` +
-        `departamento de ${departamento}, a los ${fechaEmision.getDate()} días del mes de ` +
-        `${MESES[fechaEmision.getMonth()]} de ${fechaEmision.getFullYear()}.`;
+      const fraseOtorgamiento =
+        `se le otorgó un crédito el día ${fechaInicioTexto}, ` +
+        `por un monto de ${montoTexto}, ` +
+        `a un plazo de ${cuotasTexto}, con pagos ${frecuencia.toLowerCase()}s ` +
+        `de ${cuotaTexto}, cancelándolo en su totalidad el día ${fechaCancelTexto}.`;
 
       // Pinta documento
       numEl.textContent = formatearNumeroConstancia(numeroConstancia);
@@ -450,3 +553,4 @@
   </main>
 </body>
 </html>
+

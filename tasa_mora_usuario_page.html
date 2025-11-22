@@ -127,6 +127,12 @@
       for (const ddoc of snap.docs) {
         const d = ddoc.data();
         const estado = (d.estadoCredito || "").trim();
+
+        // ❌ EXCLUIR créditos con estado "Pagado"
+        if (estado === "Pagado") {
+          continue;
+        }
+
         const cuotasAtrasadas = contarCuotasAtrasadas(d.amortizacion);
 
         const baseItem = {
@@ -140,7 +146,7 @@
           raw: d
         };
 
-        // Agregar a TODOS (sin filtrar por mora)
+        // Agregar a TODOS (sin filtrar por mora, pero ya sin Pagado)
         todosCreditosDeAgencia.push(baseItem);
 
         // Si tiene al menos una cuota Atrasado, agregar a la base de morosos

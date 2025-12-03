@@ -1,11 +1,14 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Tasa de Mora por Agencia</title>
+  <title>Tasa de Mora por Usuario – Multi Inversiones</title>
 
-  <!-- Firebase + App -->
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
+  <!-- Firebase + App (módulo) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
@@ -20,10 +23,17 @@
       appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
       measurementId: "G-H4E31XHG1Y"
     };
-
     const app  = initializeApp(firebaseConfig);
     const db   = getFirestore(app);
     const auth = getAuth(app);
+
+    // ===== Estado en memoria =====
+    let department = null;            // Agencia del logueado
+    let nombreLogueado = null;        // Nombre del logueado
+
+    // NUEVO: base completa de créditos y base de morosos (para métricas y detalle)
+    let todosCreditosDeAgencia = [];  // TODOS los créditos de la agencia (con y sin mora)
+    let morososDeAgencia = [];        // Créditos de la agencia con al menos una cuota "Atrasado"
 
     // ===== Utilidades =====
     function formatoDinero(valor) {
@@ -39,206 +49,295 @@
       if (!Array.isArray(amortizacion)) return 0;
       return amortizacion.reduce((acc, q) => acc + (q && q.estado === "Atrasado" ? 1 : 0), 0);
     }
+    function resolverNombreUsuario(d) {
+      const full = `${d?.nombre ?? ""} ${d?.apellido ?? ""}`.trim();
+      return full || d?.displayName || "Sin nombre";
+    }
 
+    // 🔹 NUEVO: resolver nombre y teléfono del cliente
     async function resolverNombreCliente(d) {
-      const candidatos = [
+      // Intentar primero con lo que venga en el crédito
+      const candidatosNombreCredito = [
         d.nombreCliente && d.apellidoCliente ? `${d.nombreCliente} ${d.apellidoCliente}` : null,
         d.clienteNombre && d.clienteApellidos ? `${d.clienteNombre} ${d.clienteApellidos}` : null,
         d.titularNombre && d.titularApellido ? `${d.titularNombre} ${d.titularApellido}` : null,
         d.nombreCompleto ? d.nombreCompleto : null,
         d.nombre ? d.nombre : null
       ].filter(Boolean);
-      if (candidatos.length > 0) return candidatos[0];
+
+      let nombre   = candidatosNombreCredito.length > 0 ? candidatosNombreCredito[0] : null;
+      let telefono =
+        d.telefonoCliente  ||
+        d.celularCliente   ||
+        d.telefono         ||
+        d.celular          ||
+        d.cel              ||
+        d.phone            ||
+        null;
 
       const cid = d.clienteID || d.idCliente || d.clienteUid || d.userId || null;
-      if (!cid) return "Sin nombre";
+      if (cid) {
+        try {
+          const cliRef = doc(db, "clientes", cid);
+          const cliSnap = await getDoc(cliRef);
+          if (cliSnap.exists()) {
+            const c = cliSnap.data();
 
-      try {
-        const cliRef = doc(db, "clientes", cid);
-        const cliSnap = await getDoc(cliRef);
-        if (cliSnap.exists()) {
-          const c = cliSnap.data();
-          const alias = [
-            c.nombre && c.apellido ? `${c.nombre} ${c.apellido}` : null,
-            c.nombres && c.apellidos ? `${c.nombres} ${c.apellidos}` : null,
-            c.nombreCompleto ? c.nombreCompleto : null
-          ].filter(Boolean);
-          return alias[0] || "Sin nombre";
+            if (!nombre) {
+              const alias = [
+                c.nombre && c.apellido ? `${c.nombre} ${c.apellido}` : null,
+                c.nombres && c.apellidos ? `${c.nombres} ${c.apellidos}` : null,
+                c.nombreCompleto ? c.nombreCompleto : null
+              ].filter(Boolean);
+              if (alias.length > 0) {
+                nombre = alias[0];
+              }
+            }
+
+            if (!telefono) {
+              telefono =
+                c.telefono   ||
+                c.celular    ||
+                c.cel        ||
+                c.phone      ||
+                c.telefono1  ||
+                null;
+            }
+          }
+        } catch (e) {
+          // silencioso
         }
-      } catch (e) {
-        console.warn("No se pudo resolver cliente", e);
       }
-      return "Sin nombre";
+
+      if (!nombre)   nombre   = "Sin nombre";
+      if (!telefono) telefono = "—";
+
+      return { nombre, telefono };
     }
 
-    // ===== Cálculo de tasa de mora por AGENCIA (corregido) =====
-    async function cargarTasaMoraAgencia(uid) {
-      document.getElementById('loading').style.display = "block";
-      document.getElementById('box-mora').style.display = "none";
-      document.getElementById('box-detalle').style.display = "none";
+    // ===== Carga base: TODOS los créditos de la agencia + morosos =====
+    async function cargarBase() {
+      const qCreds = query(collection(db, "creditos"), where("agenciaAsignada", "==", department));
+      const snap = await getDocs(qCreds);
 
-      // 1) Agencia desde users/{uid}.department
-      const userSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", uid)));
-      if (userSnap.empty) {
-        alert("No se encontró el usuario");
-        return;
-      }
-      const department = userSnap.docs[0].data().department || "No Asignado";
-      document.getElementById('nombre-agencia').textContent = department;
+      // Reiniciar bases
+      todosCreditosDeAgencia = [];
+      morososDeAgencia = [];
 
-      // 2) Créditos por agencia
-      const creditosSnap = await getDocs(query(collection(db, "creditos"), where("agenciaAsignada", "==", department)));
+      for (const ddoc of snap.docs) {
+        const d = ddoc.data();
+        const estado = (d.estadoCredito || "").trim();
 
-      let capitalEnMora = 0; // suma de saldoActual de créditos con mora (vigentes)
-      let carteraTotal  = 0; // suma de saldoActual de créditos vigentes (≠ Pagado, ≠ Revertido)
-      const listaMora   = [];
-
-      for (const docCred of creditosSnap.docs) {
-        const d = docCred.data();
-        const idCredito = docCred.id;
-        const estadoCredito = (d.estadoCredito || "").trim();
-        const saldo = asNumber(d.saldoActual);
-
-        // Cartera total vigente: excluimos Pagado y Revertido
-        if (estadoCredito !== "Pagado" && estadoCredito !== "Revertido") {
-          carteraTotal += saldo;
+        // ❌ EXCLUIR créditos con estado "Pagado"
+        if (estado === "Pagado") {
+          continue;
         }
 
-        // Ver si el crédito tiene cuotas atrasadas
         const cuotasAtrasadas = contarCuotasAtrasadas(d.amortizacion);
 
-        // Considerar el crédito como moroso solo si:
-        // - Tiene al menos una cuota Atrasado
-        // - No está Pagado ni Revertido
-        if (
-          cuotasAtrasadas > 0 &&
-          estadoCredito !== "Pagado" &&
-          estadoCredito !== "Revertido"
-        ) {
-          // Numerador: usamos el saldoActual de los créditos en mora
-          capitalEnMora += saldo;
+        const baseItem = {
+          idCredito: ddoc.id,
+          asignadoA: (d.asignadoA || "").trim(),
+          estadoCredito: estado || "—",
+          saldoActual: asNumber(d.saldoActual),
+          capitalAtrasado: asNumber(d.capitalAtrasado),
+          paraPonerseAlDia: asNumber(d.paraPonerseAlDia),
+          cuotasAtrasadas,
+          raw: d
+        };
 
-          const nombreCliente = await resolverNombreCliente(d);
-          const capitalAtrasado = asNumber(d.capitalAtrasado);
-          const ppad = asNumber(d.paraPonerseAlDia);
+        // Agregar a TODOS (sin filtrar por mora, pero ya sin Pagado)
+        todosCreditosDeAgencia.push(baseItem);
 
-          listaMora.push({
-            idCredito,
-            nombreCliente,
-            estadoCredito: estadoCredito || "—",
-            saldoActual: saldo,
-            capitalAtrasado,
-            paraPonerseAlDia: ppad,
-            cuotasAtrasadas
-          });
+        // Si tiene al menos una cuota Atrasado, agregar a la base de morosos
+        if (cuotasAtrasadas > 0) {
+          morososDeAgencia.push(baseItem);
         }
       }
 
-      // % de Mora = cartera morosa / cartera total vigente
-      const moraPct = carteraTotal > 0 ? (capitalEnMora / carteraTotal) * 100 : 0;
+      // Usuarios únicos (asignadoA) con mora para el selector
+      const select = document.getElementById("user-select");
+      const set = new Set(
+        morososDeAgencia.map(x => x.asignadoA).filter(n => n && n.length > 0)
+      );
+      const opciones = [];
+      if (nombreLogueado && set.has(nombreLogueado)) {
+        opciones.push(`<option value="${nombreLogueado}">Yo (${nombreLogueado})</option>`);
+        set.delete(nombreLogueado);
+      }
+      [...set].sort().forEach(n => opciones.push(`<option value="${n}">${n}</option>`));
 
-      document.getElementById("capital-mora").textContent = formatoDinero(capitalEnMora);
-      document.getElementById("cartera-total").textContent = formatoDinero(carteraTotal);
-      document.getElementById("pct-mora").textContent = moraPct.toFixed(2) + "%";
-
-      renderDetalle(listaMora);
-
-      document.getElementById('loading').style.display = "none";
-      document.getElementById('box-mora').style.display = "block";
-      document.getElementById('box-detalle').style.display = "block";
+      select.innerHTML = `
+        <option value="">Selecciona un usuario</option>
+        <option value="__todos__">Todos (con mora)</option>
+        ${opciones.join("")}
+      `;
     }
 
-    function renderDetalle(items) {
-      const cont = document.getElementById("detalle-body");
-      cont.innerHTML = "";
+    // ===== Cálculo de métricas por selección =====
+    function calcularMetricas(nombreSeleccionado){
+      // Base para Cartera Total: TODOS los créditos (con y sin mora)
+      const baseCartera = (nombreSeleccionado === "__todos__")
+        ? todosCreditosDeAgencia
+        : todosCreditosDeAgencia.filter(x => x.asignadoA === nombreSeleccionado);
 
-      if (!items || items.length === 0) {
-        cont.innerHTML = `
-          <tr>
-            <td colspan="7" style="text-align:center;color:#555;padding:1rem;">
-              No hay créditos en mora para esta agencia.
-            </td>
-          </tr>
-        `;
-        document.getElementById("total-registros").textContent = "0";
-        document.getElementById("btn-exportar").style.display = "none";
-        return;
-      }
+      // Items morosos: SOLO créditos con mora (para numerador y detalle)
+      const itemsMorosos = (nombreSeleccionado === "__todos__")
+        ? morososDeAgencia
+        : morososDeAgencia.filter(x => x.asignadoA === nombreSeleccionado);
 
-      items.sort((a, b) => b.capitalAtrasado - a.capitalAtrasado);
+      // Cartera Total Real (excluye Revertido)
+      const carteraTotal = baseCartera
+        .filter(x => x.estadoCredito !== "Revertido")
+        .reduce((acc, x) => acc + asNumber(x.saldoActual), 0);
 
-      for (const it of items) {
+      // Numerador: suma del saldoActual de los créditos en mora (PAR)
+      const capitalEnMora = itemsMorosos
+        .reduce((acc, x) => acc + asNumber(x.saldoActual), 0);
+
+      // % de Mora
+      const moraPct = carteraTotal > 0 ? (capitalEnMora / carteraTotal) * 100 : 0;
+
+      return { carteraTotal, capitalEnMora, moraPct, itemsMorosos };
+    }
+
+    // ===== Render principal =====
+    async function calcular(nombreSeleccionado) {
+      const resBox = document.getElementById('resultado');
+      const detBox = document.getElementById('detalle-box');
+      const tbody  = document.getElementById('detalle-body');
+      const tabla  = document.getElementById("tabla-detalle");
+
+      tbody.innerHTML = "";
+      detBox.style.display = "none";
+
+      if (!nombreSeleccionado) { resBox.innerHTML = ""; return; }
+      resBox.innerHTML = `<div class="cargando">Calculando...</div>`;
+
+      // Cálculo de métricas
+      const { carteraTotal, capitalEnMora, moraPct, itemsMorosos } = calcularMetricas(nombreSeleccionado);
+
+      const tituloUsuario = (nombreSeleccionado === "__todos__") ? "Todos (con mora)" : nombreSeleccionado;
+      resBox.innerHTML = `
+        <div class="card-res">
+          <div><span>Usuario:</span> <b>${tituloUsuario}</b></div>
+          <div><span>Capital en Mora:</span> <b class="num">${formatoDinero(capitalEnMora)}</b></div>
+          <div><span>Cartera Total:</span> <b class="num verde">${formatoDinero(carteraTotal)}</b></div>
+          <div><span>% Mora:</span> <b class="num rojo">${moraPct.toFixed(2)}%</b></div>
+        </div>
+      `;
+
+      // Detalle (ordenado por mayor capital atrasado)
+      itemsMorosos.sort((a, b) => b.capitalAtrasado - a.capitalAtrasado);
+
+      // Arreglo que usaremos para Excel, con lo mismo que se ve en la tabla
+      const datasetExport = [];
+
+      for (const it of itemsMorosos) {
+        const { nombre, telefono } = await resolverNombreCliente(it.raw);
+
+        // Guardamos en el item para futuro, por si se necesita
+        it._clienteNombre = nombre;
+        it._telefono      = telefono;
+
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td class="mono" title="${it.idCredito}">${it.idCredito}</td>
-          <td title="${it.nombreCliente}">${it.nombreCliente}</td>
+          <td title="${it.idCredito}" class="mono">${it.idCredito}</td>
+          <td title="${nombre}">${nombre}</td>
+          <td title="${telefono}">${telefono}</td>
           <td title="${it.estadoCredito}">${it.estadoCredito}</td>
           <td class="num" title="${formatoDinero(it.saldoActual)}">${formatoDinero(it.saldoActual)}</td>
           <td class="num imp" title="${formatoDinero(it.capitalAtrasado)}">${formatoDinero(it.capitalAtrasado)}</td>
           <td class="num" title="${formatoDinero(it.paraPonerseAlDia)}">${formatoDinero(it.paraPonerseAlDia)}</td>
           <td class="num" title="${it.cuotasAtrasadas}">${it.cuotasAtrasadas}</td>
         `;
-        cont.appendChild(tr);
+        tbody.appendChild(tr);
+
+        datasetExport.push({
+          idCredito:       it.idCredito,
+          cliente:         nombre,
+          telefono:        telefono,
+          estadoCredito:   it.estadoCredito,
+          saldoActual:     it.saldoActual,
+          capitalAtrasado: it.capitalAtrasado,
+          paraPonerseAlDia:it.paraPonerseAlDia,
+          cuotasAtrasadas: it.cuotasAtrasadas
+        });
       }
 
-      document.getElementById("total-registros").textContent = String(items.length);
-      document.getElementById("btn-exportar").style.display = "inline-flex";
-
-      const tabla = document.getElementById("tabla-detalle");
-      tabla.dataset.json = JSON.stringify(items);
+      // dataset para exportar Excel (lo mismo que vemos en la tabla)
+      document.getElementById("total-registros").textContent = String(itemsMorosos.length);
+      tabla.dataset.json = JSON.stringify(datasetExport);
+      document.getElementById("btn-exportar").style.display = itemsMorosos.length ? "inline-flex" : "none";
+      detBox.style.display = "block";
     }
 
+    // ===== Exportar Excel (igual que tabla) =====
     function exportarExcel() {
       const tabla = document.getElementById("tabla-detalle");
       const raw = tabla.dataset.json ? JSON.parse(tabla.dataset.json) : [];
       if (!raw || raw.length === 0) return;
 
       const ws_data = [
-        ["ID Credito","Cliente","Estado","Saldo Actual","Capital Atrasado","Para Ponerse Al Dia","Cuotas Atrasadas"],
-        ...raw.map(r => [
-          r.idCredito,
-          r.nombreCliente,
-          r.estadoCredito,
-          r.saldoActual,
-          r.capitalAtrasado,
-          r.paraPonerseAlDia,
-          r.cuotasAtrasadas
-        ])
+        ["ID Credito","Cliente","Telefono","Estado","Saldo Actual","Capital Atrasado","Para Ponerse Al Dia","Cuotas Atrasadas"],
       ];
+      const rows = raw.map(r => ([
+        r.idCredito,
+        r.cliente || "",
+        r.telefono || "",
+        r.estadoCredito,
+        r.saldoActual,
+        r.capitalAtrasado,
+        r.paraPonerseAlDia,
+        r.cuotasAtrasadas
+      ]));
+      ws_data.push(...rows);
 
       const ws = XLSX.utils.aoa_to_sheet(ws_data);
       ws['!cols'] = [
-        { wch: 20 }, { wch: 28 }, { wch: 14 }, { wch: 16 },
-        { wch: 18 }, { wch: 20 }, { wch: 16 }
+        { wch: 22 }, // ID Credito
+        { wch: 28 }, // Cliente
+        { wch: 16 }, // Telefono
+        { wch: 14 }, // Estado
+        { wch: 16 }, // Saldo Actual
+        { wch: 18 }, // Capital Atrasado
+        { wch: 20 }, // Para ponerse al dia
+        { wch: 16 }  // Cuotas Atrasadas
       ];
 
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Créditos en mora");
-      XLSX.writeFile(wb, "creditos_en_mora.xlsx");
+      XLSX.utils.book_append_sheet(wb, ws, "Mora por Usuario");
+      XLSX.writeFile(wb, "creditos_en_mora_por_usuario.xlsx");
     }
 
+    // ===== Init =====
     window.addEventListener("DOMContentLoaded", () => {
-      onAuthStateChanged(auth, user => {
+      onAuthStateChanged(auth, async user => {
         if (!user) return location.href = "login.html";
-        cargarTasaMoraAgencia(user.uid);
+
+        const udoc = await getDoc(doc(db, "users", user.uid));
+        const udata = udoc.data() || {};
+        department = udata.department || null;
+        nombreLogueado = resolverNombreUsuario(udata);
+
+        await cargarBase();
+
+        document.getElementById('user-select').addEventListener('change', e => calcular(e.target.value));
+        document.getElementById("btn-exportar").addEventListener("click", exportarExcel);
       });
-      document.getElementById("btn-exportar").addEventListener("click", exportarExcel);
     });
   </script>
 
   <!-- SheetJS para exportar a Excel -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-  <!-- Iconos -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
   <style>
-    /* ======= Estilo gráfico CLARO / GLASS ======= */
+    /* ======= Estilo gráfico CLARO / GLASS (mismo del Panel de Gerente) ======= */
     :root{
-      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --muted:#5b6776; --white:#ffffff;
+      --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --white:#ffffff; --muted:#5b6776;
       --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
       --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
-      --radius-2xl:22px;
+      --radius-2xl:22px; --radius-xl:16px;
     }
     @media (prefers-color-scheme: dark){
       :root{
@@ -246,6 +345,7 @@
         --glass-bg:rgba(255,255,255,.12); --glass-brd:rgba(255,255,255,.18); --glass-shadow:0 24px 60px rgba(0,0,0,.45);
       }
     }
+
     *{ box-sizing:border-box }
     html,body{ height:100% }
     body{
@@ -272,6 +372,9 @@
       background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
       border-bottom:1px solid var(--glass-brd);
     }
+    @media (prefers-color-scheme: dark){
+      header{ background:linear-gradient(180deg, rgba(15,20,30,.75), rgba(15,20,30,.35)); }
+    }
     .topbar{
       max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
     }
@@ -280,60 +383,36 @@
       border:1px solid var(--glass-brd); padding:8px 14px; border-radius:16px;
       box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
     }
+    .logo-plate::after{
+      content:""; position:absolute; inset:-1px;
+      background:linear-gradient(120deg, transparent 0 35%, rgba(255,255,255,.55) 45%, transparent 55% 100%);
+      transform:translateX(-120%); animation:plateSheen 6s linear infinite; pointer-events:none;
+    }
+    @keyframes plateSheen{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
     .logo-plate img{ height:28px; width:auto; display:block }
     .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
 
-    /* Contenedor ancho */
+    /* Contenedor ancho para tabla */
     .container{
       position:relative; z-index:1;
-      max-width: min(98vw, 1400px);
+      max-width: min(95vw, 1200px);
       margin: 2rem auto; padding: 1.2rem;
       background:var(--glass-bg); border:1px solid var(--glass-brd);
       border-radius:var(--radius-2xl); box-shadow:var(--glass-shadow);
     }
-    h1{
-      margin: .2rem 0 .4rem; text-align:center;
-      font-size:clamp(1.2rem, .8vw + 1.2rem, 1.8rem);
-      color:var(--brand-blue); font-weight:800;
-    }
-    .agencia-label{
-      text-align:center; color:var(--muted); font-weight:700; margin-bottom:1.2rem;
+
+    .section-title{
+      text-align:center; color:var(--brand-blue); font-weight:800;
+      font-size:clamp(1.1rem, .8vw + 1rem, 1.5rem); margin-bottom:1rem;
     }
 
-    /* === Stack: KPIs ARRIBA, tabla ABAJO (siempre 1 columna) === */
-    .stack{ display:grid; grid-template-columns: 1fr; gap:1rem; }
-
-    /* Cards KPIs */
-    .box{
-      background:var(--white);
-      border:1px solid var(--glass-brd);
-      border-radius:16px;
-      box-shadow:0 12px 28px rgba(10,20,40,.1), inset 0 1px 0 rgba(255,255,255,.7);
-      padding: 1rem 1rem 1.1rem 1rem;
-    }
-    .dato-mora{
-      display:flex; justify-content:space-between; align-items:center;
-      background:linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
-      border:1px solid rgba(36,59,134,.15);
-      border-radius:12px; padding:.75rem .9rem; margin-bottom:.7rem;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
-    }
-    .dato-mora:last-child{ margin-bottom:0; }
-    .dato-mora-label{ color:var(--brand-blue); font-weight:800; }
-    .dato-mora-valor{ font-weight:900; }
-    .valor-mora{ color:#c17900; }
-    .valor-cartera{ color:#0c8a58; }
-    .valor-pct{ color:#d03838; }
-    #loading{ text-align:center; color:#7a4b00; font-weight:800; display:none; }
-
-    /* Encabezado detalle */
-    .header-detalle{ display:flex; align-items:center; justify-content:space-between; gap:.8rem; margin-bottom:.6rem; }
-    .header-detalle h2{ margin:0; font-size:1rem; color:var(--brand-blue); font-weight:900; }
-    .pill{
-      background:linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
-      border:1px solid rgba(36,59,134,.15);
-      padding:.35rem .6rem; border-radius:999px; font-size:.85rem; color:var(--text);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    /* Select y botones */
+    label{ color:var(--muted); font-weight:700; display:block; margin-bottom:.3rem; }
+    .input-main, select{
+      width:100%; background:var(--white); color:var(--text);
+      border:1px solid var(--glass-brd); border-radius:12px;
+      font-size:1rem; padding:.75rem .85rem; outline:none;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 6px 18px rgba(10,20,40,.06);
     }
     .btn{
       display:inline-flex; align-items:center; gap:.5rem;
@@ -344,43 +423,76 @@
     }
     .btn i{ font-size:1rem; }
 
-    /* Tabla ancha (sin doble línea) */
+    /* Tarjeta resumen */
+    .card-res{
+      margin-top:1rem; padding:1rem; border-radius:16px;
+      background:var(--white); border:1px solid var(--glass-brd);
+      box-shadow:0 10px 26px rgba(10,20,40,.08), inset 0 1px 0 rgba(255,255,255,.7);
+      display:grid; grid-template-columns:repeat(2,minmax(240px,1fr)); gap:.6rem 1rem;
+    }
+    .card-res span{ color:var(--brand-blue); font-weight:800; }
+    .num{ color:#8a5a00; font-weight:900; }
+    .num.verde{ color:#0c8a58; }
+    .num.rojo{ color:#d03838; }
+    .cargando{ color:#7a4b00; text-align:center; font-weight:800; }
+
+    /* Cabecera detalle */
+    .detalle-container{ margin-top:1rem; display:none; }
+    .header-detalle{ display:flex; align-items:center; justify-content:space-between; gap:.8rem; margin-bottom:.6rem; }
+    .header-detalle h2{ margin:0; font-size:1rem; color:var(--brand-blue); font-weight:900; }
+    .pill{
+      background:linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
+      border:1px solid rgba(36,59,134,.15);
+      padding:.35rem .6rem; border-radius:999px; font-size:.85rem; color:var(--text);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    }
+
+    /* Tabla a todo ancho sin doble línea */
     .table-wrap{ width:100%; overflow:auto; }
     table#tabla-detalle{
       width:100%;
-      min-width:1200px;               /* ocupa bien el desktop */
-      border-collapse:separate; border-spacing:0;
+      min-width:1200px;              /* aseguramos ancho amplio */
+      border-collapse:separate;
+      border-spacing:0;
       background:var(--white);
       border:1px solid var(--glass-brd);
       border-radius:12px; overflow:hidden;
       box-shadow:0 8px 22px rgba(10,20,40,.08), inset 0 1px 0 rgba(255,255,255,.7);
-      table-layout:fixed;
+      table-layout:fixed;            /* permite elipsis consistente */
     }
-    table#tabla-detalle colgroup col:nth-child(1){ width:16%; }
-    table#tabla-detalle colgroup col:nth-child(2){ width:26%; }
-    table#tabla-detalle colgroup col:nth-child(3){ width:10%; }
-    table#tabla-detalle colgroup col:nth-child(4){ width:12%; }
-    table#tabla-detalle colgroup col:nth-child(5){ width:12%; }
-    table#tabla-detalle colgroup col:nth-child(6){ width:16%; }
-    table#tabla-detalle colgroup col:nth-child(7){ width:8%;  }
+
+    /* Ajustamos proporciones de 8 columnas */
+    table#tabla-detalle colgroup col:nth-child(1){ width:14%; } /* ID Crédito */
+    table#tabla-detalle colgroup col:nth-child(2){ width:20%; } /* Cliente */
+    table#tabla-detalle colgroup col:nth-child(3){ width:14%; } /* Teléfono */
+    table#tabla-detalle colgroup col:nth-child(4){ width:10%; } /* Estado */
+    table#tabla-detalle colgroup col:nth-child(5){ width:14%; } /* Saldo Actual */
+    table#tabla-detalle colgroup col:nth-child(6){ width:14%; } /* Capital Atrasado */
+    table#tabla-detalle colgroup col:nth-child(7){ width:14%; } /* Para ponerse al día */
+    table#tabla-detalle colgroup col:nth-child(8){ width:10%; } /* Cuotas Atrasadas */
 
     thead th{
       text-align:left; font-size:.9rem; color:var(--brand-blue);
       padding:.7rem .8rem;
       background:linear-gradient(180deg, rgba(103,200,241,.18), rgba(103,200,241,.08));
-      font-weight:800; white-space:nowrap;
+      font-weight:800;
+      white-space:nowrap;
       border-bottom:1px solid rgba(10,20,40,.08);
     }
     tbody td{
       padding:.7rem .8rem; font-size:.95rem; color:var(--text);
       border-top:1px solid rgba(10,20,40,.08);
-      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-      vertical-align:middle;
+      white-space:nowrap;            /* evita doble línea */
+      overflow:hidden; text-overflow:ellipsis;  /* elipsis */
     }
     tbody tr:hover{ background:rgba(103,200,241,.05); }
     td.num{ text-align:right; }
     td.imp{ color:#c17900; font-weight:900; }
     td.mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+    @media (max-width:800px){
+      .card-res{ grid-template-columns:1fr; }
+    }
   </style>
 </head>
 <body>
@@ -393,67 +505,51 @@
         <strong class="brand-name">MULTI INVERSIONES</strong>
       </div>
       <div style="margin-left:auto; font-weight:700; color:var(--muted);">
-        Tasa de Mora por Agencia
+        Tasa de Mora por Usuario
       </div>
     </div>
   </header>
 
   <div class="container">
-    <h1><i class="fas fa-city"></i> Tasa de Mora por Agencia</h1>
-    <div class="agencia-label">
-      Agencia asignada: <span id="nombre-agencia">Cargando...</span>
-    </div>
+    <div class="section-title">Consulta el % de mora y cartera por usuario</div>
 
-    <div id="loading">Cargando datos...</div>
+    <label for="user-select">Selecciona un usuario:</label>
+    <select id="user-select" class="input-main">
+      <option value="">Cargando usuarios...</option>
+    </select>
 
-    <div class="stack">
-      <!-- KPIs ARRIBA -->
-      <div class="box" id="box-mora" style="display:none;">
-        <div class="dato-mora">
-          <span class="dato-mora-label">Capital en Mora</span>
-          <span class="dato-mora-valor valor-mora" id="capital-mora">$0.00</span>
-        </div>
-        <div class="dato-mora">
-          <span class="dato-mora-label">Cartera Total</span>
-          <span class="dato-mora-valor valor-cartera" id="cartera-total">$0.00</span>
-        </div>
-        <div class="dato-mora">
-          <span class="dato-mora-label">% Mora</span>
-          <span class="dato-mora-valor valor-pct" id="pct-mora">0.00%</span>
+    <div id="resultado" style="margin-top:.6rem;"></div>
+
+    <!-- Detalle créditos en mora -->
+    <div id="detalle-box" class="detalle-container">
+      <div class="header-detalle">
+        <h2><i class="fa-solid fa-list"></i> Créditos en mora (detalle)</h2>
+        <div style="display:flex;align-items:center;gap:.6rem;">
+          <span class="pill">Registros: <strong id="total-registros">0</strong></span>
+          <button class="btn" id="btn-exportar" style="display:none;"><i class="fa-solid fa-file-excel"></i> Exportar Excel</button>
         </div>
       </div>
 
-      <!-- TABLA ABAJO -->
-      <div class="box" id="box-detalle" style="display:none;">
-        <div class="header-detalle">
-          <h2><i class="fa-solid fa-list"></i> Créditos en mora (detalle)</h2>
-          <div style="display:flex;align-items:center;gap:.6rem;">
-            <span class="pill">Registros: <strong id="total-registros">0</strong></span>
-            <button class="btn" id="btn-exportar" style="display:none;">
-              <i class="fa-solid fa-file-excel"></i> Exportar Excel
-            </button>
-          </div>
-        </div>
-
-        <div class="table-wrap">
-          <table id="tabla-detalle">
-            <colgroup>
-              <col/><col/><col/><col/><col/><col/><col/>
-            </colgroup>
-            <thead>
-              <tr>
-                <th>ID Crédito</th>
-                <th>Cliente</th>
-                <th>Estado</th>
-                <th class="num">Saldo Actual</th>
-                <th class="num">Capital Atrasado</th>
-                <th class="num">Para Ponerse al Día</th>
-                <th class="num">Cuotas Atrasadas</th>
-              </tr>
-            </thead>
-            <tbody id="detalle-body"></tbody>
-          </table>
-        </div>
+      <div class="table-wrap">
+        <table id="tabla-detalle">
+          <!-- Definimos proporciones de columnas -->
+          <colgroup>
+            <col/><col/><col/><col/><col/><col/><col/><col/>
+          </colgroup>
+          <thead>
+            <tr>
+              <th>ID Crédito</th>
+              <th>Cliente</th>
+              <th>Teléfono</th>
+              <th>Estado</th>
+              <th class="num">Saldo Actual</th>
+              <th class="num">Capital Atrasado</th>
+              <th class="num">Para Ponerse al Día</th>
+              <th class="num">Cuotas Atrasadas</th>
+            </tr>
+          </thead>
+          <tbody id="detalle-body"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -462,5 +558,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </body>
 </html>
+
 
 

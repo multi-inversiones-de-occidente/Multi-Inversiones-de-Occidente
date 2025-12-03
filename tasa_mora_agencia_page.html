@@ -71,6 +71,7 @@
       return "Sin nombre";
     }
 
+    // ===== Cálculo de tasa de mora por AGENCIA (corregido) =====
     async function cargarTasaMoraAgencia(uid) {
       document.getElementById('loading').style.display = "block";
       document.getElementById('box-mora').style.display = "none";
@@ -88,42 +89,55 @@
       // 2) Créditos por agencia
       const creditosSnap = await getDocs(query(collection(db, "creditos"), where("agenciaAsignada", "==", department)));
 
-      let capAtrasado = 0;
-      let carteraTotal = 0;
-      const listaMora = [];
+      let capitalEnMora = 0; // suma de saldoActual de créditos con mora (vigentes)
+      let carteraTotal  = 0; // suma de saldoActual de créditos vigentes (≠ Pagado, ≠ Revertido)
+      const listaMora   = [];
 
       for (const docCred of creditosSnap.docs) {
         const d = docCred.data();
         const idCredito = docCred.id;
-        const estadoCredito = d.estadoCredito || "";
+        const estadoCredito = (d.estadoCredito || "").trim();
+        const saldo = asNumber(d.saldoActual);
 
-        if (estadoCredito !== "Revertido") {
-          carteraTotal += asNumber(d.saldoActual);
+        // Cartera total vigente: excluimos Pagado y Revertido
+        if (estadoCredito !== "Pagado" && estadoCredito !== "Revertido") {
+          carteraTotal += saldo;
         }
 
+        // Ver si el crédito tiene cuotas atrasadas
         const cuotasAtrasadas = contarCuotasAtrasadas(d.amortizacion);
-        if (cuotasAtrasadas > 0) {
-          const ca = asNumber(d.capitalAtrasado);
-          capAtrasado += ca;
+
+        // Considerar el crédito como moroso solo si:
+        // - Tiene al menos una cuota Atrasado
+        // - No está Pagado ni Revertido
+        if (
+          cuotasAtrasadas > 0 &&
+          estadoCredito !== "Pagado" &&
+          estadoCredito !== "Revertido"
+        ) {
+          // Numerador: usamos el saldoActual de los créditos en mora
+          capitalEnMora += saldo;
 
           const nombreCliente = await resolverNombreCliente(d);
+          const capitalAtrasado = asNumber(d.capitalAtrasado);
           const ppad = asNumber(d.paraPonerseAlDia);
 
           listaMora.push({
             idCredito,
             nombreCliente,
             estadoCredito: estadoCredito || "—",
-            saldoActual: asNumber(d.saldoActual),
-            capitalAtrasado: ca,
+            saldoActual: saldo,
+            capitalAtrasado,
             paraPonerseAlDia: ppad,
             cuotasAtrasadas
           });
         }
       }
 
-      const moraPct = carteraTotal > 0 ? (capAtrasado / carteraTotal) * 100 : 0;
+      // % de Mora = cartera morosa / cartera total vigente
+      const moraPct = carteraTotal > 0 ? (capitalEnMora / carteraTotal) * 100 : 0;
 
-      document.getElementById("capital-mora").textContent = formatoDinero(capAtrasado);
+      document.getElementById("capital-mora").textContent = formatoDinero(capitalEnMora);
       document.getElementById("cartera-total").textContent = formatoDinero(carteraTotal);
       document.getElementById("pct-mora").textContent = moraPct.toFixed(2) + "%";
 

@@ -276,10 +276,29 @@
 
         const m = docMov.data();
 
+        // No considerar movimientos ya cerrados o anulados
         if (m.cierre === true) return;
         if ('anulado' in m && m.anulado === true) return;
         if (m.descripcion && (m.descripcion.startsWith('Reversión de pago') || m.descripcion.startsWith('Reversión correlativo'))) return;
 
+        // 🚫 BLINDAJE: evitar doble conteo de pagos
+        // Si el movimiento está claramente ligado a un crédito/pago de cliente,
+        // dejamos que la colección "pagos" sea la única fuente para ese dinero.
+        const referenciaStr = (m.referencia || "").toString().toLowerCase().trim();
+        const isMovimientoDePago =
+          !!m.creditoID || // cualquier movimiento amarrado a un crédito
+          (
+            !!m.clienteID &&
+            (
+              referenciaStr.includes("abono retroactivo") ||
+              referenciaStr.includes("pago de cliente") ||
+              referenciaStr.includes("pago crédito") ||
+              referenciaStr.includes("pago credito")
+            )
+          );
+        if (isMovimientoDePago) return;
+
+        // Deduplicación por correlativo (por si algún día también se guarda aquí)
         if (m.correlativo && correlativosSumados.has(m.correlativo)) return;
         if (m.correlativo) correlativosSumados.add(m.correlativo);
 
@@ -705,4 +724,5 @@
   </div>
 </body>
 </html>
+
 

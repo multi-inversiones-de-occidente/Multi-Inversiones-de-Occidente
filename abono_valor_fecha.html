@@ -661,11 +661,14 @@
       }
 
       // ====== 5) TOTALES / actualización
+      // El saldo pendiente se define exclusivamente como:
+      // saldo nuevo = saldoAnterior (antes del abono) - pagoCapital aplicado.
+      // Ya NO se fuerza a coincidir con la amortización, porque muchos clientes
+      // no siguen el plan de pagos exacto (pagan adelantado, atrasado o montos distintos).
       let saldoPendiente = round2(Math.max(0, saldoInicialOperacion - pagoCapital));
-      const saldoDesdeAmort = round2(saldoDesdeAmortizacion(amortizacion));
-      if (Math.abs(saldoDesdeAmort - saldoPendiente) >= 0.03) {
-        saldoPendiente = saldoDesdeAmort;
-      }
+      // Si algún día quisieras auditar diferencias, puedes calcular:
+      // const saldoDesdeAmort = round2(saldoDesdeAmortizacion(amortizacion));
+      // pero sin usarlo para sobreescribir saldoPendiente.
 
       // Informativo: interés desde fechaAbono -> hoy
       const fechaHoy = atLocalMidnight(new Date());
@@ -789,6 +792,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 

@@ -231,7 +231,7 @@
         return; // no seguir a modo en vivo
       }
 
-      // ===== 2) SIN CIERRE: reconstruir en vivo
+      // ===== 2) SIN CIERRE: reconstruir en vivo (BLINDADO CONTRA DUPLICADOS)
       let movimientos = [];
       const correlativosSumados = new Set();
 
@@ -262,6 +262,24 @@
             if ('anulado' in d && d.anulado === true) return;
             if (typeof d.descripcion === 'string' &&
                 (d.descripcion.startsWith('Reversión de pago') || d.descripcion.startsWith('Reversión correlativo'))) return;
+
+            // 🚫 BLINDAJE: evitar doble conteo de pagos de crédito
+            const referenciaStr = (d.referencia || d.descripcion || "").toString().toLowerCase().trim();
+            const esMovimientoDePago =
+              !!d.creditoID || // cualquier movimiento pegado a un crédito
+              (
+                !!d.clienteID &&
+                (
+                  referenciaStr.includes("abono retroactivo") ||
+                  referenciaStr.includes("pago crédito") ||
+                  referenciaStr.includes("pago credito") ||
+                  referenciaStr.includes("pago de cliente") ||
+                  referenciaStr.includes("pago de cuota") ||
+                  referenciaStr.includes("pago cuota")
+                )
+              );
+            if (esMovimientoDePago) return;
+
             if (d.correlativo && correlativosSumados.has(d.correlativo)) return;
             if (d.correlativo) correlativosSumados.add(d.correlativo);
 
@@ -475,11 +493,4 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
 

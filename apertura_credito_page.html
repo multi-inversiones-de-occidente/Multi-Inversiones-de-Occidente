@@ -293,7 +293,7 @@
       }
     }
 
-    // Guardar crédito (incluye refinanciamiento)
+    // Guardar crédito (incluye refinanciamiento, pero ya NO cierra el crédito anterior)
     async function guardarCredito() {
       if (asignacionAperturada) {
         alert("Este crédito ya fue aperturado. No puede volver a guardarse.");
@@ -320,7 +320,7 @@
       const fechaInicio = new Date().toISOString();
       const fechaUltimoCalculoIntereses = fechaInicio;
 
-      // id de crédito anterior si aplica
+      // id de crédito anterior si aplica (aunque ya no se usa para marcar Pagado)
       let creditoAnteriorID = null;
       if (esRefinanciamiento && creditoAnteriorInfo && creditoAnteriorInfo.id) {
         creditoAnteriorID = creditoAnteriorInfo.id;
@@ -364,13 +364,8 @@
           });
         }
 
-        // Refinanciamiento: cierra crédito anterior
-        if (esRefinanciamiento && creditoAnteriorID) {
-          await updateDoc(doc(db, "creditos", creditoAnteriorID), {
-            estadoCredito: "Pagado",
-            ultimaActualizacion: new Date().toISOString()
-          });
-        }
+        // 🔴 AQUÍ ANTES SE MARCABA EL CRÉDITO ANTERIOR COMO "Pagado"
+        // Ese bloque fue removido a tu petición.
 
         alert("Crédito guardado correctamente.");
         window.location.href = "detalle_aprobaciones_page.html?id=" + asignacionData._docId;
@@ -606,3 +601,4 @@
   </div>
 </body>
 </html>
+

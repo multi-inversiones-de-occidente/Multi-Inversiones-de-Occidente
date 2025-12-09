@@ -115,13 +115,6 @@
             </tr>
           `).join('');
 
-          let advertencia = tablaLocalStorage
-            ? `<div style="margin-bottom:16px;padding:10px 13px;background:#ffc;border-radius:9px;color:#6a4d00;">
-                <b>Advertencia:</b> Este plan de pagos es temporal (calculado y guardado localmente, aún NO aperturado en sistema).<br>
-                Una vez que el crédito sea aperturado, los datos serán definitivos.
-              </div>`
-            : "";
-
           let html = `
             <div class="doc-wrap" id="print-section">
               <div class="doc-header">
@@ -138,7 +131,6 @@
                 <div><b>Cuota:</b> $${cuota}</div>
                 <div><b>Plazo:</b> ${plazo}</div>
               </div>
-              ${advertencia}
               <br>
               <table class="plan-table">
                 <thead>
@@ -238,3 +230,4 @@
   </div>
 </body>
 </html>
+

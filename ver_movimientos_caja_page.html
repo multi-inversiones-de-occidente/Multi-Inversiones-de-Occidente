@@ -178,7 +178,9 @@
           usuario: m?.usuario || "",
           fecha: m?.fecha || null,
           clase: (m?.tipo === "Ingreso") ? "mov-ingreso" : "mov-egreso",
-          cliente: (m?.origen === "pago") ? "Cliente" : ""
+          cliente: (m?.origen === "pago") ? "Cliente" : "",
+          correlativo: m?.correlativo ?? null,
+          origen: "cierres_caja"
         }));
 
         movimientos.sort((a, b) => {
@@ -202,6 +204,7 @@
               <div class="mov-sub">Monto: $${mov.monto.toFixed(2)}</div>
               <div class="mov-sub">Usuario: ${mov.usuario || '-'}</div>
               ${mov.cliente ? `<div class="mov-sub">Cliente: ${mov.cliente}</div>` : ""}
+              ${(mov.correlativo || mov.origen) ? `<div class="mov-sub">Correlativo: ${mov.correlativo ?? '-'} • Origen: ${mov.origen || '-'}</div>` : ""}
               <div class="mov-sub">Hora: ${formatHoraAny(mov.fecha)}</div>
             </div>
           `).join('');
@@ -233,7 +236,8 @@
 
       // ===== 2) SIN CIERRE: reconstruir en vivo (BLINDADO CONTRA DUPLICADOS)
       let movimientos = [];
-      const correlativosSumados = new Set();
+      // 🔐 Set global por día+agencia para NO repetir correlativos
+      const correlativosUsados = new Set();
 
       // Movimientos manuales en ambas colecciones (Timestamp/ISO)
       for (const collName of ["movimientosCaja", "movimientos_caja"]) {
@@ -280,8 +284,9 @@
               );
             if (esMovimientoDePago) return;
 
-            if (d.correlativo && correlativosSumados.has(d.correlativo)) return;
-            if (d.correlativo) correlativosSumados.add(d.correlativo);
+            // ❗ Dedupe por correlativo a nivel global
+            if (d.correlativo != null && correlativosUsados.has(d.correlativo)) return;
+            if (d.correlativo != null) correlativosUsados.add(d.correlativo);
 
             const tipo = d.tipo === "Egreso" ? "Egreso" : "Ingreso";
             movimientos.push({
@@ -292,7 +297,9 @@
               usuario: d.usuario || '',
               fecha: d.fecha || d.createdAt || null,
               clase: tipo === "Ingreso" ? "mov-ingreso" : "mov-egreso",
-              cliente: ""
+              cliente: "",
+              correlativo: d.correlativo ?? null,
+              origen: collName
             });
           });
         }
@@ -338,6 +345,11 @@
           const d = doc.data() || {};
           if (("anulado" in d) && d.anulado) return;
 
+          // ❗ Dedupe por correlativo también para pagos
+          const corr = d.correlativo;
+          if (corr != null && correlativosUsados.has(corr)) return;
+          if (corr != null) correlativosUsados.add(corr);
+
           movimientos.push({
             tipo: "Ingreso",
             descripcion: d.retroactivo ? "Abono retroactivo" : "Pago",
@@ -346,7 +358,9 @@
             usuario: d.cajeroNombre || '',
             fecha: d.fechaRegistro || d.fechaPago || null,
             clase: "mov-pago",
-            cliente: d.nombres || "Cliente"
+            cliente: d.nombres || "Cliente",
+            correlativo: d.correlativo ?? null,
+            origen: "pagos"
           });
         });
       });
@@ -375,6 +389,7 @@
             ${mov.observaciones ? `<div class="mov-sub">Obs: ${mov.observaciones}</div>` : ""}
             <div class="mov-sub">Usuario: ${mov.usuario || '-'}</div>
             ${mov.cliente ? `<div class="mov-sub">Cliente: ${mov.cliente}</div>` : ""}
+            ${(mov.correlativo || mov.origen) ? `<div class="mov-sub">Correlativo: ${mov.correlativo ?? '-'} • Origen: ${mov.origen || '-'}</div>` : ""}
             <div class="mov-sub">Hora: ${formatHoraAny(mov.fecha)}</div>
           </div>
         `).join('');

@@ -309,6 +309,9 @@
     let userDepartment = null;
     let userNameForTicket = "Sin Nombre";
 
+    // 🔒 Flag global para evitar doble ejecución de pago
+    let pagoEnCurso = false;
+
     function setUserCard(user){
       try{
         const emailEl = document.getElementById("usuario-email");
@@ -383,7 +386,7 @@
         snap.forEach(s => {
           const d = s.data();
           const nombre = (d.nombre || '').toLowerCase();
-          const apellido = (d.apellido || '').toLowerCase(); // <-- añadido para buscar por apellido
+          const apellido = (d.apellido || '').toLowerCase();
           const dui = (d.numeroDui || '').toLowerCase();
           if (
             nombre.includes(term.toLowerCase()) ||
@@ -496,19 +499,33 @@
               </div>
             </div>
           </div>`;
-        document.getElementById("cancelar-pago").onclick = closeModal;
-        document.getElementById("pagar-btn").onclick = async () => {
+        document.getElementById("cancelar-pago").onclick = () => {
+          pagoEnCurso = false;
+          closeModal();
+        };
+        const pagarBtn = document.getElementById("pagar-btn");
+        pagarBtn.disabled = false;
+        pagarBtn.onclick = async () => {
           try{
             const montoValue = document.getElementById("monto-input").value.trim();
             const montoNum = n(montoValue);
             if (!(montoValue.length) || !Number.isFinite(montoNum) || montoNum <= 0) {
               errorMsg = "Ingresa un monto válido mayor a $0.00";
-              render(); setTimeout(()=>document.getElementById("monto-input")?.focus(), 50);
+              render();
+              setTimeout(()=>document.getElementById("monto-input")?.focus(), 50);
               return;
             }
+            if (pagoEnCurso) return;
+            pagoEnCurso = true;
+            pagarBtn.disabled = true;
             await verificarPagoDuplicadoYConfirmar({ cliente, creditoData, montoNum: round2(montoNum), closeModal });
           }catch(err){
             alert("Error al realizar el pago: " + (err?.message || err));
+          } finally {
+            // Si no hubo redirección aún, reactivamos botón
+            pagoEnCurso = false;
+            const btn = document.getElementById("pagar-btn");
+            if (btn) btn.disabled = false;
           }
         };
         const inp = document.getElementById("monto-input");
@@ -518,7 +535,7 @@
       render();
     }
 
-    /* =================== ANTI-DUPLICADO: Solo ADVERTENCIA =================== */
+    /* =================== ANTI-DUPLICADO REFORZADO =================== */
     async function verificarPagoDuplicadoYConfirmar({ cliente, creditoData, montoNum, closeModal }) {
       const fechaHoy = todayKey();
 
@@ -531,13 +548,40 @@
       const hayPagoHoy = pagosHoy.length > 0;
       const hayMismoMonto = pagosHoy.some(p => Math.abs(n(p.montoPagado) - n(montoNum)) < 0.01);
 
-      if (hayPagoHoy) {
-        // Mostrar advertencia con lista de pagos de hoy (SOLO informa; NO bloquea)
-        const modalRoot = document.getElementById("modal-root");
+      const modalRoot = document.getElementById("modal-root");
+
+      // 🔐 BLOQUEO DURO: mismo día + mismo monto -> NO se permite registrar otro pago
+      if (hayPagoHoy && hayMismoMonto) {
         const lista = pagosHoy.map(p => `• $${round2(n(p.montoPagado)).toFixed(2)} (correlativo: ${p.correlativo ?? "s/d"})`).join("<br/>");
-        const msgExtra = hayMismoMonto
-          ? `<div style="margin-top:8px;color:#b71c1c;font-weight:800">Ya existe un pago HOY por <u>el mismo monto</u>. Revisa antes de continuar.</div>`
-          : `<div style="margin-top:8px;color:#8a6d3b">Ya existe al menos un pago HOY para este crédito.</div>`;
+        modalRoot.innerHTML = `
+          <div class="modal-bg">
+            <div class="modal">
+              <div class="modal-title"><i class="fas fa-ban" style="color:#c0392b"></i> Pago duplicado detectado</div>
+              <div class="modal-sub">Ya existe al menos un pago HOY (${fechaHoy}) por el <b>mismo monto</b> para este crédito:</div>
+              <div class="muted" style="background:rgba(36,59,134,.06);border:1px solid rgba(36,59,134,.18);padding:10px;border-radius:10px;">
+                ${lista || "—"}
+              </div>
+              <div style="margin:10px 0 4px 0;">Monto que intentas registrar: <b>$${round2(montoNum).toFixed(2)}</b></div>
+              <div style="margin-top:8px;color:#b71c1c;font-weight:800">
+                Por seguridad, no se permite registrar otro pago con el mismo monto el mismo día.<br/>
+                Verifica el historial antes de intentar otro cobro.
+              </div>
+              <div class="modal-btns" style="margin-top:14px;">
+                <button class="modal-btn-cancel" id="cerrar-dup-bloqueo">Cerrar</button>
+              </div>
+            </div>
+          </div>`;
+        document.getElementById("cerrar-dup-bloqueo").onclick = () => {
+          modalRoot.innerHTML = "";
+          pagoEnCurso = false;
+        };
+        return; // NO llama a realizarPago
+      }
+
+      if (hayPagoHoy) {
+        // Advertencia suave: hay pagos hoy, pero no del mismo monto
+        const lista = pagosHoy.map(p => `• $${round2(n(p.montoPagado)).toFixed(2)} (correlativo: ${p.correlativo ?? "s/d"})`).join("<br/>");
+        const msgExtra = `<div style="margin-top:8px;color:#8a6d3b">Ya existe al menos un pago HOY para este crédito.</div>`;
         modalRoot.innerHTML = `
           <div class="modal-bg">
             <div class="modal">
@@ -554,11 +598,20 @@
               </div>
             </div>
           </div>`;
-        document.getElementById("cancelar-dup").onclick = () => { modalRoot.innerHTML = ""; };
-        document.getElementById("continuar-dup").onclick = async () => {
+        document.getElementById("cancelar-dup").onclick = () => {
           modalRoot.innerHTML = "";
-          await realizarPago(cliente, montoNum); // SIN bloqueo
-          closeModal();
+          pagoEnCurso = false;
+        };
+        document.getElementById("continuar-dup").onclick = async () => {
+          if (pagoEnCurso) return;
+          pagoEnCurso = true;
+          try{
+            modalRoot.innerHTML = "";
+            await realizarPago(cliente, montoNum);
+            closeModal();
+          } finally {
+            pagoEnCurso = false;
+          }
         };
       } else {
         // No hay pagos hoy: proceder directo
@@ -567,7 +620,7 @@
       }
     }
 
-    /* =================== LÓGICA DE PAGO (SIN BLOQUEO) =================== */
+    /* =================== LÓGICA DE PAGO (con doble chequeo) =================== */
     async function realizarPago(cliente, montoNum){
       const fechaPago = nowISO();
       try{
@@ -582,6 +635,18 @@
 
         // Traer crédito
         const { data: creditoData } = await fetchCreditoById(cliente.id);
+
+        // 🔐 SEGUNDO CHEQUEO: mismo día + mismo monto, usando datos recién escritos
+        const fechaHoy = todayKey();
+        const pagosSnap = await getDocs(query(collection(db, "pagos"), where("creditoID", "==", cliente.id)));
+        const pagosHoy = pagosSnap.docs
+          .map(d => d.data())
+          .filter(p => String(p.fechaPago || "").substring(0,10) === fechaHoy);
+        const yaHayMismoMonto = pagosHoy.some(p => Math.abs(n(p.montoPagado) - n(montoNum)) < 0.01);
+        if (yaHayMismoMonto) {
+          alert("Ya existe un pago registrado hoy por el mismo monto para este crédito. No se ha registrado otro pago.");
+          return;
+        }
 
         // ======== 0) Correlativo seguro ========
         const correlativoStr = await obtenerCorrelativoUnicoPagos();
@@ -767,7 +832,6 @@
         });
 
         // ======== 10) Persistir crédito actualizado ========
-        // FIX: Evitar reacumulación del cron -> anclar la fecha al inicio del día local del pago
         const fechaPagoDate = new Date(fechaPago);
         const pagoDiaLocal = new Date(
           fechaPagoDate.getFullYear(),
@@ -786,10 +850,8 @@
           estadoCredito: nuevoEstado,
           amortizacion: amortizacion,
           historialMultas: historialMultas,
-
-          // ======== ANCLAS: cron arrancará desde el día del pago ========
-          fechaUltimoCalculoIntereses: pagoDiaLocal,     // ⬅️ clave para no reacumular días previos
-          fechaAnclaInteres: new Date(fechaPago),        // auxiliar (ya lo usabas)
+          fechaUltimoCalculoIntereses: pagoDiaLocal,
+          fechaAnclaInteres: new Date(fechaPago),
           saldoAncla: round2(saldoNuevo),
           interesPendienteAncla: round2(interesActual)
         });
@@ -829,7 +891,6 @@
   </script>
 </body>
 </html>
-
 
 
 

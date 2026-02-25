@@ -19,10 +19,7 @@
       updateDoc,
       deleteDoc,
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
-    import {
-      getAuth,
-      onAuthStateChanged,
-    } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
@@ -38,13 +35,19 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // === ESTADO EN MEMORIA ===
-    let gerenteDept = null;        // Agencia detectada desde department
-    let ejecutivos = [];           // [{ key, nombre, asignacionID }]
-    let ejecutivosMap = {};        // key -> objeto anterior
-    let creditosActuales = [];     // Créditos del ejecutivo seleccionado
+    // ==========================
+    // ESTADO EN MEMORIA
+    // ==========================
+    let gerenteDept = null;           // Agencia detectada desde department
+    let ejecutivos = [];              // [{ keyNorm, nombreDisplay, asignacionID, variantes:Set }]
+    let ejecutivosMap = {};           // keyNorm -> objeto ejecutivo
+    let creditosAgencia = [];         // Todos los créditos de la agencia (cache)
+    let creditosDelEjecutivo = [];    // Créditos del ejecutivo (sin filtro DUI)
+    let creditosMostrados = [];       // Créditos mostrados en tabla (con filtro DUI)
 
-    // === HELPERS UI ===
+    // ==========================
+    // HELPERS
+    // ==========================
     function setLoading(text) {
       const status = document.getElementById("status-text");
       if (status) status.textContent = text || "";
@@ -57,18 +60,69 @@
       toastText.textContent = msg;
       toast.className = "toast " + (type === "error" ? "toast-error" : "toast-ok");
       toast.style.opacity = "1";
-      setTimeout(() => {
-        toast.style.opacity = "0";
-      }, 3200);
+      setTimeout(() => (toast.style.opacity = "0"), 3200);
     }
 
-    // === CARGAR EJECUTIVOS DESDE 'asignadoA' EN CREDITOS ===
+    // Normaliza nombres para evitar problemas por espacios / mayúsculas
+    function normalizeName(s) {
+      return (s || "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .toLowerCase();
+    }
+
+    // Normaliza DUI para búsquedas (quita espacios; mantiene guion)
+    function normalizeDui(s) {
+      return (s || "").toString().trim().replace(/\s+/g, "");
+    }
+
+    function money(n) {
+      const num = Number(n || 0);
+      return isFinite(num) ? num.toFixed(2) : String(n || "0.00");
+    }
+
+    function setCounts() {
+      const el1 = document.getElementById("badge-ejecutivos");
+      const el2 = document.getElementById("badge-creditos-agencia");
+      const el3 = document.getElementById("badge-creditos-ejecutivo");
+      if (el1) el1.textContent = String(ejecutivos.length);
+      if (el2) el2.textContent = String(creditosAgencia.length);
+      if (el3) el3.textContent = String(creditosDelEjecutivo.length);
+    }
+
+    // ==========================
+    // 1) CARGAR TODOS LOS CRÉDITOS DE LA AGENCIA (CACHE)
+    // ==========================
+    async function cargarCreditosDeAgencia() {
+      if (!gerenteDept) return;
+
+      setLoading("Cargando créditos de " + gerenteDept + "…");
+      creditosAgencia = [];
+
+      const qCreds = query(
+        collection(db, "creditos"),
+        where("agenciaAsignada", "==", gerenteDept)
+      );
+
+      const snap = await getDocs(qCreds);
+      snap.forEach((d) => {
+        creditosAgencia.push({ id: d.id, ...d.data() });
+      });
+
+      setLoading(`Créditos en agencia ${gerenteDept}: ${creditosAgencia.length}`);
+      setCounts();
+    }
+
+    // ==========================
+    // 2) CARGAR EJECUTIVOS DESDE 'asignadoA' (NORMALIZADO)
+    // ==========================
     async function cargarEjecutivosDeAgencia() {
       if (!gerenteDept) return;
 
       const selectAgencia = document.getElementById("select-agencia");
       const selectOrigen = document.getElementById("select-ejecutivo-origen");
       const selectDestino = document.getElementById("select-ejecutivo-destino");
+      const inputBuscarDui = document.getElementById("buscar-dui");
 
       // Mostrar agencia detectada y bloquear el select
       selectAgencia.innerHTML = "";
@@ -78,33 +132,43 @@
       selectAgencia.appendChild(optAg);
       selectAgencia.disabled = true;
 
-      setLoading("Cargando ejecutivos (asignadoA) de " + gerenteDept + "…");
+      // Asegurar cache de créditos
+      if (!creditosAgencia.length) {
+        await cargarCreditosDeAgencia();
+      }
 
-      // Tomamos todos los créditos de esa agencia y agrupamos por 'asignadoA'
-      const qCreds = query(
-        collection(db, "creditos"),
-        where("agenciaAsignada", "==", gerenteDept)
-      );
-      const snap = await getDocs(qCreds);
+      setLoading("Construyendo lista de ejecutivos…");
 
       ejecutivos = [];
       ejecutivosMap = {};
 
-      snap.forEach((d) => {
-        const c = d.data();
-        const nombre = (c.asignadoA || "").trim();
-        if (!nombre) return;
+      // Agrupar por asignadoA normalizado
+      creditosAgencia.forEach((c) => {
+        const raw = (c.asignadoA || "");
+        const keyNorm = normalizeName(raw);
+        if (!keyNorm) return;
 
-        const key = nombre; // usamos el nombre como clave visual
-        if (!ejecutivosMap[key]) {
-          ejecutivosMap[key] = {
-            key,
-            nombre,
+        if (!ejecutivosMap[keyNorm]) {
+          const nombreDisplay = (raw || "").trim().replace(/\s+/g, " ");
+          ejecutivosMap[keyNorm] = {
+            keyNorm,
+            nombreDisplay: nombreDisplay || keyNorm,
             asignacionID: c.AsignacionID || c.asignacionID || null,
+            variantes: new Set(),
           };
-          ejecutivos.push(ejecutivosMap[key]);
+          ejecutivos.push(ejecutivosMap[keyNorm]);
+        }
+
+        // Guardar variantes de texto (para depuración visual si lo necesitas)
+        ejecutivosMap[keyNorm].variantes.add(raw);
+        // Si no tenía AsignacionID y este crédito sí trae, lo guardamos
+        if (!ejecutivosMap[keyNorm].asignacionID) {
+          ejecutivosMap[keyNorm].asignacionID = c.AsignacionID || c.asignacionID || null;
         }
       });
+
+      // Ordenar por nombre
+      ejecutivos.sort((a, b) => a.nombreDisplay.localeCompare(b.nombreDisplay, "es"));
 
       // Limpiar selects
       selectOrigen.innerHTML = '<option value="">Selecciona un ejecutivo…</option>';
@@ -112,8 +176,8 @@
 
       ejecutivos.forEach((ej) => {
         const opt1 = document.createElement("option");
-        opt1.value = ej.key;
-        opt1.textContent = ej.nombre;
+        opt1.value = ej.keyNorm;                 // IMPORTANTE: guardamos la key normalizada
+        opt1.textContent = ej.nombreDisplay;      // mostramos nombre bonito
 
         const opt2 = opt1.cloneNode(true);
 
@@ -121,45 +185,83 @@
         selectDestino.appendChild(opt2);
       });
 
+      // Reset UI derecha
+      document.getElementById("tabla-creditos-body").innerHTML = "";
+      creditosDelEjecutivo = [];
+      creditosMostrados = [];
+      if (inputBuscarDui) inputBuscarDui.value = "";
+
+      setCounts();
+
       if (ejecutivos.length) {
-        setLoading("Ejecutivos encontrados en esta agencia: " + ejecutivos.length);
+        setLoading("Ejecutivos detectados: " + ejecutivos.length);
       } else {
         setLoading("No se encontraron ejecutivos con créditos en esta agencia.");
       }
     }
 
-    // === CARGAR CREDITOS DE UN EJECUTIVO (por asignadoA) ===
-    async function cargarCreditosDeEjecutivo(nombreEjecutivo) {
+    // ==========================
+    // 3) CARGAR CRÉDITOS DE EJECUTIVO (FILTRADO EN FRONTEND)
+    // ==========================
+    function cargarCreditosDeEjecutivo(keyNormEjecutivo) {
       const tbody = document.getElementById("tabla-creditos-body");
+      const inputBuscarDui = document.getElementById("buscar-dui");
+
       tbody.innerHTML = "";
-      creditosActuales = [];
+      creditosDelEjecutivo = [];
+      creditosMostrados = [];
 
-      if (!nombreEjecutivo) {
+      if (!keyNormEjecutivo) {
         setLoading("Selecciona un ejecutivo para ver sus créditos.");
+        setCounts();
         return;
       }
 
-      setLoading("Cargando créditos asignados a " + nombreEjecutivo + "…");
+      const ejecutivo = ejecutivosMap[keyNormEjecutivo];
+      const nombreDisplay = ejecutivo?.nombreDisplay || "(Ejecutivo)";
 
-      const qCred = query(
-        collection(db, "creditos"),
-        where("agenciaAsignada", "==", gerenteDept),
-        where("asignadoA", "==", nombreEjecutivo)
-      );
+      setLoading("Cargando créditos asignados a " + nombreDisplay + "…");
 
-      const snap = await getDocs(qCred);
-
-      if (snap.empty) {
-        setLoading("Este ejecutivo no tiene créditos en esta agencia.");
-        return;
-      }
-
-      snap.forEach((d) => {
-        const c = d.data();
-        creditosActuales.push({ id: d.id, ...c });
+      // Filtramos TODOS los créditos de la agencia comparando asignadoA normalizado
+      creditosDelEjecutivo = creditosAgencia.filter((c) => {
+        const k = normalizeName(c.asignadoA);
+        return k && k === keyNormEjecutivo;
       });
 
-      creditosActuales.forEach((c) => {
+      // Aplicar filtro DUI si hay texto
+      const duiText = normalizeDui(inputBuscarDui?.value || "");
+      creditosMostrados = !duiText
+        ? [...creditosDelEjecutivo]
+        : creditosDelEjecutivo.filter((c) =>
+            normalizeDui(c.numeroDui).includes(duiText)
+          );
+
+      renderTablaCreditos(creditosMostrados);
+      setCounts();
+
+      if (!creditosDelEjecutivo.length) {
+        setLoading("Este ejecutivo no tiene créditos en esta agencia (según asignadoA).");
+        return;
+      }
+
+      setLoading(
+        `Créditos del ejecutivo: ${creditosDelEjecutivo.length}` +
+        (duiText ? ` (filtrados por DUI: ${creditosMostrados.length})` : "")
+      );
+    }
+
+    function renderTablaCreditos(lista) {
+      const tbody = document.getElementById("tabla-creditos-body");
+      tbody.innerHTML = "";
+
+      if (!lista.length) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="8" class="empty-row">No hay créditos para mostrar.</td>`;
+        tbody.appendChild(tr);
+        return;
+      }
+
+      lista.forEach((c) => {
         const tr = document.createElement("tr");
 
         const saldo = Number(c.saldoActual || 0);
@@ -167,7 +269,7 @@
 
         tr.innerHTML = `
           <td>
-            <label class="check-wrap">
+            <label class="check-wrap" title="Seleccionar crédito">
               <input type="checkbox" class="chk-credito" data-id="${c.id}">
               <span></span>
             </label>
@@ -176,48 +278,55 @@
           <td>${(c.nombre || "").trim()}</td>
           <td class="mono">${c.numeroDui || ""}</td>
           <td>${c.lineaDeCredito || ""}</td>
-          <td>$ ${monto.toFixed ? monto.toFixed(2) : monto}</td>
-          <td>${c.estadoCredito || ""}</td>
-          <td>$ ${saldo.toFixed ? saldo.toFixed(2) : saldo}</td>
+          <td class="mono">$ ${money(monto)}</td>
+          <td>
+            <span class="pill ${String(c.estadoCredito || "").toLowerCase().includes("activo") ? "pill-active" : "pill-default"}">
+              ${c.estadoCredito || ""}
+            </span>
+          </td>
+          <td class="mono">$ ${money(saldo)}</td>
         `;
         tbody.appendChild(tr);
       });
-
-      setLoading(`Créditos cargados: ${creditosActuales.length}`);
     }
 
-    // === REASIGNAR CREDITOS SELECCIONADOS (CAMBIA asignadoA y opcional AsignacionID) ===
+    // ==========================
+    // 4) REASIGNAR CRÉDITOS (LIMPIA NOMBRE Y CREA CAMPO NORMALIZADO)
+    // ==========================
     async function reasignarCreditos() {
       const selectOrigen = document.getElementById("select-ejecutivo-origen");
       const selectDestino = document.getElementById("select-ejecutivo-destino");
 
-      const origenKey = selectOrigen.value;
-      const destinoKey = selectDestino.value;
+      const origenKeyNorm = selectOrigen.value;
+      const destinoKeyNorm = selectDestino.value;
 
-      if (!origenKey) {
+      if (!origenKeyNorm) {
         showToast("Selecciona el ejecutivo actual.", "error");
         return;
       }
-      if (!destinoKey) {
+      if (!destinoKeyNorm) {
         showToast("Selecciona el nuevo ejecutivo destino.", "error");
         return;
       }
-      if (origenKey === destinoKey) {
+      if (origenKeyNorm === destinoKeyNorm) {
         showToast("El ejecutivo origen y destino no pueden ser el mismo.", "error");
         return;
       }
 
-      const checkboxes = Array.from(
-        document.querySelectorAll(".chk-credito:checked")
-      );
+      const checkboxes = Array.from(document.querySelectorAll(".chk-credito:checked"));
       if (!checkboxes.length) {
         showToast("Selecciona al menos un crédito para reasignar.", "error");
         return;
       }
 
-      const destino = ejecutivosMap[destinoKey];
-      const nombreDestino = destino?.nombre || destinoKey;
+      const destino = ejecutivosMap[destinoKeyNorm];
+      const nombreDestino = (destino?.nombreDisplay || "").trim().replace(/\s+/g, " ");
       const asignacionDestino = destino?.asignacionID || null;
+
+      if (!nombreDestino) {
+        showToast("No se pudo determinar el nombre del ejecutivo destino.", "error");
+        return;
+      }
 
       if (!confirm(`¿Reasignar ${checkboxes.length} crédito(s) a ${nombreDestino}?`)) {
         return;
@@ -230,18 +339,29 @@
           checkboxes.map((chk) => {
             const id = chk.getAttribute("data-id");
             const ref = doc(db, "creditos", id);
+
             const dataUpdate = {
-              asignadoA: nombreDestino,
+              asignadoA: nombreDestino,                     // guardamos limpio (sin espacios raros)
+              asignadoA_norm: normalizeName(nombreDestino), // NUEVO: para futuro (no rompe nada)
             };
+
             if (asignacionDestino) {
               dataUpdate.AsignacionID = asignacionDestino;
             }
+
             return updateDoc(ref, dataUpdate);
           })
         );
 
         showToast("Créditos reasignados correctamente.");
-        await cargarCreditosDeEjecutivo(origenKey);
+
+        // Refrescar cache y UI
+        await cargarCreditosDeAgencia();
+        await cargarEjecutivosDeAgencia();
+
+        // Volver a cargar tabla del origen
+        document.getElementById("select-ejecutivo-origen").value = origenKeyNorm;
+        cargarCreditosDeEjecutivo(origenKeyNorm);
       } catch (e) {
         console.error(e);
         showToast("Ocurrió un error al reasignar créditos.", "error");
@@ -250,33 +370,30 @@
       }
     }
 
-    // === ELIMINAR EJECUTIVO (SI YA NO TIENE CREDITOS) ===
+    // ==========================
+    // 5) ELIMINAR EJECUTIVO (SI NO TIENE CRÉDITOS)
+    // ==========================
     async function eliminarEjecutivo() {
       const selectOrigen = document.getElementById("select-ejecutivo-origen");
-      const origenKey = selectOrigen.value;
+      const origenKeyNorm = selectOrigen.value;
 
-      if (!origenKey) {
+      if (!origenKeyNorm) {
         showToast("Selecciona un ejecutivo para eliminar.", "error");
         return;
       }
 
-      if (creditosActuales.length > 0) {
-        showToast(
-          "El ejecutivo todavía tiene créditos asignados. No se puede eliminar.",
-          "error"
-        );
+      // Importante: validamos contra TODOS los créditos del ejecutivo (sin filtro DUI)
+      if (creditosDelEjecutivo.length > 0) {
+        showToast("El ejecutivo todavía tiene créditos asignados. No se puede eliminar.", "error");
         return;
       }
 
-      const ejecutivo = ejecutivosMap[origenKey];
-      const nombre = ejecutivo?.nombre || "este ejecutivo";
+      const ejecutivo = ejecutivosMap[origenKeyNorm];
+      const nombre = ejecutivo?.nombreDisplay || "este ejecutivo";
       const asignID = ejecutivo?.asignacionID || null;
 
       if (!asignID) {
-        showToast(
-          "No se encontró AsignacionID para este ejecutivo en los créditos.",
-          "error"
-        );
+        showToast("No se encontró AsignacionID para este ejecutivo en los créditos.", "error");
         return;
       }
 
@@ -290,12 +407,9 @@
         await deleteDoc(doc(db, "users", asignID));
         showToast("Ejecutivo eliminado correctamente.");
 
-        // Volver a cargar lista de ejecutivos desde creditos
+        // Refrescar cache y UI
+        await cargarCreditosDeAgencia();
         await cargarEjecutivosDeAgencia();
-
-        // Limpiar tabla y estado local
-        document.getElementById("tabla-creditos-body").innerHTML = "";
-        creditosActuales = [];
         setLoading("");
       } catch (e) {
         console.error(e);
@@ -303,11 +417,15 @@
       }
     }
 
-    // === INICIALIZACIÓN ===
+    // ==========================
+    // 6) EVENTOS / INICIALIZACIÓN
+    // ==========================
     window.addEventListener("DOMContentLoaded", () => {
       const selectOrigen = document.getElementById("select-ejecutivo-origen");
       const btnReasignar = document.getElementById("btn-reasignar-creditos");
       const btnEliminar = document.getElementById("btn-eliminar-ejecutivo");
+      const inputBuscarDui = document.getElementById("buscar-dui");
+      const btnLimpiar = document.getElementById("btn-limpiar-busqueda");
 
       // Auth
       onAuthStateChanged(auth, async (user) => {
@@ -325,16 +443,16 @@
             setLoading("No se encontró el perfil del usuario.");
             return;
           }
+
           const data = snap.data();
           gerenteDept = data.department || data.agenciaAsignada || "";
 
           if (!gerenteDept) {
-            setLoading(
-              "Este usuario no tiene un department/agencia asignada en la base de datos."
-            );
+            setLoading("Este usuario no tiene un department/agencia asignada en la base de datos.");
             return;
           }
 
+          await cargarCreditosDeAgencia();
           await cargarEjecutivosDeAgencia();
         } catch (e) {
           console.error(e);
@@ -342,10 +460,37 @@
         }
       });
 
-      // Eventos
+      // Selección de ejecutivo
       selectOrigen.addEventListener("change", (e) => {
-        const nombreEjecutivo = e.target.value;
-        cargarCreditosDeEjecutivo(nombreEjecutivo);
+        const keyNorm = e.target.value;
+        cargarCreditosDeEjecutivo(keyNorm);
+      });
+
+      // Búsqueda DUI (filtra tabla sin romper selección)
+      inputBuscarDui.addEventListener("input", () => {
+        const keyNorm = selectOrigen.value;
+        if (!keyNorm) return;
+
+        // Reaplicamos filtro DUI sobre la lista ya cargada del ejecutivo
+        const duiText = normalizeDui(inputBuscarDui.value);
+        creditosMostrados = !duiText
+          ? [...creditosDelEjecutivo]
+          : creditosDelEjecutivo.filter((c) =>
+              normalizeDui(c.numeroDui).includes(duiText)
+            );
+
+        renderTablaCreditos(creditosMostrados);
+        setLoading(
+          `Créditos del ejecutivo: ${creditosDelEjecutivo.length}` +
+          (duiText ? ` (filtrados por DUI: ${creditosMostrados.length})` : "")
+        );
+      });
+
+      btnLimpiar.addEventListener("click", () => {
+        inputBuscarDui.value = "";
+        const keyNorm = selectOrigen.value;
+        if (keyNorm) cargarCreditosDeEjecutivo(keyNorm);
+        inputBuscarDui.focus();
       });
 
       btnReasignar.addEventListener("click", reasignarCreditos);
@@ -368,24 +513,18 @@
       --brand-blue: #243b86;
       --brand-cel: #67c8f1;
       --brand-gold: #f8af40;
-      --radius-xl: 26px;
-      --radius-lg: 18px;
-      --shadow-soft: 0 20px 60px rgba(15, 23, 42, 0.18);
+      --radius-xl: 22px;
+      --radius-lg: 16px;
+      --shadow-soft: 0 18px 50px rgba(15, 23, 42, 0.16);
+      --border: 1px solid rgba(15, 23, 42, 0.08);
     }
 
     body {
       margin: 0;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      background: radial-gradient(
-          1200px 600px at 10% -10%,
-          rgba(36, 59, 134, 0.12),
-          transparent 60%
-        ),
-        radial-gradient(
-          900px 500px at 100% 0%,
-          rgba(248, 175, 64, 0.1),
-          transparent 55%
-        ),
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(36, 59, 134, 0.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(248, 175, 64, 0.10), transparent 55%),
         linear-gradient(180deg, var(--bg), var(--bg-2));
       color: var(--text);
       min-height: 100vh;
@@ -393,17 +532,13 @@
     }
 
     header {
-      padding: 1rem 6vw;
+      padding: 0.9rem 6vw;
       display: flex;
       align-items: center;
       justify-content: space-between;
       backdrop-filter: blur(12px);
-      background: linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 0.9),
-        rgba(255, 255, 255, 0.7)
-      );
-      border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.78));
+      border-bottom: var(--border);
       position: sticky;
       top: 0;
       z-index: 10;
@@ -413,21 +548,23 @@
       display: flex;
       align-items: center;
       gap: 0.75rem;
+      min-width: 0;
     }
 
     .logo-chip {
       display: inline-flex;
       align-items: center;
       gap: 0.6rem;
-      padding: 0.45rem 0.9rem;
+      padding: 0.42rem 0.85rem;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.9);
-      border: 1px solid rgba(15, 23, 42, 0.08);
-      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.16);
+      background: rgba(255, 255, 255, 0.95);
+      border: var(--border);
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.14);
+      flex: 0 0 auto;
     }
 
     .logo-chip img {
-      height: 26px;
+      height: 24px;
       width: auto;
       display: block;
     }
@@ -435,19 +572,24 @@
     .logo-chip span {
       font-weight: 800;
       letter-spacing: 0.02em;
-      font-size: 0.9rem;
+      font-size: 0.86rem;
       color: var(--brand-blue);
       text-transform: uppercase;
+      white-space: nowrap;
     }
 
     .header-title {
       font-weight: 700;
       color: var(--muted);
       font-size: 0.95rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 38vw;
     }
 
     .user-pill {
-      padding: 0.45rem 0.9rem;
+      padding: 0.42rem 0.85rem;
       border-radius: 999px;
       background: rgba(36, 59, 134, 0.06);
       border: 1px solid rgba(36, 59, 134, 0.2);
@@ -455,94 +597,140 @@
       display: inline-flex;
       align-items: center;
       gap: 0.5rem;
+      color: var(--text);
+      flex: 0 0 auto;
     }
 
-    .user-pill i {
-      color: var(--brand-blue);
-    }
+    .user-pill i { color: var(--brand-blue); }
 
     .container {
-      max-width: 1180px;
-      margin: 1.8rem auto 3rem auto;
-      padding: 0 1.5rem;
+      max-width: 1200px;
+      margin: 1.5rem auto 3rem auto;
+      padding: 0 1.2rem;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
     }
 
     h1 {
-      font-size: clamp(1.8rem, 2.3vw + 1rem, 2.4rem);
-      margin: 0 0 0.4rem;
-      font-weight: 800;
+      font-size: clamp(1.55rem, 2.3vw + 1rem, 2.2rem);
+      margin: 0;
+      font-weight: 900;
       color: var(--brand-blue);
       letter-spacing: 0.02em;
     }
 
     .subtitle {
-      margin-bottom: 2rem;
+      margin: 0.35rem 0 0;
       color: var(--muted);
       font-size: 0.98rem;
-      max-width: 720px;
+      max-width: 780px;
+      line-height: 1.45;
+    }
+
+    .stats {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      background: rgba(255,255,255,0.9);
+      border: var(--border);
+      border-radius: 999px;
+      padding: 0.45rem 0.75rem;
+      box-shadow: 0 10px 26px rgba(15,23,42,0.10);
+      font-size: 0.9rem;
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .badge {
+      min-width: 28px;
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: rgba(36, 59, 134, 0.10);
+      border: 1px solid rgba(36, 59, 134, 0.18);
+      color: var(--brand-blue);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.82rem;
     }
 
     .layout {
       display: grid;
-      grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
-      gap: 1.8rem;
+      grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+      gap: 1.2rem;
       align-items: flex-start;
     }
 
-    @media (max-width: 900px) {
-      .layout {
-        grid-template-columns: 1fr;
-      }
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .header-title { max-width: 60vw; }
     }
 
     .card {
-      background: rgba(255, 255, 255, 0.92);
+      background: rgba(255, 255, 255, 0.94);
       border-radius: var(--radius-xl);
-      padding: 1.4rem 1.4rem 1.3rem 1.4rem;
+      padding: 1.1rem;
       box-shadow: var(--shadow-soft);
-      border: 1px solid rgba(15, 23, 42, 0.04);
+      border: var(--border);
     }
 
     .card-title {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 0.6rem;
-      margin-bottom: 1rem;
-      font-weight: 700;
+      margin-bottom: 0.9rem;
+    }
+
+    .card-title .left {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-weight: 800;
       color: var(--brand-blue);
     }
 
-    .card-title i {
-      color: var(--brand-cel);
-    }
+    .card-title i { color: var(--brand-cel); }
 
     .field-group {
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
+      gap: 0.8rem;
       margin-bottom: 1rem;
     }
 
     label {
       font-size: 0.86rem;
-      font-weight: 600;
+      font-weight: 700;
       color: var(--muted);
     }
 
-    select {
+    select, input[type="text"] {
       width: 100%;
       border-radius: 999px;
-      border: 1px solid rgba(15, 23, 42, 0.12);
-      padding: 0.6rem 0.9rem;
+      border: 1px solid rgba(15, 23, 42, 0.14);
+      padding: 0.62rem 0.92rem;
       font-size: 0.95rem;
       outline: none;
-      background: rgba(255, 255, 255, 0.94);
-      appearance: none;
-      position: relative;
+      background: rgba(255, 255, 255, 0.96);
     }
 
     select:disabled {
-      background: rgba(243, 244, 246, 0.85);
+      background: rgba(243, 244, 246, 0.9);
       color: #6b7280;
       cursor: not-allowed;
     }
@@ -550,53 +738,73 @@
     .hint {
       font-size: 0.8rem;
       color: var(--muted);
-      margin-top: 0.3rem;
+      margin-top: 0.25rem;
+      line-height: 1.35;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.6rem;
+      align-items: center;
     }
 
     .btn {
       border-radius: 999px;
-      padding: 0.65rem 1rem;
+      padding: 0.66rem 1rem;
       border: none;
       font-size: 0.93rem;
-      font-weight: 700;
+      font-weight: 800;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 0.4rem;
+      gap: 0.45rem;
       transition: transform 0.12s ease, box-shadow 0.15s ease, opacity 0.15s;
       white-space: nowrap;
+      user-select: none;
     }
 
     .btn-primary {
       background: linear-gradient(135deg, #1d3557, #14213d);
       color: #fff;
-      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.35);
+      box-shadow: 0 12px 26px rgba(15, 23, 42, 0.30);
       width: 100%;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.55rem;
     }
 
-    .btn-primary:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.45);
-    }
+    .btn-primary:hover { transform: translateY(-1px); }
 
     .btn-danger {
       background: linear-gradient(135deg, #f97373, #e11d48);
       color: #fff;
-      box-shadow: 0 10px 26px rgba(248, 113, 113, 0.45);
+      box-shadow: 0 10px 22px rgba(248, 113, 113, 0.45);
       width: 100%;
     }
 
-    .btn-danger:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 14px 38px rgba(248, 113, 113, 0.6);
+    .btn-danger:hover { transform: translateY(-1px); }
+
+    .btn-ghost {
+      background: rgba(36, 59, 134, 0.08);
+      color: var(--brand-blue);
+      border: 1px solid rgba(36, 59, 134, 0.16);
+      box-shadow: none;
+      padding: 0.62rem 0.9rem;
     }
 
     .status-text {
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       color: var(--muted);
-      margin-top: 0.4rem;
+      margin-top: 0.45rem;
+      line-height: 1.35;
+    }
+
+    .tabla-wrapper {
+      max-height: 520px;
+      overflow: auto;
+      border-radius: var(--radius-lg);
+      border: var(--border);
+      background: #fff;
     }
 
     table {
@@ -605,39 +813,36 @@
       font-size: 0.9rem;
     }
 
-    thead {
+    thead th {
+      position: sticky;
+      top: 0;
       background: linear-gradient(
         90deg,
-        rgba(36, 59, 134, 0.06),
-        rgba(103, 200, 241, 0.1)
+        rgba(36, 59, 134, 0.08),
+        rgba(103, 200, 241, 0.12)
       );
+      z-index: 2;
+      border-bottom: var(--border);
     }
 
-    th,
-    td {
-      padding: 0.55rem 0.6rem;
+    th, td {
+      padding: 0.58rem 0.62rem;
       text-align: left;
+      vertical-align: middle;
     }
 
     th {
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       text-transform: uppercase;
       letter-spacing: 0.06em;
       color: var(--muted);
-      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
     }
 
-    tbody tr:nth-child(even) {
-      background: rgba(249, 250, 251, 0.85);
-    }
-
-    tbody tr:hover {
-      background: rgba(219, 234, 254, 0.6);
-    }
+    tbody tr:nth-child(even) { background: rgba(249, 250, 251, 0.92); }
+    tbody tr:hover { background: rgba(219, 234, 254, 0.55); }
 
     .mono {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-        "Liberation Mono", "Courier New", monospace;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 0.82rem;
     }
 
@@ -648,7 +853,7 @@
       width: 18px;
       height: 18px;
       border-radius: 6px;
-      border: 1px solid rgba(15, 23, 42, 0.3);
+      border: 1px solid rgba(15, 23, 42, 0.30);
       background: #fff;
       position: relative;
       cursor: pointer;
@@ -678,12 +883,36 @@
       transform: scale(1);
     }
 
-    .tabla-wrapper {
-      max-height: 480px;
-      overflow: auto;
-      border-radius: var(--radius-lg);
-      border: 1px solid rgba(15, 23, 42, 0.06);
-      background: #fff;
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.22rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      border: 1px solid rgba(15, 23, 42, 0.10);
+      color: rgba(15, 23, 42, 0.85);
+      background: rgba(15, 23, 42, 0.04);
+      white-space: nowrap;
+    }
+
+    .pill-active {
+      background: rgba(34, 197, 94, 0.12);
+      border-color: rgba(34, 197, 94, 0.28);
+      color: #166534;
+    }
+
+    .pill-default {
+      background: rgba(36, 59, 134, 0.06);
+      border-color: rgba(36, 59, 134, 0.18);
+      color: var(--brand-blue);
+    }
+
+    .empty-row {
+      text-align: center;
+      color: var(--muted);
+      padding: 1.2rem 0.8rem;
+      font-weight: 700;
     }
 
     .toast {
@@ -692,7 +921,7 @@
       right: 1.4rem;
       padding: 0.7rem 1rem;
       border-radius: 999px;
-      font-size: 0.9rem;
+      font-size: 0.92rem;
       display: inline-flex;
       align-items: center;
       gap: 0.6rem;
@@ -703,15 +932,11 @@
       z-index: 30;
     }
 
-    .toast-ok {
-      background: linear-gradient(135deg, #16a34a, #4ade80);
-    }
-
-    .toast-error {
-      background: linear-gradient(135deg, #ef4444, #fb7185);
-    }
+    .toast-ok { background: linear-gradient(135deg, #16a34a, #4ade80); }
+    .toast-error { background: linear-gradient(135deg, #ef4444, #fb7185); }
   </style>
 </head>
+
 <body>
   <header>
     <div class="header-left">
@@ -728,18 +953,39 @@
   </header>
 
   <main class="container">
-    <h1>Reasignación de Créditos entre Ejecutivos</h1>
-    <p class="subtitle">
-      Usa esta herramienta para mover créditos de un ejecutivo a otro dentro de la
-      misma agencia. Los ejecutivos se obtienen desde el campo <strong>asignadoA</strong>
-      de los créditos registrados.
-    </p>
+    <div class="topbar">
+      <div>
+        <h1>Reasignación de Créditos</h1>
+        <p class="subtitle">
+          Mueve créditos de un ejecutivo a otro dentro de la misma agencia.
+          Ahora el sistema <strong>detecta ejecutivos ignorando espacios</strong> en <strong>asignadoA</strong>
+          (ej. “Katherin Aguirre” y “Katherin Aguirre ” se consideran iguales).
+        </p>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <i class="fa-solid fa-users"></i>
+          Ejecutivos <span class="badge" id="badge-ejecutivos">0</span>
+        </div>
+        <div class="stat">
+          <i class="fa-solid fa-building"></i>
+          Créditos en agencia <span class="badge" id="badge-creditos-agencia">0</span>
+        </div>
+        <div class="stat">
+          <i class="fa-solid fa-briefcase"></i>
+          Créditos del ejecutivo <span class="badge" id="badge-creditos-ejecutivo">0</span>
+        </div>
+      </div>
+    </div>
 
     <section class="layout">
       <div class="card">
         <div class="card-title">
-          <i class="fa-solid fa-users-gear"></i>
-          <span>Ejecutivos y Agencia</span>
+          <div class="left">
+            <i class="fa-solid fa-users-gear"></i>
+            <span>Ejecutivos y Agencia</span>
+          </div>
         </div>
 
         <div class="field-group">
@@ -749,8 +995,7 @@
               <option value="">Detectando agencia…</option>
             </select>
             <div class="hint">
-              La agencia se toma automáticamente del perfil del gerente
-              (department).
+              La agencia se toma automáticamente del perfil del gerente (department).
             </div>
           </div>
 
@@ -759,17 +1004,18 @@
             <select id="select-ejecutivo-origen">
               <option value="">Selecciona un ejecutivo…</option>
             </select>
+            <div class="hint">
+              La lista se obtiene desde los créditos en esta agencia (campo <strong>asignadoA</strong>), ignorando espacios extra.
+            </div>
           </div>
 
           <div>
-            <label for="select-ejecutivo-destino">
-              Nuevo ejecutivo (destino, misma agencia)
-            </label>
+            <label for="select-ejecutivo-destino">Nuevo ejecutivo (destino)</label>
             <select id="select-ejecutivo-destino">
               <option value="">Selecciona nuevo ejecutivo…</option>
             </select>
             <div class="hint">
-              Solo aparecen ejecutivos que ya tienen créditos en esta agencia.
+              Solo aparecen ejecutivos que ya tienen créditos en esta agencia (según <strong>asignadoA</strong>).
             </div>
           </div>
         </div>
@@ -784,16 +1030,31 @@
           <span>Eliminar ejecutivo (sin créditos)</span>
         </button>
 
-        <div class="status-text" id="status-text">
-          Cargando información…
-        </div>
+        <div class="status-text" id="status-text">Cargando información…</div>
       </div>
 
       <div class="card">
         <div class="card-title">
-          <i class="fa-solid fa-file-invoice-dollar"></i>
-          <span>Créditos asignados al ejecutivo</span>
+          <div class="left">
+            <i class="fa-solid fa-file-invoice-dollar"></i>
+            <span>Créditos del ejecutivo</span>
+          </div>
         </div>
+
+        <div class="field-group" style="margin-bottom: 0.9rem;">
+          <div class="row">
+            <div>
+              <label for="buscar-dui">Buscar por DUI</label>
+              <input id="buscar-dui" type="text" placeholder="Ej: 03354490-2" />
+              <div class="hint">Filtra la tabla por coincidencias en el DUI (en tiempo real).</div>
+            </div>
+            <button id="btn-limpiar-busqueda" class="btn btn-ghost" title="Limpiar búsqueda">
+              <i class="fa-solid fa-eraser"></i>
+              Limpiar
+            </button>
+          </div>
+        </div>
+
         <div class="tabla-wrapper">
           <table>
             <thead>
@@ -808,8 +1069,7 @@
                 <th>Saldo Actual</th>
               </tr>
             </thead>
-            <tbody id="tabla-creditos-body">
-            </tbody>
+            <tbody id="tabla-creditos-body"></tbody>
           </table>
         </div>
       </div>

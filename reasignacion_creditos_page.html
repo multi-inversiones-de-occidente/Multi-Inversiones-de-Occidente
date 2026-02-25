@@ -90,6 +90,34 @@
       if (el3) el3.textContent = String(creditosDelEjecutivo.length);
     }
 
+    // === NUEVO: Seleccionar / Deseleccionar todos los créditos visibles ===
+    function toggleSeleccionarTodos() {
+      const btn = document.getElementById("btn-seleccionar-todos");
+      const checks = Array.from(document.querySelectorAll(".chk-credito"));
+      if (!checks.length) {
+        showToast("No hay créditos para seleccionar.", "error");
+        return;
+      }
+
+      const allChecked = checks.every((c) => c.checked);
+      const nextState = !allChecked;
+
+      checks.forEach((c) => (c.checked = nextState));
+
+      if (btn) {
+        btn.innerHTML = nextState
+          ? '<i class="fa-solid fa-square-minus"></i> Deseleccionar todos'
+          : '<i class="fa-solid fa-square-check"></i> Seleccionar todos';
+      }
+    }
+
+    function resetSeleccionarTodosButton() {
+      const btn = document.getElementById("btn-seleccionar-todos");
+      if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-square-check"></i> Seleccionar todos';
+      }
+    }
+
     // ==========================
     // 1) CARGAR TODOS LOS CRÉDITOS DE LA AGENCIA (CACHE)
     // ==========================
@@ -190,6 +218,7 @@
       creditosDelEjecutivo = [];
       creditosMostrados = [];
       if (inputBuscarDui) inputBuscarDui.value = "";
+      resetSeleccionarTodosButton();
 
       setCounts();
 
@@ -210,6 +239,7 @@
       tbody.innerHTML = "";
       creditosDelEjecutivo = [];
       creditosMostrados = [];
+      resetSeleccionarTodosButton();
 
       if (!keyNormEjecutivo) {
         setLoading("Selecciona un ejecutivo para ver sus créditos.");
@@ -253,6 +283,7 @@
     function renderTablaCreditos(lista) {
       const tbody = document.getElementById("tabla-creditos-body");
       tbody.innerHTML = "";
+      resetSeleccionarTodosButton();
 
       if (!lista.length) {
         const tr = document.createElement("tr");
@@ -287,6 +318,19 @@
           <td class="mono">$ ${money(saldo)}</td>
         `;
         tbody.appendChild(tr);
+      });
+
+      // Si el usuario marca/desmarca manualmente, sincronizamos el botón "Seleccionar todos"
+      const checks = Array.from(document.querySelectorAll(".chk-credito"));
+      checks.forEach((chk) => {
+        chk.addEventListener("change", () => {
+          const btn = document.getElementById("btn-seleccionar-todos");
+          if (!btn) return;
+          const allChecked = checks.every((c) => c.checked);
+          btn.innerHTML = allChecked
+            ? '<i class="fa-solid fa-square-minus"></i> Deseleccionar todos'
+            : '<i class="fa-solid fa-square-check"></i> Seleccionar todos';
+        });
       });
     }
 
@@ -426,6 +470,7 @@
       const btnEliminar = document.getElementById("btn-eliminar-ejecutivo");
       const inputBuscarDui = document.getElementById("buscar-dui");
       const btnLimpiar = document.getElementById("btn-limpiar-busqueda");
+      const btnSeleccionarTodos = document.getElementById("btn-seleccionar-todos");
 
       // Auth
       onAuthStateChanged(auth, async (user) => {
@@ -493,6 +538,9 @@
         inputBuscarDui.focus();
       });
 
+      // NUEVO: Seleccionar todos / deseleccionar todos
+      btnSeleccionarTodos.addEventListener("click", toggleSeleccionarTodos);
+
       btnReasignar.addEventListener("click", reasignarCreditos);
       btnEliminar.addEventListener("click", eliminarEjecutivo);
     });
@@ -559,7 +607,7 @@
       border-radius: 999px;
       background: rgba(255, 255, 255, 0.95);
       border: var(--border);
-      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.14);
+      box-shadow: 0 10px 26px rgba(15,23,42,0.14);
       flex: 0 0 auto;
     }
 
@@ -1053,6 +1101,12 @@
               Limpiar
             </button>
           </div>
+
+          <!-- NUEVO: Botón Seleccionar Todos -->
+          <button id="btn-seleccionar-todos" class="btn btn-ghost" type="button">
+            <i class="fa-solid fa-square-check"></i>
+            Seleccionar todos
+          </button>
         </div>
 
         <div class="tabla-wrapper">

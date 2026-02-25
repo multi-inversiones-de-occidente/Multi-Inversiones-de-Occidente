@@ -38,7 +38,7 @@
     // ==========================
     // ESTADO EN MEMORIA
     // ==========================
-    let gerenteDept = null;           // Agencia detectada desde department
+    let gerenteDept = null;           // AGENCIA SELECCIONADA MANUALMENTE
     let ejecutivos = [];              // [{ keyNorm, nombreDisplay, asignacionID, variantes:Set }]
     let ejecutivosMap = {};           // keyNorm -> objeto ejecutivo
     let creditosAgencia = [];         // Todos los créditos de la agencia (cache)
@@ -90,7 +90,7 @@
       if (el3) el3.textContent = String(creditosDelEjecutivo.length);
     }
 
-    // === NUEVO: Seleccionar / Deseleccionar todos los créditos visibles ===
+    // === Seleccionar / Deseleccionar todos los créditos visibles ===
     function toggleSeleccionarTodos() {
       const btn = document.getElementById("btn-seleccionar-todos");
       const checks = Array.from(document.querySelectorAll(".chk-credito"));
@@ -113,9 +113,59 @@
 
     function resetSeleccionarTodosButton() {
       const btn = document.getElementById("btn-seleccionar-todos");
-      if (btn) {
-        btn.innerHTML = '<i class="fa-solid fa-square-check"></i> Seleccionar todos';
+      if (btn) btn.innerHTML = '<i class="fa-solid fa-square-check"></i> Seleccionar todos';
+    }
+
+    // ==========================
+    // NUEVO: AGENCIAS DISPONIBLES (SELECCIÓN MANUAL)
+    // ==========================
+    const AGENCIAS_HABILITADAS = ["Juayúa", "Sonsonate", "Santa Ana", "Lourdes"];
+
+    function initSelectAgencias() {
+      const selectAgencia = document.getElementById("select-agencia");
+      if (!selectAgencia) return;
+
+      selectAgencia.innerHTML = '<option value="">Selecciona una agencia…</option>';
+      AGENCIAS_HABILITADAS.forEach((a) => {
+        const opt = document.createElement("option");
+        opt.value = a;
+        opt.textContent = a;
+        selectAgencia.appendChild(opt);
+      });
+      selectAgencia.disabled = false;
+    }
+
+    function resetUIForAgencyChange() {
+      document.getElementById("select-ejecutivo-origen").innerHTML =
+        '<option value="">Selecciona un ejecutivo…</option>';
+      document.getElementById("select-ejecutivo-destino").innerHTML =
+        '<option value="">Selecciona nuevo ejecutivo…</option>';
+
+      document.getElementById("tabla-creditos-body").innerHTML = "";
+      const inputBuscarDui = document.getElementById("buscar-dui");
+      if (inputBuscarDui) inputBuscarDui.value = "";
+
+      ejecutivos = [];
+      ejecutivosMap = {};
+      creditosAgencia = [];
+      creditosDelEjecutivo = [];
+      creditosMostrados = [];
+      resetSeleccionarTodosButton();
+      setCounts();
+    }
+
+    async function onAgenciaSeleccionada(agencia) {
+      gerenteDept = agencia || null;
+
+      resetUIForAgencyChange();
+
+      if (!gerenteDept) {
+        setLoading("Selecciona una agencia para cargar ejecutivos y créditos.");
+        return;
       }
+
+      await cargarCreditosDeAgencia();
+      await cargarEjecutivosDeAgencia();
     }
 
     // ==========================
@@ -147,30 +197,15 @@
     async function cargarEjecutivosDeAgencia() {
       if (!gerenteDept) return;
 
-      const selectAgencia = document.getElementById("select-agencia");
       const selectOrigen = document.getElementById("select-ejecutivo-origen");
       const selectDestino = document.getElementById("select-ejecutivo-destino");
       const inputBuscarDui = document.getElementById("buscar-dui");
-
-      // Mostrar agencia detectada y bloquear el select
-      selectAgencia.innerHTML = "";
-      const optAg = document.createElement("option");
-      optAg.value = gerenteDept;
-      optAg.textContent = gerenteDept;
-      selectAgencia.appendChild(optAg);
-      selectAgencia.disabled = true;
-
-      // Asegurar cache de créditos
-      if (!creditosAgencia.length) {
-        await cargarCreditosDeAgencia();
-      }
 
       setLoading("Construyendo lista de ejecutivos…");
 
       ejecutivos = [];
       ejecutivosMap = {};
 
-      // Agrupar por asignadoA normalizado
       creditosAgencia.forEach((c) => {
         const raw = (c.asignadoA || "");
         const keyNorm = normalizeName(raw);
@@ -187,25 +222,22 @@
           ejecutivos.push(ejecutivosMap[keyNorm]);
         }
 
-        // Guardar variantes de texto (para depuración visual si lo necesitas)
         ejecutivosMap[keyNorm].variantes.add(raw);
-        // Si no tenía AsignacionID y este crédito sí trae, lo guardamos
+
         if (!ejecutivosMap[keyNorm].asignacionID) {
           ejecutivosMap[keyNorm].asignacionID = c.AsignacionID || c.asignacionID || null;
         }
       });
 
-      // Ordenar por nombre
       ejecutivos.sort((a, b) => a.nombreDisplay.localeCompare(b.nombreDisplay, "es"));
 
-      // Limpiar selects
       selectOrigen.innerHTML = '<option value="">Selecciona un ejecutivo…</option>';
       selectDestino.innerHTML = '<option value="">Selecciona nuevo ejecutivo…</option>';
 
       ejecutivos.forEach((ej) => {
         const opt1 = document.createElement("option");
-        opt1.value = ej.keyNorm;                 // IMPORTANTE: guardamos la key normalizada
-        opt1.textContent = ej.nombreDisplay;      // mostramos nombre bonito
+        opt1.value = ej.keyNorm;
+        opt1.textContent = ej.nombreDisplay;
 
         const opt2 = opt1.cloneNode(true);
 
@@ -213,7 +245,6 @@
         selectDestino.appendChild(opt2);
       });
 
-      // Reset UI derecha
       document.getElementById("tabla-creditos-body").innerHTML = "";
       creditosDelEjecutivo = [];
       creditosMostrados = [];
@@ -223,9 +254,9 @@
       setCounts();
 
       if (ejecutivos.length) {
-        setLoading("Ejecutivos detectados: " + ejecutivos.length);
+        setLoading(`Agencia: ${gerenteDept} · Ejecutivos detectados: ${ejecutivos.length}`);
       } else {
-        setLoading("No se encontraron ejecutivos con créditos en esta agencia.");
+        setLoading(`Agencia: ${gerenteDept} · No se encontraron ejecutivos con créditos.`);
       }
     }
 
@@ -241,6 +272,12 @@
       creditosMostrados = [];
       resetSeleccionarTodosButton();
 
+      if (!gerenteDept) {
+        setLoading("Selecciona una agencia primero.");
+        setCounts();
+        return;
+      }
+
       if (!keyNormEjecutivo) {
         setLoading("Selecciona un ejecutivo para ver sus créditos.");
         setCounts();
@@ -252,13 +289,11 @@
 
       setLoading("Cargando créditos asignados a " + nombreDisplay + "…");
 
-      // Filtramos TODOS los créditos de la agencia comparando asignadoA normalizado
       creditosDelEjecutivo = creditosAgencia.filter((c) => {
         const k = normalizeName(c.asignadoA);
         return k && k === keyNormEjecutivo;
       });
 
-      // Aplicar filtro DUI si hay texto
       const duiText = normalizeDui(inputBuscarDui?.value || "");
       creditosMostrados = !duiText
         ? [...creditosDelEjecutivo]
@@ -275,7 +310,7 @@
       }
 
       setLoading(
-        `Créditos del ejecutivo: ${creditosDelEjecutivo.length}` +
+        `Agencia: ${gerenteDept} · Créditos del ejecutivo: ${creditosDelEjecutivo.length}` +
         (duiText ? ` (filtrados por DUI: ${creditosMostrados.length})` : "")
       );
     }
@@ -294,7 +329,6 @@
 
       lista.forEach((c) => {
         const tr = document.createElement("tr");
-
         const saldo = Number(c.saldoActual || 0);
         const monto = Number(c.montoAprobado || 0);
 
@@ -320,7 +354,6 @@
         tbody.appendChild(tr);
       });
 
-      // Si el usuario marca/desmarca manualmente, sincronizamos el botón "Seleccionar todos"
       const checks = Array.from(document.querySelectorAll(".chk-credito"));
       checks.forEach((chk) => {
         chk.addEventListener("change", () => {
@@ -335,7 +368,7 @@
     }
 
     // ==========================
-    // 4) REASIGNAR CRÉDITOS (LIMPIA NOMBRE Y CREA CAMPO NORMALIZADO)
+    // 4) REASIGNAR CRÉDITOS
     // ==========================
     async function reasignarCreditos() {
       const selectOrigen = document.getElementById("select-ejecutivo-origen");
@@ -344,6 +377,10 @@
       const origenKeyNorm = selectOrigen.value;
       const destinoKeyNorm = selectDestino.value;
 
+      if (!gerenteDept) {
+        showToast("Selecciona una agencia.", "error");
+        return;
+      }
       if (!origenKeyNorm) {
         showToast("Selecciona el ejecutivo actual.", "error");
         return;
@@ -372,9 +409,7 @@
         return;
       }
 
-      if (!confirm(`¿Reasignar ${checkboxes.length} crédito(s) a ${nombreDestino}?`)) {
-        return;
-      }
+      if (!confirm(`¿Reasignar ${checkboxes.length} crédito(s) a ${nombreDestino}?`)) return;
 
       setLoading("Reasignando créditos…");
 
@@ -385,13 +420,11 @@
             const ref = doc(db, "creditos", id);
 
             const dataUpdate = {
-              asignadoA: nombreDestino,                     // guardamos limpio (sin espacios raros)
-              asignadoA_norm: normalizeName(nombreDestino), // NUEVO: para futuro (no rompe nada)
+              asignadoA: nombreDestino,
+              asignadoA_norm: normalizeName(nombreDestino),
             };
 
-            if (asignacionDestino) {
-              dataUpdate.AsignacionID = asignacionDestino;
-            }
+            if (asignacionDestino) dataUpdate.AsignacionID = asignacionDestino;
 
             return updateDoc(ref, dataUpdate);
           })
@@ -399,11 +432,10 @@
 
         showToast("Créditos reasignados correctamente.");
 
-        // Refrescar cache y UI
+        // Refrescar la agencia seleccionada
         await cargarCreditosDeAgencia();
         await cargarEjecutivosDeAgencia();
 
-        // Volver a cargar tabla del origen
         document.getElementById("select-ejecutivo-origen").value = origenKeyNorm;
         cargarCreditosDeEjecutivo(origenKeyNorm);
       } catch (e) {
@@ -421,12 +453,14 @@
       const selectOrigen = document.getElementById("select-ejecutivo-origen");
       const origenKeyNorm = selectOrigen.value;
 
+      if (!gerenteDept) {
+        showToast("Selecciona una agencia.", "error");
+        return;
+      }
       if (!origenKeyNorm) {
         showToast("Selecciona un ejecutivo para eliminar.", "error");
         return;
       }
-
-      // Importante: validamos contra TODOS los créditos del ejecutivo (sin filtro DUI)
       if (creditosDelEjecutivo.length > 0) {
         showToast("El ejecutivo todavía tiene créditos asignados. No se puede eliminar.", "error");
         return;
@@ -441,9 +475,7 @@
         return;
       }
 
-      if (!confirm(`¿Eliminar definitivamente a ${nombre} de la agencia?`)) {
-        return;
-      }
+      if (!confirm(`¿Eliminar definitivamente a ${nombre} de la agencia?`)) return;
 
       setLoading("Eliminando ejecutivo…");
 
@@ -451,7 +483,6 @@
         await deleteDoc(doc(db, "users", asignID));
         showToast("Ejecutivo eliminado correctamente.");
 
-        // Refrescar cache y UI
         await cargarCreditosDeAgencia();
         await cargarEjecutivosDeAgencia();
         setLoading("");
@@ -462,9 +493,10 @@
     }
 
     // ==========================
-    // 6) EVENTOS / INICIALIZACIÓN
+    // 6) INICIALIZACIÓN
     // ==========================
     window.addEventListener("DOMContentLoaded", () => {
+      const selectAgencia = document.getElementById("select-agencia");
       const selectOrigen = document.getElementById("select-ejecutivo-origen");
       const btnReasignar = document.getElementById("btn-reasignar-creditos");
       const btnEliminar = document.getElementById("btn-eliminar-ejecutivo");
@@ -472,7 +504,10 @@
       const btnLimpiar = document.getElementById("btn-limpiar-busqueda");
       const btnSeleccionarTodos = document.getElementById("btn-seleccionar-todos");
 
-      // Auth
+      // NUEVO: cargar agencias habilitadas
+      initSelectAgencias();
+
+      // Auth (solo valida sesión y muestra correo)
       onAuthStateChanged(auth, async (user) => {
         if (!user) {
           location.href = "login.html";
@@ -481,42 +516,41 @@
 
         document.getElementById("usuario-email").textContent = user.email || "";
 
+        // Ya NO forzamos la agencia por el usuario. Solo sugerimos si existe.
         try {
           const userRef = doc(db, "users", user.uid);
           const snap = await getDoc(userRef);
-          if (!snap.exists()) {
-            setLoading("No se encontró el perfil del usuario.");
-            return;
+          if (snap.exists()) {
+            const data = snap.data();
+            const sugerida = data.department || data.agenciaAsignada || "";
+            if (sugerida && AGENCIAS_HABILITADAS.includes(sugerida)) {
+              selectAgencia.value = sugerida; // sugerida, pero editable
+              await onAgenciaSeleccionada(sugerida);
+              return;
+            }
           }
-
-          const data = snap.data();
-          gerenteDept = data.department || data.agenciaAsignada || "";
-
-          if (!gerenteDept) {
-            setLoading("Este usuario no tiene un department/agencia asignada en la base de datos.");
-            return;
-          }
-
-          await cargarCreditosDeAgencia();
-          await cargarEjecutivosDeAgencia();
         } catch (e) {
-          console.error(e);
-          setLoading("Error al cargar la agencia del usuario.");
+          console.warn("No se pudo leer perfil para sugerir agencia:", e);
         }
+
+        setLoading("Selecciona una agencia para comenzar.");
+      });
+
+      // NUEVO: cambio manual de agencia
+      selectAgencia.addEventListener("change", async (e) => {
+        await onAgenciaSeleccionada(e.target.value);
       });
 
       // Selección de ejecutivo
       selectOrigen.addEventListener("change", (e) => {
-        const keyNorm = e.target.value;
-        cargarCreditosDeEjecutivo(keyNorm);
+        cargarCreditosDeEjecutivo(e.target.value);
       });
 
-      // Búsqueda DUI (filtra tabla sin romper selección)
+      // Búsqueda DUI
       inputBuscarDui.addEventListener("input", () => {
         const keyNorm = selectOrigen.value;
         if (!keyNorm) return;
 
-        // Reaplicamos filtro DUI sobre la lista ya cargada del ejecutivo
         const duiText = normalizeDui(inputBuscarDui.value);
         creditosMostrados = !duiText
           ? [...creditosDelEjecutivo]
@@ -526,7 +560,7 @@
 
         renderTablaCreditos(creditosMostrados);
         setLoading(
-          `Créditos del ejecutivo: ${creditosDelEjecutivo.length}` +
+          `Agencia: ${gerenteDept || "-"} · Créditos del ejecutivo: ${creditosDelEjecutivo.length}` +
           (duiText ? ` (filtrados por DUI: ${creditosMostrados.length})` : "")
         );
       });
@@ -538,7 +572,6 @@
         inputBuscarDui.focus();
       });
 
-      // NUEVO: Seleccionar todos / deseleccionar todos
       btnSeleccionarTodos.addEventListener("click", toggleSeleccionarTodos);
 
       btnReasignar.addEventListener("click", reasignarCreditos);
@@ -777,12 +810,6 @@
       background: rgba(255, 255, 255, 0.96);
     }
 
-    select:disabled {
-      background: rgba(243, 244, 246, 0.9);
-      color: #6b7280;
-      cursor: not-allowed;
-    }
-
     .hint {
       font-size: 0.8rem;
       color: var(--muted);
@@ -1006,8 +1033,7 @@
         <h1>Reasignación de Créditos</h1>
         <p class="subtitle">
           Mueve créditos de un ejecutivo a otro dentro de la misma agencia.
-          Ahora el sistema <strong>detecta ejecutivos ignorando espacios</strong> en <strong>asignadoA</strong>
-          (ej. “Katherin Aguirre” y “Katherin Aguirre ” se consideran iguales).
+          La lista de ejecutivos ignora espacios extra en <strong>asignadoA</strong>.
         </p>
       </div>
 
@@ -1039,11 +1065,11 @@
         <div class="field-group">
           <div>
             <label for="select-agencia">Agencia</label>
-            <select id="select-agencia" disabled>
-              <option value="">Detectando agencia…</option>
+            <select id="select-agencia">
+              <option value="">Selecciona una agencia…</option>
             </select>
             <div class="hint">
-              La agencia se toma automáticamente del perfil del gerente (department).
+              Selecciona la agencia manualmente (Juayúa, Sonsonate, Santa Ana, Lourdes).
             </div>
           </div>
 
@@ -1052,9 +1078,6 @@
             <select id="select-ejecutivo-origen">
               <option value="">Selecciona un ejecutivo…</option>
             </select>
-            <div class="hint">
-              La lista se obtiene desde los créditos en esta agencia (campo <strong>asignadoA</strong>), ignorando espacios extra.
-            </div>
           </div>
 
           <div>
@@ -1062,9 +1085,6 @@
             <select id="select-ejecutivo-destino">
               <option value="">Selecciona nuevo ejecutivo…</option>
             </select>
-            <div class="hint">
-              Solo aparecen ejecutivos que ya tienen créditos en esta agencia (según <strong>asignadoA</strong>).
-            </div>
           </div>
         </div>
 
@@ -1102,7 +1122,6 @@
             </button>
           </div>
 
-          <!-- NUEVO: Botón Seleccionar Todos -->
           <button id="btn-seleccionar-todos" class="btn btn-ghost" type="button">
             <i class="fa-solid fa-square-check"></i>
             Seleccionar todos

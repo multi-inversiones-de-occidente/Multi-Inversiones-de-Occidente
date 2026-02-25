@@ -39,7 +39,7 @@
     // ESTADO EN MEMORIA
     // ==========================
     let gerenteDept = null;           // AGENCIA SELECCIONADA MANUALMENTE
-    let ejecutivos = [];              // [{ keyNorm, nombreDisplay, asignacionID, variantes:Set }]
+    let ejecutivos = [];              // [{ keyNorm, nombreDisplay, asignacionID, variantes:Set, source }]
     let ejecutivosMap = {};           // keyNorm -> objeto ejecutivo
     let creditosAgencia = [];         // Todos los créditos de la agencia (cache)
     let creditosDelEjecutivo = [];    // Créditos del ejecutivo (sin filtro DUI)
@@ -117,7 +117,7 @@
     }
 
     // ==========================
-    // NUEVO: AGENCIAS DISPONIBLES (SELECCIÓN MANUAL)
+    // AGENCIAS DISPONIBLES (SELECCIÓN MANUAL)
     // ==========================
     const AGENCIAS_HABILITADAS = ["Juayúa", "Sonsonate", "Santa Ana", "Lourdes"];
 
@@ -165,7 +165,7 @@
       }
 
       await cargarCreditosDeAgencia();
-      await cargarEjecutivosDeAgencia();
+      await cargarEjecutivosDeAgencia(); // <- ahora viene de USERS por roles, no de créditos
     }
 
     // ==========================
@@ -192,8 +192,73 @@
     }
 
     // ==========================
-    // 2) CARGAR EJECUTIVOS DESDE 'asignadoA' (NORMALIZADO)
+    // 2) CARGAR EJECUTIVOS DESDE USERS (ROL Caja/Gerente/Ejecutivo)
+    //    + (extra) incorporar nombres detectados en créditos para no perder legacy
     // ==========================
+    const ROLES_PERMITIDOS = ["Caja", "Gerente", "Ejecutivo"];
+
+    function buildUserDisplayName(u) {
+      const n1 = (u.nombreCompleto || "").trim();
+      if (n1) return n1.replace(/\s+/g, " ");
+
+      const n2 = `${(u.nombre || "").trim()} ${(u.apellido || "").trim()}`.trim();
+      if (n2) return n2.replace(/\s+/g, " ");
+
+      const n3 = (u.displayName || "").trim();
+      if (n3) return n3.replace(/\s+/g, " ");
+
+      return (u.email || "").trim() || "Usuario";
+    }
+
+    async function fetchUsersByAgencyAndRoles(agencia) {
+      // Intento #1: campo "rol" y agencia en "department"
+      try {
+        const q1 = query(
+          collection(db, "users"),
+          where("department", "==", agencia),
+          where("rol", "in", ROLES_PERMITIDOS)
+        );
+        const s1 = await getDocs(q1);
+        return s1.docs.map((d) => ({ id: d.id, ...d.data() }));
+      } catch (e1) {
+        // Intento #2: campo "role" y agencia en "department"
+        try {
+          const q2 = query(
+            collection(db, "users"),
+            where("department", "==", agencia),
+            where("role", "in", ROLES_PERMITIDOS)
+          );
+          const s2 = await getDocs(q2);
+          return s2.docs.map((d) => ({ id: d.id, ...d.data() }));
+        } catch (e2) {
+          // Intento #3: agencia en "agenciaAsignada" (por si así está el perfil)
+          // NOTA: Firestore no permite OR directo; probamos por separado.
+          try {
+            const q3 = query(
+              collection(db, "users"),
+              where("agenciaAsignada", "==", agencia),
+              where("rol", "in", ROLES_PERMITIDOS)
+            );
+            const s3 = await getDocs(q3);
+            return s3.docs.map((d) => ({ id: d.id, ...d.data() }));
+          } catch (e3) {
+            try {
+              const q4 = query(
+                collection(db, "users"),
+                where("agenciaAsignada", "==", agencia),
+                where("role", "in", ROLES_PERMITIDOS)
+              );
+              const s4 = await getDocs(q4);
+              return s4.docs.map((d) => ({ id: d.id, ...d.data() }));
+            } catch (e4) {
+              console.error("No se pudo consultar users por roles/agencia:", e4);
+              return [];
+            }
+          }
+        }
+      }
+    }
+
     async function cargarEjecutivosDeAgencia() {
       if (!gerenteDept) return;
 
@@ -201,36 +266,68 @@
       const selectDestino = document.getElementById("select-ejecutivo-destino");
       const inputBuscarDui = document.getElementById("buscar-dui");
 
-      setLoading("Construyendo lista de ejecutivos…");
+      setLoading(`Cargando usuarios (${ROLES_PERMITIDOS.join(", ")}) de ${gerenteDept}…`);
 
       ejecutivos = [];
       ejecutivosMap = {};
 
+      // 2.1 Ejecutivos desde USERS (ya NO requiere tener créditos)
+      const users = await fetchUsersByAgencyAndRoles(gerenteDept);
+
+      users.forEach((u) => {
+        const nombreDisplay = buildUserDisplayName(u);
+        const keyNorm = normalizeName(nombreDisplay);
+        if (!keyNorm) return;
+
+        if (!ejecutivosMap[keyNorm]) {
+          ejecutivosMap[keyNorm] = {
+            keyNorm,
+            nombreDisplay,
+            asignacionID: u.id || null, // uid del user (doc id)
+            variantes: new Set([nombreDisplay]),
+            source: "users",
+          };
+          ejecutivos.push(ejecutivosMap[keyNorm]);
+        } else {
+          // Si ya existía por alguna razón, preferimos el UID del users
+          if (!ejecutivosMap[keyNorm].asignacionID && u.id) {
+            ejecutivosMap[keyNorm].asignacionID = u.id;
+          }
+          ejecutivosMap[keyNorm].variantes.add(nombreDisplay);
+        }
+      });
+
+      // 2.2 (Opcional pero recomendado) Añadir nombres que existan en créditos aunque no estén en users
+      //     Esto evita que “asignadoA” legacy quede sin opción al migrar.
       creditosAgencia.forEach((c) => {
         const raw = (c.asignadoA || "");
         const keyNorm = normalizeName(raw);
         if (!keyNorm) return;
 
         if (!ejecutivosMap[keyNorm]) {
-          const nombreDisplay = (raw || "").trim().replace(/\s+/g, " ");
+          const nombreDisplay = raw.trim().replace(/\s+/g, " ");
           ejecutivosMap[keyNorm] = {
             keyNorm,
             nombreDisplay: nombreDisplay || keyNorm,
             asignacionID: c.AsignacionID || c.asignacionID || null,
-            variantes: new Set(),
+            variantes: new Set([raw]),
+            source: "creditos",
           };
           ejecutivos.push(ejecutivosMap[keyNorm]);
-        }
-
-        ejecutivosMap[keyNorm].variantes.add(raw);
-
-        if (!ejecutivosMap[keyNorm].asignacionID) {
-          ejecutivosMap[keyNorm].asignacionID = c.AsignacionID || c.asignacionID || null;
+        } else {
+          // Guardar variante
+          ejecutivosMap[keyNorm].variantes.add(raw);
+          // Si no tenía asignacionID y este crédito sí trae, lo guardamos
+          if (!ejecutivosMap[keyNorm].asignacionID) {
+            ejecutivosMap[keyNorm].asignacionID = c.AsignacionID || c.asignacionID || null;
+          }
         }
       });
 
+      // Ordenar
       ejecutivos.sort((a, b) => a.nombreDisplay.localeCompare(b.nombreDisplay, "es"));
 
+      // Pintar selects
       selectOrigen.innerHTML = '<option value="">Selecciona un ejecutivo…</option>';
       selectDestino.innerHTML = '<option value="">Selecciona nuevo ejecutivo…</option>';
 
@@ -245,6 +342,7 @@
         selectDestino.appendChild(opt2);
       });
 
+      // Reset tabla / filtros
       document.getElementById("tabla-creditos-body").innerHTML = "";
       creditosDelEjecutivo = [];
       creditosMostrados = [];
@@ -254,9 +352,9 @@
       setCounts();
 
       if (ejecutivos.length) {
-        setLoading(`Agencia: ${gerenteDept} · Ejecutivos detectados: ${ejecutivos.length}`);
+        setLoading(`Agencia: ${gerenteDept} · Usuarios disponibles: ${ejecutivos.length}`);
       } else {
-        setLoading(`Agencia: ${gerenteDept} · No se encontraron ejecutivos con créditos.`);
+        setLoading(`Agencia: ${gerenteDept} · No hay usuarios con rol Caja/Gerente/Ejecutivo.`);
       }
     }
 
@@ -289,6 +387,8 @@
 
       setLoading("Cargando créditos asignados a " + nombreDisplay + "…");
 
+      // IMPORTANTE: sigue comparando por asignadoA (normalizado)
+      // (porque tus créditos hoy están asignados por nombre en asignadoA)
       creditosDelEjecutivo = creditosAgencia.filter((c) => {
         const k = normalizeName(c.asignadoA);
         return k && k === keyNormEjecutivo;
@@ -303,11 +403,6 @@
 
       renderTablaCreditos(creditosMostrados);
       setCounts();
-
-      if (!creditosDelEjecutivo.length) {
-        setLoading("Este ejecutivo no tiene créditos en esta agencia (según asignadoA).");
-        return;
-      }
 
       setLoading(
         `Agencia: ${gerenteDept} · Créditos del ejecutivo: ${creditosDelEjecutivo.length}` +
@@ -424,6 +519,7 @@
               asignadoA_norm: normalizeName(nombreDestino),
             };
 
+            // Si tenemos UID del usuario destino, lo seteamos
             if (asignacionDestino) dataUpdate.AsignacionID = asignacionDestino;
 
             return updateDoc(ref, dataUpdate);
@@ -432,7 +528,6 @@
 
         showToast("Créditos reasignados correctamente.");
 
-        // Refrescar la agencia seleccionada
         await cargarCreditosDeAgencia();
         await cargarEjecutivosDeAgencia();
 
@@ -461,6 +556,8 @@
         showToast("Selecciona un ejecutivo para eliminar.", "error");
         return;
       }
+
+      // Si tiene créditos, no se elimina
       if (creditosDelEjecutivo.length > 0) {
         showToast("El ejecutivo todavía tiene créditos asignados. No se puede eliminar.", "error");
         return;
@@ -471,7 +568,7 @@
       const asignID = ejecutivo?.asignacionID || null;
 
       if (!asignID) {
-        showToast("No se encontró AsignacionID para este ejecutivo en los créditos.", "error");
+        showToast("No se encontró el ID del usuario (UID) para este ejecutivo.", "error");
         return;
       }
 
@@ -504,7 +601,6 @@
       const btnLimpiar = document.getElementById("btn-limpiar-busqueda");
       const btnSeleccionarTodos = document.getElementById("btn-seleccionar-todos");
 
-      // NUEVO: cargar agencias habilitadas
       initSelectAgencias();
 
       // Auth (solo valida sesión y muestra correo)
@@ -515,28 +611,10 @@
         }
 
         document.getElementById("usuario-email").textContent = user.email || "";
-
-        // Ya NO forzamos la agencia por el usuario. Solo sugerimos si existe.
-        try {
-          const userRef = doc(db, "users", user.uid);
-          const snap = await getDoc(userRef);
-          if (snap.exists()) {
-            const data = snap.data();
-            const sugerida = data.department || data.agenciaAsignada || "";
-            if (sugerida && AGENCIAS_HABILITADAS.includes(sugerida)) {
-              selectAgencia.value = sugerida; // sugerida, pero editable
-              await onAgenciaSeleccionada(sugerida);
-              return;
-            }
-          }
-        } catch (e) {
-          console.warn("No se pudo leer perfil para sugerir agencia:", e);
-        }
-
         setLoading("Selecciona una agencia para comenzar.");
       });
 
-      // NUEVO: cambio manual de agencia
+      // Cambio manual de agencia
       selectAgencia.addEventListener("change", async (e) => {
         await onAgenciaSeleccionada(e.target.value);
       });
@@ -1032,8 +1110,8 @@
       <div>
         <h1>Reasignación de Créditos</h1>
         <p class="subtitle">
-          Mueve créditos de un ejecutivo a otro dentro de la misma agencia.
-          La lista de ejecutivos ignora espacios extra en <strong>asignadoA</strong>.
+          Los ejecutivos ahora se cargan desde <strong>users</strong> por rol: <strong>Caja, Gerente, Ejecutivo</strong>
+          (no necesitan tener créditos asignados).
         </p>
       </div>
 

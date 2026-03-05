@@ -540,7 +540,14 @@
             if (pagoEnCurso) return;
             pagoEnCurso = true;
             pagarBtn.disabled = true;
-            await verificarPagoDuplicadoYConfirmar({ cliente, creditoData, montoNum: round2(montoNum), closeModal });
+
+            // ✅ PASAMOS closeModal para cerrarlo ANTES del pago (no después)
+            await verificarPagoDuplicadoYConfirmar({
+              cliente,
+              creditoData,
+              montoNum: round2(montoNum),
+              closeModal
+            });
           }catch(err){
             alert("Error al realizar el pago: " + (err?.message || err));
           } finally {
@@ -618,24 +625,29 @@
               </div>
             </div>
           </div>`;
+
         document.getElementById("cancelar-dup").onclick = () => {
           modalRoot.innerHTML = "";
           pagoEnCurso = false;
         };
+
+        // ✅ FIX: cerramos modal de duplicado y el modal de monto ANTES del pago.
+        // ❌ No hacemos closeModal() después del pago, porque borra la reseña.
         document.getElementById("continuar-dup").onclick = async () => {
           if (pagoEnCurso) return;
           pagoEnCurso = true;
           try{
-            modalRoot.innerHTML = "";
-            await realizarPago(cliente, montoNum);
-            closeModal();
+            modalRoot.innerHTML = "";  // cierra modal duplicado
+            closeModal();              // cierra modal "ingresar monto"
+            await realizarPago(cliente, montoNum); // aquí se muestra la reseña y SE QUEDA
           } finally {
             pagoEnCurso = false;
           }
         };
       } else {
-        await realizarPago(cliente, montoNum);
+        // ✅ FIX: cerramos modal "ingresar monto" ANTES del pago, para que no borre la reseña
         closeModal();
+        await realizarPago(cliente, montoNum);
       }
     }
 
@@ -810,8 +822,6 @@
           : [];
 
         // ======== CAMBIO: si pagan de más y el crédito puede quedar en 0, NO registramos excedente ========
-        // total para cancelar (según valores actuales del crédito)
-        // Nota: aquí usamos las métricas del crédito tal cual (cron), para no recalcular interés.
         const totalParaCancelar = round2(add(add(saldoActual, interesActual), multasAcumuladas));
 
         const montoRecibido = round2(n(montoNum));
@@ -874,21 +884,17 @@
         abonarCapital(c=> !isBeforeTodayLocal(c.fecha) && !isTodayLocal(c.fecha));
 
         // ======== CAMBIO: si aún sobra restante y el saldo NO ha llegado a 0, aplicar como capital extra ========
-        // Esto evita casos como $6.51 "perdidos". Se aplica al saldo (contable) y si hay dónde, también a amortización.
         let pagoCapitalFueraPlan = 0;
         if (restante > EPS) {
-          // Calculamos saldo provisional según capital aplicado
           let saldoProvisional = round2(saldoAnterior - pagoCapital);
           if (saldoProvisional < 0) saldoProvisional = 0;
 
           if (saldoProvisional > TOL) {
-            // Aplicar lo que se pueda como capital extra al saldo
             const extra = Math.min(restante, saldoProvisional);
             if (extra > EPS){
               pagoCapital = round2(pagoCapital + extra);
               restante = round2(restante - extra);
 
-              // Intento de distribuir a cuotas futuras si existe faltaCap (por consistencia)
               let extraPend = extra;
               for (let i=0; i<amortizacion.length && extraPend>EPS; i++){
                 const c = amortizacion[i];
@@ -899,14 +905,11 @@
                   extraPend = round2(extraPend - ab);
                 }
               }
-              // Si no hubo dónde colocarlo en amortización, queda como capital fuera de plan (solo auditado)
               if (extraPend > EPS) {
                 pagoCapitalFueraPlan = round2(pagoCapitalFueraPlan + extraPend);
               }
             }
           }
-          // Si saldoProvisional ya está en 0 (o dentro de tolerancia), el excedente ya se trató arriba con "excedente"
-          // y montoAplicado ya fue recortado.
         }
 
         // ======== 5) Estados por cuota (SIN inventar capital pagado) ========
@@ -914,9 +917,8 @@
           const c = amortizacion[i];
           const faltaCap = Math.max(0, round2(n(c.capital) - n(c.montoPagado)));
 
-          const capOk = (faltaCap <= CLOSE_TOL); // tolerancia (solo para estado)
+          const capOk = (faltaCap <= CLOSE_TOL);
           if (capOk){
-            // IMPORTANTE: no forzamos c.montoPagado = c.capital (evita desfaces)
             c.estado = "Pagada";
             if (!c.fechaPagoReal) c.fechaPagoReal = fechaPago;
           }
@@ -943,7 +945,6 @@
           }
         }
 
-        // PPD = interesActual + capitalAtrasado + multas No Pagadas
         paraPonerseAlDia = round2(add(add(interesActual, capitalAtrasado), multasAcumuladas));
 
         // ======== 7) saldoActual (contable) ========
@@ -951,10 +952,9 @@
         if (saldoNuevo < 0) saldoNuevo = 0;
 
         // ======== CAMBIO: cierre real por tolerancia (0.06) ========
-        // Si queda dentro de tolerancia, se pone en 0.00 (no solo estado)
         let ajusteCierre = 0;
         if (saldoNuevo <= TOL) {
-          ajusteCierre = saldoNuevo; // auditado
+          ajusteCierre = saldoNuevo;
           saldoNuevo = 0;
         }
 
@@ -972,7 +972,7 @@
           }
         }
 
-        // ======== 9) Registrar pago (se guarda SOLO lo aplicado, y se audita lo recibido/excedente) ========
+        // ======== 9) Registrar pago ========
         await window.firebaseAddDoc("pagos", {
           clienteID: creditoData.clienteID,
           creditoID: cliente.id,
@@ -980,10 +980,8 @@
           apellido: creditoData.apellido || "",
           numeroDui: creditoData.numeroDui || "",
 
-          // Campo histórico: montoPagado = aplicado (para no contaminar contabilidad)
           montoPagado: round2(montoAplicado),
 
-          // Auditoría adicional (nuevo, no rompe)
           montoRecibido: round2(montoRecibido),
           excedenteDevuelto: round2(excedente),
           ajusteCierre: round2(ajusteCierre),
@@ -1027,7 +1025,6 @@
           saldoAncla: round2(saldoNuevo),
           interesPendienteAncla: round2(interesActual),
 
-          // Auditoría de cierre (no rompe)
           ajusteCierre: round2(ajusteCierre),
           pagoCapitalFueraPlan: round2(pagoCapitalFueraPlan)
         });
@@ -1080,6 +1077,5 @@
   </script>
 </body>
 </html>
-
 
 

@@ -158,7 +158,7 @@
       border:1px solid rgba(36,59,134,.18); border-radius:12px; padding-left:10px; }
     .input-group span{ color: var(--brand-green); font-size:1.15rem; font-weight:800; margin-right:6px; }
     .input-group input{ border:none; background:transparent; padding:11px 10px; color:var(--text); font-size:1.12rem; outline:none; width:100%; }
-    .modal-btns{ display:flex; gap:10px; justify-content:flex-end; margin-top:10px; }
+    .modal-btns{ display:flex; gap:10px; justify-content:flex-end; margin-top:10px; flex-wrap:wrap; }
     .modal-btn-cancel{
       background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%); color:#fff;
       border:none; padding:10px 16px; border-radius:10px; cursor:pointer; font-weight:800; }
@@ -171,6 +171,26 @@
     .kpi b{ display:block; font-size:.98rem; margin-bottom:4px; color:#0f6aa0 }
     .kpi span{ font-weight:800 }
     .w-100{ width:100% }
+
+    /* ====== Resumen / Reseña post-pago ====== */
+    .summary-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+    .summary-box{
+      background:rgba(36,59,134,.06);
+      border:1px solid rgba(36,59,134,.18);
+      border-radius:12px;
+      padding:10px;
+    }
+    .summary-box b{ display:block; margin-bottom:6px; color:#0f6aa0; }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 10px; border-radius:999px;
+      background:rgba(19,182,107,.10); border:1px solid rgba(19,182,107,.25);
+      font-weight:800;
+    }
+    .pill.warn{
+      background:rgba(248,175,64,.14); border:1px solid rgba(248,175,64,.28);
+    }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New"; }
   </style>
 </head>
 <body>
@@ -225,14 +245,16 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import {
       getFirestore, collection, query, where, getDocs, doc, updateDoc, addDoc,
-      runTransaction, setDoc
+      runTransaction
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
     /* =================== NUM & DATE SAFETY =================== */
     const EPS = 1e-6;
-    const TOL = 0.01;       // tolerancia centavos
-    const CLOSE_TOL = 0.05; // tolerancia para cerrar capital/estado
+
+    // ===== CAMBIO: tolerancias para producción =====
+    const TOL = 0.06;       // tolerancia en dólares (6 centavos) para cierre de saldo/estado
+    const CLOSE_TOL = 0.06; // tolerancia para considerar cuota cerrada (sin inventar capital)
 
     const nowISO = () => new Date().toISOString();
     const todayKey = () => nowISO().substring(0, 10); // "YYYY-MM-DD"
@@ -240,7 +262,7 @@
     const n = (x) => {
       if (typeof x === "number" && Number.isFinite(x)) return x;
       if (x === null || x === undefined) return 0;
-      const v = parseFloat(String(x).replace(",", ".")); 
+      const v = parseFloat(String(x).replace(",", "."));
       return Number.isFinite(v) ? v : 0;
     };
     const add = (a,b)=> n(a)+n(b);
@@ -522,7 +544,6 @@
           }catch(err){
             alert("Error al realizar el pago: " + (err?.message || err));
           } finally {
-            // Si no hubo redirección aún, reactivamos botón
             pagoEnCurso = false;
             const btn = document.getElementById("pagar-btn");
             if (btn) btn.disabled = false;
@@ -575,11 +596,10 @@
           modalRoot.innerHTML = "";
           pagoEnCurso = false;
         };
-        return; // NO llama a realizarPago
+        return;
       }
 
       if (hayPagoHoy) {
-        // Advertencia suave: hay pagos hoy, pero no del mismo monto
         const lista = pagosHoy.map(p => `• $${round2(n(p.montoPagado)).toFixed(2)} (correlativo: ${p.correlativo ?? "s/d"})`).join("<br/>");
         const msgExtra = `<div style="margin-top:8px;color:#8a6d3b">Ya existe al menos un pago HOY para este crédito.</div>`;
         modalRoot.innerHTML = `
@@ -614,13 +634,110 @@
           }
         };
       } else {
-        // No hay pagos hoy: proceder directo
         await realizarPago(cliente, montoNum);
         closeModal();
       }
     }
 
-    /* =================== LÓGICA DE PAGO (con doble chequeo) =================== */
+    /* =================== MODAL RESEÑA POST-PAGO =================== */
+    function mostrarResenaPostPago({
+      correlativoStr,
+      clienteNombre,
+      clienteApellido,
+      numeroDui,
+      sucursal,
+      fechaPago,
+      montoRecibido,
+      montoAplicado,
+      excedente,
+      pagoMultas,
+      pagoInteres,
+      pagoCapital,
+      pagoCapitalFueraPlan,
+      saldoAnterior,
+      saldoNuevo,
+      interesAntes,
+      interesDespues,
+      ppdAntes,
+      ppdDespues,
+      estadoNuevo
+    }){
+      const modalRoot = document.getElementById("modal-root");
+      const excedeTxt = excedente > EPS
+        ? `<div class="pill warn"><i class="fa-solid fa-circle-exclamation"></i> Excedente a devolver: <span class="mono">$${round2(excedente).toFixed(2)}</span></div>`
+        : `<div class="pill"><i class="fa-solid fa-circle-check"></i> Pago aplicado correctamente</div>`;
+
+      const fueraPlanTxt = (pagoCapitalFueraPlan > EPS)
+        ? `<div class="muted" style="margin-top:8px;"><i class="fa-solid fa-triangle-exclamation"></i> Nota: <b>$${round2(pagoCapitalFueraPlan).toFixed(2)}</b> se aplicó como <b>capital fuera de plan</b> (amortización desfasada).</div>`
+        : "";
+
+      const url = `ticket_page.html?correlativo=${encodeURIComponent(correlativoStr)}` +
+        `&cliente=${encodeURIComponent(clienteNombre)}` +
+        `&apellido=${encodeURIComponent(clienteApellido || '')}` +
+        `&numeroDui=${encodeURIComponent(numeroDui || '')}` +
+        `&monto=${encodeURIComponent(round2(montoAplicado).toFixed(2))}` +
+        `&agencia=${encodeURIComponent(sucursal)}` +
+        `&fecha=${encodeURIComponent(fechaPago)}` +
+        `&pagoCapital=${encodeURIComponent(round2(pagoCapital).toFixed(2))}` +
+        `&pagoInteres=${encodeURIComponent(round2(pagoInteres).toFixed(2))}` +
+        `&pagoMultas=${encodeURIComponent(round2(pagoMultas).toFixed(2))}` +
+        `&saldoRestante=${encodeURIComponent(round2(saldoNuevo).toFixed(2))}` +
+        `&montoRecibido=${encodeURIComponent(round2(montoRecibido).toFixed(2))}` +
+        `&excedente=${encodeURIComponent(round2(excedente).toFixed(2))}`;
+
+      modalRoot.innerHTML = `
+        <div class="modal-bg">
+          <div class="modal">
+            <div class="modal-title"><i class="fas fa-receipt" style="color:#243b86"></i> Reseña del pago</div>
+            <div class="modal-sub">Correlativo: <b class="mono">${correlativoStr}</b> • Sucursal: <b>${sucursal}</b></div>
+
+            ${excedeTxt}
+
+            <div class="summary-grid">
+              <div class="summary-box">
+                <b>Monto</b>
+                <div>Recibido: <span class="mono">$${round2(montoRecibido).toFixed(2)}</span></div>
+                <div>Aplicado: <span class="mono">$${round2(montoAplicado).toFixed(2)}</span></div>
+              </div>
+              <div class="summary-box">
+                <b>Aplicación</b>
+                <div>Multas: <span class="mono">$${round2(pagoMultas).toFixed(2)}</span></div>
+                <div>Interés: <span class="mono">$${round2(pagoInteres).toFixed(2)}</span></div>
+                <div>Capital: <span class="mono">$${round2(pagoCapital).toFixed(2)}</span></div>
+              </div>
+
+              <div class="summary-box">
+                <b>Saldo</b>
+                <div>Anterior: <span class="mono">$${round2(saldoAnterior).toFixed(2)}</span></div>
+                <div>Después: <span class="mono">$${round2(saldoNuevo).toFixed(2)}</span></div>
+              </div>
+              <div class="summary-box">
+                <b>Estado / PPD</b>
+                <div>Estado: <b>${estadoNuevo}</b></div>
+                <div>PPD antes: <span class="mono">$${round2(ppdAntes).toFixed(2)}</span></div>
+                <div>PPD después: <span class="mono">$${round2(ppdDespues).toFixed(2)}</span></div>
+              </div>
+            </div>
+
+            <div class="summary-box" style="margin-top:10px;">
+              <b>Interés (informativo)</b>
+              <div>Antes: <span class="mono">$${round2(interesAntes).toFixed(2)}</span> • Después: <span class="mono">$${round2(interesDespues).toFixed(2)}</span></div>
+              ${fueraPlanTxt}
+            </div>
+
+            <div class="modal-btns" style="margin-top:14px;">
+              <button class="modal-btn-cancel" id="cerrar-resena">Cerrar</button>
+              <button class="modal-btn-pay" id="continuar-ticket"><i class="fa-solid fa-print"></i> Continuar a ticket</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById("cerrar-resena").onclick = () => { modalRoot.innerHTML = ""; };
+      document.getElementById("continuar-ticket").onclick = () => { window.location.href = url; };
+    }
+
+    /* =================== LÓGICA DE PAGO (con reseña + tolerancia + excedente) =================== */
     async function realizarPago(cliente, montoNum){
       const fechaPago = nowISO();
       try{
@@ -636,7 +753,7 @@
         // Traer crédito
         const { data: creditoData } = await fetchCreditoById(cliente.id);
 
-        // 🔐 SEGUNDO CHEQUEO: mismo día + mismo monto, usando datos recién escritos
+        // 🔐 SEGUNDO CHEQUEO: mismo día + mismo monto
         const fechaHoy = todayKey();
         const pagosSnap = await getDocs(query(collection(db, "pagos"), where("creditoID", "==", cliente.id)));
         const pagosHoy = pagosSnap.docs
@@ -664,10 +781,14 @@
         });
 
         // ======== 1) Normalizar estructuras ========
+        const saldoAnterior = round2(n(creditoData.saldoActual));
         let saldoActual = round2(n(creditoData.saldoActual));
         let interesActual = round2(n(creditoData.interesActual)); // TAL CUAL Cron
         let multasAcumuladas = round2(n(creditoData.multasAcumuladas));
         let paraPonerseAlDia = round2(n(creditoData.paraPonerseAlDia));
+
+        const ppdAntes = round2(n(creditoData.paraPonerseAlDia));
+        const interesAntes = round2(n(creditoData.interesActual));
 
         let amortizacion = Array.isArray(creditoData.amortizacion) ? JSON.parse(JSON.stringify(creditoData.amortizacion)) : [];
         amortizacion = amortizacion.map(c => ({
@@ -688,7 +809,21 @@
           ? JSON.parse(JSON.stringify(creditoData.historialMultas)).filter(m => !!m)
           : [];
 
-        let restante = round2(n(montoNum));
+        // ======== CAMBIO: si pagan de más y el crédito puede quedar en 0, NO registramos excedente ========
+        // total para cancelar (según valores actuales del crédito)
+        // Nota: aquí usamos las métricas del crédito tal cual (cron), para no recalcular interés.
+        const totalParaCancelar = round2(add(add(saldoActual, interesActual), multasAcumuladas));
+
+        const montoRecibido = round2(n(montoNum));
+        let excedente = 0;
+        let montoAplicado = montoRecibido;
+
+        if (montoRecibido > totalParaCancelar + EPS) {
+          excedente = round2(montoRecibido - totalParaCancelar);
+          montoAplicado = round2(montoRecibido - excedente); // se registra SOLO lo aplicado
+        }
+
+        let restante = round2(montoAplicado);
         let pagoMultas = 0, pagoInteres = 0, pagoCapital = 0;
 
         // ======== 2) MULTAS primero ========
@@ -721,7 +856,7 @@
           interesActual = round2(interesActual - aplicadoInteres);
         }
 
-        // ======== 4) CAPITAL en cadena ========
+        // ======== 4) CAPITAL en cadena (por cuotas) ========
         function abonarCapital(selectorFn){
           for (let i=0; i<amortizacion.length && restante>EPS; i++){
             const c = amortizacion[i];
@@ -738,12 +873,50 @@
         abonarCapital(c=> isTodayLocal(c.fecha));
         abonarCapital(c=> !isBeforeTodayLocal(c.fecha) && !isTodayLocal(c.fecha));
 
-        // ======== 5) Estados por cuota (por capital) ========
+        // ======== CAMBIO: si aún sobra restante y el saldo NO ha llegado a 0, aplicar como capital extra ========
+        // Esto evita casos como $6.51 "perdidos". Se aplica al saldo (contable) y si hay dónde, también a amortización.
+        let pagoCapitalFueraPlan = 0;
+        if (restante > EPS) {
+          // Calculamos saldo provisional según capital aplicado
+          let saldoProvisional = round2(saldoAnterior - pagoCapital);
+          if (saldoProvisional < 0) saldoProvisional = 0;
+
+          if (saldoProvisional > TOL) {
+            // Aplicar lo que se pueda como capital extra al saldo
+            const extra = Math.min(restante, saldoProvisional);
+            if (extra > EPS){
+              pagoCapital = round2(pagoCapital + extra);
+              restante = round2(restante - extra);
+
+              // Intento de distribuir a cuotas futuras si existe faltaCap (por consistencia)
+              let extraPend = extra;
+              for (let i=0; i<amortizacion.length && extraPend>EPS; i++){
+                const c = amortizacion[i];
+                const faltaCap = Math.max(0, round2(n(c.capital) - n(c.montoPagado)));
+                if (faltaCap > EPS){
+                  const ab = Math.min(extraPend, faltaCap);
+                  c.montoPagado = round2(n(c.montoPagado) + ab);
+                  extraPend = round2(extraPend - ab);
+                }
+              }
+              // Si no hubo dónde colocarlo en amortización, queda como capital fuera de plan (solo auditado)
+              if (extraPend > EPS) {
+                pagoCapitalFueraPlan = round2(pagoCapitalFueraPlan + extraPend);
+              }
+            }
+          }
+          // Si saldoProvisional ya está en 0 (o dentro de tolerancia), el excedente ya se trató arriba con "excedente"
+          // y montoAplicado ya fue recortado.
+        }
+
+        // ======== 5) Estados por cuota (SIN inventar capital pagado) ========
         for (let i=0;i<amortizacion.length;i++){
           const c = amortizacion[i];
-          const capOk = n(c.montoPagado) + CLOSE_TOL >= n(c.capital);
+          const faltaCap = Math.max(0, round2(n(c.capital) - n(c.montoPagado)));
+
+          const capOk = (faltaCap <= CLOSE_TOL); // tolerancia (solo para estado)
           if (capOk){
-            c.montoPagado = round2(n(c.capital));
+            // IMPORTANTE: no forzamos c.montoPagado = c.capital (evita desfaces)
             c.estado = "Pagada";
             if (!c.fechaPagoReal) c.fechaPagoReal = fechaPago;
           }
@@ -773,30 +946,20 @@
         // PPD = interesActual + capitalAtrasado + multas No Pagadas
         paraPonerseAlDia = round2(add(add(interesActual, capitalAtrasado), multasAcumuladas));
 
-        // ======== 7) saldoActual (simple) ========
-        const saldoAnterior = round2(n(creditoData.saldoActual));
+        // ======== 7) saldoActual (contable) ========
         let saldoNuevo = round2(saldoAnterior - pagoCapital);
         if (saldoNuevo < 0) saldoNuevo = 0;
 
-        // PARCHE B: Si queda un residuo minúsculo, empújalo a capital y cierra en 0.00
-        if (saldoNuevo <= TOL || saldoNuevo <= CLOSE_TOL) {
-          let faltaPendiente = saldoNuevo;
-          for (let i = amortizacion.length - 1; i >= 0 && faltaPendiente > EPS; i--) {
-            const c = amortizacion[i];
-            const faltaCap = round2(n(c.capital) - n(c.montoPagado));
-            if (faltaCap > EPS) {
-              const abono = Math.min(faltaPendiente, faltaCap);
-              c.montoPagado = round2(n(c.montoPagado) + abono);
-              pagoCapital = round2(pagoCapital + abono);
-              faltaPendiente = round2(faltaPendiente - abono);
-            }
-          }
-          saldoNuevo = round2(saldoAnterior - pagoCapital);
-          if (saldoNuevo < TOL) saldoNuevo = 0;
+        // ======== CAMBIO: cierre real por tolerancia (0.06) ========
+        // Si queda dentro de tolerancia, se pone en 0.00 (no solo estado)
+        let ajusteCierre = 0;
+        if (saldoNuevo <= TOL) {
+          ajusteCierre = saldoNuevo; // auditado
+          saldoNuevo = 0;
         }
 
         // ======== 8) Estado del crédito ========
-        let nuevoEstado = (saldoNuevo <= EPS) ? "Pagado" : (creditoData.estadoCredito || "Activo");
+        let nuevoEstado = (saldoNuevo <= TOL) ? "Pagado" : (creditoData.estadoCredito || "Activo");
         if (nuevoEstado !== "Pagado"){
           if (cuotasAtrasadas > 0){
             if (maxDiasAtraso <= 30) nuevoEstado = "Mora Temprana";
@@ -809,14 +972,23 @@
           }
         }
 
-        // ======== 9) Recibo (auditoría) ========
+        // ======== 9) Registrar pago (se guarda SOLO lo aplicado, y se audita lo recibido/excedente) ========
         await window.firebaseAddDoc("pagos", {
           clienteID: creditoData.clienteID,
           creditoID: cliente.id,
           nombres: creditoData.nombre,
           apellido: creditoData.apellido || "",
           numeroDui: creditoData.numeroDui || "",
-          montoPagado: round2(montoNum),
+
+          // Campo histórico: montoPagado = aplicado (para no contaminar contabilidad)
+          montoPagado: round2(montoAplicado),
+
+          // Auditoría adicional (nuevo, no rompe)
+          montoRecibido: round2(montoRecibido),
+          excedenteDevuelto: round2(excedente),
+          ajusteCierre: round2(ajusteCierre),
+          pagoCapitalFueraPlan: round2(pagoCapitalFueraPlan),
+
           fechaPago: fechaPago,
           pagoMultas: round2(pagoMultas),
           pagoInteres: round2(pagoInteres),
@@ -827,7 +999,7 @@
           sucursal: sucursal,
           correlativo: Number(correlativoStr),
           timestamp: new Date(),
-          paraPonerseAlDiaAntes: round2(n(creditoData.paraPonerseAlDia)),
+          paraPonerseAlDiaAntes: round2(ppdAntes),
           paraPonerseAlDiaDespues: round2(paraPonerseAlDia)
         });
 
@@ -853,22 +1025,39 @@
           fechaUltimoCalculoIntereses: pagoDiaLocal,
           fechaAnclaInteres: new Date(fechaPago),
           saldoAncla: round2(saldoNuevo),
-          interesPendienteAncla: round2(interesActual)
+          interesPendienteAncla: round2(interesActual),
+
+          // Auditoría de cierre (no rompe)
+          ajusteCierre: round2(ajusteCierre),
+          pagoCapitalFueraPlan: round2(pagoCapitalFueraPlan)
         });
 
-        // ======== 11) Redirigir a ticket ========
-        const url = `ticket_page.html?correlativo=${encodeURIComponent(correlativoStr)}` +
-          `&cliente=${encodeURIComponent(creditoData.nombre)}` +
-          `&apellido=${encodeURIComponent(creditoData.apellido || '')}` +
-          `&numeroDui=${encodeURIComponent(creditoData.numeroDui || '')}` +
-          `&monto=${encodeURIComponent(round2(montoNum).toFixed(2))}` +
-          `&agencia=${encodeURIComponent(sucursal)}` +
-          `&fecha=${encodeURIComponent(fechaPago)}` +
-          `&pagoCapital=${encodeURIComponent(round2(pagoCapital).toFixed(2))}` +
-          `&pagoInteres=${encodeURIComponent(round2(pagoInteres).toFixed(2))}` +
-          `&pagoMultas=${encodeURIComponent(round2(pagoMultas).toFixed(2))}` +
-          `&saldoRestante=${encodeURIComponent(round2(saldoNuevo).toFixed(2))}`;
-        window.location.href = url;
+        // ======== 11) Mostrar reseña (modal) y botón "Continuar a ticket" ========
+        const ppdDespues = round2(paraPonerseAlDia);
+        const interesDespues = round2(interesActual);
+
+        mostrarResenaPostPago({
+          correlativoStr,
+          clienteNombre: creditoData.nombre,
+          clienteApellido: creditoData.apellido || "",
+          numeroDui: creditoData.numeroDui || "",
+          sucursal,
+          fechaPago,
+          montoRecibido,
+          montoAplicado,
+          excedente,
+          pagoMultas,
+          pagoInteres,
+          pagoCapital,
+          pagoCapitalFueraPlan,
+          saldoAnterior,
+          saldoNuevo,
+          interesAntes,
+          interesDespues,
+          ppdAntes,
+          ppdDespues,
+          estadoNuevo: nuevoEstado
+        });
 
       }catch(e){
         console.error(e);

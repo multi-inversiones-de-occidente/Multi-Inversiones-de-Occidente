@@ -228,6 +228,17 @@
     function round2(v){ return Math.round((v + Number.EPSILON)*100)/100; }
     function money(v){ return `$${Number(v||0).toFixed(2)}`; }
 
+    /* ===========================
+       ✅ NUEVO helper (solo para FIX)
+       =========================== */
+    function getTodayYMDLocal(){
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      const day = String(d.getDate()).padStart(2,'0');
+      return `${y}-${m}-${day}`;
+    }
+
     function saldoDesdeAmortizacion(amortizacion){
       let totalCents = 0;
       for (const c of (amortizacion || [])) {
@@ -911,10 +922,31 @@
       }
       const saldoPendiente = round2(saldoPendienteRaw);
 
-      // Interés “actual” desde fecha valor hasta hoy (informativo para métricas)
-      const fechaHoy = atLocalMidnight(new Date());
-      const diasPost = diasEntreFechasSinHora(fechaAbonoYMD, fechaHoy);
-      const interesActual = round2(saldoPendiente * tasaDiaria * diasPost);
+      /* ===========================================================
+         ✅ FIX: interesActual NO debe anclarse a fechaValor retroactiva
+         - Si NO pagó capital y NO cambió saldoActual => NO bajar interesActual
+         - Si cambió saldo / pagó capital => recalcular interesActual al corte de HOY usando SOLO RECIBOS
+         =========================================================== */
+      const saldoAntesDoc = round2(num(creditoAntes?.saldoActual, 0));
+      const saldoNoCambio = Math.abs(round2(saldoPendiente) - saldoAntesDoc) < 0.01;
+
+      let interesActualFinal = 0;
+      let fechaUltimoCalculoInteresesFinal = creditoAntes?.fechaUltimoCalculoIntereses || null;
+
+      if (round2(pagoCapital) === 0 && saldoNoCambio) {
+        interesActualFinal = round2(num(creditoAntes?.interesActual, 0));
+        // NO tocar fechaUltimoCalculoIntereses
+      } else {
+        const hoyYMD = getTodayYMDLocal();
+        const resumenIntHoy = await calcularInteresSoloRecibos(
+          db,
+          { ...creditoSeleccionado, amortizacion, saldoActual: round2(saldoPendiente) },
+          hoyYMD
+        );
+        interesActualFinal = round2(resumenIntHoy?.interesCobrar || 0);
+        fechaUltimoCalculoInteresesFinal = new Date();
+      }
+      /* ======================= FIN FIX ======================= */
 
       // Multas acumuladas hoy (métricas)
       let multasAcumuladasFinal = 0;
@@ -951,7 +983,7 @@
         },0)
       );
 
-      const paraPonerseAlDiaFinal = round2(capitalAtrasado + multasAcumuladasFinal + interesActual);
+      const paraPonerseAlDiaFinal = round2(capitalAtrasado + multasAcumuladasFinal + interesActualFinal);
       const nuevoEstadoCredito = (saldoPendiente === 0) ? "Pagado" : ((cuotasAtrasadasFinal === 0 && multasAcumuladasFinal === 0) ? "Activo" : "Mora Temprana");
 
       // ====== PagoObj ======
@@ -1030,14 +1062,22 @@
       batch.update(doc(db, "creditos", creditoSeleccionado.id), {
         amortizacion,
         saldoActual: round2(saldoPendiente),
-        interesActual: round2(interesActual),
+
+        /* ===========================
+           ✅ SOLO CAMBIO AQUÍ (métricas)
+           =========================== */
+        interesActual: round2(interesActualFinal),
         paraPonerseAlDia: round2(paraPonerseAlDiaFinal),
+
         historialMultas: historialMultasActualizado,
         multasAcumuladas: round2(multasAcumuladasFinal),
         estadoCredito: nuevoEstadoCredito,
         cuotasAtrasadas: cuotasAtrasadasFinal,
         capitalAtrasado: round2(capitalAtrasado),
-        fechaUltimoCalculoIntereses: new Date(),
+
+        // Si fue solo multas y no cambió saldo, NO actualices el ancla.
+        // Si cambió saldo / pagó capital, sí actualiza.
+        fechaUltimoCalculoIntereses: fechaUltimoCalculoInteresesFinal ? new Date(fechaUltimoCalculoInteresesFinal) : null,
         ultimaActualizacion: new Date()
       });
 
@@ -1094,6 +1134,7 @@
   </script>
 </body>
 </html>
+
 
 
 

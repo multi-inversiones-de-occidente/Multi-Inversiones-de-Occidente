@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
@@ -18,8 +18,29 @@
     .list-group-item { background: #181e2b; color: #fff; border-radius: 8px; padding: 8px 14px; margin-bottom: 7px; cursor: pointer; }
     .list-group-item.selected, .list-group-item:hover { background: #fb923c; color: #181818; font-weight: bold;}
     .label { color: #fb923c; font-weight: 600; margin-bottom: 4px; display: block;}
+
     .modal-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #181e21cc; z-index: 9999; display: flex; align-items: center; justify-content: center;}
-    .modal { background: #fff; color: #232a37; border-radius: 14px; box-shadow: 0 2px 32px #0007; padding: 27px 23px 18px 23px; max-width: 350px; width: 96%; font-size: 1.03rem; }
+    .modal { background: #fff; color: #232a37; border-radius: 14px; box-shadow: 0 2px 32px #0007; padding: 22px 20px 16px 20px; max-width: 430px; width: 96%; font-size: 1.03rem; }
+    .modal h3 { margin: 0 0 10px 0; color:#fb923c; }
+    .modal .row { margin: 7px 0; }
+    .modal .muted { color:#475569; font-size:.95rem; }
+    .modal .danger { color:#b91c1c; font-weight:700; }
+    .modal .ok { color:#0f766e; font-weight:700; }
+    .modal .pill { display:inline-block; padding:3px 8px; border-radius:999px; font-size:.85rem; font-weight:700; }
+    .pill-ok { background:#d1fae5; color:#065f46; }
+    .pill-no { background:#fee2e2; color:#991b1b; }
+    .modal-btns { display:flex; gap:10px; justify-content:flex-end; margin-top: 14px; }
+    .modal-btn { border:none; padding: 10px 14px; border-radius: 9px; cursor:pointer; font-weight:700; }
+    .btn-cancel { background:#e5e7eb; color:#111827; }
+    .btn-ok { background:#fb923c; color:#181818; }
+    .modal-error { margin-top:10px; color:#b91c1c; font-weight:700; }
+    .hr { border:none; border-top:1px dashed #cbd5e1; margin:10px 0; }
+    .mini-table { width:100%; border-collapse: collapse; margin-top:6px; }
+    .mini-table th, .mini-table td { border-bottom: 1px solid #e5e7eb; padding: 6px 4px; font-size:.95rem; text-align:left; vertical-align:top; }
+    .mini-table th { color:#334155; font-weight:800; }
+    .k { color:#0f172a; font-weight:800; }
+    .v { color:#111827; }
+
     .recibo { background: #fff; color: #232a37; border-radius: 14px; box-shadow: 0 2px 32px #0007; padding: 27px 23px 18px 23px; max-width: 350px; width: 96%; font-size: 1.03rem; }
     .recibo-titulo { font-weight: bold; font-size: 1.2rem; margin-bottom: 12px; color: #fb923c; }
     .recibo-row { margin-bottom: 7px; }
@@ -28,44 +49,13 @@
     .recibo-print { background: #10b981; color: #0b2b22; border: none; padding: 7px 15px; border-radius: 7px; cursor: pointer; font-weight: bold;}
     .recibo-hr { border: 0; border-top: 1px dashed #cbd5e1; margin: 10px 0 14px; }
 
-    /* ===== IMPRESIÓN: una sola página bonita ===== */
     @media print {
-      @page {
-        size: A4 portrait;
-        margin: 12mm;
-      }
-      /* Oculta todo excepto el recibo */
-      body *:not(.recibo):not(.recibo *){
-        visibility: hidden !important;
-      }
-      /* Vuelve el overlay en contenedor estático para que no sume alto de viewport */
-      .modal-bg, .recibo-bg {
-        position: static !important;
-        width: auto !important;
-        height: auto !important;
-        background: transparent !important;
-        box-shadow: none !important;
-      }
-      /* Muestra solo el recibo y que ocupe el ancho de impresión sin saltos */
-      .recibo {
-        visibility: visible !important;
-        box-shadow: none !important;
-        border-radius: 0 !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        font-size: 12pt !important;
-        page-break-inside: avoid !important;
-        break-inside: avoid-page !important;
-      }
-      /* Ocultar botones y elementos de acción en impresión */
-      .no-print, .recibo-close, .recibo-print {
-        display: none !important;
-      }
-      /* Evitar que encabezados/filas se partan */
-      .recibo-row {
-        page-break-inside: avoid !important;
-        break-inside: avoid-page !important;
-      }
+      @page { size: A4 portrait; margin: 12mm; }
+      body *:not(.recibo):not(.recibo *){ visibility: hidden !important; }
+      .modal-bg, .recibo-bg { position: static !important; width: auto !important; height: auto !important; background: transparent !important; box-shadow: none !important; }
+      .recibo { visibility: visible !important; box-shadow: none !important; border-radius: 0 !important; width: 100% !important; max-width: 100% !important; font-size: 12pt !important; page-break-inside: avoid !important; break-inside: avoid-page !important; }
+      .no-print, .recibo-close, .recibo-print { display: none !important; }
+      .recibo-row { page-break-inside: avoid !important; break-inside: avoid-page !important; }
     }
   </style>
 </head>
@@ -74,7 +64,8 @@
     <div class="titulo"><i class="fas fa-history"></i> Abono a Fechas Anteriores</div>
     <div class="info-msg">
       Esta opción registra un abono en una fecha anterior a la actual.<br>
-      <b>El interés se calcula <u>EXCLUSIVAMENTE</u> desde el último recibo en “pagos”.</b>
+      <b>El interés se calcula <u>EXCLUSIVAMENTE</u> desde el último recibo en “pagos”.</b><br>
+      <span class="muted">Orden: Multa (si procede) → Interés por días → Capital.</span>
     </div>
 
     <label class="label" for="busqueda">Buscar cliente por nombre o DUI</label>
@@ -97,23 +88,21 @@
   </div>
 
   <div id="modal-root"></div>
+  <div id="resumen-root"></div>
   <div id="recibo-root"></div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-app.js";
     import {
-      getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, query, where
+      getFirestore, collection, getDocs, getDoc, doc, query, where,
+      writeBatch
     } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.20.0/firebase-auth.js";
 
-    // ====== POLÍTICA ======
-    const INTERES_SOLO_DESDE_RECIBOS = true;
+    const TZ_OFFSET = "-06:00";
+    const MODO_RETRO = true;
+    const TOLERANCIA_CIERRE = 0.06;
 
-    // ====== Config ======
-    const TZ_OFFSET = "-06:00"; // El Salvador
-    const MODO_RETRO = true;    // Reglas especiales de retroactivo
-
-    // ====== Utils TZ ======
     function toLocalEndISO(ymd){ return `${ymd}T23:59:59${TZ_OFFSET}`; }
     function toLocalStartISO(ymd){ return `${ymd}T00:00:00${TZ_OFFSET}`; }
     function atLocalMidnight(d){ const x=new Date(d); x.setHours(0,0,0,0); return x; }
@@ -141,8 +130,8 @@
       return Number.isFinite(v) ? v : def;
     }
     function round2(v){ return Math.round((v + Number.EPSILON)*100)/100; }
+    function money(v){ return `$${Number(v||0).toFixed(2)}`; }
 
-    // Saldo desde amortización (centavos para exactitud)
     function saldoDesdeAmortizacion(amortizacion){
       let totalCents = 0;
       for (const c of (amortizacion || [])) {
@@ -154,33 +143,28 @@
       return totalCents / 100;
     }
 
-    // Tasa diaria robusta
     function normalizeDailyRate(credito){
       let td = num(credito.tasaDiariaCredito, 0);
       if (td <= 0 || td >= 0.02){
-        if (td > 1 && td <= 100) td = td/100; // venía en %
+        if (td > 1 && td <= 100) td = td/100;
       }
       if (td <= 0 || td >= 0.02){
-        const ta = num(credito.tasaAnualCredito, 0); // % anual
+        const ta = num(credito.tasaAnualCredito, 0);
         if (ta > 0) td = ta/100/365;
       }
-      if (!(td > 0 && td < 0.02)) td = 0.005; // fallback ~0.5%/día
+      if (!(td > 0 && td < 0.02)) td = 0.005;
       return td;
     }
 
-    // ====== Helper fecha base según tipo de pago (quirúrgico) ======
     function getFechaBaseDePago(p){
-      // Retroactivo: usar fechaRegistro si existe y es válida
       if (p && p.retroactivo === true && p.fechaRegistro){
         const fr = new Date(p.fechaRegistro);
         if (!Number.isNaN(fr.getTime())) return fr;
       }
-      // Pago normal: usar fechaPago si es válida
       if (p && p.fechaPago){
         const fp = new Date(p.fechaPago);
         if (!Number.isNaN(fp.getTime())) return fp;
       }
-      // Último fallback: timestamp si existiera y fuera válido
       if (p && p.timestamp){
         const ft = new Date(p.timestamp);
         if (!Number.isNaN(ft.getTime())) return ft;
@@ -188,13 +172,11 @@
       return null;
     }
 
-    // ====== SOLO RECIBOS: último pago y cálculo ======
     async function obtenerUltimoRecibo(db, creditoID, fechaAbonoYMD){
       const corte = new Date(`${fechaAbonoYMD}T23:59:59-06:00`);
-      const snap = await getDocs(
-        query(collection(db,"pagos"), where("creditoID","==", creditoID))
-      );
+      const snap = await getDocs(query(collection(db,"pagos"), where("creditoID","==", creditoID)));
       let ultimo = null;
+
       snap.forEach(d=>{
         const p = d.data();
         if (!p || p.anulado === true) return;
@@ -203,43 +185,32 @@
         if (!base || Number.isNaN(base.getTime())) return;
         if (base > corte) return;
 
-        if (!ultimo) {
-          ultimo = { ...p, _base: base };
-        } else if (base > ultimo._base) {
-          ultimo = { ...p, _base: base };
-        } else if (base.getTime() === ultimo._base.getTime()){
-          // Desempate por fechaRegistro (si existe), luego por fechaPago (consistencia)
+        if (!ultimo) ultimo = { ...p, _base: base };
+        else if (base > ultimo._base) ultimo = { ...p, _base: base };
+        else if (base.getTime() === ultimo._base.getTime()){
           const regA = p.fechaRegistro ? new Date(p.fechaRegistro) : new Date(p.fechaPago || 0);
           const regB = ultimo.fechaRegistro ? new Date(ultimo.fechaRegistro) : new Date(ultimo.fechaPago || 0);
           if (regA > regB) ultimo = { ...p, _base: base };
         }
       });
+
       if (!ultimo) return null;
-      return { 
-        fechaBase: ultimo._base, 
-        saldoRestante: Number(num(ultimo.saldoRestante, 0)), 
-        raw: ultimo,
-        esRetroactivo: ultimo.retroactivo === true
-      };
+      return { fechaBase: ultimo._base, saldoRestante: Number(num(ultimo.saldoRestante, 0)), raw: ultimo };
     }
 
-    // ====== Interés por días: desde último recibo; si no hay, desde credito.fechaInicio (string ISO) ======
     async function calcularInteresSoloRecibos(db, credito, fechaAbonoYMD){
       const tasa = normalizeDailyRate(credito);
       const fechaCorte = new Date(toLocalEndISO(fechaAbonoYMD));
       const up = await obtenerUltimoRecibo(db, credito.id, fechaAbonoYMD);
 
-      // Caso estándar: hay último recibo -> política "solo desde recibos"
       if (up){
-        const fechaBase = up.fechaBase; // <- cambio quirúrgico: usar la fecha base real (registro si retroactivo, pago si normal)
+        const fechaBase = up.fechaBase;
         const saldoBase = Number.isFinite(up.saldoRestante) ? up.saldoRestante : num(credito.saldoActual, 0);
-        const dias = daysMedioAbiertoDates(fechaBase, fechaCorte); // (último recibo, corte]
+        const dias = daysMedioAbiertoDates(fechaBase, fechaCorte);
         const interes = round2(Math.max(0, saldoBase * tasa * dias));
         return { interesCobrar: interes, dias, saldoBase, fechaBase, fechaCorte, origen: "ultimo_recibo" };
       }
 
-      // === PRIMER PAGO: EXCLUSIVAMENTE DESDE credito.fechaInicio (string ISO) ===
-      // Si no existe o no es válida, no cobramos interés por seguridad.
       const fechaInicioRaw = credito && typeof credito.fechaInicio === "string" ? credito.fechaInicio : null;
       if (!fechaInicioRaw) {
         return { interesCobrar: 0, dias: 0, saldoBase: 0, fechaBase: fechaCorte, fechaCorte, origen: "sin_recibo" };
@@ -250,26 +221,16 @@
         return { interesCobrar: 0, dias: 0, saldoBase: 0, fechaBase: fechaCorte, fechaCorte, origen: "sin_recibo" };
       }
 
-      // Base de saldo: saldoActual; si no es válido/positivo se intenta reconstruir desde amortización
       let saldoBase = num(credito.saldoActual, NaN);
       if (!Number.isFinite(saldoBase) || saldoBase <= 0){
         saldoBase = round2(saldoDesdeAmortizacion(credito.amortizacion || []));
       }
 
-      const dias = daysMedioAbiertoDates(fechaBase, fechaCorte); // (fechaInicio, corte]
+      const dias = daysMedioAbiertoDates(fechaBase, fechaCorte);
       const interes = round2(Math.max(0, saldoBase * tasa * dias));
-
-      return {
-        interesCobrar: interes,
-        dias,
-        saldoBase,
-        fechaBase,
-        fechaCorte,
-        origen: "primer_pago_desde_fechaInicio"
-      };
+      return { interesCobrar: interes, dias, saldoBase, fechaBase, fechaCorte, origen: "primer_pago_desde_fechaInicio" };
     }
 
-    // ====== Helpers de MULTAS ======
     function getMultaFechaISO(m){
       const fRaw = m.fecha;
       if (!fRaw) return null;
@@ -287,7 +248,6 @@
       return Number.isFinite(n) ? round2(n) : 0;
     }
 
-    // ====== Firebase / estado ======
     const firebaseConfig = {
       apiKey: "AIzaSyBWEXs6RIB_LJUdbPdYRGh2ARZmpHhupMo",
       authDomain: "multinversiones-38e13.firebaseapp.com",
@@ -297,6 +257,7 @@
       appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
       measurementId: "G-H4E31XHG1Y"
     };
+
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
@@ -325,6 +286,7 @@
       return new Promise((resolve)=>{
         let modalRoot = document.getElementById("modal-root");
         let errorMsg = "";
+
         async function onOk(){
           try{
             const pinValue = document.getElementById("gerente-pin-input").value.trim();
@@ -343,17 +305,20 @@
             if (pinValido){ close(); resolve(true); } else { errorMsg="PIN incorrecto"; render(); }
           }catch(e){ errorMsg="Error técnico: " + e; render(); }
         }
+
         function close(){ modalRoot.innerHTML=""; }
         function render(){
           modalRoot.innerHTML = `
             <div class="modal-bg">
               <div class="modal">
-                <label>PIN del gerente</label>
-                <input type="password" id="gerente-pin-input" maxlength="10" autocomplete="off" placeholder="PIN" style="font-size:1.18rem;"/>
+                <h3>Autorización</h3>
+                <div class="row">Ingresa el <b>PIN del gerente</b> para registrar un pago retroactivo.</div>
+                <input type="password" id="gerente-pin-input" maxlength="10" autocomplete="off"
+                       placeholder="PIN" style="font-size:1.18rem;width:100%;padding:10px;border-radius:10px;border:1px solid #cbd5e1;"/>
                 ${errorMsg ? `<div class="modal-error">${errorMsg}</div>` : ""}
                 <div class="modal-btns">
-                  <button class="modal-btn-cancel" id="cancelar-pin">Cancelar</button>
-                  <button class="modal-btn-ok" id="autorizar-pin">Autorizar</button>
+                  <button class="modal-btn btn-cancel" id="cancelar-pin">Cancelar</button>
+                  <button class="modal-btn btn-ok" id="autorizar-pin">Autorizar</button>
                 </div>
               </div>
             </div>`;
@@ -366,16 +331,17 @@
       });
     }
 
-    // ====== Búsqueda de créditos ======
     onAuthStateChanged(auth, async user=>{
       if(!user) return location.href="login.html";
       usuarioActual = user.displayName || user.email || "Usuario desconocido";
       userId = user.uid;
+
       const docUser = await getDoc(doc(db,"users", user.uid));
       userAgencia = docUser.exists() && docUser.data().department ? docUser.data().department : "";
 
       const qy = query(collection(db,"creditos"), where("agenciaAsignada","==", userAgencia));
       const snap = await getDocs(qy);
+
       creditosAgencia = snap.docs
         .map(d=>({ id:d.id, ...d.data() }))
         .filter(c => (c.estadoCredito || "").toString().trim().toLowerCase() !== "revertido");
@@ -394,10 +360,7 @@
         const nombre = (credito.nombre || credito.nombres || credito.clienteNombre || "").toString().toLowerCase();
         const duiDoc = (credito.numeroDui || "").toString();
         const duiClean = duiDoc.replace(/[^0-9]/g,"");
-
-        const matchNombre = queryTxt ? nombre.includes(queryTxt) : false;
-        const matchDui    = queryDui ? duiClean.includes(queryDui) : false;
-        return matchNombre || matchDui;
+        return (queryTxt && nombre.includes(queryTxt)) || (queryDui && duiClean.includes(queryDui));
       });
 
       filtrados.forEach(credito=>{
@@ -408,17 +371,103 @@
         const div = document.createElement("div");
         div.className = "list-group-item";
         div.textContent = `${nombre} — DUI: ${dui} — Saldo: $${saldo}`;
-        div.onclick = (event)=> seleccionarCredito(credito, event);
+        div.onclick = (event)=> {
+          creditoSeleccionado = credito;
+          Array.from(document.getElementsByClassName("list-group-item")).forEach(d=>d.classList.remove("selected"));
+          event.target.classList.add("selected");
+          document.getElementById("seleccion-fecha").style.display = "block";
+          document.getElementById("form-abono").style.display = "none";
+        };
         listaDiv.appendChild(div);
       });
     });
 
-    function seleccionarCredito(credito, event){
-      creditoSeleccionado = credito;
-      Array.from(document.getElementsByClassName("list-group-item")).forEach(div=>div.classList.remove("selected"));
-      event.target.classList.add("selected");
-      document.getElementById("seleccion-fecha").style.display = "block";
-      document.getElementById("form-abono").style.display = "none";
+    function mostrarResumenPostPago(res){
+      const root = document.getElementById("resumen-root");
+
+      const lineaQuePaga = `Pagó ${money(res.pagoMulta)} en multas + ${money(res.pagoInteres)} en interés + ${money(res.pagoCapital)} a capital.`;
+
+      const multasRows = (res.multasEvaluadas || []).map(m=>{
+        const pill = m.procede ? `<span class="pill pill-ok">PROCEDE</span>` : `<span class="pill pill-no">NO PROCEDE</span>`;
+        return `
+          <tr>
+            <td>#${m.index}</td>
+            <td>${m.fechaMulta || '—'}</td>
+            <td>${money(m.monto)}</td>
+            <td>${pill}<div class="muted">${m.razon}</div></td>
+          </tr>
+        `;
+      }).join("");
+
+      root.innerHTML = `
+        <div class="modal-bg">
+          <div class="modal">
+            <h3>Qué está pagando el cliente</h3>
+            <div class="row"><span class="k">Cliente:</span> <span class="v">${res.cliente}</span></div>
+            <div class="row"><span class="k">Fecha valor:</span> <span class="v">${res.fechaValor}</span></div>
+            <div class="row"><span class="k">Monto recibido:</span> <span class="v">${money(res.montoRecibido)}</span></div>
+
+            <div class="hr"></div>
+
+            <div class="row"><b>${lineaQuePaga}</b></div>
+            <div class="row muted">
+              Orden aplicado: Multa (si procede) → Interés por días → Capital.
+            </div>
+
+            <div class="hr"></div>
+
+            <div class="row"><span class="k">Saldo antes:</span> <span class="v">${money(res.saldoAntes)}</span></div>
+            <div class="row"><span class="k">Multas aplicadas:</span> <span class="v">${money(res.pagoMulta)}</span></div>
+            <div class="row">
+              <span class="k">Interés aplicado:</span> <span class="v">${money(res.pagoInteres)}</span>
+              <div class="muted">
+                Base usada: ${money(res.interesBaseSaldo)} |
+                Días: ${res.interesDias} |
+                Tasa diaria: ${(res.tasaDiaria*100).toFixed(4)}% |
+                Fecha base: ${res.interesFechaBase || '—'} |
+                Origen: ${res.interesOrigen}
+              </div>
+            </div>
+            <div class="row"><span class="k">Capital aplicado:</span> <span class="v">${money(res.pagoCapital)}</span></div>
+            <div class="row">
+              <span class="k">Saldo después:</span> <span class="v">${money(res.saldoDespues)}</span>
+              ${res.ajusteRedondeo > 0 ? `<div class="muted">Ajuste por tolerancia (${money(res.ajusteRedondeo)}) para dejar saldo en $0.00.</div>` : ``}
+            </div>
+
+            ${res.esCancelacion ? `
+              <div class="hr"></div>
+              <div class="row ok"><b>✅ Cancelación total a valor fecha.</b></div>
+              <div class="row"><span class="k">Total para cancelar:</span> <span class="v">${money(res.totalParaCancelar)}</span></div>
+              ${res.vuelto > 0 ? `<div class="row danger"><b>Vuelto a entregar:</b> ${money(res.vuelto)}</div>` : ``}
+            ` : ``}
+
+            <div class="hr"></div>
+
+            <div class="row"><b>Multas evaluadas (por qué procede o no)</b></div>
+            ${(res.multasEvaluadas || []).length === 0
+              ? `<div class="row muted">No hay multas configuradas para evaluar.</div>`
+              : `
+                <table class="mini-table">
+                  <thead>
+                    <tr><th>#</th><th>Fecha multa</th><th>Monto</th><th>Evaluación</th></tr>
+                  </thead>
+                  <tbody>${multasRows}</tbody>
+                </table>
+              `
+            }
+
+            <div class="modal-btns">
+              <button class="modal-btn btn-cancel" id="cerrar-resumen">Cerrar</button>
+              <button class="modal-btn btn-ok" id="continuar-ticket">Continuar a ticket</button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.getElementById("cerrar-resumen").onclick = ()=> root.innerHTML = "";
+      document.getElementById("continuar-ticket").onclick = ()=>{
+        root.innerHTML = "";
+        mostrarRecibo(res.pagoObj);
+      };
     }
 
     function mostrarRecibo(datos){
@@ -433,9 +482,12 @@
             <div class="recibo-row"><b>No. Correlativo:</b> ${datos.correlativo || '-'}</div>
             <div class="recibo-row"><b>Cliente:</b> ${datos.nombres}</div>
             <div class="recibo-row"><b>DUI:</b> ${datos.numeroDui || ''}</div>
-            <div class="recibo-row"><b>Monto pagado:</b> $${Number(datos.montoPagado).toFixed(2)}</div>
+            <div class="recibo-row"><b>Monto recibido:</b> $${Number(datos.montoPagado).toFixed(2)}</div>
+            ${Number(datos.vuelto || 0) > 0 ? `<div class="recibo-row"><b>Vuelto:</b> $${Number(datos.vuelto).toFixed(2)}</div>` : ``}
             <div class="recibo-row"><b>Pago a valor fecha:</b> ${fechaFmt}</div>
             <div class="recibo-row"><b>Sucursal:</b> ${datos.sucursal}</div>
+            <div class="recibo-row"><b>Cajero:</b> ${datos.cajeroNombre || datos.usuarioNombre || '—'}</div>
+            <hr class="recibo-hr"/>
             <div class="recibo-row"><b>Pago capital:</b> $${Number(datos.pagoCapital).toFixed(2)}</div>
             <div class="recibo-row"><b>Pago interés:</b> $${Number(datos.pagoInteres).toFixed(2)}</div>
             <div class="recibo-row"><b>Pago multa:</b> $${Number(datos.pagoMulta || 0).toFixed(2)}</div>
@@ -454,30 +506,10 @@
       amortizacion.sort((a,b)=> new Date(a.fecha) - new Date(b.fecha));
     }
 
-    // (Se deja por compatibilidad, pero ya NO se usa para topes de interés)
-    function cubrirInteresVencidasPrimero(amortizacion, fechaAbonoYMD, refAbono, refPagoInteres){
-      const fechaCorte = new Date(toLocalEndISO(fechaAbonoYMD));
-      for (let i=0; i<amortizacion.length && refAbono.value>0; i++){
-        const c = amortizacion[i];
-        const f = new Date(c.fecha);
-        if (f <= fechaCorte){
-          const interesCuota = num(c.interes, 0);
-          const pagadoInt = num(c.montoPagadoInteres, 0);
-          const pendienteInt = round2(Math.max(0, interesCuota - pagadoInt));
-          if (pendienteInt > 0){
-            const apli = Math.min(pendienteInt, refAbono.value);
-            c.montoPagadoInteres = round2(pagadoInt + apli);
-            refPagoInteres.value = round2(refPagoInteres.value + apli);
-            refAbono.value = round2(refAbono.value - apli);
-          }
-        }
-      }
-    }
-
-    // ====== SUBMIT ======
     document.getElementById("form-abono").onsubmit = async function(e){
       e.preventDefault();
       if (!creditoSeleccionado || !fechaSeleccionada) return alert("Selecciona cliente y fecha.");
+
       const monto = num(document.getElementById("monto").value, 0);
       const motivo = document.getElementById("motivo").value.trim();
       if (!monto || !motivo) return alert("Completa todos los campos.");
@@ -485,174 +517,251 @@
       const autorizado = await showGerentePinDialog();
       if (!autorizado) return alert("PIN de gerente incorrecto o cancelado.");
 
-      // Snapshot para reversión
       const correlativoGenerado = await obtenerCorrelativoUnicoPagos(db);
+
       const credRef = doc(db, "creditos", creditoSeleccionado.id);
       const credSnap = await getDoc(credRef);
       const creditoAntes = credSnap.exists() ? credSnap.data() : JSON.parse(JSON.stringify(creditoSeleccionado));
-      await addDoc(collection(db, "reversionPago"), {
-        correlativo: Number(correlativoGenerado),
-        creditoID: creditoSeleccionado.id,
-        clienteID: creditoAntes.clienteID || "",
-        snapshot: JSON.parse(JSON.stringify(creditoAntes)),
-        createdAt: new Date(),
-        realizadoPorUID: userId,
-        realizadoPorNombre: usuarioActual,
-        sucursal: userAgencia
-      });
 
-      let abonoRestante = monto;
+      let abonoRestante = round2(monto);
       let pagoInteres = 0, pagoCapital = 0, pagoMulta = 0;
 
       const tasaDiaria = normalizeDailyRate(creditoSeleccionado);
+
       let historialMultas = Array.isArray(creditoSeleccionado.historialMultas) ? JSON.parse(JSON.stringify(creditoSeleccionado.historialMultas)) : [];
       let amortizacion = Array.isArray(creditoSeleccionado.amortizacion) ? JSON.parse(JSON.stringify(creditoSeleccionado.amortizacion)) : [];
+      ordenarAmortizacionPorFecha(amortizacion);
+
       const fechaAbonoYMD = fechaSeleccionada;
       const fechaAbonoEnd = new Date(toLocalEndISO(fechaAbonoYMD));
-      ordenarAmortizacionPorFecha(amortizacion);
+      const abono0h = new Date(toLocalStartISO(fechaAbonoYMD));
 
       const saldoInicialOperacion = Number.isFinite(num(creditoAntes?.saldoActual, NaN))
         ? num(creditoAntes.saldoActual, 0)
         : num(creditoSeleccionado.saldoActual, 0);
 
-      // 0) Interés EXCLUSIVO desde RECIBOS (por días) con fallback primer pago desde credito.fechaInicio
       const resumenInt = await calcularInteresSoloRecibos(db, creditoSeleccionado, fechaAbonoYMD);
       const interesAlCorte = round2(resumenInt.interesCobrar);
 
-      // ====== 1) MULTAS — COBRAR ANTES QUE INTERÉS Y CAPITAL ======
+      // ====== Evaluación de multas para el modal (Procede / No procede) ======
+      // Nota: Esto NO cambia lógica, solo deja trazabilidad para caja.
+      let multasEvaluadas = [];
       let historialMultasActualizado = Array.isArray(historialMultas) ? JSON.parse(JSON.stringify(historialMultas)) : [];
-      {
-        const abono0h = new Date(toLocalStartISO(fechaAbonoYMD));
-        for (let i = 0; i < historialMultasActualizado.length && abonoRestante > 0; i++) {
+      let multasExigiblesPendientes = 0;
+
+      for (let i = 0; i < historialMultasActualizado.length; i++) {
+        const m = historialMultasActualizado[i] || {};
+        const estado = String(m.estadoCuota || "").trim();
+        const fMulta = getMultaFechaISO(m);
+
+        // si no está en “No Pagada”, igual la mostramos como ya resuelta (informativo)
+        const montoM = getMultaMonto(m);
+        const pagadoM = getMultaPagado(m);
+
+        if (!fMulta){
+          multasEvaluadas.push({
+            index: i+1,
+            fechaMulta: null,
+            monto: montoM,
+            procede: false,
+            razon: "Sin fecha válida: no se cobra por seguridad."
+          });
+          continue;
+        }
+
+        const fMulta0h = atLocalMidnight(fMulta);
+        const procede = (fMulta0h <= abono0h);
+
+        if (estado === "No Pagada") {
+          if (!procede) {
+            // no procede a valor fecha
+            multasEvaluadas.push({
+              index: i+1,
+              fechaMulta: fMulta.toISOString().slice(0,10),
+              monto: montoM,
+              procede: false,
+              razon: "La fecha de la multa es posterior a la fecha valor."
+            });
+          } else {
+            const pendiente = round2(Math.max(0, montoM - pagadoM));
+            if (pendiente > 0) multasExigiblesPendientes = round2(multasExigiblesPendientes + pendiente);
+
+            multasEvaluadas.push({
+              index: i+1,
+              fechaMulta: fMulta.toISOString().slice(0,10),
+              monto: montoM,
+              procede: true,
+              razon: `Exigible a la fecha valor. Pendiente: ${money(pendiente)}.`
+            });
+          }
+        } else {
+          // ya pagada o no procede, solo informamos
+          let razon = "No se cobra (estado: " + (estado || "—") + ").";
+          if (!procede) razon += " Además, por fecha tampoco sería exigible.";
+          multasEvaluadas.push({
+            index: i+1,
+            fechaMulta: fMulta.toISOString().slice(0,10),
+            monto: montoM,
+            procede: procede,
+            razon
+          });
+        }
+      }
+
+      // ====== Opción C automática ======
+      const totalParaCancelar = round2(saldoInicialOperacion + interesAlCorte + multasExigiblesPendientes);
+      const esCancelacionTotal = monto >= totalParaCancelar;
+      let vuelto = 0;
+
+      if (esCancelacionTotal){
+        // Multas exigibles completas
+        let faltanteMultas = multasExigiblesPendientes;
+        for (let i = 0; i < historialMultasActualizado.length && faltanteMultas > 0; i++) {
           const m = historialMultasActualizado[i] || {};
           const estado = String(m.estadoCuota || "").trim();
-          if (estado === "No Procede" || estado === "Pagada") continue; // nunca se cobran
-          if (estado !== "No Pagada") continue; // solo cobramos multas marcadas como No Pagada
+          if (estado !== "No Pagada") continue;
 
           const fMulta = getMultaFechaISO(m);
-          if (!fMulta) continue;                        // sin fecha válida, no se cobra
-          const fMulta0h = atLocalMidnight(fMulta);
-
-          // *** CAMBIO QUIRÚRGICO: si la multa NO era exigible a la fecha del abono -> NO PROCEDE ***
-          if (fMulta0h > abono0h) {
-            historialMultasActualizado[i] = {
-              ...m,
-              estadoCuota: "No Procede",
-              pagadoMulta: 0,
-              fechaPagoMulta: null
-            };
-            continue; // no se cobra ni se acumula
+          if (!fMulta) continue;
+          if (atLocalMidnight(fMulta) > abono0h) {
+            // marcar no procede por fecha
+            historialMultasActualizado[i] = { ...m, estadoCuota:"No Procede", pagadoMulta:0, fechaPagoMulta:null };
+            continue;
           }
 
-          // Exigible: se puede cobrar (si hay abono)
           const valor = getMultaMonto(m);
           const pagadoPrevio = getMultaPagado(m);
           const pendiente = round2(Math.max(0, valor - pagadoPrevio));
           if (pendiente <= 0) {
-            historialMultasActualizado[i] = {
-              ...m,
-              estadoCuota: "Pagada",
-              pagadoMulta: round2(valor),
-              fechaPagoMulta: toLocalStartISO(fechaAbonoYMD)
-            };
+            historialMultasActualizado[i] = { ...m, estadoCuota:"Pagada", pagadoMulta:round2(valor), fechaPagoMulta: toLocalStartISO(fechaAbonoYMD) };
+            continue;
+          }
+
+          const apli = Math.min(pendiente, faltanteMultas);
+          const nuevoPagado = round2(pagadoPrevio + apli);
+          historialMultasActualizado[i] = {
+            ...m,
+            pagadoMulta: nuevoPagado,
+            estadoCuota: (Math.abs(nuevoPagado - valor) < 0.01) ? "Pagada" : "No Pagada",
+            fechaPagoMulta: toLocalStartISO(fechaAbonoYMD)
+          };
+          pagoMulta = round2(pagoMulta + apli);
+          faltanteMultas = round2(faltanteMultas - apli);
+        }
+
+        // Interés completo y capital completo
+        pagoInteres = round2(interesAlCorte);
+        pagoCapital = round2(saldoInicialOperacion);
+        vuelto = round2(monto - totalParaCancelar);
+        abonoRestante = 0;
+
+        // Aplicar capital a amortización para consistencia visual
+        let capRest = pagoCapital;
+        for (let i=0; i<amortizacion.length && capRest>0; i++){
+          let cuota = amortizacion[i];
+          cuota.montoPagado = num(cuota.montoPagado, 0);
+          const capitalCuota = num(cuota.capital, 0);
+          const pendienteCapital = Math.max(0, capitalCuota - cuota.montoPagado);
+          if (pendienteCapital <= 0) continue;
+
+          const apli = Math.min(pendienteCapital, capRest);
+          cuota.montoPagado = round2(cuota.montoPagado + apli);
+          capRest = round2(capRest - apli);
+
+          const capitalOk = Math.abs(round2(cuota.montoPagado) - round2(capitalCuota)) < 0.01;
+          cuota.estado = capitalOk ? "Pagada" : "Parcial";
+          cuota.fechaPagoReal = fechaAbonoYMD;
+        }
+
+      } else {
+        // ====== Flujo normal: Multa → Interés → Capital ======
+
+        // 1) Multas
+        for (let i = 0; i < historialMultasActualizado.length && abonoRestante > 0; i++) {
+          const m = historialMultasActualizado[i] || {};
+          const estado = String(m.estadoCuota || "").trim();
+          if (estado === "No Procede" || estado === "Pagada") continue;
+          if (estado !== "No Pagada") continue;
+
+          const fMulta = getMultaFechaISO(m);
+          if (!fMulta) continue;
+
+          if (atLocalMidnight(fMulta) > abono0h) {
+            historialMultasActualizado[i] = { ...m, estadoCuota:"No Procede", pagadoMulta:0, fechaPagoMulta:null };
+            continue;
+          }
+
+          const valor = getMultaMonto(m);
+          const pagadoPrevio = getMultaPagado(m);
+          const pendiente = round2(Math.max(0, valor - pagadoPrevio));
+          if (pendiente <= 0) {
+            historialMultasActualizado[i] = { ...m, estadoCuota:"Pagada", pagadoMulta:round2(valor), fechaPagoMulta: toLocalStartISO(fechaAbonoYMD) };
             continue;
           }
 
           const apli = Math.min(pendiente, abonoRestante);
-          if (apli > 0) {
-            const nuevoPagado = round2(pagadoPrevio + apli);
-            let nuevoEstado = "No Pagada";
-            if (Math.abs(nuevoPagado - valor) < 0.01) {
-              nuevoEstado = "Pagada";
-            }
-            historialMultasActualizado[i] = {
-              ...m,
-              pagadoMulta: nuevoPagado,
-              estadoCuota: nuevoEstado,
-              fechaPagoMulta: toLocalStartISO(fechaAbonoYMD)
-            };
-            pagoMulta = round2(pagoMulta + apli);
-            abonoRestante = round2(abonoRestante - apli);
-          }
+          const nuevoPagado = round2(pagadoPrevio + apli);
+          historialMultasActualizado[i] = {
+            ...m,
+            pagadoMulta: nuevoPagado,
+            estadoCuota: (Math.abs(nuevoPagado - valor) < 0.01) ? "Pagada" : "No Pagada",
+            fechaPagoMulta: toLocalStartISO(fechaAbonoYMD)
+          };
+          pagoMulta = round2(pagoMulta + apli);
+          abonoRestante = round2(abonoRestante - apli);
         }
-      }
 
-      // ====== 2) INTERÉS — POR DÍAS (sin tope por cuotas)
-      if (abonoRestante > 0){
-        const interesAPagar = Math.min(abonoRestante, interesAlCorte);
-        if (interesAPagar > 0){
-          // Aplicación directa del interés por días
+        // 2) Interés por días
+        if (abonoRestante > 0){
+          const interesAPagar = Math.min(abonoRestante, interesAlCorte);
           pagoInteres = round2(pagoInteres + interesAPagar);
           abonoRestante = round2(abonoRestante - interesAPagar);
-          // Nota: NO llamamos a cubrirInteresVencidasPrimero(...) para que no lo limite por cuota
         }
-      }
 
-      // ====== 3) CAPITAL — vencidas primero (SIN volver a pagar interés de cuotas)
-      for (let i=0; i<amortizacion.length && abonoRestante>0; i++){
-        let cuota = amortizacion[i];
-        let fechaCuota = new Date(cuota.fecha);
-        if (fechaCuota <= fechaAbonoEnd && cuota.estado !== "Pagada"){
-          cuota.montoPagado = num(cuota.montoPagado, 0);
+        // 3) Capital vencidas primero
+        for (let i=0; i<amortizacion.length && abonoRestante>0; i++){
+          let cuota = amortizacion[i];
+          let fechaCuota = new Date(cuota.fecha);
+          if (fechaCuota <= fechaAbonoEnd && cuota.estado !== "Pagada"){
+            cuota.montoPagado = num(cuota.montoPagado, 0);
 
-          // *** BLOQUE DESACTIVADO SI SOLO DESDE RECIBOS ***
-          if (!INTERES_SOLO_DESDE_RECIBOS) {
-            const interesCuota = num(cuota.interes, 0);
-            const pagInt = num(cuota.montoPagadoInteres, 0);
-            const intPend = round2(Math.max(0, interesCuota - pagInt));
-            if (intPend > 0 && abonoRestante > 0){
-              const apliInt = Math.min(intPend, abonoRestante);
-              cuota.montoPagadoInteres = round2(pagInt + apliInt);
-              pagoInteres = round2(pagoInteres + apliInt);
-              abonoRestante = round2(abonoRestante - apliInt);
-            }
-          }
-
-          let capitalCuota = num(cuota.capital, 0);
-          let pendienteCapital = Math.max(0, capitalCuota - cuota.montoPagado);
-          if (pendienteCapital > 0 && abonoRestante > 0){
-            const apli = Math.min(pendienteCapital, abonoRestante);
-            cuota.montoPagado = round2(cuota.montoPagado + apli);
-            pagoCapital = round2(pagoCapital + apli);
-            abonoRestante = round2(abonoRestante - apli);
-          }
-
-          const EPS=0.01;
-          const capitalOk = Math.abs(round2(cuota.montoPagado) - round2(capitalCuota)) < EPS;
-
-          if (capitalOk && MODO_RETRO){
-            cuota.estado = "Pagada";
-            cuota.fechaPagoReal = fechaAbonoYMD;
-          } else if ((cuota.montoPagado > 0 || num(cuota.montoPagadoInteres,0) > 0)) {
-            const hoy = atLocalMidnight(new Date());
-            cuota.estado = (fechaCuota < hoy ? "Atrasada" : "Parcial");
-            cuota.fechaPagoReal = null;
-          }
-        }
-      }
-
-      // ====== 4) FUTURAS — todo remanente a capital
-      if (abonoRestante > 0){
-        for (let j=0; j<amortizacion.length && abonoRestante>0; j++){
-          let cuotaSig = amortizacion[j];
-          let fechaCuota = new Date(cuotaSig.fecha);
-          if (fechaCuota > fechaAbonoEnd && cuotaSig.estado !== "Pagada"){
-            cuotaSig.montoPagado = num(cuotaSig.montoPagado, 0);
-            let capitalCuota = num(cuotaSig.capital, 0);
-            let pendienteCapital = Math.max(0, capitalCuota - cuotaSig.montoPagado);
+            const capitalCuota = num(cuota.capital, 0);
+            const pendienteCapital = Math.max(0, capitalCuota - cuota.montoPagado);
             if (pendienteCapital > 0){
               const apli = Math.min(pendienteCapital, abonoRestante);
-              cuotaSig.montoPagado = round2(cuotaSig.montoPagado + apli);
+              cuota.montoPagado = round2(cuota.montoPagado + apli);
               pagoCapital = round2(pagoCapital + apli);
               abonoRestante = round2(abonoRestante - apli);
+            }
 
-              const EPS=0.01;
-              const capitalOk = Math.abs(round2(cuotaSig.montoPagado) - round2(capitalCuota)) < EPS;
-              if (capitalOk && MODO_RETRO){
-                cuotaSig.estado = "Pagada";
-                cuotaSig.fechaPagoReal = fechaAbonoYMD;
-              } else if (cuotaSig.montoPagado > 0){
-                cuotaSig.estado = "Parcial";
+            const capitalOk = Math.abs(round2(cuota.montoPagado) - round2(capitalCuota)) < 0.01;
+            if (capitalOk && MODO_RETRO){
+              cuota.estado = "Pagada";
+              cuota.fechaPagoReal = fechaAbonoYMD;
+            } else if (cuota.montoPagado > 0) {
+              cuota.estado = "Parcial";
+              cuota.fechaPagoReal = fechaAbonoYMD;
+            }
+          }
+        }
+
+        // 4) Futuras
+        if (abonoRestante > 0){
+          for (let j=0; j<amortizacion.length && abonoRestante>0; j++){
+            let cuotaSig = amortizacion[j];
+            let fechaCuota = new Date(cuotaSig.fecha);
+            if (fechaCuota > fechaAbonoEnd && cuotaSig.estado !== "Pagada"){
+              cuotaSig.montoPagado = num(cuotaSig.montoPagado, 0);
+              const capitalCuota = num(cuotaSig.capital, 0);
+              const pendienteCapital = Math.max(0, capitalCuota - cuotaSig.montoPagado);
+              if (pendienteCapital > 0){
+                const apli = Math.min(pendienteCapital, abonoRestante);
+                cuotaSig.montoPagado = round2(cuotaSig.montoPagado + apli);
+                pagoCapital = round2(pagoCapital + apli);
+                abonoRestante = round2(abonoRestante - apli);
+
+                const capitalOk = Math.abs(round2(cuotaSig.montoPagado) - round2(capitalCuota)) < 0.01;
+                cuotaSig.estado = capitalOk ? "Pagada" : "Parcial";
                 cuotaSig.fechaPagoReal = fechaAbonoYMD;
               }
             }
@@ -660,22 +769,21 @@
         }
       }
 
-      // ====== 5) TOTALES / actualización
-      // El saldo pendiente se define exclusivamente como:
-      // saldo nuevo = saldoAnterior (antes del abono) - pagoCapital aplicado.
-      // Ya NO se fuerza a coincidir con la amortización, porque muchos clientes
-      // no siguen el plan de pagos exacto (pagan adelantado, atrasado o montos distintos).
-      let saldoPendiente = round2(Math.max(0, saldoInicialOperacion - pagoCapital));
-      // Si algún día quisieras auditar diferencias, puedes calcular:
-      // const saldoDesdeAmort = round2(saldoDesdeAmortizacion(amortizacion));
-      // pero sin usarlo para sobreescribir saldoPendiente.
+      // ====== Saldo + tolerancia ======
+      let saldoPendienteRaw = round2(Math.max(0, saldoInicialOperacion - pagoCapital));
+      let ajusteRedondeo = 0;
+      if (saldoPendienteRaw > 0 && saldoPendienteRaw <= TOLERANCIA_CIERRE){
+        ajusteRedondeo = saldoPendienteRaw;
+        saldoPendienteRaw = 0;
+      }
+      const saldoPendiente = round2(saldoPendienteRaw);
 
-      // Informativo: interés desde fechaAbono -> hoy
+      // Interés “actual” desde fecha valor hasta hoy (informativo para métricas)
       const fechaHoy = atLocalMidnight(new Date());
       const diasPost = diasEntreFechasSinHora(fechaAbonoYMD, fechaHoy);
-      let interesActual = round2(saldoPendiente * tasaDiaria * diasPost);
+      const interesActual = round2(saldoPendiente * tasaDiaria * diasPost);
 
-      // Recalcular multas pendientes (para métricas y paraPonerseAlDia)
+      // Multas acumuladas hoy (métricas)
       let multasAcumuladasFinal = 0;
       {
         const hoy0h = atLocalMidnight(new Date());
@@ -687,19 +795,18 @@
           if (atLocalMidnight(fMulta) <= hoy0h) {
             const valor = getMultaMonto(m);
             const pagado = getMultaPagado(m);
-            const pendiente = round2(Math.max(0, valor - pagado));
-            multasAcumuladasFinal = round2(multasAcumuladasFinal + pendiente);
+            multasAcumuladasFinal = round2(multasAcumuladasFinal + Math.max(0, valor - pagado));
           }
         }
       }
 
-      let cuotasAtrasadasFinal = amortizacion.filter(c=>{
+      const cuotasAtrasadasFinal = amortizacion.filter(c=>{
         const f = new Date(c.fecha);
         const hoy = atLocalMidnight(new Date());
         return f < hoy && c.estado !== "Pagada";
       }).length;
 
-      let capitalAtrasado = round2(
+      const capitalAtrasado = round2(
         amortizacion.filter(c=>{
           const f = new Date(c.fecha);
           const hoy = atLocalMidnight(new Date());
@@ -712,10 +819,10 @@
       );
 
       const paraPonerseAlDiaFinal = round2(capitalAtrasado + multasAcumuladasFinal + interesActual);
-      const nuevoEstadoCredito = (cuotasAtrasadasFinal === 0 && multasAcumuladasFinal === 0) ? "Activo" : "Mora Temprana";
+      const nuevoEstadoCredito = (saldoPendiente === 0) ? "Pagado" : ((cuotasAtrasadasFinal === 0 && multasAcumuladasFinal === 0) ? "Activo" : "Mora Temprana");
 
-      // Registrar pago
-      let pagoObj = {
+      // ====== PagoObj ======
+      const pagoObj = {
         creditoID: creditoSeleccionado.id,
         clienteID: creditoSeleccionado.clienteID || "",
         montoPagado: round2(monto),
@@ -727,36 +834,68 @@
         nombres: creditoSeleccionado.nombre,
         numeroDui: creditoSeleccionado.numeroDui || "",
         sucursal: userAgencia,
+
         usuarioID: userId,
-        motivo: motivo,
+        usuarioNombre: usuarioActual,
+        cajeroID: userId,
+        cajeroNombre: usuarioActual,
+
+        motivo,
         retroactivo: true,
         anulado: false,
         fechaRegistro: new Date().toISOString(),
         correlativo: Number(correlativoGenerado),
-        // Auditoría interés (SOLO recibos o primer pago desde fechaInicio)
+
+        // auditoría interés
         interesCalculadoDesde: resumenInt.origen,
         interesDiasBase: resumenInt.dias,
         interesSaldoBase: round2(resumenInt.saldoBase || 0),
         interesFechaBaseISO: resumenInt.fechaBase ? resumenInt.fechaBase.toISOString() : null,
         interesCorteISO: resumenInt.fechaCorte ? resumenInt.fechaCorte.toISOString() : null,
-        interesCobrarAlCorte: round2(interesAlCorte)
-      };
-      await addDoc(collection(db, "pagos"), pagoObj);
+        interesCobrarAlCorte: round2(interesAlCorte),
 
-      // Movimiento de caja
-      await addDoc(collection(db, "movimientos_caja"), {
+        // auditoría cancelación / tolerancia
+        ajusteRedondeo: round2(ajusteRedondeo),
+        esCancelacion: !!esCancelacionTotal,
+        totalParaCancelar: round2(totalParaCancelar),
+        vuelto: round2(vuelto)
+      };
+
+      // ====== Batch: reversionPago + pagos + movimientos + update crédito ======
+      const batch = writeBatch(db);
+
+      const revRef = doc(collection(db, "reversionPago"));
+      batch.set(revRef, {
+        correlativo: Number(correlativoGenerado),
+        creditoID: creditoSeleccionado.id,
+        clienteID: creditoAntes.clienteID || "",
+        snapshot: JSON.parse(JSON.stringify(creditoAntes)),
+        createdAt: new Date(),
+        realizadoPorUID: userId,
+        realizadoPorNombre: usuarioActual,
+        sucursal: userAgencia
+      });
+
+      const pagoRef = doc(collection(db, "pagos"));
+      batch.set(pagoRef, pagoObj);
+
+      const movRef = doc(collection(db, "movimientos_caja"));
+      batch.set(movRef, {
         tipoMovimiento: 'Ingreso',
         monto: round2(monto),
         fecha: new Date().toISOString(),
         referencia: 'Abono retroactivo',
         usuarioID: userId,
+        usuarioNombre: usuarioActual,
+        cajeroID: userId,
+        cajeroNombre: usuarioActual,
         clienteID: creditoSeleccionado.clienteID || "",
-        creditoID: creditoSeleccionado.id
+        creditoID: creditoSeleccionado.id,
+        correlativo: Number(correlativoGenerado)
       });
 
-      // Update crédito (sin anclas)
-      await updateDoc(doc(db, "creditos", creditoSeleccionado.id), {
-        amortizacion: amortizacion,
+      batch.update(doc(db, "creditos", creditoSeleccionado.id), {
+        amortizacion,
         saldoActual: round2(saldoPendiente),
         interesActual: round2(interesActual),
         paraPonerseAlDia: round2(paraPonerseAlDiaFinal),
@@ -769,12 +908,42 @@
         ultimaActualizacion: new Date()
       });
 
-      mostrarRecibo(pagoObj);
+      await batch.commit();
 
-      // Reset UI
+      // ====== Modal final “qué paga” + multas procede/no procede ======
+      const fmtFechaBase = resumenInt.fechaBase ? resumenInt.fechaBase.toISOString().slice(0,10) : null;
+
+      mostrarResumenPostPago({
+        cliente: creditoSeleccionado.nombre || "—",
+        fechaValor: fechaAbonoYMD,
+        montoRecibido: monto,
+        saldoAntes: saldoInicialOperacion,
+        pagoMulta,
+        pagoInteres,
+        pagoCapital,
+        saldoDespues: saldoPendiente,
+        ajusteRedondeo,
+        vuelto,
+        esCancelacion: esCancelacionTotal,
+        totalParaCancelar: totalParaCancelar,
+
+        interesDias: resumenInt.dias,
+        tasaDiaria,
+        interesBaseSaldo: resumenInt.saldoBase || 0,
+        interesFechaBase: fmtFechaBase,
+        interesOrigen: resumenInt.origen,
+
+        multasEvaluadas,
+        pagoObj
+      });
+
+      // Reset UI suave
       const ok = document.getElementById("ok-msg");
-      ok.textContent = "Abono retroactivo registrado (Multa → Interés por días → Capital; primer pago desde fechaInicio si no hay recibos).";
+      ok.textContent = esCancelacionTotal
+        ? "Pago retroactivo registrado (Cancelación total a valor fecha)."
+        : "Pago retroactivo registrado (Multa → Interés por días → Capital).";
       ok.style.display = "block";
+
       setTimeout(()=>{
         ok.style.display = "none";
         document.getElementById("form-abono").reset();
@@ -787,11 +956,12 @@
 
     document.getElementById("fecha-abono").addEventListener("change", function(){
       fechaSeleccionada = document.getElementById("fecha-abono").value;
-      document.getElementById("form-abono").style.display = fechaSeleccionada && creditoSeleccionado ? "block" : "none";
+      document.getElementById("form-abono").style.display = (fechaSeleccionada && creditoSeleccionado) ? "block" : "none";
     });
   </script>
 </body>
 </html>
+
 
 
 

@@ -19,35 +19,267 @@
     .list-group-item.selected, .list-group-item:hover { background: #fb923c; color: #181818; font-weight: bold;}
     .label { color: #fb923c; font-weight: 600; margin-bottom: 4px; display: block;}
 
-    .modal-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #181e21cc; z-index: 9999; display: flex; align-items: center; justify-content: center;}
-    .modal { background: #fff; color: #232a37; border-radius: 14px; box-shadow: 0 2px 32px #0007; padding: 22px 20px 16px 20px; max-width: 430px; width: 96%; font-size: 1.03rem; }
-    .modal h3 { margin: 0 0 10px 0; color:#fb923c; }
-    .modal .row { margin: 7px 0; }
-    .modal .muted { color:#475569; font-size:.95rem; }
-    .modal .danger { color:#b91c1c; font-weight:700; }
-    .modal .ok { color:#0f766e; font-weight:700; }
-    .modal .pill { display:inline-block; padding:3px 8px; border-radius:999px; font-size:.85rem; font-weight:700; }
-    .pill-ok { background:#d1fae5; color:#065f46; }
-    .pill-no { background:#fee2e2; color:#991b1b; }
-    .modal-btns { display:flex; gap:10px; justify-content:flex-end; margin-top: 14px; }
-    .modal-btn { border:none; padding: 10px 14px; border-radius: 9px; cursor:pointer; font-weight:700; }
-    .btn-cancel { background:#e5e7eb; color:#111827; }
-    .btn-ok { background:#fb923c; color:#181818; }
-    .modal-error { margin-top:10px; color:#b91c1c; font-weight:700; }
-    .hr { border:none; border-top:1px dashed #cbd5e1; margin:10px 0; }
-    .mini-table { width:100%; border-collapse: collapse; margin-top:6px; }
-    .mini-table th, .mini-table td { border-bottom: 1px solid #e5e7eb; padding: 6px 4px; font-size:.95rem; text-align:left; vertical-align:top; }
-    .mini-table th { color:#334155; font-weight:800; }
-    .k { color:#0f172a; font-weight:800; }
-    .v { color:#111827; }
+    /* ==========================
+       ✅ NUEVO LOOK GLASS (MODAL)
+       - elegante, transparente, moderno
+       - con scroll y límites de pantalla
+       ========================== */
 
-    .recibo { background: #fff; color: #232a37; border-radius: 14px; box-shadow: 0 2px 32px #0007; padding: 27px 23px 18px 23px; max-width: 350px; width: 96%; font-size: 1.03rem; }
-    .recibo-titulo { font-weight: bold; font-size: 1.2rem; margin-bottom: 12px; color: #fb923c; }
-    .recibo-row { margin-bottom: 7px; }
-    .recibo-actions { display:flex; gap:8px; justify-content:flex-end; margin-top: 12px; }
-    .recibo-close { background: #e74c3c; color: #fff; border: none; padding: 7px 15px; border-radius: 7px; cursor: pointer; font-weight: bold;}
-    .recibo-print { background: #10b981; color: #0b2b22; border: none; padding: 7px 15px; border-radius: 7px; cursor: pointer; font-weight: bold;}
-    .recibo-hr { border: 0; border-top: 1px dashed #cbd5e1; margin: 10px 0 14px; }
+    :root{
+      --bg:#0b1220;
+      --text:#e9eef7;
+      --muted:#9aa6b6;
+      --glass-bg: rgba(255,255,255,.10);
+      --glass-brd: rgba(255,255,255,.18);
+      --glass-shadow: 0 24px 60px rgba(0,0,0,.45);
+      --brand-blue:#243b86;
+      --brand-cel:#67C8F1;
+      --brand-green:#13b66b;
+      --brand-gold:#F8AF40;
+      --radius-2xl: 22px;
+    }
+
+    .modal-bg{
+      position: fixed;
+      inset: 0;
+      background: rgba(8,12,20,.62);
+      z-index: 9999;
+      display: grid;
+      place-items: center;
+      padding: 14px;
+      backdrop-filter: blur(10px) saturate(1.2);
+      -webkit-backdrop-filter: blur(10px) saturate(1.2);
+    }
+
+    .modal{
+      width: min(760px, 96vw);
+      max-height: min(84vh, 860px);
+      overflow: hidden;
+      color: #0d1b2a;
+      background: radial-gradient(120% 140% at 0% 0%,
+        rgba(255,255,255,.92),
+        rgba(255,255,255,.78) 40%,
+        rgba(255,255,255,.72) 100%);
+      border: 1px solid rgba(255,255,255,.22);
+      border-radius: var(--radius-2xl);
+      box-shadow: var(--glass-shadow);
+      position: relative;
+      animation: showmodal .18s ease-out;
+    }
+
+    .modal::before{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      border-radius: inherit;
+      pointer-events:none;
+      background: conic-gradient(from 220deg,
+        rgba(103,200,241,.22),
+        rgba(248,175,64,.18),
+        rgba(19,182,107,.18),
+        rgba(103,200,241,.22)
+      );
+      filter: blur(10px);
+      opacity:.55;
+      mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      padding: 1px;
+    }
+
+    @keyframes showmodal { from { transform: translateY(6px) scale(.985); opacity:.65;} to {transform:none;opacity:1;} }
+
+    .modal-header{
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      padding: 16px 16px 12px 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,.90), rgba(255,255,255,.70));
+      border-bottom: 1px solid rgba(10,20,40,.10);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .modal-title{
+      margin: 0;
+      font-size: 1.18rem;
+      font-weight: 900;
+      color: var(--brand-blue);
+      display:flex;
+      align-items:center;
+      gap:10px;
+      letter-spacing:.2px;
+    }
+
+    .modal-sub{
+      margin-top: 6px;
+      color: #5b6776;
+      font-weight: 700;
+      font-size: .98rem;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap: wrap;
+    }
+
+    .modal-body{
+      padding: 14px 16px 10px 16px;
+      overflow: auto;
+      max-height: calc(min(84vh, 860px) - 64px - 74px);
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .row{ margin: 8px 0; }
+    .muted{ color:#5b6776; font-size:.95rem; }
+    .danger{ color:#b91c1c; font-weight:800; }
+    .ok{ color:#0f766e; font-weight:800; }
+    .k{ color:#0f172a; font-weight:900; }
+    .v{ color:#111827; font-weight:700; }
+
+    .hr{ border:none; border-top:1px dashed rgba(15,23,42,.25); margin:10px 0; }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 6px 10px;
+      border-radius:999px;
+      font-size:.85rem;
+      font-weight:900;
+      border:1px solid rgba(15,23,42,.10);
+      background: rgba(36,59,134,.06);
+      color:#0f6aa0;
+    }
+    .pill-ok{ background: rgba(19,182,107,.12); border: 1px solid rgba(19,182,107,.25); color:#0b6b3f; }
+    .pill-no{ background: rgba(231,76,60,.12); border: 1px solid rgba(231,76,60,.25); color:#8e0800; }
+
+    .mini-table{
+      width:100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      background: rgba(255,255,255,.55);
+      border: 1px solid rgba(10,20,40,.10);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .mini-table th, .mini-table td{
+      border-bottom: 1px solid rgba(15,23,42,.10);
+      padding: 10px 10px;
+      font-size:.94rem;
+      text-align:left;
+      vertical-align:top;
+    }
+    .mini-table th{
+      color:#0f6aa0;
+      font-weight:900;
+      background: rgba(36,59,134,.06);
+    }
+    .mini-table tr:last-child td{ border-bottom: none; }
+
+    .modal-btns{
+      position: sticky;
+      bottom: 0;
+      z-index: 2;
+      display:flex;
+      gap:10px;
+      justify-content:flex-end;
+      padding: 12px 16px 14px 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,.82));
+      border-top: 1px solid rgba(10,20,40,.10);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      flex-wrap: wrap;
+    }
+
+    .modal-btn{
+      border:none;
+      padding: 10px 14px;
+      border-radius: 12px;
+      cursor:pointer;
+      font-weight:900;
+      letter-spacing:.2px;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      transition: transform .12s ease, box-shadow .2s ease, opacity .2s ease;
+    }
+    .modal-btn:active{ transform: translateY(1px); }
+
+    .btn-cancel{
+      background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%);
+      color:#fff;
+      box-shadow: 0 10px 22px rgba(231,76,60,.22);
+    }
+    .btn-ok{
+      background: linear-gradient(90deg, var(--brand-green) 0%, #0b854c 100%);
+      color:#fff;
+      box-shadow: 0 10px 22px rgba(19,182,107,.24);
+    }
+
+    .modal-error{ margin-top:10px; color:#b91c1c; font-weight:900; }
+
+    /* ==========================
+       ✅ NUEVO LOOK GLASS (RECIBO)
+       - mismo estilo del modal de pagos
+       ========================== */
+
+    .recibo{
+      width: min(460px, 96vw);
+      max-height: min(84vh, 860px);
+      overflow: auto;
+      color: #0d1b2a;
+      background: radial-gradient(120% 140% at 0% 0%,
+        rgba(255,255,255,.92),
+        rgba(255,255,255,.78) 40%,
+        rgba(255,255,255,.72) 100%);
+      border: 1px solid rgba(255,255,255,.22);
+      border-radius: var(--radius-2xl);
+      box-shadow: var(--glass-shadow);
+      padding: 18px 18px 14px 18px;
+      position: relative;
+      animation: showmodal .18s ease-out;
+    }
+    .recibo::before{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      border-radius: inherit;
+      pointer-events:none;
+      background: conic-gradient(from 220deg,
+        rgba(103,200,241,.22),
+        rgba(248,175,64,.18),
+        rgba(19,182,107,.18),
+        rgba(103,200,241,.22)
+      );
+      filter: blur(10px);
+      opacity:.55;
+      mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      padding: 1px;
+    }
+    .recibo-titulo{ font-weight: 900; font-size: 1.18rem; margin-bottom: 12px; color: var(--brand-blue); display:flex; gap:10px; align-items:center; }
+    .recibo-row{ margin-bottom: 8px; font-weight: 700; color:#111827; }
+    .recibo-row b{ color:#0f6aa0; }
+    .recibo-hr{ border: 0; border-top: 1px dashed rgba(15,23,42,.25); margin: 10px 0 14px; }
+
+    .recibo-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top: 12px; flex-wrap: wrap; }
+    .recibo-close{
+      background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%);
+      color:#fff; border: none; padding: 10px 14px; border-radius: 12px; cursor: pointer; font-weight: 900;
+      box-shadow: 0 10px 22px rgba(231,76,60,.22);
+    }
+    .recibo-print{
+      background: linear-gradient(90deg, var(--brand-green) 0%, #0b854c 100%);
+      color:#fff; border: none; padding: 10px 14px; border-radius: 12px; cursor: pointer; font-weight: 900;
+      box-shadow: 0 10px 22px rgba(19,182,107,.24);
+    }
+
+    @media (max-width: 420px){
+      .modal-body{ padding: 12px 12px 8px 12px; }
+      .modal-header{ padding: 14px 12px 10px 12px; }
+      .modal-btns{ padding: 10px 12px 12px 12px; }
+    }
 
     @media print {
       @page { size: A4 portrait; margin: 12mm; }
@@ -308,17 +540,25 @@
 
         function close(){ modalRoot.innerHTML=""; }
         function render(){
+          /* ✅ SOLO VISUAL: ahora usa el mismo look glass + scroll natural */
           modalRoot.innerHTML = `
             <div class="modal-bg">
-              <div class="modal">
-                <h3>Autorización</h3>
-                <div class="row">Ingresa el <b>PIN del gerente</b> para registrar un pago retroactivo.</div>
-                <input type="password" id="gerente-pin-input" maxlength="10" autocomplete="off"
-                       placeholder="PIN" style="font-size:1.18rem;width:100%;padding:10px;border-radius:10px;border:1px solid #cbd5e1;"/>
-                ${errorMsg ? `<div class="modal-error">${errorMsg}</div>` : ""}
+              <div class="modal" role="dialog" aria-modal="true" aria-label="Autorización de gerente">
+                <div class="modal-header">
+                  <div class="modal-title"><i class="fa-solid fa-shield-halved" style="color:#13b66b;"></i> Autorización</div>
+                  <div class="modal-sub">Ingresa el <b>PIN del gerente</b> para registrar un pago retroactivo.</div>
+                </div>
+                <div class="modal-body">
+                  <div class="row muted">Esta acción quedará registrada en auditoría.</div>
+                  <div class="row">
+                    <input type="password" id="gerente-pin-input" maxlength="10" autocomplete="off"
+                           placeholder="PIN" style="font-size:1.18rem;width:100%;padding:12px 12px;border-radius:12px;border:1px solid rgba(36,59,134,.20);outline:none;background:rgba(36,59,134,.06);"/>
+                    ${errorMsg ? `<div class="modal-error">${errorMsg}</div>` : ""}
+                  </div>
+                </div>
                 <div class="modal-btns">
-                  <button class="modal-btn btn-cancel" id="cancelar-pin">Cancelar</button>
-                  <button class="modal-btn btn-ok" id="autorizar-pin">Autorizar</button>
+                  <button class="modal-btn btn-cancel" id="cancelar-pin"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+                  <button class="modal-btn btn-ok" id="autorizar-pin"><i class="fa-solid fa-check"></i> Autorizar</button>
                 </div>
               </div>
             </div>`;
@@ -388,7 +628,7 @@
       const lineaQuePaga = `Pagó ${money(res.pagoMulta)} en multas + ${money(res.pagoInteres)} en interés + ${money(res.pagoCapital)} a capital.`;
 
       const multasRows = (res.multasEvaluadas || []).map(m=>{
-        const pill = m.procede ? `<span class="pill pill-ok">PROCEDE</span>` : `<span class="pill pill-no">NO PROCEDE</span>`;
+        const pill = m.procede ? `<span class="pill pill-ok"><i class="fa-solid fa-circle-check"></i> PROCEDE</span>` : `<span class="pill pill-no"><i class="fa-solid fa-circle-xmark"></i> NO PROCEDE</span>`;
         return `
           <tr>
             <td>#${m.index}</td>
@@ -399,66 +639,81 @@
         `;
       }).join("");
 
+      /* ✅ SOLO VISUAL: mismo contenido, pero en estructura header/body + scroll + botones sticky */
       root.innerHTML = `
         <div class="modal-bg">
-          <div class="modal">
-            <h3>Qué está pagando el cliente</h3>
-            <div class="row"><span class="k">Cliente:</span> <span class="v">${res.cliente}</span></div>
-            <div class="row"><span class="k">Fecha valor:</span> <span class="v">${res.fechaValor}</span></div>
-            <div class="row"><span class="k">Monto recibido:</span> <span class="v">${money(res.montoRecibido)}</span></div>
-
-            <div class="hr"></div>
-
-            <div class="row"><b>${lineaQuePaga}</b></div>
-            <div class="row muted">
-              Orden aplicado: Multa (si procede) → Interés por días → Capital.
-            </div>
-
-            <div class="hr"></div>
-
-            <div class="row"><span class="k">Saldo antes:</span> <span class="v">${money(res.saldoAntes)}</span></div>
-            <div class="row"><span class="k">Multas aplicadas:</span> <span class="v">${money(res.pagoMulta)}</span></div>
-            <div class="row">
-              <span class="k">Interés aplicado:</span> <span class="v">${money(res.pagoInteres)}</span>
-              <div class="muted">
-                Base usada: ${money(res.interesBaseSaldo)} |
-                Días: ${res.interesDias} |
-                Tasa diaria: ${(res.tasaDiaria*100).toFixed(4)}% |
-                Fecha base: ${res.interesFechaBase || '—'} |
-                Origen: ${res.interesOrigen}
+          <div class="modal" role="dialog" aria-modal="true" aria-label="Resumen del pago retroactivo">
+            <div class="modal-header">
+              <div class="modal-title"><i class="fa-solid fa-receipt" style="color:#243b86;"></i> Qué está pagando el cliente</div>
+              <div class="modal-sub">
+                <span><i class="fa-solid fa-user"></i> <b>${res.cliente}</b></span>
+                <span>•</span>
+                <span><i class="fa-solid fa-calendar-day"></i> Fecha valor: <b>${res.fechaValor}</b></span>
               </div>
             </div>
-            <div class="row"><span class="k">Capital aplicado:</span> <span class="v">${money(res.pagoCapital)}</span></div>
-            <div class="row">
-              <span class="k">Saldo después:</span> <span class="v">${money(res.saldoDespues)}</span>
-              ${res.ajusteRedondeo > 0 ? `<div class="muted">Ajuste por tolerancia (${money(res.ajusteRedondeo)}) para dejar saldo en $0.00.</div>` : ``}
+
+            <div class="modal-body">
+              <div class="row"><span class="k">Monto recibido:</span> <span class="v">${money(res.montoRecibido)}</span></div>
+
+              <div class="hr"></div>
+
+              <div class="row"><b>${lineaQuePaga}</b></div>
+              <div class="row muted">
+                Orden aplicado: Multa (si procede) → Interés por días → Capital.
+              </div>
+
+              <div class="hr"></div>
+
+              <div class="row"><span class="k">Saldo antes:</span> <span class="v">${money(res.saldoAntes)}</span></div>
+              <div class="row"><span class="k">Multas aplicadas:</span> <span class="v">${money(res.pagoMulta)}</span></div>
+
+              <div class="row">
+                <span class="k">Interés aplicado:</span> <span class="v">${money(res.pagoInteres)}</span>
+                <div class="muted" style="margin-top:6px;">
+                  Base usada: <b>${money(res.interesBaseSaldo)}</b> •
+                  Días: <b>${res.interesDias}</b> •
+                  Tasa diaria: <b>${(res.tasaDiaria*100).toFixed(4)}%</b> •
+                  Fecha base: <b>${res.interesFechaBase || '—'}</b> •
+                  Origen: <b>${res.interesOrigen}</b>
+                </div>
+              </div>
+
+              <div class="row"><span class="k">Capital aplicado:</span> <span class="v">${money(res.pagoCapital)}</span></div>
+
+              <div class="row">
+                <span class="k">Saldo después:</span> <span class="v">${money(res.saldoDespues)}</span>
+                ${res.ajusteRedondeo > 0 ? `<div class="muted">Ajuste por tolerancia (${money(res.ajusteRedondeo)}) para dejar saldo en $0.00.</div>` : ``}
+              </div>
+
+              ${res.esCancelacion ? `
+                <div class="hr"></div>
+                <div class="row ok"><b><i class="fa-solid fa-circle-check"></i> Cancelación total a valor fecha.</b></div>
+                <div class="row"><span class="k">Total para cancelar:</span> <span class="v">${money(res.totalParaCancelar)}</span></div>
+                ${res.vuelto > 0 ? `<div class="row danger"><b><i class="fa-solid fa-hand-holding-dollar"></i> Vuelto a entregar:</b> ${money(res.vuelto)}</div>` : ``}
+              ` : ``}
+
+              <div class="hr"></div>
+
+              <div class="row"><b>Multas evaluadas (por qué procede o no)</b></div>
+              ${(res.multasEvaluadas || []).length === 0
+                ? `<div class="row muted">No hay multas configuradas para evaluar.</div>`
+                : `
+                  <table class="mini-table">
+                    <thead>
+                      <tr><th>#</th><th>Fecha multa</th><th>Monto</th><th>Evaluación</th></tr>
+                    </thead>
+                    <tbody>${multasRows}</tbody>
+                  </table>
+                `
+              }
+              <div class="row muted" style="margin-top:10px;">
+                Tip: puedes desplazarte dentro del modal para ver todo el contenido.
+              </div>
             </div>
 
-            ${res.esCancelacion ? `
-              <div class="hr"></div>
-              <div class="row ok"><b>✅ Cancelación total a valor fecha.</b></div>
-              <div class="row"><span class="k">Total para cancelar:</span> <span class="v">${money(res.totalParaCancelar)}</span></div>
-              ${res.vuelto > 0 ? `<div class="row danger"><b>Vuelto a entregar:</b> ${money(res.vuelto)}</div>` : ``}
-            ` : ``}
-
-            <div class="hr"></div>
-
-            <div class="row"><b>Multas evaluadas (por qué procede o no)</b></div>
-            ${(res.multasEvaluadas || []).length === 0
-              ? `<div class="row muted">No hay multas configuradas para evaluar.</div>`
-              : `
-                <table class="mini-table">
-                  <thead>
-                    <tr><th>#</th><th>Fecha multa</th><th>Monto</th><th>Evaluación</th></tr>
-                  </thead>
-                  <tbody>${multasRows}</tbody>
-                </table>
-              `
-            }
-
             <div class="modal-btns">
-              <button class="modal-btn btn-cancel" id="cerrar-resumen">Cerrar</button>
-              <button class="modal-btn btn-ok" id="continuar-ticket">Continuar a ticket</button>
+              <button class="modal-btn btn-cancel" id="cerrar-resumen"><i class="fa-solid fa-xmark"></i> Cerrar</button>
+              <button class="modal-btn btn-ok" id="continuar-ticket"><i class="fa-solid fa-print"></i> Continuar a ticket</button>
             </div>
           </div>
         </div>
@@ -477,7 +732,7 @@
       reciboDiv.innerHTML = `
         <div class="modal-bg recibo-bg">
           <div class="recibo">
-            <div class="recibo-titulo">Recibo de Pago Retroactivo</div>
+            <div class="recibo-titulo"><i class="fa-solid fa-receipt"></i> Recibo de Pago Retroactivo</div>
             <hr class="recibo-hr"/>
             <div class="recibo-row"><b>No. Correlativo:</b> ${datos.correlativo || '-'}</div>
             <div class="recibo-row"><b>Cliente:</b> ${datos.nombres}</div>
@@ -961,7 +1216,6 @@
   </script>
 </body>
 </html>
-
 
 
 

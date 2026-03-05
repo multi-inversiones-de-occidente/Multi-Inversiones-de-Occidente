@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Abono a Fechas Anteriores – Solo desde Recibos</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
   <style>
     body { background: #111827; color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; min-height: 100vh;}
     .container { max-width: 580px; margin: 2.2rem auto 0 auto; background: #232a37; border-radius: 17px; box-shadow: 0 2px 24px #0008; padding: 2.4rem 1.8rem 1.7rem 1.8rem;}
@@ -20,29 +21,24 @@
     .label { color: #fb923c; font-weight: 600; margin-bottom: 4px; display: block;}
 
     /* ==========================
-       ✅ NUEVO LOOK GLASS (MODAL)
-       - elegante, transparente, moderno
-       - con scroll y límites de pantalla
+       MODALES: estilo glass moderno + scroll
+       (solo visual, no toca lógica)
        ========================== */
-
     :root{
-      --bg:#0b1220;
-      --text:#e9eef7;
-      --muted:#9aa6b6;
-      --glass-bg: rgba(255,255,255,.10);
-      --glass-brd: rgba(255,255,255,.18);
-      --glass-shadow: 0 24px 60px rgba(0,0,0,.45);
+      --glass-bg: rgba(255,255,255,.92);
+      --glass-brd: rgba(15, 23, 42, .12);
+      --glass-shadow: 0 24px 70px rgba(0,0,0,.35);
+      --muted:#475569;
       --brand-blue:#243b86;
-      --brand-cel:#67C8F1;
       --brand-green:#13b66b;
-      --brand-gold:#F8AF40;
-      --radius-2xl: 22px;
+      --brand-gold:#fb923c;
+      --danger:#b91c1c;
+      --radius: 18px;
     }
 
     .modal-bg{
-      position: fixed;
-      inset: 0;
-      background: rgba(8,12,20,.62);
+      position: fixed; inset: 0;
+      background: rgba(8,12,20,.60);
       z-index: 9999;
       display: grid;
       place-items: center;
@@ -52,234 +48,101 @@
     }
 
     .modal{
-      width: min(760px, 96vw);
-      max-height: min(84vh, 860px);
-      overflow: hidden;
-      color: #0d1b2a;
-      background: radial-gradient(120% 140% at 0% 0%,
-        rgba(255,255,255,.92),
-        rgba(255,255,255,.78) 40%,
-        rgba(255,255,255,.72) 100%);
-      border: 1px solid rgba(255,255,255,.22);
-      border-radius: var(--radius-2xl);
+      background: radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,.98), rgba(255,255,255,.90) 45%, rgba(255,255,255,.86) 100%);
+      color: #0f172a;
+      border-radius: var(--radius);
       box-shadow: var(--glass-shadow);
+      border: 1px solid var(--glass-brd);
+      max-width: 860px; /* más ancho */
+      width: min(900px, 96vw);
+      overflow: hidden; /* para header/footer */
       position: relative;
-      animation: showmodal .18s ease-out;
+      animation: showmodal .16s ease-out;
     }
-
-    .modal::before{
-      content:"";
-      position:absolute;
-      inset:-2px;
-      border-radius: inherit;
-      pointer-events:none;
-      background: conic-gradient(from 220deg,
-        rgba(103,200,241,.22),
-        rgba(248,175,64,.18),
-        rgba(19,182,107,.18),
-        rgba(103,200,241,.22)
-      );
-      filter: blur(10px);
-      opacity:.55;
-      mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      padding: 1px;
-    }
-
-    @keyframes showmodal { from { transform: translateY(6px) scale(.985); opacity:.65;} to {transform:none;opacity:1;} }
+    @keyframes showmodal { from { transform: translateY(8px) scale(.98); opacity:.6;} to {transform:none;opacity:1;} }
 
     .modal-header{
-      position: sticky;
-      top: 0;
-      z-index: 2;
-      padding: 16px 16px 12px 16px;
-      background: linear-gradient(180deg, rgba(255,255,255,.90), rgba(255,255,255,.70));
-      border-bottom: 1px solid rgba(10,20,40,.10);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding: 16px 18px;
+      border-bottom: 1px solid rgba(15,23,42,.10);
+      background: linear-gradient(180deg, rgba(36,59,134,.10), rgba(36,59,134,.02));
     }
 
     .modal-title{
-      margin: 0;
-      font-size: 1.18rem;
+      display:flex; align-items:center; gap:10px;
+      font-size: 1.12rem;
       font-weight: 900;
       color: var(--brand-blue);
-      display:flex;
-      align-items:center;
-      gap:10px;
-      letter-spacing:.2px;
+      margin: 0;
+      letter-spacing: .2px;
     }
 
     .modal-sub{
+      font-size: .96rem;
+      color: var(--muted);
+      margin: 0;
       margin-top: 6px;
-      color: #5b6776;
-      font-weight: 700;
-      font-size: .98rem;
       display:flex;
+      gap:10px;
       align-items:center;
-      gap:8px;
-      flex-wrap: wrap;
+      flex-wrap:wrap;
     }
 
     .modal-body{
-      padding: 14px 16px 10px 16px;
+      padding: 14px 18px 16px 18px;
+      max-height: min(72vh, 640px); /* 👈 scroll */
       overflow: auto;
-      max-height: calc(min(84vh, 860px) - 64px - 74px);
-      -webkit-overflow-scrolling: touch;
     }
 
-    .row{ margin: 8px 0; }
-    .muted{ color:#5b6776; font-size:.95rem; }
-    .danger{ color:#b91c1c; font-weight:800; }
-    .ok{ color:#0f766e; font-weight:800; }
-    .k{ color:#0f172a; font-weight:900; }
-    .v{ color:#111827; font-weight:700; }
-
-    .hr{ border:none; border-top:1px dashed rgba(15,23,42,.25); margin:10px 0; }
-
-    .pill{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding: 6px 10px;
-      border-radius:999px;
-      font-size:.85rem;
-      font-weight:900;
-      border:1px solid rgba(15,23,42,.10);
-      background: rgba(36,59,134,.06);
-      color:#0f6aa0;
-    }
-    .pill-ok{ background: rgba(19,182,107,.12); border: 1px solid rgba(19,182,107,.25); color:#0b6b3f; }
-    .pill-no{ background: rgba(231,76,60,.12); border: 1px solid rgba(231,76,60,.25); color:#8e0800; }
-
-    .mini-table{
-      width:100%;
-      border-collapse: collapse;
-      margin-top: 8px;
-      background: rgba(255,255,255,.55);
-      border: 1px solid rgba(10,20,40,.10);
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    .mini-table th, .mini-table td{
-      border-bottom: 1px solid rgba(15,23,42,.10);
-      padding: 10px 10px;
-      font-size:.94rem;
-      text-align:left;
-      vertical-align:top;
-    }
-    .mini-table th{
-      color:#0f6aa0;
-      font-weight:900;
-      background: rgba(36,59,134,.06);
-    }
-    .mini-table tr:last-child td{ border-bottom: none; }
-
-    .modal-btns{
-      position: sticky;
-      bottom: 0;
-      z-index: 2;
+    .modal-footer{
       display:flex;
       gap:10px;
       justify-content:flex-end;
-      padding: 12px 16px 14px 16px;
-      background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,.82));
-      border-top: 1px solid rgba(10,20,40,.10);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      flex-wrap: wrap;
+      padding: 12px 18px;
+      border-top: 1px solid rgba(15,23,42,.10);
+      background: linear-gradient(180deg, rgba(255,255,255,.40), rgba(255,255,255,.80));
+      position: sticky;
+      bottom: 0;
     }
 
-    .modal-btn{
-      border:none;
-      padding: 10px 14px;
-      border-radius: 12px;
-      cursor:pointer;
-      font-weight:900;
-      letter-spacing:.2px;
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      transition: transform .12s ease, box-shadow .2s ease, opacity .2s ease;
-    }
-    .modal-btn:active{ transform: translateY(1px); }
+    .modal h3{ margin: 0; color: var(--brand-blue); font-weight: 900; }
 
-    .btn-cancel{
-      background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%);
-      color:#fff;
-      box-shadow: 0 10px 22px rgba(231,76,60,.22);
-    }
-    .btn-ok{
-      background: linear-gradient(90deg, var(--brand-green) 0%, #0b854c 100%);
-      color:#fff;
-      box-shadow: 0 10px 22px rgba(19,182,107,.24);
-    }
+    .row { margin: 8px 0; }
+    .muted { color: var(--muted); font-size:.95rem; }
+    .danger { color: var(--danger); font-weight:800; }
+    .ok { color:#0f766e; font-weight:800; }
 
-    .modal-error{ margin-top:10px; color:#b91c1c; font-weight:900; }
+    .pill { display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; font-size:.88rem; font-weight:900; }
+    .pill-ok { background: rgba(19,182,107,.12); color: #0b6b3f; border: 1px solid rgba(19,182,107,.25); }
+    .pill-no { background: rgba(185,28,28,.10); color: #8b1414; border: 1px solid rgba(185,28,28,.20); }
 
-    /* ==========================
-       ✅ NUEVO LOOK GLASS (RECIBO)
-       - mismo estilo del modal de pagos
-       ========================== */
+    .modal-btns { display:flex; gap:10px; justify-content:flex-end; margin-top: 0; }
+    .modal-btn { border:none; padding: 10px 14px; border-radius: 12px; cursor:pointer; font-weight:900; display:inline-flex; align-items:center; gap:8px; }
+    .btn-cancel { background: linear-gradient(90deg, #ef4444, #991b1b); color:#fff; }
+    .btn-ok { background: linear-gradient(90deg, var(--brand-green), #0b854c); color:#fff; }
+    .btn-neutral { background: rgba(15,23,42,.06); border:1px solid rgba(15,23,42,.12); color:#0f172a; }
 
-    .recibo{
-      width: min(460px, 96vw);
-      max-height: min(84vh, 860px);
-      overflow: auto;
-      color: #0d1b2a;
-      background: radial-gradient(120% 140% at 0% 0%,
-        rgba(255,255,255,.92),
-        rgba(255,255,255,.78) 40%,
-        rgba(255,255,255,.72) 100%);
-      border: 1px solid rgba(255,255,255,.22);
-      border-radius: var(--radius-2xl);
-      box-shadow: var(--glass-shadow);
-      padding: 18px 18px 14px 18px;
-      position: relative;
-      animation: showmodal .18s ease-out;
-    }
-    .recibo::before{
-      content:"";
-      position:absolute;
-      inset:-2px;
-      border-radius: inherit;
-      pointer-events:none;
-      background: conic-gradient(from 220deg,
-        rgba(103,200,241,.22),
-        rgba(248,175,64,.18),
-        rgba(19,182,107,.18),
-        rgba(103,200,241,.22)
-      );
-      filter: blur(10px);
-      opacity:.55;
-      mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      padding: 1px;
-    }
-    .recibo-titulo{ font-weight: 900; font-size: 1.18rem; margin-bottom: 12px; color: var(--brand-blue); display:flex; gap:10px; align-items:center; }
-    .recibo-row{ margin-bottom: 8px; font-weight: 700; color:#111827; }
-    .recibo-row b{ color:#0f6aa0; }
-    .recibo-hr{ border: 0; border-top: 1px dashed rgba(15,23,42,.25); margin: 10px 0 14px; }
+    .modal-error { margin-top:10px; color: var(--danger); font-weight:800; }
 
-    .recibo-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top: 12px; flex-wrap: wrap; }
-    .recibo-close{
-      background: linear-gradient(90deg, #e74c3c 0%, #8e0800 100%);
-      color:#fff; border: none; padding: 10px 14px; border-radius: 12px; cursor: pointer; font-weight: 900;
-      box-shadow: 0 10px 22px rgba(231,76,60,.22);
-    }
-    .recibo-print{
-      background: linear-gradient(90deg, var(--brand-green) 0%, #0b854c 100%);
-      color:#fff; border: none; padding: 10px 14px; border-radius: 12px; cursor: pointer; font-weight: 900;
-      box-shadow: 0 10px 22px rgba(19,182,107,.24);
-    }
+    .hr { border:none; border-top:1px dashed rgba(15,23,42,.25); margin:12px 0; }
 
-    @media (max-width: 420px){
-      .modal-body{ padding: 12px 12px 8px 12px; }
-      .modal-header{ padding: 14px 12px 10px 12px; }
-      .modal-btns{ padding: 10px 12px 12px 12px; }
-    }
+    .mini-table { width:100%; border-collapse: collapse; margin-top:8px; border-radius: 12px; overflow: hidden; }
+    .mini-table th, .mini-table td { border-bottom: 1px solid rgba(15,23,42,.10); padding: 10px 8px; font-size:.95rem; text-align:left; vertical-align:top; }
+    .mini-table th { color:#0f6aa0; font-weight:900; background: rgba(36,59,134,.06); }
+    .k { color:#0f172a; font-weight:900; }
+    .v { color:#111827; }
+
+    /* Recibo (se queda igual, solo un poquito más clean) */
+    .recibo { background: #fff; color: #232a37; border-radius: 14px; box-shadow: 0 2px 32px #0007; padding: 27px 23px 18px 23px; max-width: 380px; width: 96%; font-size: 1.03rem; }
+    .recibo-titulo { font-weight: 900; font-size: 1.2rem; margin-bottom: 12px; color: #fb923c; }
+    .recibo-row { margin-bottom: 7px; }
+    .recibo-actions { display:flex; gap:8px; justify-content:flex-end; margin-top: 12px; }
+    .recibo-close { background: #e74c3c; color: #fff; border: none; padding: 8px 14px; border-radius: 10px; cursor: pointer; font-weight: 900;}
+    .recibo-print { background: #10b981; color: #0b2b22; border: none; padding: 8px 14px; border-radius: 10px; cursor: pointer; font-weight: 900;}
+    .recibo-hr { border: 0; border-top: 1px dashed #cbd5e1; margin: 10px 0 14px; }
 
     @media print {
       @page { size: A4 portrait; margin: 12mm; }
@@ -291,6 +154,7 @@
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <div class="titulo"><i class="fas fa-history"></i> Abono a Fechas Anteriores</div>
@@ -539,34 +403,41 @@
         }
 
         function close(){ modalRoot.innerHTML=""; }
+
         function render(){
-          /* ✅ SOLO VISUAL: ahora usa el mismo look glass + scroll natural */
           modalRoot.innerHTML = `
             <div class="modal-bg">
-              <div class="modal" role="dialog" aria-modal="true" aria-label="Autorización de gerente">
+              <div class="modal">
                 <div class="modal-header">
-                  <div class="modal-title"><i class="fa-solid fa-shield-halved" style="color:#13b66b;"></i> Autorización</div>
-                  <div class="modal-sub">Ingresa el <b>PIN del gerente</b> para registrar un pago retroactivo.</div>
+                  <div>
+                    <div class="modal-title"><i class="fa-solid fa-lock"></i> Autorización</div>
+                    <div class="modal-sub">Ingresa el <b>PIN del gerente</b> para registrar un pago retroactivo.</div>
+                  </div>
+                  <button class="modal-btn btn-neutral" id="cancelar-pin-top"><i class="fa-solid fa-xmark"></i></button>
                 </div>
+
                 <div class="modal-body">
-                  <div class="row muted">Esta acción quedará registrada en auditoría.</div>
                   <div class="row">
                     <input type="password" id="gerente-pin-input" maxlength="10" autocomplete="off"
-                           placeholder="PIN" style="font-size:1.18rem;width:100%;padding:12px 12px;border-radius:12px;border:1px solid rgba(36,59,134,.20);outline:none;background:rgba(36,59,134,.06);"/>
-                    ${errorMsg ? `<div class="modal-error">${errorMsg}</div>` : ""}
+                      placeholder="PIN"
+                      style="font-size:1.12rem;width:100%;padding:12px 12px;border-radius:12px;border:1px solid rgba(15,23,42,.18); outline:none;"/>
                   </div>
+                  ${errorMsg ? `<div class="modal-error">${errorMsg}</div>` : ""}
                 </div>
-                <div class="modal-btns">
-                  <button class="modal-btn btn-cancel" id="cancelar-pin"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+
+                <div class="modal-footer">
+                  <button class="modal-btn btn-cancel" id="cancelar-pin"><i class="fa-solid fa-ban"></i> Cancelar</button>
                   <button class="modal-btn btn-ok" id="autorizar-pin"><i class="fa-solid fa-check"></i> Autorizar</button>
                 </div>
               </div>
             </div>`;
+          document.getElementById("cancelar-pin-top").onclick = ()=>{ close(); resolve(false); };
           document.getElementById("cancelar-pin").onclick = ()=>{ close(); resolve(false); };
           document.getElementById("autorizar-pin").onclick = onOk;
           document.getElementById("gerente-pin-input").onkeydown = e=>{ if(e.key==="Enter") onOk(); };
-          setTimeout(()=> document.getElementById("gerente-pin-input").focus(), 30);
+          setTimeout(()=> document.getElementById("gerente-pin-input")?.focus(), 30);
         }
+
         render();
       });
     }
@@ -628,28 +499,30 @@
       const lineaQuePaga = `Pagó ${money(res.pagoMulta)} en multas + ${money(res.pagoInteres)} en interés + ${money(res.pagoCapital)} a capital.`;
 
       const multasRows = (res.multasEvaluadas || []).map(m=>{
-        const pill = m.procede ? `<span class="pill pill-ok"><i class="fa-solid fa-circle-check"></i> PROCEDE</span>` : `<span class="pill pill-no"><i class="fa-solid fa-circle-xmark"></i> NO PROCEDE</span>`;
+        const pill = m.procede ? `<span class="pill pill-ok"><i class="fa-solid fa-check"></i> PROCEDE</span>` : `<span class="pill pill-no"><i class="fa-solid fa-xmark"></i> NO PROCEDE</span>`;
         return `
           <tr>
             <td>#${m.index}</td>
             <td>${m.fechaMulta || '—'}</td>
             <td>${money(m.monto)}</td>
-            <td>${pill}<div class="muted">${m.razon}</div></td>
+            <td>${pill}<div class="muted" style="margin-top:4px;">${m.razon}</div></td>
           </tr>
         `;
       }).join("");
 
-      /* ✅ SOLO VISUAL: mismo contenido, pero en estructura header/body + scroll + botones sticky */
       root.innerHTML = `
         <div class="modal-bg">
-          <div class="modal" role="dialog" aria-modal="true" aria-label="Resumen del pago retroactivo">
+          <div class="modal">
             <div class="modal-header">
-              <div class="modal-title"><i class="fa-solid fa-receipt" style="color:#243b86;"></i> Qué está pagando el cliente</div>
-              <div class="modal-sub">
-                <span><i class="fa-solid fa-user"></i> <b>${res.cliente}</b></span>
-                <span>•</span>
-                <span><i class="fa-solid fa-calendar-day"></i> Fecha valor: <b>${res.fechaValor}</b></span>
+              <div>
+                <div class="modal-title"><i class="fa-solid fa-receipt"></i> Qué está pagando el cliente</div>
+                <div class="modal-sub">
+                  <span><i class="fa-solid fa-user"></i> <b>${res.cliente}</b></span>
+                  <span>•</span>
+                  <span><i class="fa-solid fa-calendar-day"></i> Fecha valor: <b>${res.fechaValor}</b></span>
+                </div>
               </div>
+              <button class="modal-btn btn-neutral" id="cerrar-resumen-top"><i class="fa-solid fa-xmark"></i></button>
             </div>
 
             <div class="modal-body">
@@ -670,26 +543,25 @@
               <div class="row">
                 <span class="k">Interés aplicado:</span> <span class="v">${money(res.pagoInteres)}</span>
                 <div class="muted" style="margin-top:6px;">
-                  Base usada: <b>${money(res.interesBaseSaldo)}</b> •
-                  Días: <b>${res.interesDias}</b> •
-                  Tasa diaria: <b>${(res.tasaDiaria*100).toFixed(4)}%</b> •
-                  Fecha base: <b>${res.interesFechaBase || '—'}</b> •
+                  Base usada: ${money(res.interesBaseSaldo)} |
+                  Días: ${res.interesDias} |
+                  Tasa diaria: ${(res.tasaDiaria*100).toFixed(4)}% |
+                  Fecha base: ${res.interesFechaBase || '—'} |
                   Origen: <b>${res.interesOrigen}</b>
                 </div>
               </div>
 
               <div class="row"><span class="k">Capital aplicado:</span> <span class="v">${money(res.pagoCapital)}</span></div>
-
               <div class="row">
                 <span class="k">Saldo después:</span> <span class="v">${money(res.saldoDespues)}</span>
-                ${res.ajusteRedondeo > 0 ? `<div class="muted">Ajuste por tolerancia (${money(res.ajusteRedondeo)}) para dejar saldo en $0.00.</div>` : ``}
+                ${res.ajusteRedondeo > 0 ? `<div class="muted" style="margin-top:6px;">Ajuste por tolerancia (${money(res.ajusteRedondeo)}) para dejar saldo en $0.00.</div>` : ``}
               </div>
 
               ${res.esCancelacion ? `
                 <div class="hr"></div>
-                <div class="row ok"><b><i class="fa-solid fa-circle-check"></i> Cancelación total a valor fecha.</b></div>
+                <div class="row ok"><b>✅ Cancelación total a valor fecha.</b></div>
                 <div class="row"><span class="k">Total para cancelar:</span> <span class="v">${money(res.totalParaCancelar)}</span></div>
-                ${res.vuelto > 0 ? `<div class="row danger"><b><i class="fa-solid fa-hand-holding-dollar"></i> Vuelto a entregar:</b> ${money(res.vuelto)}</div>` : ``}
+                ${res.vuelto > 0 ? `<div class="row danger"><b>Vuelto a entregar:</b> ${money(res.vuelto)}</div>` : ``}
               ` : ``}
 
               <div class="hr"></div>
@@ -706,18 +578,16 @@
                   </table>
                 `
               }
-              <div class="row muted" style="margin-top:10px;">
-                Tip: puedes desplazarte dentro del modal para ver todo el contenido.
-              </div>
             </div>
 
-            <div class="modal-btns">
+            <div class="modal-footer">
               <button class="modal-btn btn-cancel" id="cerrar-resumen"><i class="fa-solid fa-xmark"></i> Cerrar</button>
               <button class="modal-btn btn-ok" id="continuar-ticket"><i class="fa-solid fa-print"></i> Continuar a ticket</button>
             </div>
           </div>
         </div>
       `;
+      document.getElementById("cerrar-resumen-top").onclick = ()=> root.innerHTML = "";
       document.getElementById("cerrar-resumen").onclick = ()=> root.innerHTML = "";
       document.getElementById("continuar-ticket").onclick = ()=>{
         root.innerHTML = "";
@@ -732,7 +602,7 @@
       reciboDiv.innerHTML = `
         <div class="modal-bg recibo-bg">
           <div class="recibo">
-            <div class="recibo-titulo"><i class="fa-solid fa-receipt"></i> Recibo de Pago Retroactivo</div>
+            <div class="recibo-titulo">Recibo de Pago Retroactivo</div>
             <hr class="recibo-hr"/>
             <div class="recibo-row"><b>No. Correlativo:</b> ${datos.correlativo || '-'}</div>
             <div class="recibo-row"><b>Cliente:</b> ${datos.nombres}</div>
@@ -791,12 +661,24 @@
       const fechaAbonoEnd = new Date(toLocalEndISO(fechaAbonoYMD));
       const abono0h = new Date(toLocalStartISO(fechaAbonoYMD));
 
-      const saldoInicialOperacion = Number.isFinite(num(creditoAntes?.saldoActual, NaN))
-        ? num(creditoAntes.saldoActual, 0)
-        : num(creditoSeleccionado.saldoActual, 0);
-
+      /* ===========================================================
+         ✅ FIX PEQUEÑO (SOLO ESTE DETALLE):
+         Si el interés viene de ultimo_recibo, el saldo base real de operación
+         debe ser el saldoRestante del último recibo (resumenInt.saldoBase),
+         no el saldoActual del documento creditos.
+         =========================================================== */
       const resumenInt = await calcularInteresSoloRecibos(db, creditoSeleccionado, fechaAbonoYMD);
       const interesAlCorte = round2(resumenInt.interesCobrar);
+
+      let saldoInicialOperacion = 0;
+      if (resumenInt && resumenInt.origen === "ultimo_recibo" && Number.isFinite(Number(resumenInt.saldoBase))) {
+        saldoInicialOperacion = round2(Number(resumenInt.saldoBase));
+      } else {
+        saldoInicialOperacion = Number.isFinite(num(creditoAntes?.saldoActual, NaN))
+          ? round2(num(creditoAntes.saldoActual, 0))
+          : round2(num(creditoSeleccionado.saldoActual, 0));
+      }
+      /* ======================= FIN FIX ======================= */
 
       // ====== Evaluación de multas para el modal (Procede / No procede) ======
       // Nota: Esto NO cambia lógica, solo deja trazabilidad para caja.
@@ -809,7 +691,6 @@
         const estado = String(m.estadoCuota || "").trim();
         const fMulta = getMultaFechaISO(m);
 
-        // si no está en “No Pagada”, igual la mostramos como ya resuelta (informativo)
         const montoM = getMultaMonto(m);
         const pagadoM = getMultaPagado(m);
 
@@ -829,7 +710,6 @@
 
         if (estado === "No Pagada") {
           if (!procede) {
-            // no procede a valor fecha
             multasEvaluadas.push({
               index: i+1,
               fechaMulta: fMulta.toISOString().slice(0,10),
@@ -850,7 +730,6 @@
             });
           }
         } else {
-          // ya pagada o no procede, solo informamos
           let razon = "No se cobra (estado: " + (estado || "—") + ").";
           if (!procede) razon += " Además, por fecha tampoco sería exigible.";
           multasEvaluadas.push({
@@ -879,7 +758,6 @@
           const fMulta = getMultaFechaISO(m);
           if (!fMulta) continue;
           if (atLocalMidnight(fMulta) > abono0h) {
-            // marcar no procede por fecha
             historialMultasActualizado[i] = { ...m, estadoCuota:"No Procede", pagadoMulta:0, fechaPagoMulta:null };
             continue;
           }
@@ -1216,7 +1094,6 @@
   </script>
 </body>
 </html>
-
 
 
 

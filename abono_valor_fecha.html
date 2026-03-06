@@ -723,6 +723,20 @@
       return null;
     }
 
+    function getInteresPendienteArrastradoFromPago(p){
+      const directo = num(p?.interesPendienteDespuesPago, NaN);
+      if (Number.isFinite(directo) && directo >= 0) return round2(directo);
+
+      const cobradoAlCorte = num(p?.interesCobrarAlCorte, NaN);
+      const pagadoInteres = num(p?.pagoInteres, NaN);
+
+      if (Number.isFinite(cobradoAlCorte) && Number.isFinite(pagadoInteres)) {
+        return round2(Math.max(0, cobradoAlCorte - pagadoInteres));
+      }
+
+      return 0;
+    }
+
     async function obtenerUltimoRecibo(db, creditoID, fechaAbonoYMD){
       const corte = new Date(`${fechaAbonoYMD}T23:59:59-06:00`);
       const snap = await getDocs(query(collection(db,"pagos"), where("creditoID","==", creditoID)));
@@ -758,18 +772,49 @@
         const fechaBase = up.fechaBase;
         const saldoBase = Number.isFinite(up.saldoRestante) ? up.saldoRestante : num(credito.saldoActual, 0);
         const dias = daysMedioAbiertoDates(fechaBase, fechaCorte);
-        const interes = round2(Math.max(0, saldoBase * tasa * dias));
-        return { interesCobrar: interes, dias, saldoBase, fechaBase, fechaCorte, origen: "ultimo_recibo" };
+
+        const interesArrastrado = getInteresPendienteArrastradoFromPago(up.raw);
+        const interesNuevo = round2(Math.max(0, saldoBase * tasa * dias));
+        const interes = round2(interesArrastrado + interesNuevo);
+
+        return {
+          interesCobrar: interes,
+          interesArrastrado,
+          interesNuevo,
+          dias,
+          saldoBase,
+          fechaBase,
+          fechaCorte,
+          origen: "ultimo_recibo"
+        };
       }
 
       const fechaInicioRaw = credito && typeof credito.fechaInicio === "string" ? credito.fechaInicio : null;
       if (!fechaInicioRaw) {
-        return { interesCobrar: 0, dias: 0, saldoBase: 0, fechaBase: fechaCorte, fechaCorte, origen: "sin_recibo" };
+        return {
+          interesCobrar: 0,
+          interesArrastrado: 0,
+          interesNuevo: 0,
+          dias: 0,
+          saldoBase: 0,
+          fechaBase: fechaCorte,
+          fechaCorte,
+          origen: "sin_recibo"
+        };
       }
 
       const fechaBase = new Date(fechaInicioRaw);
       if (Number.isNaN(fechaBase.getTime()) || fechaBase > fechaCorte){
-        return { interesCobrar: 0, dias: 0, saldoBase: 0, fechaBase: fechaCorte, fechaCorte, origen: "sin_recibo" };
+        return {
+          interesCobrar: 0,
+          interesArrastrado: 0,
+          interesNuevo: 0,
+          dias: 0,
+          saldoBase: 0,
+          fechaBase: fechaCorte,
+          fechaCorte,
+          origen: "sin_recibo"
+        };
       }
 
       let saldoBase = num(credito.saldoActual, NaN);
@@ -778,8 +823,19 @@
       }
 
       const dias = daysMedioAbiertoDates(fechaBase, fechaCorte);
-      const interes = round2(Math.max(0, saldoBase * tasa * dias));
-      return { interesCobrar: interes, dias, saldoBase, fechaBase, fechaCorte, origen: "primer_pago_desde_fechaInicio" };
+      const interesNuevo = round2(Math.max(0, saldoBase * tasa * dias));
+      const interes = round2(interesNuevo);
+
+      return {
+        interesCobrar: interes,
+        interesArrastrado: 0,
+        interesNuevo,
+        dias,
+        saldoBase,
+        fechaBase,
+        fechaCorte,
+        origen: "primer_pago_desde_fechaInicio"
+      };
     }
 
     function getMultaFechaISO(m){
@@ -1504,6 +1560,8 @@
         }
       }
 
+      const interesPendienteValorFecha = round2(Math.max(0, interesAlCorte - pagoInteres));
+
       let saldoPendienteRaw = round2(Math.max(0, saldoInicialOperacion - pagoCapital));
       let ajusteRedondeo = 0;
 
@@ -1514,24 +1572,23 @@
 
       const saldoPendiente = round2(saldoPendienteRaw);
 
-      const saldoAntesDoc = round2(num(creditoAntes?.saldoActual, 0));
-      const saldoNoCambio = Math.abs(round2(saldoPendiente) - saldoAntesDoc) < 0.01;
-
       let interesActualFinal = 0;
       let fechaUltimoCalculoInteresesFinal = creditoAntes?.fechaUltimoCalculoIntereses || null;
 
-      if (round2(pagoCapital) === 0 && saldoNoCambio) {
-        interesActualFinal = round2(num(creditoAntes?.interesActual, 0));
-      } else {
-        const hoyYMD = getTodayYMDLocal();
-        const resumenIntHoy = await calcularInteresSoloRecibos(
-          db,
-          { ...creditoSeleccionado, amortizacion, saldoActual: round2(saldoPendiente) },
-          hoyYMD
-        );
-        interesActualFinal = round2(resumenIntHoy?.interesCobrar || 0);
-        fechaUltimoCalculoInteresesFinal = new Date();
+      const hoyYMD = getTodayYMDLocal();
+      const fechaValorDate = parseLocalYMD(fechaAbonoYMD);
+      const fechaHoyDate = parseLocalYMD(hoyYMD);
+
+      let diasPostValor = 0;
+      let interesNuevoPostValor = 0;
+
+      if (saldoPendiente > 0 && fechaValorDate && fechaHoyDate) {
+        diasPostValor = daysMedioAbiertoDates(fechaValorDate, fechaHoyDate);
+        interesNuevoPostValor = round2(Math.max(0, saldoPendiente * tasaDiaria * diasPostValor));
       }
+
+      interesActualFinal = round2(interesPendienteValorFecha + interesNuevoPostValor);
+      fechaUltimoCalculoInteresesFinal = new Date();
 
       let multasAcumuladasFinal = 0;
       {
@@ -1603,6 +1660,12 @@
         interesFechaBaseISO: resumenInt.fechaBase ? resumenInt.fechaBase.toISOString() : null,
         interesCorteISO: resumenInt.fechaCorte ? resumenInt.fechaCorte.toISOString() : null,
         interesCobrarAlCorte: round2(interesAlCorte),
+
+        interesArrastradoPrevio: round2(resumenInt.interesArrastrado || 0),
+        interesNuevoAlCorte: round2(resumenInt.interesNuevo || 0),
+        interesPendienteDespuesPago: round2(interesPendienteValorFecha),
+        interesNuevoPostValor: round2(interesNuevoPostValor),
+        interesDiasPostValor: Number(diasPostValor),
 
         ajusteRedondeo: round2(ajusteRedondeo),
         esCancelacion: !!esCancelacionTotal,

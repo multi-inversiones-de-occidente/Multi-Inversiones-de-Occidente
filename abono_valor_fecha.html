@@ -135,22 +135,221 @@
     .k { color:#0f172a; font-weight:900; }
     .v { color:#111827; }
 
-    /* Recibo (se queda igual, solo un poquito más clean) */
-    .recibo { background: #fff; color: #232a37; border-radius: 14px; box-shadow: 0 2px 32px #0007; padding: 27px 23px 18px 23px; max-width: 380px; width: 96%; font-size: 1.03rem; }
-    .recibo-titulo { font-weight: 900; font-size: 1.2rem; margin-bottom: 12px; color: #fb923c; }
-    .recibo-row { margin-bottom: 7px; }
-    .recibo-actions { display:flex; gap:8px; justify-content:flex-end; margin-top: 12px; }
-    .recibo-close { background: #e74c3c; color: #fff; border: none; padding: 8px 14px; border-radius: 10px; cursor: pointer; font-weight: 900;}
-    .recibo-print { background: #10b981; color: #0b2b22; border: none; padding: 8px 14px; border-radius: 10px; cursor: pointer; font-weight: 900;}
-    .recibo-hr { border: 0; border-top: 1px dashed #cbd5e1; margin: 10px 0 14px; }
+    /* ==========================
+       RECIBO CORPORATIVO (pantalla)
+       ========================== */
+    .recibo {
+      background: #fff;
+      color: #0f172a;
+      border-radius: 16px;
+      box-shadow: 0 2px 32px #0007;
+      padding: 22px 22px 16px 22px;
+      width: min(560px, 96vw);
+      font-size: 1.03rem;
+      border: 1px solid rgba(15,23,42,.10);
+    }
 
+    .recibo-header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      margin-bottom: 10px;
+    }
+
+    .recibo-logo {
+      width: 160px;
+      max-width: 45%;
+      height: auto;
+      object-fit: contain;
+    }
+
+    .recibo-head-right {
+      text-align:right;
+      line-height:1.1;
+    }
+
+    .recibo-titulo {
+      font-weight: 900;
+      font-size: 1.22rem;
+      margin: 0;
+      color: #243b86;
+      letter-spacing: .2px;
+    }
+
+    .recibo-subtitulo {
+      margin-top: 6px;
+      color: #475569;
+      font-size: .95rem;
+      font-weight: 800;
+    }
+
+    .recibo-hr { border: 0; border-top: 1px dashed #cbd5e1; margin: 12px 0 14px; }
+
+    .recibo-grid {
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 14px;
+    }
+
+    .recibo-item {
+      padding: 10px 12px;
+      border: 1px solid rgba(15,23,42,.08);
+      border-radius: 12px;
+      background: rgba(248,250,252,.75);
+    }
+
+    .recibo-item .lbl {
+      display:block;
+      font-size: .86rem;
+      color:#64748b;
+      font-weight: 900;
+      margin-bottom: 3px;
+    }
+
+    .recibo-item .val {
+      display:block;
+      font-size: 1rem;
+      font-weight: 900;
+      color:#0f172a;
+      word-break: break-word;
+    }
+
+    .recibo-total {
+      margin-top: 10px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(36,59,134,.16);
+      background: linear-gradient(180deg, rgba(36,59,134,.06), rgba(36,59,134,.03));
+    }
+
+    .recibo-total .ttl {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      font-weight: 900;
+      color:#243b86;
+      font-size: 1.02rem;
+    }
+
+    .recibo-foot {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(15,23,42,.10);
+      text-align:center;
+      color:#475569;
+      font-size: .9rem;
+      font-weight: 800;
+    }
+
+    .recibo-actions { display:flex; gap:8px; justify-content:flex-end; margin-top: 12px; }
+    .recibo-close { background: #e74c3c; color: #fff; border: none; padding: 9px 14px; border-radius: 12px; cursor: pointer; font-weight: 900;}
+    .recibo-print { background: #10b981; color: #0b2b22; border: none; padding: 9px 14px; border-radius: 12px; cursor: pointer; font-weight: 900;}
+    .no-print { }
+
+    /* ==========================
+       IMPRESIÓN A4 CORPORATIVA
+       - Centrado exacto
+       - Recibo “media página” visual
+       - 1 sola página
+       ========================== */
     @media print {
-      @page { size: A4 portrait; margin: 12mm; }
-      body *:not(.recibo):not(.recibo *){ visibility: hidden !important; }
-      .modal-bg, .recibo-bg { position: static !important; width: auto !important; height: auto !important; background: transparent !important; box-shadow: none !important; }
-      .recibo { visibility: visible !important; box-shadow: none !important; border-radius: 0 !important; width: 100% !important; max-width: 100% !important; font-size: 12pt !important; page-break-inside: avoid !important; break-inside: avoid-page !important; }
-      .no-print, .recibo-close, .recibo-print { display: none !important; }
-      .recibo-row { page-break-inside: avoid !important; break-inside: avoid-page !important; }
+      @page { size: A4 portrait; margin: 14mm; }
+
+      html, body {
+        width: 210mm;
+        height: 297mm;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      /* Ocultar todo por defecto */
+      body * { display: none !important; }
+
+      /* Mostrar SOLO el recibo-root y su contenido */
+      #recibo-root,
+      #recibo-root * { display: block !important; }
+
+      /* Lienzo A4 */
+      #recibo-root{
+        position: fixed !important;
+        inset: 0 !important;
+        width: 210mm !important;
+        height: 297mm !important;
+        background: #fff !important;
+
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
+
+      /* Neutraliza overlay */
+      .modal-bg, .recibo-bg{
+        position: static !important;
+        inset: auto !important;
+        width: auto !important;
+        height: auto !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+
+      /* Recibo corporativo:
+         - ancho físico consistente
+         - alto máximo ≈ media página A4 (148.5mm)
+         - sin saltos */
+      .recibo{
+        width: 135mm !important;
+        max-width: 135mm !important;
+
+        max-height: 148mm !important;   /* media página */
+        overflow: hidden !important;
+
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        border: 0.30mm solid #e5e7eb !important;
+        padding: 12mm 12mm 10mm 12mm !important;
+
+        font-size: 10.8pt !important;
+        line-height: 1.22 !important;
+
+        page-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+      }
+
+      .recibo-logo{
+        width: 46mm !important;
+        max-width: 46mm !important;
+        height: auto !important;
+      }
+
+      .recibo-titulo{ font-size: 14pt !important; }
+      .recibo-subtitulo{ font-size: 10pt !important; }
+
+      .recibo-item{
+        padding: 6mm 6mm !important;
+        border-radius: 10px !important;
+      }
+
+      .recibo-item .lbl{ font-size: 9pt !important; }
+      .recibo-item .val{ font-size: 10.5pt !important; }
+
+      .recibo-total{
+        margin-top: 6mm !important;
+        padding: 6mm 6mm !important;
+        border-radius: 12px !important;
+      }
+
+      .recibo-foot{ font-size: 9.2pt !important; }
+
+      /* Botones nunca */
+      .no-print, .recibo-actions, .recibo-close, .recibo-print { display:none !important; }
     }
   </style>
 </head>
@@ -213,13 +412,6 @@
       const [y,m,d] = ymd.split('-').map(n=>parseInt(n,10));
       return new Date(y, m-1, d, 0,0,0,0);
     }
-    function diasEntreFechasSinHora(f1YMD, f2DateObj){
-      const d1 = parseLocalYMD(f1YMD);
-      const d2 = new Date(f2DateObj);
-      d2.setHours(0,0,0,0);
-      const MS=86400000;
-      return Math.max(0, Math.floor((d2 - d1)/MS));
-    }
     function num(n, def=0){
       const x = (typeof n === 'string') ? n.replace(',', '.').trim() : n;
       const v = Number(x);
@@ -228,9 +420,6 @@
     function round2(v){ return Math.round((v + Number.EPSILON)*100)/100; }
     function money(v){ return `$${Number(v||0).toFixed(2)}`; }
 
-    /* ===========================
-       ✅ NUEVO helper (solo para FIX)
-       =========================== */
     function getTodayYMDLocal(){
       const d = new Date();
       const y = d.getFullYear();
@@ -606,36 +795,140 @@
       };
     }
 
+    /* ==========================
+       RECIBO CORPORATIVO + LOGO
+       - eventos sin onclick inline
+       ========================== */
     function mostrarRecibo(datos){
-      let reciboDiv = document.getElementById("recibo-root");
-      let fechaFmt = new Date(datos.fechaPago).toLocaleDateString('es-SV');
-      let hoyFmt = new Date().toLocaleDateString('es-SV');
+      const reciboDiv = document.getElementById("recibo-root");
+
+      const fechaFmt = new Date(datos.fechaPago).toLocaleDateString('es-SV');
+      const hoyFmt = new Date().toLocaleDateString('es-SV');
+
+      const correl = datos.correlativo || '-';
+      const cliente = datos.nombres || '—';
+      const dui = datos.numeroDui || '';
+      const suc = datos.sucursal || '—';
+      const cajero = datos.cajeroNombre || datos.usuarioNombre || '—';
+
+      const montoRec = Number(datos.montoPagado || 0);
+      const vuelto = Number(datos.vuelto || 0);
+      const cap = Number(datos.pagoCapital || 0);
+      const inte = Number(datos.pagoInteres || 0);
+      const multa = Number(datos.pagoMulta || 0);
+      const saldo = Number(datos.saldoRestante || 0);
+
+      const motivo = (datos.motivo || '').toString();
+
       reciboDiv.innerHTML = `
         <div class="modal-bg recibo-bg">
-          <div class="recibo">
-            <div class="recibo-titulo">Recibo de Pago Retroactivo</div>
+          <div class="recibo" id="ticket">
+            <div class="recibo-header">
+              <img src="logo_mi_bw.png" class="recibo-logo" alt="Multi Inversiones de Occidente">
+              <div class="recibo-head-right">
+                <h2 class="recibo-titulo">Recibo de Pago Retroactivo</h2>
+                <div class="recibo-subtitulo">Multi Inversiones de Occidente</div>
+              </div>
+            </div>
+
             <hr class="recibo-hr"/>
-            <div class="recibo-row"><b>No. Correlativo:</b> ${datos.correlativo || '-'}</div>
-            <div class="recibo-row"><b>Cliente:</b> ${datos.nombres}</div>
-            <div class="recibo-row"><b>DUI:</b> ${datos.numeroDui || ''}</div>
-            <div class="recibo-row"><b>Monto recibido:</b> $${Number(datos.montoPagado).toFixed(2)}</div>
-            ${Number(datos.vuelto || 0) > 0 ? `<div class="recibo-row"><b>Vuelto:</b> $${Number(datos.vuelto).toFixed(2)}</div>` : ``}
-            <div class="recibo-row"><b>Pago a valor fecha:</b> ${fechaFmt}</div>
-            <div class="recibo-row"><b>Sucursal:</b> ${datos.sucursal}</div>
-            <div class="recibo-row"><b>Cajero:</b> ${datos.cajeroNombre || datos.usuarioNombre || '—'}</div>
+
+            <div class="recibo-grid">
+              <div class="recibo-item">
+                <span class="lbl">No. Correlativo</span>
+                <span class="val">${correl}</span>
+              </div>
+              <div class="recibo-item">
+                <span class="lbl">Sucursal</span>
+                <span class="val">${suc}</span>
+              </div>
+
+              <div class="recibo-item">
+                <span class="lbl">Cliente</span>
+                <span class="val">${cliente}</span>
+              </div>
+              <div class="recibo-item">
+                <span class="lbl">DUI</span>
+                <span class="val">${dui}</span>
+              </div>
+
+              <div class="recibo-item">
+                <span class="lbl">Pago a valor fecha</span>
+                <span class="val">${fechaFmt}</span>
+              </div>
+              <div class="recibo-item">
+                <span class="lbl">Registrado el</span>
+                <span class="val">${hoyFmt}</span>
+              </div>
+            </div>
+
+            <div class="recibo-total">
+              <div class="ttl">
+                <span>Monto recibido</span>
+                <span>$${montoRec.toFixed(2)}</span>
+              </div>
+              ${vuelto > 0 ? `<div class="recibo-subtitulo" style="margin-top:6px;color:#0f766e;font-weight:900;">Vuelto: $${vuelto.toFixed(2)}</div>` : ``}
+            </div>
+
             <hr class="recibo-hr"/>
-            <div class="recibo-row"><b>Pago capital:</b> $${Number(datos.pagoCapital).toFixed(2)}</div>
-            <div class="recibo-row"><b>Pago interés:</b> $${Number(datos.pagoInteres).toFixed(2)}</div>
-            <div class="recibo-row"><b>Pago multa:</b> $${Number(datos.pagoMulta || 0).toFixed(2)}</div>
-            <div class="recibo-row"><b>Saldo restante:</b> $${Number(datos.saldoRestante).toFixed(2)}</div>
-            <div class="recibo-row"><b>Registrado el:</b> ${hoyFmt}</div>
-            <div class="recibo-row"><b>Motivo:</b> ${datos.motivo || ''}</div>
+
+            <div class="recibo-grid">
+              <div class="recibo-item">
+                <span class="lbl">Pago a capital</span>
+                <span class="val">$${cap.toFixed(2)}</span>
+              </div>
+              <div class="recibo-item">
+                <span class="lbl">Pago a interés</span>
+                <span class="val">$${inte.toFixed(2)}</span>
+              </div>
+
+              <div class="recibo-item">
+                <span class="lbl">Pago a multa</span>
+                <span class="val">$${multa.toFixed(2)}</span>
+              </div>
+              <div class="recibo-item">
+                <span class="lbl">Saldo restante</span>
+                <span class="val">$${saldo.toFixed(2)}</span>
+              </div>
+            </div>
+
+            ${motivo ? `
+              <div class="recibo-total" style="margin-top:10px;">
+                <div class="ttl" style="justify-content:flex-start;gap:10px;">
+                  <span style="color:#243b86;">Motivo</span>
+                </div>
+                <div class="recibo-subtitulo" style="margin-top:6px;color:#0f172a;font-weight:800;">
+                  ${motivo}
+                </div>
+              </div>
+            ` : ``}
+
+            <div class="recibo-foot">
+              Cajero: <b>${cajero}</b> • Gracias por su pago
+            </div>
+
             <div class="recibo-actions no-print">
-              <button class="recibo-print" onclick="window.print()"><i class="fa fa-print"></i> Imprimir</button>
-              <button class="recibo-close" onclick="document.getElementById('recibo-root').innerHTML=''"><i class="fa fa-times"></i> Cerrar</button>
+              <button class="recibo-print" id="btn-imprimir-recibo"><i class="fa fa-print"></i> Imprimir</button>
+              <button class="recibo-close" id="btn-cerrar-recibo"><i class="fa fa-times"></i> Cerrar</button>
             </div>
           </div>
-        </div>`;
+        </div>
+      `;
+
+      const btnImprimir = document.getElementById("btn-imprimir-recibo");
+      const btnCerrar = document.getElementById("btn-cerrar-recibo");
+
+      if (btnCerrar) {
+        btnCerrar.addEventListener("click", () => {
+          reciboDiv.innerHTML = "";
+        });
+      }
+
+      if (btnImprimir) {
+        btnImprimir.addEventListener("click", () => {
+          setTimeout(() => window.print(), 150);
+        });
+      }
     }
 
     function ordenarAmortizacionPorFecha(amortizacion){
@@ -1134,6 +1427,7 @@
   </script>
 </body>
 </html>
+
 
 
 

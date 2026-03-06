@@ -332,13 +332,13 @@
     .recibo-hr {
       border: 0;
       border-top: 1px dashed #cbd5e1;
-      margin: 12px 0 14px;
+      margin: 10px 0 12px;
     }
 
     .recibo-grid {
       display:grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px 14px;
+      gap: 8px 12px;
     }
 
     .recibo-item {
@@ -366,8 +366,8 @@
     }
 
     .recibo-total {
-      margin-top: 10px;
-      padding: 12px 14px;
+      margin-top: 8px;
+      padding: 10px 12px;
       border-radius: 14px;
       border: 1px solid rgba(36,59,134,.16);
       background: linear-gradient(180deg, rgba(36,59,134,.06), rgba(36,59,134,.03));
@@ -383,9 +383,40 @@
       font-size: 1.02rem;
     }
 
+    .recibo-social {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(15,23,42,.10);
+      text-align:center;
+      color:#475569;
+    }
+
+    .recibo-social-main {
+      font-size: .96rem;
+      font-weight: 900;
+      color:#243b86;
+      margin-bottom: 4px;
+    }
+
+    .recibo-social-sub {
+      font-size: .86rem;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+
+    .recibo-social-icons {
+      margin-top: 7px;
+      display:flex;
+      justify-content:center;
+      gap:10px;
+      align-items:center;
+      color:#243b86;
+      font-size: 1rem;
+    }
+
     .recibo-foot {
-      margin-top: 12px;
-      padding-top: 12px;
+      margin-top: 8px;
+      padding-top: 8px;
       border-top: 1px solid rgba(15,23,42,.10);
       text-align:center;
       color:#475569;
@@ -488,7 +519,7 @@
         border: none !important;
         border-radius: 0 !important;
         box-shadow: none !important;
-        padding: 12mm 14mm 10mm 14mm !important;
+        padding: 10mm 12mm 8mm 12mm !important;
         overflow: hidden !important;
         page-break-inside: avoid !important;
         break-inside: avoid-page !important;
@@ -498,14 +529,14 @@
         display: flex !important;
         align-items: center !important;
         justify-content: space-between !important;
-        gap: 10mm !important;
-        margin-bottom: 4mm !important;
+        gap: 8mm !important;
+        margin-bottom: 3mm !important;
       }
 
       .recibo-logo {
         display: block !important;
-        width: 42mm !important;
-        max-width: 42mm !important;
+        width: 38mm !important;
+        max-width: 38mm !important;
         height: auto !important;
       }
 
@@ -516,7 +547,7 @@
 
       .recibo-titulo {
         display: block !important;
-        font-size: 14pt !important;
+        font-size: 12.8pt !important;
         font-weight: 900 !important;
         margin: 0 !important;
         color: #243b86 !important;
@@ -524,8 +555,8 @@
 
       .recibo-subtitulo {
         display: block !important;
-        margin-top: 2mm !important;
-        font-size: 9pt !important;
+        margin-top: 1.4mm !important;
+        font-size: 8.2pt !important;
         color: #475569 !important;
         font-weight: 800 !important;
       }
@@ -534,46 +565,46 @@
         display: block !important;
         border: 0 !important;
         border-top: 0.35mm dashed #cbd5e1 !important;
-        margin: 4mm 0 5mm 0 !important;
+        margin: 2.8mm 0 3.2mm 0 !important;
       }
 
       .recibo-grid {
         display: grid !important;
         grid-template-columns: 1fr 1fr !important;
-        gap: 3mm 4mm !important;
+        gap: 2.4mm 3mm !important;
       }
 
       .recibo-item {
         display: block !important;
-        padding: 3.2mm 3.5mm !important;
+        padding: 2.7mm 3mm !important;
         border: 0.3mm solid rgba(15,23,42,.10) !important;
-        border-radius: 2.5mm !important;
+        border-radius: 2.3mm !important;
         background: #f8fafc !important;
         box-sizing: border-box !important;
       }
 
       .recibo-item .lbl {
         display: block !important;
-        font-size: 7.8pt !important;
+        font-size: 7.3pt !important;
         color: #64748b !important;
         font-weight: 900 !important;
-        margin-bottom: 1mm !important;
+        margin-bottom: 0.8mm !important;
       }
 
       .recibo-item .val {
         display: block !important;
-        font-size: 9.4pt !important;
+        font-size: 8.6pt !important;
         color: #0f172a !important;
         font-weight: 900 !important;
-        line-height: 1.15 !important;
+        line-height: 1.1 !important;
         word-break: break-word !important;
       }
 
       .recibo-total {
         display: block !important;
-        margin-top: 4mm !important;
-        padding: 3.5mm 4mm !important;
-        border-radius: 3mm !important;
+        margin-top: 2.6mm !important;
+        padding: 2.8mm 3mm !important;
+        border-radius: 2.6mm !important;
         border: 0.3mm solid rgba(36,59,134,.16) !important;
         background: #f8fbff !important;
         box-sizing: border-box !important;
@@ -584,17 +615,51 @@
         align-items: center !important;
         justify-content: space-between !important;
         font-weight: 900 !important;
-        font-size: 10pt !important;
+        font-size: 9pt !important;
         color: #243b86 !important;
+      }
+
+      .recibo-social {
+        display: block !important;
+        margin-top: 2.8mm !important;
+        padding-top: 2.6mm !important;
+        border-top: 0.3mm solid rgba(15,23,42,.10) !important;
+        text-align: center !important;
+        color: #475569 !important;
+      }
+
+      .recibo-social-main {
+        display: block !important;
+        font-size: 8.6pt !important;
+        font-weight: 900 !important;
+        color: #243b86 !important;
+        margin-bottom: 1mm !important;
+      }
+
+      .recibo-social-sub {
+        display: block !important;
+        font-size: 7.3pt !important;
+        font-weight: 700 !important;
+        line-height: 1.15 !important;
+      }
+
+      .recibo-social-icons {
+        display: flex !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        align-items: center !important;
+        margin-top: 1.5mm !important;
+        color: #243b86 !important;
+        font-size: 8.8pt !important;
       }
 
       .recibo-foot {
         display: block !important;
-        margin-top: 4mm !important;
-        padding-top: 3mm !important;
+        margin-top: 2.2mm !important;
+        padding-top: 2mm !important;
         border-top: 0.3mm solid rgba(15,23,42,.10) !important;
         text-align: center !important;
-        font-size: 8.5pt !important;
+        font-size: 7.3pt !important;
         color: #475569 !important;
         font-weight: 800 !important;
       }
@@ -705,6 +770,37 @@
       }
       if (!(td > 0 && td < 0.02)) td = 0.005;
       return td;
+    }
+
+    function construirNombreCompletoCliente(obj = {}){
+      const posiblesNombres = [
+        obj.nombre,
+        obj.nombres,
+        obj.primerNombre,
+        obj.segundoNombre
+      ];
+
+      const posiblesApellidos = [
+        obj.apellido,
+        obj.apellidos,
+        obj.primerApellido,
+        obj.segundoApellido
+      ];
+
+      const nombreStr = posiblesNombres
+        .filter(v => typeof v === "string" && v.trim())
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      const apellidoStr = posiblesApellidos
+        .filter(v => typeof v === "string" && v.trim())
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      const completo = `${nombreStr} ${apellidoStr}`.replace(/\s+/g, " ").trim();
+      return completo || obj.clienteNombre || "—";
     }
 
     function getFechaBaseDePago(p){
@@ -997,20 +1093,20 @@
       if (!queryTxt && !queryDui) return;
 
       const filtrados = creditosAgencia.filter(credito => {
-        const nombre = (credito.nombre || credito.nombres || credito.clienteNombre || "").toString().toLowerCase();
+        const nombreCompleto = construirNombreCompletoCliente(credito).toLowerCase();
         const duiDoc = (credito.numeroDui || "").toString();
         const duiClean = duiDoc.replace(/[^0-9]/g,"");
-        return (queryTxt && nombre.includes(queryTxt)) || (queryDui && duiClean.includes(queryDui));
+        return (queryTxt && nombreCompleto.includes(queryTxt)) || (queryDui && duiClean.includes(queryDui));
       });
 
       filtrados.forEach(credito=>{
-        const nombre = (credito.nombre || credito.nombres || credito.clienteNombre || "—");
+        const nombreCompleto = construirNombreCompletoCliente(credito);
         const dui = (credito.numeroDui || "").toString();
         const saldo = Number(credito.saldoActual || 0).toFixed(2);
 
         const div = document.createElement("div");
         div.className = "list-group-item";
-        div.textContent = `${nombre} — DUI: ${dui} — Saldo: $${saldo}`;
+        div.textContent = `${nombreCompleto} — DUI: ${dui} — Saldo: $${saldo}`;
         div.onclick = (event)=> {
           creditoSeleccionado = credito;
           Array.from(document.getElementsByClassName("list-group-item")).forEach(d=>d.classList.remove("selected"));
@@ -1135,19 +1231,15 @@
       const hoyFmt = new Date().toLocaleDateString('es-SV');
 
       const correl = datos.correlativo || '-';
-      const cliente = datos.nombres || '—';
+      const cliente = datos.clienteNombreCompleto || datos.nombres || '—';
       const dui = datos.numeroDui || '';
       const suc = datos.sucursal || '—';
       const cajero = datos.cajeroNombre || datos.usuarioNombre || '—';
 
-      const montoRec = Number(datos.montoPagado || 0);
-      const vuelto = Number(datos.vuelto || 0);
+      const multa = Number(datos.pagoMulta || 0);
       const cap = Number(datos.pagoCapital || 0);
       const inte = Number(datos.pagoInteres || 0);
-      const multa = Number(datos.pagoMulta || 0);
       const saldo = Number(datos.saldoRestante || 0);
-
-      const motivo = (datos.motivo || '').toString();
 
       reciboDiv.innerHTML = `
         <div class="modal-bg recibo-bg">
@@ -1191,49 +1283,44 @@
               </div>
             </div>
 
-            <div class="recibo-total">
-              <div class="ttl">
-                <span>Monto recibido</span>
-                <span>$${montoRec.toFixed(2)}</span>
-              </div>
-              ${vuelto > 0 ? `<div class="recibo-subtitulo" style="margin-top:6px;color:#0f766e;font-weight:900;">Vuelto: $${vuelto.toFixed(2)}</div>` : ``}
-            </div>
-
             <hr class="recibo-hr"/>
 
             <div class="recibo-grid">
               <div class="recibo-item">
-                <span class="lbl">Pago a capital</span>
-                <span class="val">$${cap.toFixed(2)}</span>
+                <span class="lbl">Pago a Multa</span>
+                <span class="val">${money(multa)}</span>
               </div>
               <div class="recibo-item">
-                <span class="lbl">Pago a interés</span>
-                <span class="val">$${inte.toFixed(2)}</span>
+                <span class="lbl">Pago a Capital</span>
+                <span class="val">${money(cap)}</span>
               </div>
 
               <div class="recibo-item">
-                <span class="lbl">Pago a multa</span>
-                <span class="val">$${multa.toFixed(2)}</span>
+                <span class="lbl">Pago a Intereses</span>
+                <span class="val">${money(inte)}</span>
               </div>
               <div class="recibo-item">
                 <span class="lbl">Saldo restante</span>
-                <span class="val">$${saldo.toFixed(2)}</span>
+                <span class="val">${money(saldo)}</span>
               </div>
             </div>
 
-            ${motivo ? `
-              <div class="recibo-total" style="margin-top:10px;">
-                <div class="ttl" style="justify-content:flex-start;gap:10px;">
-                  <span style="color:#243b86;">Motivo</span>
-                </div>
-                <div class="recibo-subtitulo" style="margin-top:6px;color:#0f172a;font-weight:800;">
-                  ${motivo}
-                </div>
+            <div class="recibo-social">
+              <div class="recibo-social-main">Gracias por su pago</div>
+              <div class="recibo-social-sub">
+                No olvides seguirnos en nuestras redes sociales como
+                <b>Multi Inversiones de Occidente</b>
               </div>
-            ` : ``}
+              <div class="recibo-social-icons">
+                <i class="fa-brands fa-facebook-f"></i>
+                <i class="fa-brands fa-instagram"></i>
+                <i class="fa-brands fa-tiktok"></i>
+                <i class="fa-solid fa-heart"></i>
+              </div>
+            </div>
 
             <div class="recibo-foot">
-              Cajero: <b>${cajero}</b> • Gracias por su pago
+              Cajero: <b>${cajero}</b>
             </div>
 
             <div class="recibo-actions no-print">
@@ -1630,6 +1717,8 @@
         ? "Pagado"
         : ((cuotasAtrasadasFinal === 0 && multasAcumuladasFinal === 0) ? "Activo" : "Mora Temprana");
 
+      const clienteNombreCompleto = construirNombreCompletoCliente(creditoSeleccionado);
+
       const pagoObj = {
         creditoID: creditoSeleccionado.id,
         clienteID: creditoSeleccionado.clienteID || "",
@@ -1640,6 +1729,7 @@
         saldoRestante: round2(saldoPendiente),
         fechaPago: new Date(toLocalStartISO(fechaAbonoYMD)).toISOString(),
         nombres: creditoSeleccionado.nombre,
+        clienteNombreCompleto,
         numeroDui: creditoSeleccionado.numeroDui || "",
         sucursal: userAgencia,
 
@@ -1724,7 +1814,7 @@
       const fmtFechaBase = resumenInt.fechaBase ? resumenInt.fechaBase.toISOString().slice(0,10) : null;
 
       mostrarResumenPostPago({
-        cliente: creditoSeleccionado.nombre || "—",
+        cliente: clienteNombreCompleto || "—",
         fechaValor: fechaAbonoYMD,
         montoRecibido: monto,
         saldoAntes: saldoInicialOperacion,

@@ -28,6 +28,8 @@
     let currentUser = null;
     let currentAgencia = null;
     let clientesAgencia = []; // Para autocompletar
+    let currentCreditosCliente = []; // Todos los créditos encontrados del cliente actual
+    let currentClienteSeleccionado = null; // Cliente actual seleccionado
 
     // --- AUTOCOMPLETAR CLIENTES ---
     async function cargarClientesAgencia() {
@@ -78,13 +80,90 @@
       predictivo.style.display = 'block';
     }
 
+    function limpiarVistaCredito() {
+      document.getElementById('resumen-credito').innerHTML = '';
+      document.getElementById('estado-cuenta').innerHTML = '';
+      document.getElementById('selector-credito-wrap').style.display = 'none';
+      document.getElementById('selector-credito').innerHTML = '';
+      currentCreditosCliente = [];
+    }
+
+    function renderSelectorCreditos(creditos) {
+      const wrap = document.getElementById('selector-credito-wrap');
+      const select = document.getElementById('selector-credito');
+
+      if (!creditos || !creditos.length) {
+        wrap.style.display = 'none';
+        select.innerHTML = '';
+        return;
+      }
+
+      select.innerHTML = '';
+
+      creditos.forEach((credito, index) => {
+        const option = document.createElement('option');
+        option.value = credito.id;
+        option.textContent = `Crédito ${index + 1} | ID: ${credito.id} | Estado: ${credito.estadoCredito || '-'} | Saldo Actual: $${parseFloat(credito.saldoActual || 0).toFixed(2)}`;
+        select.appendChild(option);
+      });
+
+      wrap.style.display = 'block';
+    }
+
+    async function mostrarCreditoSeleccionado(creditoId) {
+      const credito = currentCreditosCliente.find(c => c.id === creditoId);
+
+      if (!credito) {
+        document.getElementById('resumen-credito').innerHTML = '';
+        document.getElementById('estado-cuenta').innerHTML = '<div style="color:#F44;text-align:center;">No se encontró la información del crédito seleccionado.</div>';
+        return;
+      }
+
+      // Resumen de crédito arriba de la tabla
+      document.getElementById('resumen-credito').innerHTML = `
+        <div class="resumen-box resumen-credito">
+          <b>ID Crédito:</b> ${credito.id} |
+          <b>Monto Aprobado:</b> $${parseFloat(credito.montoAprobado || 0).toFixed(2)} |
+          <b>Saldo Inicial:</b> $${parseFloat(credito.saldoInicial || 0).toFixed(2)} |
+          <b>Saldo Actual:</b> $${parseFloat(credito.saldoActual || 0).toFixed(2)} |
+          <b>Estado:</b> ${credito.estadoCredito || '-'} |
+          <b>Para Ponerse al Día:</b> $${parseFloat(credito.paraPonerseAlDia || 0).toFixed(2)}
+        </div>
+      `;
+
+      document.getElementById('estado-cuenta').innerHTML = '<div class="loader"></div>';
+
+      try {
+        // Buscar pagos de ese crédito (solo en esta agencia)
+        let pagosRef = collection(db, "pagos");
+        let pagosQuery = query(
+          pagosRef,
+          where("creditoID", "==", credito.id),
+          where("sucursal", "==", currentAgencia)
+        );
+        let pagosSnap = await getDocs(pagosQuery);
+        let pagos = [];
+        pagosSnap.forEach(doc => pagos.push(doc.data()));
+        pagos.sort((a, b) => new Date(a.fechaPago) - new Date(b.fechaPago));
+
+        renderEstadoCuenta(credito, pagos);
+      } catch (e) {
+        document.getElementById('estado-cuenta').innerHTML = `<div style="color:#F44;text-align:center;">Error al cargar pagos: ${e.message}</div>`;
+      }
+    }
+
     async function buscarCliente() {
       let criterio = document.getElementById('busqueda').value.trim().toLowerCase();
       const predictivo = document.getElementById('opciones-busqueda');
       predictivo.style.display = 'none';
+
       document.getElementById('estado-cuenta').innerHTML = '<div class="loader"></div>';
       document.getElementById('resumen-usuario').innerHTML = '';
       document.getElementById('resumen-credito').innerHTML = '';
+      document.getElementById('selector-credito-wrap').style.display = 'none';
+      document.getElementById('selector-credito').innerHTML = '';
+      currentCreditosCliente = [];
+      currentClienteSeleccionado = null;
 
       // Soporta buscar por predicción
       let cliente = null;
@@ -113,6 +192,8 @@
         return;
       }
 
+      currentClienteSeleccionado = cliente;
+
       // Mostrar resumen de cliente
       document.getElementById('resumen-usuario').innerHTML = `
         <div class="resumen-box">
@@ -124,7 +205,11 @@
       // Buscar créditos de ese cliente en la agencia actual
       try {
         let creditosRef = collection(db, "creditos");
-        let q2 = query(creditosRef, where("clienteID", "==", cliente.id), where("agenciaAsignada", "==", currentAgencia));
+        let q2 = query(
+          creditosRef,
+          where("clienteID", "==", cliente.id),
+          where("agenciaAsignada", "==", currentAgencia)
+        );
         let creditosSnap = await getDocs(q2);
         let creditos = [];
         creditosSnap.forEach(doc => {
@@ -134,34 +219,23 @@
         if (!creditos.length) {
           document.getElementById('estado-cuenta').innerHTML = '<div style="color:#F44;text-align:center;">No tiene créditos activos en esta agencia.</div>';
           document.getElementById('resumen-credito').innerHTML = '';
+          document.getElementById('selector-credito-wrap').style.display = 'none';
           return;
         }
 
-        let credito = creditos[0];
+        currentCreditosCliente = creditos;
 
-        // Resumen de crédito arriba de la tabla
-        document.getElementById('resumen-credito').innerHTML = `
-          <div class="resumen-box resumen-credito">
-            <b>Monto Aprobado:</b> $${parseFloat(credito.montoAprobado || 0).toFixed(2)} |
-            <b>Saldo Inicial:</b> $${parseFloat(credito.saldoInicial || 0).toFixed(2)} |
-            <b>Saldo Actual:</b> $${parseFloat(credito.saldoActual || 0).toFixed(2)} |
-            <b>Estado:</b> ${credito.estadoCredito || '-'} |
-            <b>Para Ponerse al Día:</b> $${parseFloat(credito.paraPonerseAlDia || 0).toFixed(2)}
-          </div>
-        `;
+        // Renderizar selector de créditos
+        renderSelectorCreditos(currentCreditosCliente);
 
-        // Buscar pagos de ese crédito (solo en esta agencia)
-        let pagosRef = collection(db, "pagos");
-        let pagosQuery = query(pagosRef, where("creditoID", "==", credito.id), where("sucursal", "==", currentAgencia));
-        let pagosSnap = await getDocs(pagosQuery);
-        let pagos = [];
-        pagosSnap.forEach(doc => pagos.push(doc.data()));
-        pagos.sort((a, b) => new Date(a.fechaPago) - new Date(b.fechaPago));
+        // Mostrar el primer crédito por defecto
+        document.getElementById('selector-credito').value = currentCreditosCliente[0].id;
+        await mostrarCreditoSeleccionado(currentCreditosCliente[0].id);
 
-        renderEstadoCuenta(credito, pagos);
       } catch (e) {
         document.getElementById('estado-cuenta').innerHTML = `<div style="color:#F44;text-align:center;">Error: ${e.message}</div>`;
         document.getElementById('resumen-credito').innerHTML = '';
+        document.getElementById('selector-credito-wrap').style.display = 'none';
       }
     }
 
@@ -245,6 +319,11 @@
       busquedaInput.addEventListener('keydown', function(e) {
         if (e.key === "Enter") buscarCliente();
       });
+
+      document.getElementById('selector-credito').addEventListener('change', async function(e) {
+        await mostrarCreditoSeleccionado(e.target.value);
+      });
+
       document.addEventListener('click', function(event) {
         if (!event.target.closest('.busqueda-wrap')) {
           document.getElementById('opciones-busqueda').style.display = 'none';
@@ -350,6 +429,33 @@
       margin: 2.1rem auto;
     }
     @keyframes spin { 100% { transform: rotate(360deg); } }
+
+    .selector-credito-wrap {
+      margin: 0 0 1rem 0;
+      display: none;
+    }
+    .selector-credito-label {
+      display: block;
+      margin-bottom: 0.45rem;
+      color: #67C8F1;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+    .selector-credito {
+      width: 100%;
+      background: #181c1f;
+      color: #fff;
+      border: 1px solid #2b3338;
+      border-radius: 9px;
+      padding: 0.8rem 1rem;
+      font-size: 1rem;
+      outline: none;
+      box-shadow: 0 1px 7px #0003;
+    }
+    .selector-credito:focus {
+      border: 1.5px solid #67C8F1;
+    }
+
     .tabla-scroll {
       width: 100%;
       overflow-x: auto;
@@ -451,14 +557,16 @@
       .container { padding: 1.1rem 1vw; }
       .tabla-estado { min-width: 550px; font-size: 0.93rem;}
       .resumen-box { font-size: .95rem;}
+      .selector-credito { font-size: 0.95rem; }
     }
 
     /* ===== SOLO PARA IMPRESIÓN ===== */
     @media print {
-      /* Ocultar cuadro de búsqueda, menú predictivo y botón imprimir */
+      /* Ocultar cuadro de búsqueda, menú predictivo, selector y botón imprimir */
       .busqueda-row,
       #opciones-busqueda,
-      .btn-imprimir { 
+      .btn-imprimir,
+      .selector-credito-wrap { 
         display: none !important; 
       }
 
@@ -480,6 +588,7 @@
     <div id="usuario-nombre"></div>
     <h1>MULTI INVERSIONES DE OCCIDENTE S.A. DE C.V.<br>
       <span style="font-size:.97rem;color:#fff;font-weight:400">Estado de Cuenta</span></h1>
+
     <div class="busqueda-row">
       <div class="busqueda-wrap">
         <input type="text" id="busqueda" placeholder="Buscar por nombre, apellido o DUI..." autocomplete="off">
@@ -487,12 +596,18 @@
       </div>
       <button id="btn-buscar" class="btn-buscar"><i class="fas fa-search"></i>Buscar</button>
     </div>
+
     <div id="resumen-usuario"></div>
+
+    <div id="selector-credito-wrap" class="selector-credito-wrap">
+      <label for="selector-credito" class="selector-credito-label">Selecciona el crédito a visualizar:</label>
+      <select id="selector-credito" class="selector-credito"></select>
+    </div>
+
     <div id="resumen-credito"></div>
     <div id="estado-cuenta"></div>
   </div>
 </body>
 </html>
-
 
 

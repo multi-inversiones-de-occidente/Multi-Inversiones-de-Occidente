@@ -883,7 +883,7 @@
         abonarCapital(c=> isTodayLocal(c.fecha));
         abonarCapital(c=> !isBeforeTodayLocal(c.fecha) && !isTodayLocal(c.fecha));
 
-        // ======== CAMBIO: si aún sobra restante y el saldo NO ha llegado a 0, aplicar como capital extra ========
+        // ======== CAPITAL EXTRA fuera de plan si ya no hay cuotas que absorban el resto ========
         let pagoCapitalFueraPlan = 0;
         if (restante > EPS) {
           let saldoProvisional = round2(saldoAnterior - pagoCapital);
@@ -892,7 +892,6 @@
           if (saldoProvisional > TOL) {
             const extra = Math.min(restante, saldoProvisional);
             if (extra > EPS){
-              pagoCapital = round2(pagoCapital + extra);
               restante = round2(restante - extra);
 
               let extraPend = extra;
@@ -902,9 +901,11 @@
                 if (faltaCap > EPS){
                   const ab = Math.min(extraPend, faltaCap);
                   c.montoPagado = round2(n(c.montoPagado) + ab);
+                  pagoCapital = round2(pagoCapital + ab);
                   extraPend = round2(extraPend - ab);
                 }
               }
+
               if (extraPend > EPS) {
                 pagoCapitalFueraPlan = round2(pagoCapitalFueraPlan + extraPend);
               }
@@ -948,7 +949,11 @@
         paraPonerseAlDia = round2(add(add(interesActual, capitalAtrasado), multasAcumuladas));
 
         // ======== 7) saldoActual (contable) ========
-        let saldoNuevo = round2(saldoAnterior - pagoCapital);
+        // CAMBIO CLAVE:
+        // Antes solo descontaba pagoCapital.
+        // Ahora descontamos también pagoCapitalFueraPlan para que el saldo no quede colgado
+        // cuando ya no haya más cuotas en la amortización donde acomodar ese capital.
+        let saldoNuevo = round2(saldoAnterior - pagoCapital - pagoCapitalFueraPlan);
         if (saldoNuevo < 0) saldoNuevo = 0;
 
         // ======== CAMBIO: cierre real por tolerancia (0.06) ========
@@ -1077,5 +1082,4 @@
   </script>
 </body>
 </html>
-
 

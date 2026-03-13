@@ -717,6 +717,7 @@
     const TZ_OFFSET = "-06:00";
     const MODO_RETRO = true;
     const TOLERANCIA_CIERRE = 0.06;
+    const MONTO_MULTA_RETROACTIVA = 3.00;
 
     function toLocalEndISO(ymd){ return `${ymd}T23:59:59${TZ_OFFSET}`; }
     function toLocalStartISO(ymd){ return `${ymd}T00:00:00${TZ_OFFSET}`; }
@@ -746,6 +747,23 @@
       const m = String(d.getMonth()+1).padStart(2,'0');
       const day = String(d.getDate()).padStart(2,'0');
       return `${y}-${m}-${day}`;
+    }
+
+    function toYMDLocalFromDate(dateLike){
+      if (!dateLike) return null;
+      const d = new Date(dateLike);
+      if (Number.isNaN(d.getTime())) return null;
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      const day = String(d.getDate()).padStart(2,'0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function addDaysToYMD(ymd, days){
+      const d = parseLocalYMD(ymd);
+      if (!d) return null;
+      d.setDate(d.getDate() + Number(days || 0));
+      return toYMDLocalFromDate(d);
     }
 
     function saldoDesdeAmortizacion(amortizacion){
@@ -951,6 +969,63 @@
       const v = m.pagadoMulta;
       const n = Number(v);
       return Number.isFinite(n) ? round2(n) : 0;
+    }
+
+    function existeMultaParaCuota(historial, cuotaIndex, cuotaFechaYMD, fechaMultaYMD){
+      for (const m of (historial || [])) {
+        const idx = Number(m?.cuotaIndex);
+        const cuotaFechaM = typeof m?.cuotaFecha === "string" ? m.cuotaFecha.slice(0,10) : null;
+        const fechaM = toYMDLocalFromDate(m?.fecha);
+
+        if (Number.isFinite(idx) && idx === cuotaIndex) return true;
+        if (cuotaFechaM && cuotaFechaYMD && cuotaFechaM === cuotaFechaYMD) return true;
+        if (fechaM && fechaMultaYMD && fechaM === fechaMultaYMD) return true;
+      }
+      return false;
+    }
+
+    function agregarMultasHistoricasRetroactivas(amortizacion, historialMultasActualizado){
+      const hoyYMD = getTodayYMDLocal();
+
+      for (let i = 0; i < (amortizacion || []).length; i++) {
+        const cuota = amortizacion[i] || {};
+        const cuotaFechaYMD = typeof cuota.fecha === "string"
+          ? cuota.fecha.slice(0,10)
+          : toYMDLocalFromDate(cuota.fecha);
+
+        if (!cuotaFechaYMD) continue;
+
+        const capitalCuota = round2(num(cuota.capital, 0));
+        const pagadoCuota = round2(num(cuota.montoPagado, 0));
+        const capitalPendiente = round2(Math.max(0, capitalCuota - pagadoCuota));
+
+        if (capitalPendiente <= 0) continue;
+
+        const fechaMultaYMD = addDaysToYMD(cuotaFechaYMD, 1);
+        if (!fechaMultaYMD) continue;
+
+        if (fechaMultaYMD > hoyYMD) continue;
+
+        const yaExiste = existeMultaParaCuota(
+          historialMultasActualizado,
+          i,
+          cuotaFechaYMD,
+          fechaMultaYMD
+        );
+
+        if (yaExiste) continue;
+
+        historialMultasActualizado.push({
+          cuotaIndex: i,
+          cuotaFecha: cuotaFechaYMD,
+          fecha: toLocalStartISO(fechaMultaYMD),
+          monto: round2(MONTO_MULTA_RETROACTIVA),
+          pagadoMulta: 0,
+          estadoCuota: "No Pagada",
+          fechaPagoMulta: null,
+          origen: "retroactivo_auto"
+        });
+      }
     }
 
     const firebaseConfig = {
@@ -1646,6 +1721,8 @@
           }
         }
       }
+
+      agregarMultasHistoricasRetroactivas(amortizacion, historialMultasActualizado);
 
       const interesPendienteValorFecha = round2(Math.max(0, interesAlCorte - pagoInteres));
 

@@ -6,31 +6,328 @@
   <title>Historial de Pagos por Cliente</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body { background:#f7fafd; color:#22293d; font-family:'Segoe UI', Arial, sans-serif; margin:0; min-height:100vh; }
-    .container { max-width:1200px; margin:2.2rem auto 0; background:#fff; border-radius:22px; box-shadow:0 6px 26px #3ad6d888, 0 1.5px 18px #0001; padding:2.8rem 2.2rem 2.3rem; }
-    .titulo { font-size:1.65rem; color:#16b0bb; font-weight:bold; margin-bottom:1.1em; text-align:center; letter-spacing:.5px; }
-    .inputs-row { display:grid; grid-template-columns:1fr auto; gap:12px; align-items:end; margin-bottom:14px; }
-    .input-group { display:grid; gap:8px; }
-    .input-group label { color:#6b82a7; font-size:.95rem; font-weight:600; }
-    .input-group input, .input-group select { width:100%; padding:9px 12px; border-radius:8px; border:1.2px solid #c8eaf7; font-size:1.02rem; outline:none; background:#f5faff; color:#234; font-weight:600; }
-    .input-group input:focus, .input-group select:focus { border-color:#16b0bb; background:#e7fafd; }
-    .btn { padding:10px 20px; border-radius:10px; border:none; background:linear-gradient(90deg,#16b0bb 40%,#3586ea 100%); color:#fff; font-weight:700; font-size:1.05rem; cursor:pointer; box-shadow:0 2px 10px #16d0bb22; display:inline-flex; align-items:center; gap:8px; height:42px; }
-    .btn:hover { background:#158196; transform:translateY(-1px); }
-    .resumen-credito, .resumen-totales { background:#effafd; border-radius:14px; margin-bottom:18px; padding:14px 18px 12px; box-shadow:0 1.5px 7px #16d0bb13; font-size:1.02rem; }
-    .resumen-credito .grid, .resumen-totales .grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px 14px; }
-    .resumen-credito .item b, .resumen-totales .item b { color:#19bb5b; font-weight:700; }
-    .bloque-ultimo-pago { background:linear-gradient(100deg, #16d0ba19 0, #ffc34e1b 100%); border-left:6px solid #19bb5b; border-radius:13px; margin-bottom:22px; padding:16px 22px 12px 17px; box-shadow:0 1px 8px #16d0bb10; color:#21222b; }
-    .bloque-ultimo-pago b { color:#16b0bb; }
-    .tabla-historial { width:100%; border-collapse:collapse; margin-top:8px; font-size:1.02rem; background:#fff; border-radius:14px; box-shadow:0 1.5px 7px #16d0bb08; overflow:hidden; table-layout:fixed; word-break:break-word; }
-    .tabla-historial th, .tabla-historial td { padding:11px 13px; border-bottom:1px solid #e8eff5; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .tabla-historial th { background:#16b0bb; color:#fff; font-weight:700; font-size:1.04rem; letter-spacing:.7px; border:none; }
-    .tabla-historial tr:last-child td { border-bottom:none; }
-    .resaltado { background:#e3fce9 !important; color:#0b8b64 !important; font-weight:bold; }
-    .empty-msg { text-align:center; color:#babec8; padding:37px 0 18px; font-size:1.1rem; }
-    .helper { color:#6b82a7; font-size:.92rem; margin:8px 2px 14px; }
-    .hidden { display:none !important; }
-    @media (max-width:950px){ .container{max-width:99vw; padding:1.2rem .7rem 2rem;} .tabla-historial th, .tabla-historial td{padding:7px 4px; font-size:.98rem;} .resumen-credito .grid, .resumen-totales .grid{grid-template-columns:repeat(2,1fr);} .inputs-row{grid-template-columns:1fr;} }
-    @media (max-width:600px){ .container{padding:1.1rem .6rem;} .resumen-credito .grid, .resumen-totales .grid{grid-template-columns:1fr;} }
+    * { box-sizing: border-box; }
+
+    body {
+      background: linear-gradient(180deg, #f3fbfd 0%, #eef5fb 100%);
+      color: #22293d;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1320px;
+      margin: 2.2rem auto 0;
+      background: #fff;
+      border-radius: 24px;
+      box-shadow: 0 10px 30px rgba(27, 107, 153, 0.10), 0 2px 16px rgba(0, 0, 0, 0.05);
+      padding: 2.4rem 2rem 2rem;
+      border: 1px solid #e6f1f8;
+    }
+
+    .titulo {
+      font-size: 1.75rem;
+      color: #16b0bb;
+      font-weight: 800;
+      margin-bottom: 1.4em;
+      text-align: center;
+      letter-spacing: .4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .inputs-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: end;
+      margin-bottom: 16px;
+    }
+
+    .input-group {
+      display: grid;
+      gap: 8px;
+    }
+
+    .input-group label {
+      color: #55708f;
+      font-size: .95rem;
+      font-weight: 700;
+    }
+
+    .input-group input,
+    .input-group select {
+      width: 100%;
+      padding: 11px 13px;
+      border-radius: 10px;
+      border: 1.2px solid #c8eaf7;
+      font-size: 1rem;
+      outline: none;
+      background: #f7fbff;
+      color: #234;
+      font-weight: 600;
+      transition: .18s ease;
+    }
+
+    .input-group input:focus,
+    .input-group select:focus {
+      border-color: #16b0bb;
+      background: #ebfbff;
+      box-shadow: 0 0 0 4px rgba(22, 176, 187, 0.08);
+    }
+
+    .btn {
+      padding: 11px 22px;
+      border-radius: 11px;
+      border: none;
+      background: linear-gradient(90deg, #16b0bb 20%, #3586ea 100%);
+      color: #fff;
+      font-weight: 800;
+      font-size: 1rem;
+      cursor: pointer;
+      box-shadow: 0 6px 16px rgba(22, 176, 187, 0.16);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      transition: .18s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 18px rgba(22, 176, 187, 0.18);
+    }
+
+    .resumen-credito,
+    .resumen-totales {
+      background: linear-gradient(180deg, #f4fcff 0%, #eefafd 100%);
+      border-radius: 16px;
+      margin-bottom: 18px;
+      padding: 16px 18px 14px;
+      box-shadow: 0 4px 14px rgba(22, 208, 187, 0.08);
+      font-size: 1rem;
+      border: 1px solid #ddf2f6;
+    }
+
+    .resumen-credito .grid,
+    .resumen-totales .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px 16px;
+    }
+
+    .resumen-credito .item,
+    .resumen-totales .item {
+      background: rgba(255,255,255,.72);
+      border: 1px solid #edf7fb;
+      border-radius: 12px;
+      padding: 10px 12px;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .resumen-credito .item b,
+    .resumen-totales .item b {
+      color: #19bb5b;
+      font-weight: 800;
+    }
+
+    .bloque-ultimo-pago {
+      background: linear-gradient(100deg, rgba(22, 208, 186, 0.10) 0%, rgba(255, 195, 78, 0.10) 100%);
+      border-left: 6px solid #19bb5b;
+      border-radius: 15px;
+      margin-bottom: 22px;
+      padding: 18px 20px 14px 16px;
+      box-shadow: 0 4px 14px rgba(22, 176, 187, 0.08);
+      color: #21222b;
+      border-top: 1px solid rgba(25, 187, 91, 0.08);
+      border-right: 1px solid rgba(25, 187, 91, 0.08);
+      border-bottom: 1px solid rgba(25, 187, 91, 0.08);
+      line-height: 1.7;
+    }
+
+    .bloque-ultimo-pago b {
+      color: #16b0bb;
+    }
+
+    .tabla-wrap {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      border-radius: 16px;
+      box-shadow: 0 4px 14px rgba(22, 176, 187, 0.07);
+      border: 1px solid #e4eef6;
+      background: #fff;
+    }
+
+    .tabla-historial {
+      width: 100%;
+      min-width: 1080px;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 1rem;
+      background: #fff;
+      table-layout: auto;
+    }
+
+    .tabla-historial thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: linear-gradient(90deg, #16b0bb 0%, #1e9fd3 100%);
+      color: #fff;
+      font-weight: 800;
+      font-size: 1rem;
+      letter-spacing: .3px;
+      border: none;
+      padding: 13px 14px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .tabla-historial thead th:first-child {
+      border-top-left-radius: 14px;
+    }
+
+    .tabla-historial thead th:last-child {
+      border-top-right-radius: 14px;
+    }
+
+    .tabla-historial tbody td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #edf2f7;
+      text-align: left;
+      white-space: nowrap;
+      vertical-align: middle;
+      color: #263547;
+      background: #fff;
+    }
+
+    .tabla-historial tbody tr:nth-child(even) td {
+      background: #fbfdff;
+    }
+
+    .tabla-historial tbody tr:hover td {
+      background: #f1fbff;
+    }
+
+    .tabla-historial tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .tabla-historial td:nth-child(1),
+    .tabla-historial th:nth-child(1) {
+      min-width: 110px;
+    }
+
+    .tabla-historial td:nth-child(2),
+    .tabla-historial th:nth-child(2) {
+      min-width: 165px;
+    }
+
+    .tabla-historial td:nth-child(3),
+    .tabla-historial th:nth-child(3),
+    .tabla-historial td:nth-child(4),
+    .tabla-historial th:nth-child(4),
+    .tabla-historial td:nth-child(5),
+    .tabla-historial th:nth-child(5),
+    .tabla-historial td:nth-child(6),
+    .tabla-historial th:nth-child(6),
+    .tabla-historial td:nth-child(8),
+    .tabla-historial th:nth-child(8) {
+      min-width: 120px;
+    }
+
+    .tabla-historial td:nth-child(7),
+    .tabla-historial th:nth-child(7) {
+      min-width: 180px;
+    }
+
+    .resaltado td {
+      background: #e8fff1 !important;
+      color: #0b8b64 !important;
+      font-weight: 700;
+    }
+
+    .empty-msg {
+      text-align: center;
+      color: #8ea0b4;
+      padding: 32px 12px 12px;
+      font-size: 1.06rem;
+      font-weight: 600;
+    }
+
+    .helper {
+      color: #6b82a7;
+      font-size: .93rem;
+      margin: 8px 2px 14px;
+      background: #f6fbff;
+      border: 1px solid #e4f0f8;
+      padding: 10px 12px;
+      border-radius: 10px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 950px) {
+      .container {
+        max-width: 99vw;
+        padding: 1.2rem .75rem 1.8rem;
+        margin-top: 1rem;
+        border-radius: 18px;
+      }
+
+      .titulo {
+        font-size: 1.4rem;
+      }
+
+      .inputs-row {
+        grid-template-columns: 1fr;
+      }
+
+      .resumen-credito .grid,
+      .resumen-totales .grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .tabla-historial {
+        min-width: 1040px;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        padding: 1rem .55rem 1.4rem;
+      }
+
+      .resumen-credito .grid,
+      .resumen-totales .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .tabla-historial {
+        min-width: 1000px;
+      }
+
+      .tabla-historial thead th,
+      .tabla-historial tbody td {
+        padding: 10px 12px;
+        font-size: .95rem;
+      }
+
+      .btn {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
@@ -57,20 +354,24 @@
     <div id="resumen-totales"></div>
     <div id="ultimo-pago"></div>
 
-    <table class="tabla-historial">
-      <thead>
-        <tr>
-          <th>Fecha</th>
-          <th>Monto</th>
-          <th>Capital</th>
-          <th>Interés</th>
-          <th>Multas</th>
-          <th>Cajero</th>
-          <th>Saldo Restante</th>
-        </tr>
-      </thead>
-      <tbody id="tabla-pagos"></tbody>
-    </table>
+    <div class="tabla-wrap">
+      <table class="tabla-historial">
+        <thead>
+          <tr>
+            <th>Correlativo</th>
+            <th>Fecha</th>
+            <th>Monto</th>
+            <th>Capital</th>
+            <th>Interés</th>
+            <th>Multas</th>
+            <th>Cajero</th>
+            <th>Saldo Restante</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-pagos"></tbody>
+      </table>
+    </div>
+
     <div id="empty-msg" class="empty-msg" style="display:none"></div>
   </div>
 
@@ -89,19 +390,32 @@
       appId: "1:380001917078:web:b5eccc64bc77709bd2cab7",
       measurementId: "G-H4E31XHG1Y"
     };
+
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
 
     // Helpers
     const getParam = (name) => new URL(window.location.href).searchParams.get(name) || "";
-    const money = n => '$' + (Number(n||0)).toFixed(2);
-    const safeNum = (v, def=0) => { const n = Number(v); return Number.isFinite(n) ? n : def; };
+    const money = n => '$' + (Number(n || 0)).toFixed(2);
+    const safeNum = (v, def = 0) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : def;
+    };
+
     function formatDate(iso) {
       if (!iso) return '';
       const d = new Date(iso);
-      return d.toLocaleDateString('es-SV', { day:'2-digit', month:'2-digit', year:'numeric' }) + ' ' +
-             d.toLocaleTimeString('es-SV', { hour:'2-digit', minute:'2-digit', hour12:true });
+      return d.toLocaleDateString('es-SV', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      }) + ' ' +
+      d.toLocaleTimeString('es-SV', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
     }
 
     // Estado UI
@@ -110,7 +424,11 @@
 
     // Auth
     onAuthStateChanged(auth, async (user) => {
-      if (!user) { window.location.href = "login.html"; return; }
+      if (!user) {
+        window.location.href = "login.html";
+        return;
+      }
+
       usuarioAutenticado = user;
 
       // Auto-carga por parámetros
@@ -129,8 +447,13 @@
         // Validar que el crédito exista y pertenezca al cliente
         const credRef = doc(db, "creditos", creditoID);
         const credSnap = await getDoc(credRef);
-        if (!credSnap.exists()) { return showEmpty("Crédito no encontrado."); }
+
+        if (!credSnap.exists()) {
+          return showEmpty("Crédito no encontrado.");
+        }
+
         const credData = credSnap.data();
+
         if (credData.clienteID !== clienteID) {
           return showEmpty("El crédito no pertenece al ClienteID suministrado.");
         }
@@ -146,9 +469,7 @@
         return;
       }
 
-      // ➕ BÚSQUEDA AUTOMÁTICA AL ENTRAR (sin click):
-      // - Si viene clienteID (sin creditoID), o
-      // - Si el input ya tiene valor al cargar la página.
+      // Búsqueda automática al entrar
       const inputVal = document.getElementById('clienteID-input').value.trim();
       if (inputVal && !creditoID) {
         await buscarCreditos(inputVal);
@@ -161,9 +482,11 @@
       if (!clienteID) return showEmpty("Debes ingresar el ClienteID.");
       await buscarCreditos(clienteID);
     };
+
     document.getElementById('clienteID-input').onkeydown = (e) => {
       if (e.key === "Enter") document.getElementById('buscar-btn').click();
     };
+
     document.getElementById('credito-select').onchange = async () => {
       const id = document.getElementById('credito-select').value;
       const c = creditosDelCliente.find(x => x.id === id);
@@ -172,7 +495,7 @@
       await cargarPagosPorCredito(id);
     };
 
-    // Cargar créditos por cliente (flujo manual/respaldo)
+    // Cargar créditos por cliente
     async function buscarCreditos(clienteID) {
       resetUI();
 
@@ -180,6 +503,7 @@
         const qCreds = query(collection(db, "creditos"), where("clienteID", "==", clienteID));
         const snap = await getDocs(qCreds);
         creditosDelCliente = [];
+
         snap.forEach(d => {
           const data = d.data();
           // Excluir créditos con estado "Revertido"
@@ -188,7 +512,9 @@
           }
         });
 
-        if (!creditosDelCliente.length) return showEmpty("No se encontraron créditos (no Revertidos) para este ClienteID.");
+        if (!creditosDelCliente.length) {
+          return showEmpty("No se encontraron créditos (no Revertidos) para este ClienteID.");
+        }
 
         // Poblar selector
         const sel = document.getElementById('credito-select');
@@ -200,6 +526,7 @@
           const cuotas = d.numeroCuotas || '—';
           return `<option value="${c.id}">${linea} | ${estado} | ${cuotas}x${money(cuota)} | ID: ${c.id}</option>`;
         }).join('');
+
         document.getElementById('creditos-wrapper').classList.remove('hidden');
 
         // Autoselección del primero
@@ -215,7 +542,10 @@
 
     function renderResumenCreditoDirecto(creditoID, d) {
       const cont = document.getElementById('resumen-credito');
-      if (!d) { cont.classList.add('hidden'); return; }
+      if (!d) {
+        cont.classList.add('hidden');
+        return;
+      }
 
       const saldoActual = safeNum(d.saldoActual);
       const interesActual = safeNum(d.interesActual);
@@ -269,16 +599,18 @@
           where("creditoID", "==", creditoID),
           orderBy("fechaPago", "asc")
         );
+
         const pagosSnap = await getDocs(pagosQ);
 
         let pagos = [];
-        pagosSnap.forEach(doc => {
-          const d = doc.data();
+        pagosSnap.forEach(docSnap => {
+          const d = docSnap.data();
           if (!d.anulado) pagos.push(d);
         });
 
         pagos = pagos.map(p => ({
           ...p,
+          correlativo: p.correlativo ?? '—',
           montoPagado: safeNum(p.montoPagado),
           pagoCapital: safeNum(p.pagoCapital),
           pagoInteres: safeNum(p.pagoInteres),
@@ -286,7 +618,9 @@
           saldoRestante: safeNum(p.saldoRestante)
         }));
 
-        if (!pagos.length) return showEmpty("No se encontraron pagos para el crédito seleccionado.");
+        if (!pagos.length) {
+          return showEmpty("No se encontraron pagos para el crédito seleccionado.");
+        }
 
         // Totales
         let totalPagado = 0, totalCapital = 0, totalInteres = 0, totalMultas = 0;
@@ -315,6 +649,7 @@
         ultimoPago.innerHTML = `
           <div class="bloque-ultimo-pago">
             <span><b>Último pago realizado</b></span><br>
+            <span><b>Correlativo:</b> ${last.correlativo}</span><br>
             <span><b>Fecha:</b> ${formatDate(last.fechaPago)}</span><br>
             <span><b>Monto pagado:</b> ${money(last.montoPagado)}</span><br>
             <span><b>Cajero:</b> ${last.cajeroNombre || ''}</span><br>
@@ -328,6 +663,7 @@
         // Tabla
         tbody.innerHTML = pagos.map((d, i) => `
           <tr class="${i === pagos.length - 1 ? 'resaltado' : ''}">
+            <td>${d.correlativo}</td>
             <td>${formatDate(d.fechaPago)}</td>
             <td>${money(d.montoPagado)}</td>
             <td>${money(d.pagoCapital)}</td>
@@ -344,7 +680,7 @@
     }
 
     // Util UI
-    function resetUI(){
+    function resetUI() {
       document.getElementById('tabla-pagos').innerHTML = "";
       document.getElementById('resumen-totales').innerHTML = "";
       document.getElementById('ultimo-pago').innerHTML = "";
@@ -354,7 +690,8 @@
       document.getElementById('credito-select').innerHTML = "";
       creditosDelCliente = [];
     }
-    function showEmpty(msg){
+
+    function showEmpty(msg) {
       document.getElementById('tabla-pagos').innerHTML = "";
       document.getElementById('resumen-totales').innerHTML = "";
       document.getElementById('ultimo-pago').innerHTML = "";

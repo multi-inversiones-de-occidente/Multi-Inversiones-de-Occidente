@@ -173,181 +173,6 @@
       border-collapse: separate;
       border-spacing: 0;
       font-size: 1rem;
-<!DOCTYPE html> 
-<html lang="es">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Historial de Pagos por Cliente</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    * { box-sizing: border-box; }
-
-    body {
-      background: linear-gradient(180deg, #f3fbfd 0%, #eef5fb 100%);
-      color: #22293d;
-      font-family: 'Segoe UI', Arial, sans-serif;
-      margin: 0;
-      min-height: 100vh;
-    }
-
-    .container {
-      max-width: 1320px;
-      margin: 2.2rem auto 0;
-      background: #fff;
-      border-radius: 24px;
-      box-shadow: 0 10px 30px rgba(27, 107, 153, 0.10), 0 2px 16px rgba(0, 0, 0, 0.05);
-      padding: 2.4rem 2rem 2rem;
-      border: 1px solid #e6f1f8;
-    }
-
-    .titulo {
-      font-size: 1.75rem;
-      color: #16b0bb;
-      font-weight: 800;
-      margin-bottom: 1.4em;
-      text-align: center;
-      letter-spacing: .4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-    }
-
-    .inputs-row {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 12px;
-      align-items: end;
-      margin-bottom: 16px;
-    }
-
-    .input-group {
-      display: grid;
-      gap: 8px;
-    }
-
-    .input-group label {
-      color: #55708f;
-      font-size: .95rem;
-      font-weight: 700;
-    }
-
-    .input-group input,
-    .input-group select {
-      width: 100%;
-      padding: 11px 13px;
-      border-radius: 10px;
-      border: 1.2px solid #c8eaf7;
-      font-size: 1rem;
-      outline: none;
-      background: #f7fbff;
-      color: #234;
-      font-weight: 600;
-      transition: .18s ease;
-    }
-
-    .input-group input:focus,
-    .input-group select:focus {
-      border-color: #16b0bb;
-      background: #ebfbff;
-      box-shadow: 0 0 0 4px rgba(22, 176, 187, 0.08);
-    }
-
-    .btn {
-      padding: 11px 22px;
-      border-radius: 11px;
-      border: none;
-      background: linear-gradient(90deg, #16b0bb 20%, #3586ea 100%);
-      color: #fff;
-      font-weight: 800;
-      font-size: 1rem;
-      cursor: pointer;
-      box-shadow: 0 6px 16px rgba(22, 176, 187, 0.16);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      min-height: 44px;
-      transition: .18s ease;
-    }
-
-    .btn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 10px 18px rgba(22, 176, 187, 0.18);
-    }
-
-    .resumen-credito,
-    .resumen-totales {
-      background: linear-gradient(180deg, #f4fcff 0%, #eefafd 100%);
-      border-radius: 16px;
-      margin-bottom: 18px;
-      padding: 16px 18px 14px;
-      box-shadow: 0 4px 14px rgba(22, 208, 187, 0.08);
-      font-size: 1rem;
-      border: 1px solid #ddf2f6;
-    }
-
-    .resumen-credito .grid,
-    .resumen-totales .grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px 16px;
-    }
-
-    .resumen-credito .item,
-    .resumen-totales .item {
-      background: rgba(255,255,255,.72);
-      border: 1px solid #edf7fb;
-      border-radius: 12px;
-      padding: 10px 12px;
-      min-height: 48px;
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 4px;
-    }
-
-    .resumen-credito .item b,
-    .resumen-totales .item b {
-      color: #19bb5b;
-      font-weight: 800;
-    }
-
-    .bloque-ultimo-pago {
-      background: linear-gradient(100deg, rgba(22, 208, 186, 0.10) 0%, rgba(255, 195, 78, 0.10) 100%);
-      border-left: 6px solid #19bb5b;
-      border-radius: 15px;
-      margin-bottom: 22px;
-      padding: 18px 20px 14px 16px;
-      box-shadow: 0 4px 14px rgba(22, 176, 187, 0.08);
-      color: #21222b;
-      border-top: 1px solid rgba(25, 187, 91, 0.08);
-      border-right: 1px solid rgba(25, 187, 91, 0.08);
-      border-bottom: 1px solid rgba(25, 187, 91, 0.08);
-      line-height: 1.7;
-    }
-
-    .bloque-ultimo-pago b {
-      color: #16b0bb;
-    }
-
-    .tabla-wrap {
-      width: 100%;
-      overflow-x: auto;
-      overflow-y: hidden;
-      border-radius: 16px;
-      box-shadow: 0 4px 14px rgba(22, 176, 187, 0.07);
-      border: 1px solid #e4eef6;
-      background: #fff;
-    }
-
-    .tabla-historial {
-      width: 100%;
-      min-width: 1160px;
-      border-collapse: separate;
-      border-spacing: 0;
-      font-size: 1rem;
       background: #fff;
       table-layout: auto;
     }
@@ -597,6 +422,10 @@
       return data.nombre || data.nombres || data.primerNombre || data.name || '—';
     }
 
+    function obtenerApellidoCliente(data = {}) {
+      return data.apellido || data.apellidos || data.segundoNombre || data.lastName || '—';
+    }
+
     function obtenerDuiCliente(data = {}) {
       return data.dui || data.DUI || data.numeroDui || '—';
     }
@@ -775,30 +604,32 @@
       const tasaDiariaCredito = safeNum(d.tasaDiariaCredito);
 
       const nombreCliente = obtenerNombreCliente(datosClienteActual || {});
+      const apellidoCliente = obtenerApellidoCliente(datosClienteActual || {});
       const duiCliente = obtenerDuiCliente(datosClienteActual || {});
 
       cont.innerHTML = `
         <div class="grid">
           <div class="item"><b>Nombre:</b> ${nombreCliente}</div>
+          <div class="item"><b>Apellido:</b> ${apellidoCliente}</div>
           <div class="item"><b>DUI:</b> ${duiCliente}</div>
-          <div class="item"><b>Crédito ID:</b> ${creditoID}</div>
 
+          <div class="item"><b>Crédito ID:</b> ${creditoID}</div>
           <div class="item"><b>Línea:</b> ${d.lineaDeCredito || '—'}</div>
           <div class="item"><b>Estado:</b> ${d.estadoCredito || '—'}</div>
-          <div class="item"><b>Cuota aprobada:</b> ${money(d.cuotaAprobada)}</div>
 
+          <div class="item"><b>Cuota aprobada:</b> ${money(d.cuotaAprobada)}</div>
           <div class="item"><b>Frecuencia:</b> ${d.frecuenciaPago || '—'}</div>
           <div class="item"><b>Cuotas:</b> ${d.numeroCuotas || '—'}</div>
-          <div class="item"><b>Saldo actual:</b> ${money(saldoActual)}</div>
 
+          <div class="item"><b>Saldo actual:</b> ${money(saldoActual)}</div>
           <div class="item"><b>Interés actual:</b> ${money(interesActual)}</div>
           <div class="item"><b>PPD:</b> ${money(paraPonerseAlDia)}</div>
-          <div class="item"><b>Capital vencido:</b> ${money(capitalAtrasado)}</div>
 
+          <div class="item"><b>Capital vencido:</b> ${money(capitalAtrasado)}</div>
           <div class="item"><b>Multas no pagadas:</b> ${money(multasAcumuladas)}</div>
           <div class="item"><b>Tasa anual:</b> ${tasaAnualCredito || '—'}%</div>
-          <div class="item"><b>Tasa diaria:</b> ${tasaDiariaCredito || '—'}</div>
 
+          <div class="item"><b>Tasa diaria:</b> ${tasaDiariaCredito || '—'}</div>
           <div class="item"><b>Agencia:</b> ${d.agenciaAsignada || '—'}</div>
           <div class="item"><b>Inicio:</b> ${d.fechaInicio ? new Date(d.fechaInicio).toLocaleString('es-SV') : '—'}</div>
         </div>
@@ -925,7 +756,6 @@
   </script>
 </body>
 </html>
-
 
 
 

@@ -183,7 +183,7 @@
           }
         }
 
-        // +++ NUEVO: incluir pagos (aunque no tengan 'cierre') para poblar el selector
+        // +++ PAGOS: normal por fechaPago, retroactivo solo por fechaRegistro
         {
           const agenciaActualNorm = (agenciaActual || "").toLowerCase().trim();
           const pagosQ = query(
@@ -203,19 +203,19 @@
             const sucNorm = (d.sucursal || "").toString().toLowerCase().trim();
             if (sucNorm !== agenciaActualNorm) continue;
 
-            // Fecha operativa principal: fechaPago
-            if (typeof d.fechaPago === "string" && d.fechaPago.length >= 10) {
-              movDatesSet.add(d.fechaPago.slice(0,10));
-            } else if (d.fechaPago?.toDate) {
-              movDatesSet.add(yyyymmdd(d.fechaPago.toDate()));
-            }
-
-            // Si es retroactivo, también considerar fechaRegistro
-            if (d.retroactivo) {
+            if (d.retroactivo === true) {
+              // Para retroactivos, SOLO se toma fechaRegistro
               if (typeof d.fechaRegistro === "string" && d.fechaRegistro.length >= 10) {
                 movDatesSet.add(d.fechaRegistro.slice(0,10));
               } else if (d.fechaRegistro?.toDate) {
                 movDatesSet.add(yyyymmdd(d.fechaRegistro.toDate()));
+              }
+            } else {
+              // Para pagos normales, se toma fechaPago
+              if (typeof d.fechaPago === "string" && d.fechaPago.length >= 10) {
+                movDatesSet.add(d.fechaPago.slice(0,10));
+              } else if (d.fechaPago?.toDate) {
+                movDatesSet.add(yyyymmdd(d.fechaPago.toDate()));
               }
             }
           }
@@ -286,7 +286,7 @@
         // dejamos que la colección "pagos" sea la única fuente para ese dinero.
         const referenciaStr = (m.referencia || "").toString().toLowerCase().trim();
         const isMovimientoDePago =
-          !!m.creditoID || // cualquier movimiento amarrado a un crédito
+          !!m.creditoID ||
           (
             !!m.clienteID &&
             (
@@ -360,6 +360,7 @@
       }
 
       // 2) Pagos (ingresos)
+      // Pagos normales: SOLO por fechaPago
       const pagosSnap = await getDocs(
         query(
           collection(db, "pagos"),
@@ -368,6 +369,8 @@
           where("fechaPago", "<=", fechaFinUTC)
         )
       );
+
+      // Pagos retroactivos: SOLO por fechaRegistro
       const pagosRetroSnap = await getDocs(
         query(
           collection(db, "pagos"),
@@ -383,6 +386,10 @@
 
       for (const docPago of pagosSnap.docs) {
         const d = docPago.data();
+
+        // En pagos normales, excluir retroactivos para que no entren por fechaPago
+        if (d.retroactivo === true) continue;
+
         if (!("anulado" in d) || !d.anulado) {
           const cierrePago = d.hasOwnProperty("cierre") ? d.cierre : false;
           if (cierrePago === false || cierrePago === null) {
@@ -391,6 +398,7 @@
           }
         }
       }
+
       for (const docPago of pagosRetroSnap.docs) {
         if (pagosIds.has(docPago.id)) continue;
         const d = docPago.data();
@@ -405,7 +413,13 @@
 
       for (const d of pagosUnidos) {
         const monto = Number(d.montoPagado) || 0;
-        const fechaIso = d.fechaRegistro || d.fechaPago || "";
+
+        // Fecha visible coherente con la lógica del cierre:
+        // normal = fechaPago, retroactivo = fechaRegistro
+        const fechaIso = d.retroactivo === true
+          ? (d.fechaRegistro || d.fechaPago || "")
+          : (d.fechaPago || d.fechaRegistro || "");
+
         movimientosDelDia.push({
           id: d.id,
           coll: "pagos",
@@ -724,5 +738,3 @@
   </div>
 </body>
 </html>
-
-

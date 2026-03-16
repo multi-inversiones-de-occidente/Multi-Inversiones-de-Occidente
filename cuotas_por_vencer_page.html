@@ -7,12 +7,30 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <style>
     :root{
-      --bg:#f5f8fa; --card:#fff; --brand:#1371b6; --muted:#6b7c93;
-      --line:#e3e9f2; --chip:#e7f2fb; --chipText:#125c9c; --warm:#ffa726;
+      --bg:#f5f8fa;
+      --card:#fff;
+      --brand:#1371b6;
+      --muted:#6b7c93;
+      --line:#e3e9f2;
+      --chip:#e7f2fb;
+      --chipText:#125c9c;
+      --warm:#ffa726;
       --shadow: 0 6px 24px #00538b16;
+
+      --pendiente:#dbab16;
+      --parcial:#ff8f00;
+      --atrasado:#e53935;
+      --pagada:#18a058;
+
+      --pendienteBg:#fff8df;
+      --parcialBg:#fff1e3;
+      --atrasadoBg:#ffe8e8;
+      --pagadaBg:#e8f8ef;
     }
+
     *{ box-sizing: border-box; }
     html, body { height: 100%; }
+
     body {
       background: var(--bg);
       min-height: 100vh;
@@ -20,14 +38,16 @@
       margin: 0;
       color: #0f1b2d;
     }
+
     .container {
-      max-width: 1200px;
+      max-width: 1280px;
       margin: 2.8rem auto 2rem;
       background: var(--card);
       border-radius: 18px;
       box-shadow: var(--shadow);
       padding: 2.2rem 2rem 2rem;
     }
+
     h2 {
       font-size: 2rem;
       font-weight: 800;
@@ -38,6 +58,7 @@
       align-items: center;
       gap: 10px;
     }
+
     .subtitulo {
       font-size: 1.25rem;
       color: var(--warm);
@@ -46,6 +67,7 @@
       letter-spacing: .2px;
       text-align: left;
     }
+
     .user-email {
       color: #1785ba;
       font-size: 1.02rem;
@@ -59,15 +81,20 @@
       gap: 12px;
       margin-bottom: 14px;
     }
+
     .filter-row, .date-row {
       display: flex;
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
     }
+
     .group-label{
-      font-weight:700; color:#126caa; white-space:nowrap;
+      font-weight:700;
+      color:#126caa;
+      white-space:nowrap;
     }
+
     select, input[type="date"] {
       padding: 10px 14px;
       border-radius: 10px;
@@ -79,10 +106,12 @@
       outline: none;
       transition: border .16s, box-shadow .16s;
     }
+
     select:focus, input[type="date"]:focus {
       border: 1.5px solid var(--brand);
       box-shadow: 0 0 0 3px #1371b620;
     }
+
     .btn {
       appearance: none;
       border: 0;
@@ -93,31 +122,138 @@
       transition: transform .06s ease, box-shadow .2s ease, opacity .2s ease;
       white-space: nowrap;
     }
+
     .btn-primary {
       background: var(--brand);
       color: #fff;
       box-shadow: 0 6px 16px #1371b644;
     }
+
     .btn-secondary {
       background: #eef4fb;
       color: #0b3a67;
       border: 1px solid #cfe2f3;
     }
+
     .btn:active { transform: translateY(1px); }
+
+    .legend{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin: 10px 2px 18px;
+      color:#496480;
+      font-size:.92rem;
+    }
+
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:6px 10px;
+      border-radius:20px;
+      border:1px solid var(--line);
+      background:#fff;
+    }
+
+    .dot{
+      width:12px;
+      height:12px;
+      border-radius:50%;
+      display:inline-block;
+    }
+
+    .dot-today{ background:#f1d46a; }
+    .dot-7{ background:#9de29d; }
+    .dot-15{ background:#aedaff; }
+    .dot-30{ background:#dfc7ff; }
+
+    .sections-container{
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      margin-top: 8px;
+    }
+
+    .status-section{
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: #fff;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.03);
+    }
+
+    .status-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding: 14px 16px;
+      font-weight: 800;
+      font-size: 1.08rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .status-title{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-width: 0;
+    }
+
+    .status-title i{
+      font-size: 1.05rem;
+    }
+
+    .status-count{
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: .9rem;
+      font-weight: 800;
+      background: rgba(255,255,255,0.7);
+      border: 1px solid rgba(0,0,0,0.06);
+      white-space: nowrap;
+    }
+
+    .pendiente-header{
+      background: linear-gradient(90deg, var(--pendienteBg), #fffdf2);
+      color: #8a6a00;
+    }
+
+    .parcial-header{
+      background: linear-gradient(90deg, var(--parcialBg), #fff8f1);
+      color: #b26100;
+    }
+
+    .atrasado-header{
+      background: linear-gradient(90deg, var(--atrasadoBg), #fff4f4);
+      color: #b42318;
+    }
+
+    .pagada-header{
+      background: linear-gradient(90deg, var(--pagadaBg), #f4fff8);
+      color: #0d7a44;
+    }
+
+    .section-body{
+      padding: 0;
+    }
 
     .table-wrap{
       width: 100%;
       overflow: auto;
-      border: 1px solid var(--line);
-      border-radius: 14px;
+      border-radius: 0 0 14px 14px;
       background: #fafdff;
     }
+
     table {
       width: 100%;
       min-width: 1080px;
       border-collapse: collapse;
       table-layout: fixed;
     }
+
     thead th {
       position: sticky;
       top: 0;
@@ -129,6 +265,7 @@
       padding: 10px 10px;
       border-bottom: 1px solid var(--line);
     }
+
     tbody td {
       padding: 9px 10px;
       border-bottom: 1px solid var(--line);
@@ -138,46 +275,162 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+
     tbody tr:hover { background: #f3f9ff; }
     tbody tr:nth-child(even){ background: #fbfdff; }
 
-    .pendiente { color: #dbab16; font-weight: 700; }
-    .tel { color: #14b060; font-weight: 600; white-space: nowrap; }
-    .tel i { margin-right: 5px;}
-    .total-monto { color: var(--warm); font-weight: 800; }
+    .pendiente { color: var(--pendiente); font-weight: 700; }
+    .parcial { color: var(--parcial); font-weight: 700; }
+    .atrasado { color: var(--atrasado); font-weight: 700; }
+    .pagada { color: var(--pagada); font-weight: 700; }
+
+    .tel {
+      color: #14b060;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .tel i { margin-right: 5px; }
+
+    .total-monto {
+      color: var(--warm);
+      font-weight: 800;
+    }
+
+    .estado-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:7px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: .88rem;
+      font-weight: 800;
+      border: 1px solid transparent;
+    }
+
+    .estado-pendiente{
+      background: var(--pendienteBg);
+      color: #8a6a00;
+      border-color: #f1d46a;
+    }
+
+    .estado-parcial{
+      background: var(--parcialBg);
+      color: #b26100;
+      border-color: #ffc17c;
+    }
+
+    .estado-atrasado{
+      background: var(--atrasadoBg);
+      color: #b42318;
+      border-color: #f2a7a7;
+    }
+
+    .estado-pagada{
+      background: var(--pagadaBg);
+      color: #0d7a44;
+      border-color: #9ddbb9;
+    }
 
     .row-today { background: #fefbe7 !important; }
     .row-7d   { background: #e8fbe7 !important; }
     .row-15d  { background: #e7f3fb !important; }
     .row-30d  { background: #f4e7fb !important; }
 
-    .loading { color: #667; text-align: center; padding: 28px 0; font-size: 1.05rem; }
+    .loading {
+      color: #667;
+      text-align: center;
+      padding: 28px 0;
+      font-size: 1.05rem;
+    }
 
-    .legend{
-      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
-      margin: 10px 2px 14px;
-      color:#496480; font-size:.92rem;
+    .empty-section{
+      padding: 22px 16px;
+      text-align: center;
+      color: #6f7f93;
+      font-weight: 600;
+      background: #fcfdff;
     }
-    .chip{
-      display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:20px; border:1px solid var(--line);
+
+    .summary-bar{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(160px, 1fr));
+      gap: 12px;
+      margin: 8px 0 18px;
+    }
+
+    .summary-card{
       background:#fff;
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:14px 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+      display:flex;
+      align-items:center;
+      gap:12px;
     }
-    .dot{ width:12px; height:12px; border-radius:50%; display:inline-block; }
-    .dot-today{ background:#f1d46a; }
-    .dot-7{ background:#9de29d; }
-    .dot-15{ background:#aedaff; }
-    .dot-30{ background:#dfc7ff; }
+
+    .summary-card i{
+      width:42px;
+      height:42px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:50%;
+      font-size:1rem;
+      flex-shrink:0;
+    }
+
+    .summary-card .txt{
+      min-width:0;
+    }
+
+    .summary-card .label{
+      font-size:.9rem;
+      color:#6b7c93;
+      font-weight:700;
+      margin-bottom:2px;
+    }
+
+    .summary-card .value{
+      font-size:1.2rem;
+      font-weight:800;
+      color:#0f1b2d;
+    }
+
+    .sum-pend i{ background: var(--pendienteBg); color:#8a6a00; }
+    .sum-parcial i{ background: var(--parcialBg); color:#b26100; }
+    .sum-atrasado i{ background: var(--atrasadoBg); color:#b42318; }
+    .sum-pagada i{ background: var(--pagadaBg); color:#0d7a44; }
+
+    @media (max-width: 900px){
+      .summary-bar{
+        grid-template-columns: repeat(2, minmax(160px, 1fr));
+      }
+    }
 
     @media (max-width: 640px){
       .filters{ grid-template-columns: 1fr; }
       .date-row{ justify-content: space-between; }
+      .summary-bar{
+        grid-template-columns: 1fr;
+      }
+      .container{
+        padding: 1.3rem 1rem 1.2rem;
+      }
+      h2{
+        font-size: 1.55rem;
+      }
+      .subtitulo{
+        font-size: 1rem;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
     <h2><i class="fa-solid fa-calendar-day"></i> Cuotas por Vencer</h2>
-    <div class="subtitulo">Cuotas Pendientes Próximas a Vencer</div>
+    <div class="subtitulo">Cuotas organizadas por estado y fecha correspondiente</div>
     <div class="user-email" id="usuario-email"></div>
 
     <!-- Filtros -->
@@ -191,11 +444,9 @@
           <option value="30">Próximos 30 días</option>
         </select>
 
-        <!-- NUEVO: filtro Asignado a -->
         <span class="group-label">Asignado a:</span>
         <select id="asignadoAFilter" aria-label="Filtrar por asignado a">
           <option value="__TODOS__">Todos</option>
-          <!-- opciones se llenan dinámicamente -->
         </select>
       </div>
 
@@ -214,23 +465,39 @@
       <span class="chip"><span class="dot dot-30"></span> ≤ 30 días</span>
     </div>
 
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 240px;">Cliente</th>
-            <th style="width: 95px;">Cuota #</th>
-            <th style="width: 130px;">Fecha</th>
-            <th style="width: 90px;">Días</th>
-            <th style="width: 120px;">Capital</th>
-            <th style="width: 120px;">Interés</th>
-            <th style="width: 120px;">Total</th>
-            <th style="width: 140px;">Saldo Crédito</th>
-            <th style="width: 160px;">Teléfono</th>
-          </tr>
-        </thead>
-        <tbody id="cuotas-list"></tbody>
-      </table>
+    <div class="summary-bar" id="summary-bar">
+      <div class="summary-card sum-pend">
+        <i class="fa-regular fa-clock"></i>
+        <div class="txt">
+          <div class="label">Pendientes</div>
+          <div class="value" id="count-pendiente">0</div>
+        </div>
+      </div>
+      <div class="summary-card sum-parcial">
+        <i class="fa-solid fa-hourglass-half"></i>
+        <div class="txt">
+          <div class="label">Parciales</div>
+          <div class="value" id="count-parcial">0</div>
+        </div>
+      </div>
+      <div class="summary-card sum-atrasado">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <div class="txt">
+          <div class="label">Atrasadas</div>
+          <div class="value" id="count-atrasado">0</div>
+        </div>
+      </div>
+      <div class="summary-card sum-pagada">
+        <i class="fa-solid fa-circle-check"></i>
+        <div class="txt">
+          <div class="label">Pagadas</div>
+          <div class="value" id="count-pagada">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sections-container" id="sections-container">
+      <div class="loading"><i class="fa-solid fa-spinner fa-spin"></i> Cargando...</div>
     </div>
   </div>
 
@@ -244,39 +511,80 @@
       authDomain: "multinversiones-38e13.firebaseapp.com",
       projectId: "multinversiones-38e13"
     };
+
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
 
     function formateaFechaUTC(fechaIso) {
-      if(!fechaIso) return '';
+      if (!fechaIso) return '';
       const f = new Date(fechaIso);
-      const dd = String(f.getUTCDate()).padStart(2,'0');
-      const mm = String(f.getUTCMonth()+1).padStart(2,'0');
+      const dd = String(f.getUTCDate()).padStart(2, '0');
+      const mm = String(f.getUTCMonth() + 1).padStart(2, '0');
       const yyyy = f.getUTCFullYear();
       return `${dd}/${mm}/${yyyy}`;
     }
-    function toUTCDateOnly(d){
+
+    function toUTCDateOnly(d) {
       return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
     }
+
     function diasEntreUTC(f1, f2) {
       const d1 = toUTCDateOnly(f1);
       const d2 = toUTCDateOnly(f2);
-      return Math.floor((d1 - d2) / (1000*60*60*24));
+      return Math.floor((d1 - d2) / (1000 * 60 * 60 * 24));
     }
-    function sameUTCDate(a, b){
-      return a.getUTCFullYear()===b.getUTCFullYear()
-        && a.getUTCMonth()===b.getUTCMonth()
-        && a.getUTCDate()===b.getUTCDate();
+
+    function sameUTCDate(a, b) {
+      return a.getUTCFullYear() === b.getUTCFullYear()
+        && a.getUTCMonth() === b.getUTCMonth()
+        && a.getUTCDate() === b.getUTCDate();
+    }
+
+    function normalizarEstado(estado) {
+      const e = String(estado || "").trim().toLowerCase();
+      if (e === "pendiente") return "Pendiente";
+      if (e === "parcial") return "Parcial";
+      if (e === "atrasado") return "Atrasado";
+      if (e === "pagada") return "Pagada";
+      return "Otros";
+    }
+
+    function obtenerClaseFilaPorDias(dias) {
+      if (dias === 0) return "row-today";
+      if (dias > 0 && dias <= 7) return "row-7d";
+      if (dias > 0 && dias <= 15) return "row-15d";
+      if (dias > 0 && dias <= 30) return "row-30d";
+      return "";
+    }
+
+    function crearEstadoChip(estado) {
+      if (estado === "Pendiente") {
+        return `<span class="estado-chip estado-pendiente"><i class="fa-regular fa-clock"></i> Pendiente</span>`;
+      }
+      if (estado === "Parcial") {
+        return `<span class="estado-chip estado-parcial"><i class="fa-solid fa-hourglass-half"></i> Parcial</span>`;
+      }
+      if (estado === "Atrasado") {
+        return `<span class="estado-chip estado-atrasado"><i class="fa-solid fa-triangle-exclamation"></i> Atrasado</span>`;
+      }
+      if (estado === "Pagada") {
+        return `<span class="estado-chip estado-pagada"><i class="fa-solid fa-circle-check"></i> Pagada</span>`;
+      }
+      return `<span class="estado-chip"><i class="fa-solid fa-circle-question"></i> ${estado}</span>`;
     }
 
     let agenciaActual = "";
     let ultimoRango = "hoy";
-    let ultimoAsignado = "__TODOS__"; // nuevo
-    let opcionesAsignadoCargadas = false; // evitar repoblar cada vez
+    let ultimoAsignado = "__TODOS__";
+    let opcionesAsignadoCargadas = false;
 
     onAuthStateChanged(auth, async user => {
-      if (!user) return location.href = "login.html";
+      if (!user) {
+        location.href = "login.html";
+        return;
+      }
+
       document.getElementById("usuario-email").textContent = "Usuario: " + user.email;
 
       const usersSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
@@ -285,45 +593,48 @@
         agenciaActual = data?.department || "";
       }
 
-      // Cargar inicialmente (hoy, todos)
       await cargarCuotas("hoy", null, ultimoAsignado, true);
     });
 
-    /**
-     * Carga y pinta cuotas
-     * @param {('hoy'|'7'|'15'|'30'|'fecha')} rango
-     * @param {string|null} fechaSeleccionadaStr 'YYYY-MM-DD' o null
-     * @param {string} asignadoSel '__TODOS__' | '__SIN_ASIGNAR__' | nombre
-     * @param {boolean} poblarAsignados si true, repobla el select con opciones únicas
-     */
-    async function cargarCuotas(rango, fechaSeleccionadaStr=null, asignadoSel="__TODOS__", poblarAsignados=false) {
+    async function cargarCuotas(rango, fechaSeleccionadaStr = null, asignadoSel = "__TODOS__", poblarAsignados = false) {
       const hoy = new Date();
       const hoyUTC = toUTCDateOnly(new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate())));
-      let cuotas = [];
 
-      const tbody = document.getElementById("cuotas-list");
-      tbody.innerHTML = `<tr><td colspan="9" class="loading"><i class="fa-solid fa-spinner fa-spin"></i> Cargando...</td></tr>`;
+      const sectionsContainer = document.getElementById("sections-container");
+      sectionsContainer.innerHTML = `<div class="loading"><i class="fa-solid fa-spinner fa-spin"></i> Cargando...</div>`;
+
+      document.getElementById("count-pendiente").textContent = "0";
+      document.getElementById("count-parcial").textContent = "0";
+      document.getElementById("count-atrasado").textContent = "0";
+      document.getElementById("count-pagada").textContent = "0";
 
       if (!agenciaActual) {
-        tbody.innerHTML = `<tr><td colspan="9" class="loading">No se pudo determinar la agencia del usuario.</td></tr>`;
+        sectionsContainer.innerHTML = `<div class="loading">No se pudo determinar la agencia del usuario.</div>`;
         return;
       }
 
-      // Traer créditos por agencia
       const snapshot = await getDocs(query(collection(db, "creditos"), where("agenciaAsignada", "==", agenciaActual)));
-
-      // Armar set de asignados si es necesario
       const setAsignados = new Set();
 
-      snapshot.forEach(doc => {
-        const d = doc.data();
+      const secciones = {
+        Pendiente: [],
+        Parcial: [],
+        Atrasado: [],
+        Pagada: []
+      };
+
+      snapshot.forEach(docSnap => {
+        const d = docSnap.data();
+
         if (d.estadoCredito === "Revertido") return;
         if (!Array.isArray(d.amortizacion)) return;
 
-        const asignado = (d.asignadoA && String(d.asignadoA).trim()) ? String(d.asignadoA).trim() : "__SIN_ASIGNAR__";
+        const asignado = (d.asignadoA && String(d.asignadoA).trim())
+          ? String(d.asignadoA).trim()
+          : "__SIN_ASIGNAR__";
+
         if (poblarAsignados) setAsignados.add(asignado);
 
-        // Filtro por asignado
         const pasaAsignado =
           asignadoSel === "__TODOS__"
             ? true
@@ -334,102 +645,176 @@
         if (!pasaAsignado) return;
 
         d.amortizacion.forEach(cuota => {
-          if (!["Pendiente", "Parcial", "Atrasado"].includes(cuota?.estado)) return;
+          const estadoNormalizado = normalizarEstado(cuota?.estado);
+          if (!["Pendiente", "Parcial", "Atrasado", "Pagada"].includes(estadoNormalizado)) return;
           if (!cuota?.fecha) return;
 
           const fcuota = new Date(cuota.fecha);
-          const fcuotaUTC = toUTCDateOnly(new Date(Date.UTC(fcuota.getUTCFullYear(), fcuota.getUTCMonth(), fcuota.getUTCDate())));
+          const fcuotaUTC = toUTCDateOnly(new Date(Date.UTC(
+            fcuota.getUTCFullYear(),
+            fcuota.getUTCMonth(),
+            fcuota.getUTCDate()
+          )));
+
           const dias = diasEntreUTC(fcuotaUTC, hoyUTC);
 
-          // Decidir mostrar por rango o fecha exacta
-          let mostrar = false, clase = "";
-          if (rango === "fecha" && fechaSeleccionadaStr){
+          let mostrar = false;
+
+          if (rango === "fecha" && fechaSeleccionadaStr) {
             const sel = new Date(fechaSeleccionadaStr + "T00:00:00Z");
             const selUTC = toUTCDateOnly(sel);
             if (sameUTCDate(fcuotaUTC, selUTC)) {
               mostrar = true;
-              if (dias === 0) clase = "row-today";
-              else if (dias > 0 && dias <= 7) clase = "row-7d";
-              else if (dias > 0 && dias <= 15) clase = "row-15d";
-              else if (dias > 0 && dias <= 30) clase = "row-30d";
             }
           } else {
-            if      (rango === "hoy" && dias === 0)            { mostrar = true; clase = "row-today"; }
-            else if (rango === "7"  && dias > 0 && dias <= 7)  { mostrar = true; clase = "row-7d"; }
-            else if (rango === "15" && dias > 0 && dias <= 15) { mostrar = true; clase = "row-15d"; }
-            else if (rango === "30" && dias > 0 && dias <= 30) { mostrar = true; clase = "row-30d"; }
+            if      (rango === "hoy" && dias === 0)           mostrar = true;
+            else if (rango === "7"  && dias > 0 && dias <= 7)  mostrar = true;
+            else if (rango === "15" && dias > 0 && dias <= 15) mostrar = true;
+            else if (rango === "30" && dias > 0 && dias <= 30) mostrar = true;
           }
 
-          if (mostrar) {
-            const cliente = `${(d.nombre||"").trim()}${d.apellido ? " " + d.apellido.trim() : ""}`.trim();
-            const tsUTC = Date.UTC(fcuotaUTC.getUTCFullYear(), fcuotaUTC.getUTCMonth(), fcuotaUTC.getUTCDate());
-            cuotas.push({
-              cliente,
-              numero: cuota.numeroCuota,
-              fecha: cuota.fecha,
-              fechaUTCts: tsUTC,
-              dias,
-              capital: cuota.capital,
-              interes: cuota.interes,
-              total: cuota.cuota,
-              saldo: d.saldoActual,
-              telefono: d.telefono,
-              clase
-            });
-          }
+          if (!mostrar) return;
+
+          const cliente = `${(d.nombre || "").trim()}${d.apellido ? " " + d.apellido.trim() : ""}`.trim();
+          const tsUTC = Date.UTC(fcuotaUTC.getUTCFullYear(), fcuotaUTC.getUTCMonth(), fcuotaUTC.getUTCDate());
+
+          secciones[estadoNormalizado].push({
+            cliente,
+            numero: cuota.numeroCuota,
+            fecha: cuota.fecha,
+            fechaUTCts: tsUTC,
+            dias,
+            capital: cuota.capital,
+            interes: cuota.interes,
+            total: cuota.cuota,
+            saldo: d.saldoActual,
+            telefono: d.telefono,
+            clase: obtenerClaseFilaPorDias(dias),
+            estado: estadoNormalizado
+          });
         });
       });
 
-      // Poblar select Asignado a (una sola vez o cuando se pida)
       if (poblarAsignados && !opcionesAsignadoCargadas) {
         const selectAsig = document.getElementById("asignadoAFilter");
-        // limpiar todo menos "Todos"
-        selectAsig.querySelectorAll('option:not([value="__TODOS__"])').forEach(o=>o.remove());
+        selectAsig.querySelectorAll('option:not([value="__TODOS__"])').forEach(o => o.remove());
 
-        const arr = Array.from(setAsignados).sort((a,b)=>{
-          const A = (a==="__SIN_ASIGNAR__" ? "Sin asignar" : a).toLowerCase();
-          const B = (b==="__SIN_ASIGNAR__" ? "Sin asignar" : b).toLowerCase();
+        const arr = Array.from(setAsignados).sort((a, b) => {
+          const A = (a === "__SIN_ASIGNAR__" ? "Sin asignar" : a).toLowerCase();
+          const B = (b === "__SIN_ASIGNAR__" ? "Sin asignar" : b).toLowerCase();
           return A.localeCompare(B);
         });
 
         for (const val of arr) {
           const opt = document.createElement("option");
           opt.value = val;
-          opt.textContent = (val==="__SIN_ASIGNAR__") ? "Sin asignar" : val;
+          opt.textContent = (val === "__SIN_ASIGNAR__") ? "Sin asignar" : val;
           selectAsig.appendChild(opt);
         }
+
         opcionesAsignadoCargadas = true;
       }
 
-      // Ordenar y pintar
-      cuotas.sort((a,b) => (a.fechaUTCts - b.fechaUTCts) || ((a.numero||0) - (b.numero||0)));
-      const tbodyHtml = cuotas.length
-        ? cuotas.map(c => `
-          <tr class="${c.clase}">
-            <td title="${c.cliente}">${c.cliente || "-"}</td>
-            <td>${(c.numero ?? "-")}</td>
-            <td>${formateaFechaUTC(c.fecha)}</td>
-            <td>${(c.dias ?? "-")}</td>
-            <td>$${parseFloat(c.capital ?? 0).toFixed(2)}</td>
-            <td>$${parseFloat(c.interes ?? 0).toFixed(2)}</td>
-            <td class="total-monto">$${parseFloat(c.total ?? 0).toFixed(2)}</td>
-            <td>$${parseFloat(c.saldo ?? 0).toFixed(2)}</td>
-            <td class="tel"><i class="fa-solid fa-phone"></i> ${c.telefono || "-"}</td>
-          </tr>
-        `).join('')
-        : `<tr><td colspan="9" class="loading">Sin cuotas por vencer en este filtro</td></tr>`;
-      document.getElementById("cuotas-list").innerHTML = tbodyHtml;
+      Object.keys(secciones).forEach(key => {
+        secciones[key].sort((a, b) => (a.fechaUTCts - b.fechaUTCts) || ((a.numero || 0) - (b.numero || 0)));
+      });
+
+      document.getElementById("count-pendiente").textContent = secciones.Pendiente.length;
+      document.getElementById("count-parcial").textContent = secciones.Parcial.length;
+      document.getElementById("count-atrasado").textContent = secciones.Atrasado.length;
+      document.getElementById("count-pagada").textContent = secciones.Pagada.length;
+
+      sectionsContainer.innerHTML = `
+        ${renderSeccion("Pendiente", secciones.Pendiente)}
+        ${renderSeccion("Parcial", secciones.Parcial)}
+        ${renderSeccion("Atrasado", secciones.Atrasado)}
+        ${renderSeccion("Pagada", secciones.Pagada)}
+      `;
     }
 
-    // Eventos de filtros
-    document.getElementById("rango").addEventListener("change", function(){
+    function renderSeccion(estado, items) {
+      let icono = "fa-circle-question";
+      let headerClass = "";
+      let textoContador = "cuotas";
+
+      if (estado === "Pendiente") {
+        icono = "fa-regular fa-clock";
+        headerClass = "pendiente-header";
+      } else if (estado === "Parcial") {
+        icono = "fa-solid fa-hourglass-half";
+        headerClass = "parcial-header";
+      } else if (estado === "Atrasado") {
+        icono = "fa-solid fa-triangle-exclamation";
+        headerClass = "atrasado-header";
+      } else if (estado === "Pagada") {
+        icono = "fa-solid fa-circle-check";
+        headerClass = "pagada-header";
+      }
+
+      const contenidoTabla = items.length
+        ? `
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 240px;">Cliente</th>
+                  <th style="width: 95px;">Cuota #</th>
+                  <th style="width: 130px;">Fecha</th>
+                  <th style="width: 90px;">Días</th>
+                  <th style="width: 120px;">Capital</th>
+                  <th style="width: 120px;">Interés</th>
+                  <th style="width: 120px;">Total</th>
+                  <th style="width: 140px;">Saldo Crédito</th>
+                  <th style="width: 160px;">Teléfono</th>
+                  <th style="width: 150px;">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${items.map(c => `
+                  <tr class="${c.clase}">
+                    <td title="${c.cliente}">${c.cliente || "-"}</td>
+                    <td>${(c.numero ?? "-")}</td>
+                    <td>${formateaFechaUTC(c.fecha)}</td>
+                    <td>${(c.dias ?? "-")}</td>
+                    <td>$${parseFloat(c.capital ?? 0).toFixed(2)}</td>
+                    <td>$${parseFloat(c.interes ?? 0).toFixed(2)}</td>
+                    <td class="total-monto">$${parseFloat(c.total ?? 0).toFixed(2)}</td>
+                    <td>$${parseFloat(c.saldo ?? 0).toFixed(2)}</td>
+                    <td class="tel"><i class="fa-solid fa-phone"></i> ${c.telefono || "-"}</td>
+                    <td>${crearEstadoChip(c.estado)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `
+        : `<div class="empty-section"><i class="fa-regular fa-folder-open"></i> No hay cuotas en esta sección con el filtro actual.</div>`;
+
+      return `
+        <section class="status-section">
+          <div class="status-header ${headerClass}">
+            <div class="status-title">
+              <i class="${icono}"></i>
+              <span>${estado}</span>
+            </div>
+            <div class="status-count">${items.length} ${textoContador}</div>
+          </div>
+          <div class="section-body">
+            ${contenidoTabla}
+          </div>
+        </section>
+      `;
+    }
+
+    document.getElementById("rango").addEventListener("change", function () {
       ultimoRango = this.value;
       cargarCuotas(ultimoRango, null, ultimoAsignado);
     });
 
-    document.getElementById("asignadoAFilter").addEventListener("change", function(){
+    document.getElementById("asignadoAFilter").addEventListener("change", function () {
       ultimoAsignado = this.value;
       const fechaVal = document.getElementById("fechaSeleccionada").value;
+
       if (fechaVal) {
         cargarCuotas("fecha", fechaVal, ultimoAsignado);
       } else {
@@ -439,7 +824,7 @@
 
     document.getElementById("btnFecha").addEventListener("click", () => {
       const val = document.getElementById("fechaSeleccionada").value;
-      if (!val){
+      if (!val) {
         cargarCuotas(ultimoRango || "hoy", null, ultimoAsignado);
         return;
       }
@@ -454,6 +839,7 @@
   </script>
 </body>
 </html>
+
 
 
 

@@ -68,6 +68,54 @@
     .toast-wrap{position:fixed;right:16px;bottom:16px;z-index:9999;display:flex;flex-direction:column;gap:10px}
     .toast{background:#1f2937;color:#fff;padding:10px 12px;border-radius:10px;box-shadow:0 6px 18px #0005;max-width:320px;transition:all .35s ease}
     .toast.warn{background:#b45309}.toast.error{background:#991b1b}.toast.info{background:#374151}
+
+    /* Selección múltiple */
+    .select-list{ display:flex; flex-direction:column; gap:10px; margin-top:12px; }
+    .select-item{
+      background:#fff;
+      border:1px solid #e7ebf3;
+      border-radius:14px;
+      padding:14px;
+      box-shadow:0 8px 24px rgba(10,20,40,.08);
+    }
+    .select-item .head{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      margin-bottom:8px;
+      flex-wrap:wrap;
+    }
+    .select-item .tag{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:6px 10px;
+      border-radius:999px;
+      background:#eef4ff;
+      color:#0b3b85;
+      font-weight:800;
+      font-size:.92rem;
+    }
+    .select-item .mini{
+      color:#617086;
+      font-size:.94rem;
+      margin:2px 0;
+    }
+    .select-btn{
+      margin-top:10px;
+      background: linear-gradient(90deg, var(--brand-green) 0%, #0f8d53 100%);
+      color:#fff;
+      border:none;
+      padding:10px 14px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:800;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+    }
+    .select-btn:hover{ filter:brightness(1.05) }
   </style>
 </head>
 <body>
@@ -172,7 +220,6 @@
     /* ====== Mensajería propia (reemplazo de alert) ====== */
     function showMessage({ title = "Aviso", html = "", tone = "info" }) {
       const root = document.getElementById("modal-root");
-      // Cierra cualquier modal previo para evitar colisiones
       root.innerHTML = "";
 
       const tones = {
@@ -228,6 +275,35 @@
     const toCents  = (v)=> Math.round((parseFloat(v||0)+Number.EPSILON)*100);
     const fromCents= (c)=> (c/100).toFixed(2);
 
+    function fmtFechaCorta(val){
+      const d = toDate(val);
+      if (!d || isNaN(d.getTime())) return "";
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      const hh = String(d.getHours()).padStart(2,'0');
+      const mi = String(d.getMinutes()).padStart(2,'0');
+      return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+    }
+
+    function getPagoSortMillis(data){
+      const f1 = data?.fechaRegistro ? new Date(data.fechaRegistro).getTime() : NaN;
+      const f2 = data?.fechaPago ? new Date(data.fechaPago).getTime() : NaN;
+      if (Number.isFinite(f1) && Number.isFinite(f2)) return Math.max(f1, f2);
+      if (Number.isFinite(f1)) return f1;
+      if (Number.isFinite(f2)) return f2;
+      return 0;
+    }
+
+    function getMovSortMillis(data){
+      const f1 = data?.fechaRegistro ? new Date(data.fechaRegistro).getTime() : NaN;
+      const f2 = data?.fecha ? new Date(data.fecha).getTime() : NaN;
+      if (Number.isFinite(f1) && Number.isFinite(f2)) return Math.max(f1, f2);
+      if (Number.isFinite(f1)) return f1;
+      if (Number.isFinite(f2)) return f2;
+      return 0;
+    }
+
     /* === Medianoche exacta de El Salvador (UTC-6) para una fecha dada === */
     function svStartOfDay(date = new Date()){
       const parts = new Intl.DateTimeFormat('en-CA', {
@@ -236,14 +312,13 @@
       const y = parts.find(p=>p.type==='year').value;
       const m = parts.find(p=>p.type==='month').value;
       const d = parts.find(p=>p.type==='day').value;
-      return new Date(`${y}-${m}-${d}T06:00:00.000Z`); // 00:00 ES = 06:00Z
+      return new Date(`${y}-${m}-${d}T06:00:00.000Z`);
     }
 
     /* ===== Confirmación PIN Gerente ===== */
     function confirmPINGerente() {
       return new Promise((resolve) => {
         const root = document.getElementById("modal-root");
-        // Limpia cualquier modal abierto antes de mostrar el de PIN
         root.innerHTML = "";
         let errorMsg = "";
 
@@ -308,7 +383,6 @@
 
       const pushAll = s => s.forEach(d => { if (!candidatos.find(x => x.id === d.id)) candidatos.push(d); });
 
-      // correlativo number/string + sucursal (sin where("usado","==", false))
       pushAll(await getDocs(query(col,
         where("correlativo","==", Number(pagoData.correlativo)),
         where("creditoID","==", cred),
@@ -320,7 +394,6 @@
         where("sucursal","==", suc)
       )));
 
-      // compat: 'agencia' y 'agenciaAsignada'
       pushAll(await getDocs(query(col,
         where("correlativo","==", Number(pagoData.correlativo)),
         where("creditoID","==", cred),
@@ -344,14 +417,12 @@
 
       if (!candidatos.length) return null;
 
-      // Aceptar docs sin 'usado' o con usado === false
       const validos = candidatos.filter(d => {
         const x = d.data();
         return x && x.usado !== true;
       });
       if (!validos.length) return null;
 
-      // Elegir el más reciente por timestamp completo (fecha y hora)
       const toMillis = v => {
         if (!v) return 0;
         if (v.seconds !== undefined) return (v.seconds * 1000) + Math.floor((v.nanoseconds || 0)/1e6);
@@ -379,7 +450,6 @@
 
       if (!agenciaActual) await obtenerAgencia({ uid: userId });
 
-      // Buscar por correlativo (número y string) + sucursal
       const qNum = query(collection(db, "pagos"), where("correlativo","==", Number(raw)), where("sucursal","==", agenciaActual));
       const qStr = query(collection(db, "pagos"), where("correlativo","==", raw), where("sucursal","==", agenciaActual));
       const [sNum, sStr] = await Promise.all([getDocs(qNum), getDocs(qStr)]);
@@ -390,25 +460,65 @@
       sNum.forEach(d=>todos.push(d));
       sStr.forEach(d=>{ if(!todos.find(x=>x.id===d.id)) todos.push(d); });
 
-      if (todos.length === 0){
+      const visibles = todos.filter(d => d?.data?.().cierre !== true);
+
+      if (visibles.length === 0){
         showCard("pago-card", `<div class="card"><b style="color:#c0392b">No se encontró el pago.</b></div>`);
         return;
       }
 
-      // Elegir el MÁS RECIENTE priorizando fechaRegistro, luego fechaPago
-      const getMillis = (snap) => {
-        const data = snap.data();
-        const f1 = data?.fechaRegistro ? new Date(data.fechaRegistro).getTime() : NaN;
-        const f2 = data?.fechaPago ? new Date(data.fechaPago).getTime() : NaN;
-        if (Number.isFinite(f1) && Number.isFinite(f2)) return Math.max(f1, f2);
-        if (Number.isFinite(f1)) return f1;
-        if (Number.isFinite(f2)) return f2;
-        return 0;
-      };
-      todos.sort((a,b)=> getMillis(b) - getMillis(a));
-      pagoDoc = todos[0];
-      pagoData = pagoDoc.data();
-      renderPagoCard();
+      visibles.sort((a,b)=> getPagoSortMillis(b.data()) - getPagoSortMillis(a.data()));
+
+      if (visibles.length === 1){
+        pagoDoc = visibles[0];
+        pagoData = pagoDoc.data();
+        renderPagoCard();
+        return;
+      }
+
+      renderPagoSelector(visibles);
+    }
+
+    function renderPagoSelector(docs){
+      showCard("pago-card", `
+        <div class="card">
+          <div style="font-weight:900;color:#0b3b85;margin-bottom:6px;">
+            Se encontraron varios pagos con ese correlativo
+          </div>
+          <div class="k" style="margin-bottom:8px;">Selecciona exactamente cuál deseas revertir.</div>
+          <div id="pago-select-list" class="select-list"></div>
+        </div>
+      `);
+
+      const cont = document.getElementById("pago-select-list");
+      cont.innerHTML = docs.map((d, i) => {
+        const x = d.data();
+        return `
+          <div class="select-item">
+            <div class="head">
+              <span class="tag"><i class="fas fa-receipt"></i> Ticket ${x.correlativo}</span>
+              <span class="mini"><b>Fecha:</b> ${fmtFechaCorta(x.fechaRegistro || x.fechaPago)}</span>
+            </div>
+            <div class="mini"><b>Cliente:</b> ${x.nombres || '-'} ${x.apellido || ''}</div>
+            <div class="mini"><b>Agencia:</b> ${x.sucursal || '-'}</div>
+            <div class="mini"><b>Cajero:</b> ${x.cajeroNombre || '-'}</div>
+            <div class="mini"><b>Monto pagado:</b> $${(+x.montoPagado||0).toFixed(2)}</div>
+            <div class="mini"><b>Capital:</b> $${(+x.pagoCapital||0).toFixed(2)} • <b>Interés:</b> $${(+x.pagoInteres||0).toFixed(2)} • <b>Multas:</b> $${(+((x.pagoMultas ?? x.pagoMulta) || 0)).toFixed(2)}</div>
+            <button class="select-btn" data-index="${i}">
+              <i class="fas fa-hand-pointer"></i> Seleccionar este pago
+            </button>
+          </div>
+        `;
+      }).join("");
+
+      cont.querySelectorAll(".select-btn").forEach(btn => {
+        btn.onclick = () => {
+          const idx = Number(btn.getAttribute("data-index"));
+          pagoDoc = docs[idx];
+          pagoData = pagoDoc.data();
+          renderPagoCard();
+        };
+      });
     }
 
     function renderPagoCard(){
@@ -418,7 +528,7 @@
       showCard("pago-card", `
         <div class="card">
           <div class="row" style="justify-content:space-between"><div class="k">Ticket</div><div class="val"><b>${pagoData.correlativo}</b></div></div>
-          <div class="row" style="justify-content:space-between"><div class="k">Cliente</div><div class="val">${pagoData.nombres || '-'}</div></div>
+          <div class="row" style="justify-content:space-between"><div class="k">Cliente</div><div class="val">${pagoData.nombres || '-'} ${pagoData.apellido || ''}</div></div>
           <div class="row" style="justify-content:space-between"><div class="k">Agencia</div><div class="val">${pagoData.sucursal || '-'}</div></div>
           <div class="row" style="justify-content:space-between"><div class="k">Cajero</div><div class="val">${pagoData.cajeroNombre || '-'}</div></div>
           <div class="row" style="justify-content:space-between"><div class="k">Fecha</div><div class="val">${pagoData.fechaPago ? pagoData.fechaPago.replace("T"," ").substring(0,16) : ""}</div></div>
@@ -453,7 +563,6 @@
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner"></span> Revirtiendo...';
 
-        // (1) Traer pagos del crédito SIN orderBy y ordenar localmente por el más reciente entre fechaRegistro y fechaPago
         const ultQ = query(
           collection(db, "pagos"),
           where("creditoID", "==", pagoData.creditoID),
@@ -467,7 +576,6 @@
           return;
         }
 
-        // Función para obtener el timestamp más alto entre fechaRegistro y fechaPago
         const getMillisMixed = (data) => {
           const f1 = data?.fechaRegistro ? toDate(data.fechaRegistro).getTime() : NaN;
           const f2 = data?.fechaPago ? toDate(data.fechaPago).getTime() : NaN;
@@ -477,7 +585,6 @@
           return 0;
         };
 
-        // Ordenar por más reciente y tomar el primero no anulado
         const pagosDocs = ultSnap.docs.slice().sort((a,b)=> getMillisMixed(b.data()) - getMillisMixed(a.data()));
         let ultimoNoAnulado = null;
         for (const d of pagosDocs){
@@ -498,7 +605,6 @@
           return;
         }
 
-        /* ===== BÚSQUEDA DEL RESPALDO ===== */
         const revDoc = await encontrarRespaldoPago(pagoDoc, pagoData);
         if (!revDoc){
           btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
@@ -507,7 +613,6 @@
         }
         const revData = revDoc.data();
 
-        // Seguridad extra
         if (!revData.creditoID || revData.creditoID !== pagoData.creditoID){
           btn.disabled=false; btn.innerHTML='<i class="fas fa-undo"></i> Revertir Pago';
           error("El respaldo encontrado no corresponde a este crédito.");
@@ -519,12 +624,10 @@
           return;
         }
 
-        // (3) Cargar crédito actual para preservar multas nuevas
         const creditoRef = doc(db, "creditos", pagoData.creditoID);
         const creditoNowSnap = await getDoc(creditoRef);
         const creditoNow = creditoNowSnap.exists() ? creditoNowSnap.data() : {};
 
-        // ====== Catch-up de INTERÉS “al día” sobre el snapshot ======
         const todayStart = startOfDayLocal(new Date());
         const bases = [];
         if (pagoData.fechaPago) bases.push(startOfDayLocal(pagoData.fechaPago));
@@ -545,7 +648,6 @@
           ? toCentsSafe(revData.snapshot.montoAprobado)
           : (revData.snapshot?.saldoInicial ? toCentsSafe(revData.snapshot.saldoInicial) : 0);
 
-        // Capital ya pagado hasta el snapshot (tope a capital por cuota)
         const amortSnap = Array.isArray(revData.snapshot.amortizacion) ? revData.snapshot.amortizacion : [];
         let capPagadoCents = 0;
         for (const c of amortSnap){
@@ -559,7 +661,6 @@
         const interesNuevoCents = interesPrevioCents + interesPeriodoCents;
         const interesNuevo = (interesNuevoCents/100).toFixed(2);
 
-        // ====== Merge de MULTAS: snapshot + las nuevas que existan ahora (evita duplicados exactos) ======
         const keyMulta = (m) => {
           const tipo  = (m.tipo || "").trim();
           const cuota = (m.cuotaNumero != null) ? String(m.cuotaNumero) : "";
@@ -581,7 +682,6 @@
           return acc;
         }, 0);
 
-        // ====== CAPITAL vencido y KPIs con fechas del snapshot ======
         let capAtrNowCents = 0, cuotasAtrasadasNow = 0;
         for (const c of amortSnap){
           const capC = toCentsSafe(c.capital || 0);
@@ -599,10 +699,8 @@
         const ppdNuevo = ((interesNuevoCents + capAtrNowCents + multasAjustadasCents)/100).toFixed(2);
         let estadoCreditoNow = (saldoSnapCents === 0) ? "Pagado" : (cuotasAtrasadasNow > 0 ? "Mora Temprana" : "Activo");
 
-        /* ====== Setear fechaUltimoCalculoIntereses EXACTA (medianoche ES) ====== */
         const fechaULCI = svStartOfDay(new Date());
 
-        // ====== Snapshot final a restaurar ======
         const snapshotToRestore = {
           ...revData.snapshot,
           interesActual: parseFloat(interesNuevo),
@@ -617,7 +715,6 @@
           ultimaActualizacion: new Date().toISOString()
         };
 
-        // (4) Commit en batch: set crédito exacto + catch-ups, borrar pago, marcar backup usado, log
         const batch = writeBatch(db);
         const pagoRef = doc(db, "pagos", pagoDoc.id);
         const revRef  = doc(db, "reversionPago", revDoc.id);
@@ -664,23 +761,76 @@
 
       if (!agenciaActual) await obtenerAgencia({ uid: userId });
 
-      let q1 = query(collection(db, "movimientosCaja"), where("correlativo","==", Number(raw)), where("agencia","==", agenciaActual));
-      let s1 = await getDocs(q1);
-      if (s1.empty){
-        q1 = query(collection(db, "movimientosCaja"), where("correlativo","==", raw), where("agencia","==", agenciaActual));
-        s1 = await getDocs(q1);
-      }
+      let qNum = query(collection(db, "movimientosCaja"), where("correlativo","==", Number(raw)), where("agencia","==", agenciaActual));
+      let qStr = query(collection(db, "movimientosCaja"), where("correlativo","==", raw), where("agencia","==", agenciaActual));
+
+      const [sNum, sStr] = await Promise.all([getDocs(qNum), getDocs(qStr)]);
 
       btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Buscar';
 
-      if (s1.empty){
+      const todos = [];
+      sNum.forEach(d => todos.push(d));
+      sStr.forEach(d => { if(!todos.find(x => x.id === d.id)) todos.push(d); });
+
+      const visibles = todos.filter(d => d?.data?.().cierre !== true);
+
+      if (visibles.length === 0){
         showCard("mov-card", `<div class="card"><b style="color:#c0392b">No se encontró el movimiento.</b></div>`);
         return;
       }
 
-      movDoc = s1.docs[0];
-      movData = movDoc.data();
-      renderMovCard();
+      visibles.sort((a,b)=> getMovSortMillis(b.data()) - getMovSortMillis(a.data()));
+
+      if (visibles.length === 1){
+        movDoc = visibles[0];
+        movData = movDoc.data();
+        renderMovCard();
+        return;
+      }
+
+      renderMovSelector(visibles);
+    }
+
+    function renderMovSelector(docs){
+      showCard("mov-card", `
+        <div class="card">
+          <div style="font-weight:900;color:#0b3b85;margin-bottom:6px;">
+            Se encontraron varios movimientos con ese correlativo
+          </div>
+          <div class="k" style="margin-bottom:8px;">Selecciona exactamente cuál deseas revertir.</div>
+          <div id="mov-select-list" class="select-list"></div>
+        </div>
+      `);
+
+      const cont = document.getElementById("mov-select-list");
+      cont.innerHTML = docs.map((d, i) => {
+        const x = d.data();
+        return `
+          <div class="select-item">
+            <div class="head">
+              <span class="tag"><i class="fas fa-cash-register"></i> Movimiento ${x.correlativo}</span>
+              <span class="mini"><b>Fecha:</b> ${fmtFechaCorta(x.fechaRegistro || x.fecha)}</span>
+            </div>
+            <div class="mini"><b>Tipo:</b> ${x.tipo || '-'}</div>
+            <div class="mini"><b>Descripción:</b> ${x.descripcion || '-'}</div>
+            <div class="mini"><b>Agencia:</b> ${x.agencia || '-'}</div>
+            <div class="mini"><b>Usuario:</b> ${x.usuario || '-'}</div>
+            <div class="mini"><b>Monto:</b> $${(+x.monto||0).toFixed(2)}</div>
+            <button class="select-btn" data-index="${i}">
+              <i class="fas fa-hand-pointer"></i> Seleccionar este movimiento
+            </button>
+          </div>
+        `;
+      }).join("");
+
+      cont.querySelectorAll(".select-btn").forEach(btn => {
+        btn.onclick = () => {
+          const idx = Number(btn.getAttribute("data-index"));
+          movDoc = docs[idx];
+          movData = movDoc.data();
+          renderMovCard();
+        };
+      });
     }
 
     function renderMovCard(){
@@ -721,7 +871,6 @@
         const batch = writeBatch(db);
         const movRef = doc(db, "movimientosCaja", movDoc.id);
 
-        // Marcar original como anulado
         batch.set(movRef, {
           anulado: true,
           fechaReversion: new Date().toISOString(),
@@ -729,11 +878,10 @@
           motivoReversion: motivo
         }, { merge:true });
 
-        // Asiento compensatorio
         const nuevoTipo = (movData.tipo === "Ingreso") ? "Egreso" : "Ingreso";
         const compRef = doc(collection(db, "movimientosCaja"));
         batch.set(compRef, {
-          correlativo: Math.floor(Math.random() * 1000000), // Reemplaza por tu generador secuencial si aplica
+          correlativo: Math.floor(Math.random() * 1000000),
           tipo: nuevoTipo,
           descripcion: `Reversión correlativo ${movData.correlativo}`,
           agencia: movData.agencia,
@@ -769,8 +917,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-

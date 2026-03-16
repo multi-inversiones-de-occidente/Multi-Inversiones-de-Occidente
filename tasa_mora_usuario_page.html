@@ -31,77 +31,142 @@
     let department = null;            // Agencia del logueado
     let nombreLogueado = null;        // Nombre del logueado
 
-    // NUEVO: base completa de créditos y base de morosos (para métricas y detalle)
-    let todosCreditosDeAgencia = [];  // TODOS los créditos de la agencia (con y sin mora)
-    let morososDeAgencia = [];        // Créditos de la agencia con al menos una cuota "Atrasado"
+    // Base completa de créditos y base de morosos
+    let todosCreditosDeAgencia = [];
+    let morososDeAgencia = [];
 
     // ===== Utilidades =====
     function formatoDinero(valor) {
       const n = (typeof valor === "number") ? valor : parseFloat(valor || "0");
       return n.toLocaleString("es-SV", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
     }
+
     function asNumber(v, def = 0) {
       if (typeof v === "number") return v;
       const p = parseFloat(v);
       return Number.isFinite(p) ? p : def;
     }
+
     function contarCuotasAtrasadas(amortizacion) {
       if (!Array.isArray(amortizacion)) return 0;
       return amortizacion.reduce((acc, q) => acc + (q && q.estado === "Atrasado" ? 1 : 0), 0);
     }
+
     function resolverNombreUsuario(d) {
       const full = `${d?.nombre ?? ""} ${d?.apellido ?? ""}`.trim();
       return full || d?.displayName || "Sin nombre";
     }
 
-    // 🔹 NUEVO: resolver nombre y teléfono del cliente
-    async function resolverNombreCliente(d) {
-      // Intentar primero con lo que venga en el crédito
-      const candidatosNombreCredito = [
-        d.nombreCliente && d.apellidoCliente ? `${d.nombreCliente} ${d.apellidoCliente}` : null,
-        d.clienteNombre && d.clienteApellidos ? `${d.clienteNombre} ${d.clienteApellidos}` : null,
-        d.titularNombre && d.titularApellido ? `${d.titularNombre} ${d.titularApellido}` : null,
-        d.nombreCompleto ? d.nombreCompleto : null,
-        d.nombre ? d.nombre : null
-      ].filter(Boolean);
+    function calcularDiasMora(amortizacion) {
+      if (!Array.isArray(amortizacion)) return 0;
 
-      let nombre   = candidatosNombreCredito.length > 0 ? candidatosNombreCredito[0] : null;
+      const fechasAtrasadas = amortizacion
+        .filter(q => q && q.estado === "Atrasado" && q.fecha)
+        .map(q => {
+          const f = new Date(`${q.fecha}T00:00:00`);
+          return isNaN(f.getTime()) ? null : f;
+        })
+        .filter(Boolean);
+
+      if (fechasAtrasadas.length === 0) return 0;
+
+      const fechaMasAntigua = new Date(Math.min(...fechasAtrasadas.map(f => f.getTime())));
+      const hoy = new Date();
+
+      const fechaMoraUTC = Date.UTC(
+        fechaMasAntigua.getFullYear(),
+        fechaMasAntigua.getMonth(),
+        fechaMasAntigua.getDate()
+      );
+
+      const hoyUTC = Date.UTC(
+        hoy.getFullYear(),
+        hoy.getMonth(),
+        hoy.getDate()
+      );
+
+      const diff = Math.floor((hoyUTC - fechaMoraUTC) / (1000 * 60 * 60 * 24));
+      return diff > 0 ? diff : 0;
+    }
+
+    // Resolver datos del cliente usando primero el crédito y luego clientes como respaldo
+    async function resolverDatosCliente(d) {
+      let nombre =
+        d.nombreCliente ||
+        d.clienteNombre ||
+        d.titularNombre ||
+        d.nombre ||
+        "";
+
+      let apellido =
+        d.apellidoCliente ||
+        d.clienteApellidos ||
+        d.titularApellido ||
+        d.apellido ||
+        "";
+
       let telefono =
-        d.telefonoCliente  ||
-        d.celularCliente   ||
-        d.telefono         ||
-        d.celular          ||
-        d.cel              ||
-        d.phone            ||
-        null;
+        d.telefonoCliente ||
+        d.celularCliente ||
+        d.telefono ||
+        d.celular ||
+        d.cel ||
+        d.phone ||
+        "";
+
+      let direccion =
+        d.direccionCliente ||
+        d.direccion ||
+        d.domicilio ||
+        d.address ||
+        "";
+
+      const frecuenciaPago =
+        d.frecuenciaPago ||
+        d.frecuencia ||
+        d.periodicidad ||
+        "—";
 
       const cid = d.clienteID || d.idCliente || d.clienteUid || d.userId || null;
+
       if (cid) {
         try {
           const cliRef = doc(db, "clientes", cid);
           const cliSnap = await getDoc(cliRef);
+
           if (cliSnap.exists()) {
             const c = cliSnap.data();
 
             if (!nombre) {
-              const alias = [
-                c.nombre && c.apellido ? `${c.nombre} ${c.apellido}` : null,
-                c.nombres && c.apellidos ? `${c.nombres} ${c.apellidos}` : null,
-                c.nombreCompleto ? c.nombreCompleto : null
-              ].filter(Boolean);
-              if (alias.length > 0) {
-                nombre = alias[0];
-              }
+              nombre =
+                c.nombre ||
+                c.nombres ||
+                "";
+            }
+
+            if (!apellido) {
+              apellido =
+                c.apellido ||
+                c.apellidos ||
+                "";
             }
 
             if (!telefono) {
               telefono =
-                c.telefono   ||
-                c.celular    ||
-                c.cel        ||
-                c.phone      ||
-                c.telefono1  ||
-                null;
+                c.telefono ||
+                c.celular ||
+                c.cel ||
+                c.phone ||
+                c.telefono1 ||
+                "";
+            }
+
+            if (!direccion) {
+              direccion =
+                c.direccion ||
+                c.domicilio ||
+                c.address ||
+                "";
             }
           }
         } catch (e) {
@@ -109,10 +174,18 @@
         }
       }
 
-      if (!nombre)   nombre   = "Sin nombre";
-      if (!telefono) telefono = "—";
+      nombre = (nombre || "").trim() || "Sin nombre";
+      apellido = (apellido || "").trim() || "—";
+      telefono = (telefono || "").trim() || "—";
+      direccion = (direccion || "").trim() || "—";
 
-      return { nombre, telefono };
+      return {
+        nombre,
+        apellido,
+        telefono,
+        direccion,
+        frecuenciaPago: (frecuenciaPago || "").trim() || "—"
+      };
     }
 
     // ===== Carga base: TODOS los créditos de la agencia + morosos =====
@@ -120,7 +193,6 @@
       const qCreds = query(collection(db, "creditos"), where("agenciaAsignada", "==", department));
       const snap = await getDocs(qCreds);
 
-      // Reiniciar bases
       todosCreditosDeAgencia = [];
       morososDeAgencia = [];
 
@@ -128,7 +200,6 @@
         const d = ddoc.data();
         const estado = (d.estadoCredito || "").trim();
 
-        // ❌ EXCLUIR créditos con estado "Pagado"
         if (estado === "Pagado") {
           continue;
         }
@@ -143,28 +214,33 @@
           capitalAtrasado: asNumber(d.capitalAtrasado),
           paraPonerseAlDia: asNumber(d.paraPonerseAlDia),
           cuotasAtrasadas,
+          diasMora: calcularDiasMora(d.amortizacion),
+          nombre: (d.nombre || "").trim(),
+          apellido: (d.apellido || "").trim(),
+          direccion: (d.direccion || "").trim(),
+          telefono: (d.telefono || "").trim(),
+          frecuenciaPago: (d.frecuenciaPago || d.frecuencia || d.periodicidad || "").trim() || "—",
           raw: d
         };
 
-        // Agregar a TODOS (sin filtrar por mora, pero ya sin Pagado)
         todosCreditosDeAgencia.push(baseItem);
 
-        // Si tiene al menos una cuota Atrasado, agregar a la base de morosos
         if (cuotasAtrasadas > 0) {
           morososDeAgencia.push(baseItem);
         }
       }
 
-      // Usuarios únicos (asignadoA) con mora para el selector
       const select = document.getElementById("user-select");
       const set = new Set(
         morososDeAgencia.map(x => x.asignadoA).filter(n => n && n.length > 0)
       );
+
       const opciones = [];
       if (nombreLogueado && set.has(nombreLogueado)) {
         opciones.push(`<option value="${nombreLogueado}">Yo (${nombreLogueado})</option>`);
         set.delete(nombreLogueado);
       }
+
       [...set].sort().forEach(n => opciones.push(`<option value="${n}">${n}</option>`));
 
       select.innerHTML = `
@@ -176,26 +252,21 @@
 
     // ===== Cálculo de métricas por selección =====
     function calcularMetricas(nombreSeleccionado){
-      // Base para Cartera Total: TODOS los créditos (con y sin mora)
       const baseCartera = (nombreSeleccionado === "__todos__")
         ? todosCreditosDeAgencia
         : todosCreditosDeAgencia.filter(x => x.asignadoA === nombreSeleccionado);
 
-      // Items morosos: SOLO créditos con mora (para numerador y detalle)
       const itemsMorosos = (nombreSeleccionado === "__todos__")
         ? morososDeAgencia
         : morososDeAgencia.filter(x => x.asignadoA === nombreSeleccionado);
 
-      // Cartera Total Real (excluye Revertido)
       const carteraTotal = baseCartera
         .filter(x => x.estadoCredito !== "Revertido")
         .reduce((acc, x) => acc + asNumber(x.saldoActual), 0);
 
-      // Numerador: suma del saldoActual de los créditos en mora (PAR)
       const capitalEnMora = itemsMorosos
         .reduce((acc, x) => acc + asNumber(x.saldoActual), 0);
 
-      // % de Mora
       const moraPct = carteraTotal > 0 ? (capitalEnMora / carteraTotal) * 100 : 0;
 
       return { carteraTotal, capitalEnMora, moraPct, itemsMorosos };
@@ -211,10 +282,13 @@
       tbody.innerHTML = "";
       detBox.style.display = "none";
 
-      if (!nombreSeleccionado) { resBox.innerHTML = ""; return; }
+      if (!nombreSeleccionado) {
+        resBox.innerHTML = "";
+        return;
+      }
+
       resBox.innerHTML = `<div class="cargando">Calculando...</div>`;
 
-      // Cálculo de métricas
       const { carteraTotal, capitalEnMora, moraPct, itemsMorosos } = calcularMetricas(nombreSeleccionado);
 
       const tituloUsuario = (nombreSeleccionado === "__todos__") ? "Todos (con mora)" : nombreSeleccionado;
@@ -227,82 +301,101 @@
         </div>
       `;
 
-      // Detalle (ordenado por mayor capital atrasado)
       itemsMorosos.sort((a, b) => b.capitalAtrasado - a.capitalAtrasado);
 
-      // Arreglo que usaremos para Excel, con lo mismo que se ve en la tabla
       const datasetExport = [];
 
       for (const it of itemsMorosos) {
-        const { nombre, telefono } = await resolverNombreCliente(it.raw);
+        const datosCliente = await resolverDatosCliente(it.raw);
 
-        // Guardamos en el item para futuro, por si se necesita
+        const nombre = datosCliente.nombre || it.nombre || "Sin nombre";
+        const apellido = datosCliente.apellido || it.apellido || "—";
+        const telefono = datosCliente.telefono || it.telefono || "—";
+        const direccion = datosCliente.direccion || it.direccion || "—";
+        const frecuenciaPago = datosCliente.frecuenciaPago || it.frecuenciaPago || "—";
+
         it._clienteNombre = nombre;
-        it._telefono      = telefono;
+        it._clienteApellido = apellido;
+        it._telefono = telefono;
+        it._direccion = direccion;
+        it._frecuenciaPago = frecuenciaPago;
 
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td title="${it.idCredito}" class="mono">${it.idCredito}</td>
           <td title="${nombre}">${nombre}</td>
+          <td title="${apellido}">${apellido}</td>
           <td title="${telefono}">${telefono}</td>
+          <td title="${direccion}">${direccion}</td>
+          <td title="${frecuenciaPago}">${frecuenciaPago}</td>
           <td title="${it.estadoCredito}">${it.estadoCredito}</td>
           <td class="num" title="${formatoDinero(it.saldoActual)}">${formatoDinero(it.saldoActual)}</td>
           <td class="num imp" title="${formatoDinero(it.capitalAtrasado)}">${formatoDinero(it.capitalAtrasado)}</td>
           <td class="num" title="${formatoDinero(it.paraPonerseAlDia)}">${formatoDinero(it.paraPonerseAlDia)}</td>
           <td class="num" title="${it.cuotasAtrasadas}">${it.cuotasAtrasadas}</td>
+          <td class="num" title="${it.diasMora}">${it.diasMora}</td>
         `;
         tbody.appendChild(tr);
 
         datasetExport.push({
-          idCredito:       it.idCredito,
-          cliente:         nombre,
-          telefono:        telefono,
-          estadoCredito:   it.estadoCredito,
-          saldoActual:     it.saldoActual,
+          cliente: nombre,
+          apellido: apellido,
+          telefono: telefono,
+          direccion: direccion,
+          frecuenciaPago: frecuenciaPago,
+          estadoCredito: it.estadoCredito,
+          saldoActual: it.saldoActual,
           capitalAtrasado: it.capitalAtrasado,
-          paraPonerseAlDia:it.paraPonerseAlDia,
-          cuotasAtrasadas: it.cuotasAtrasadas
+          paraPonerseAlDia: it.paraPonerseAlDia,
+          cuotasAtrasadas: it.cuotasAtrasadas,
+          diasMora: it.diasMora
         });
       }
 
-      // dataset para exportar Excel (lo mismo que vemos en la tabla)
       document.getElementById("total-registros").textContent = String(itemsMorosos.length);
       tabla.dataset.json = JSON.stringify(datasetExport);
       document.getElementById("btn-exportar").style.display = itemsMorosos.length ? "inline-flex" : "none";
       detBox.style.display = "block";
     }
 
-    // ===== Exportar Excel (igual que tabla) =====
+    // ===== Exportar Excel =====
     function exportarExcel() {
       const tabla = document.getElementById("tabla-detalle");
       const raw = tabla.dataset.json ? JSON.parse(tabla.dataset.json) : [];
       if (!raw || raw.length === 0) return;
 
       const ws_data = [
-        ["ID Credito","Cliente","Telefono","Estado","Saldo Actual","Capital Atrasado","Para Ponerse Al Dia","Cuotas Atrasadas"],
+        ["Cliente","Apellido","Telefono","Direccion","Frecuencia Pago","Estado","Saldo Actual","Capital Atrasado","Para Ponerse Al Dia","Cuotas Atrasadas","Dias Mora"],
       ];
+
       const rows = raw.map(r => ([
-        r.idCredito,
         r.cliente || "",
+        r.apellido || "",
         r.telefono || "",
-        r.estadoCredito,
+        r.direccion || "",
+        r.frecuenciaPago || "",
+        r.estadoCredito || "",
         r.saldoActual,
         r.capitalAtrasado,
         r.paraPonerseAlDia,
-        r.cuotasAtrasadas
+        r.cuotasAtrasadas,
+        r.diasMora
       ]));
+
       ws_data.push(...rows);
 
       const ws = XLSX.utils.aoa_to_sheet(ws_data);
       ws['!cols'] = [
-        { wch: 22 }, // ID Credito
-        { wch: 28 }, // Cliente
+        { wch: 24 }, // Cliente
+        { wch: 24 }, // Apellido
         { wch: 16 }, // Telefono
+        { wch: 34 }, // Direccion
+        { wch: 18 }, // Frecuencia Pago
         { wch: 14 }, // Estado
         { wch: 16 }, // Saldo Actual
         { wch: 18 }, // Capital Atrasado
         { wch: 20 }, // Para ponerse al dia
-        { wch: 16 }  // Cuotas Atrasadas
+        { wch: 16 }, // Cuotas Atrasadas
+        { wch: 12 }  // Dias Mora
       ];
 
       const wb = XLSX.utils.book_new();
@@ -332,13 +425,13 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <style>
-    /* ======= Estilo gráfico CLARO / GLASS (mismo del Panel de Gerente) ======= */
     :root{
       --bg:#f7f9fc; --bg-2:#eef2f7; --text:#0d1b2a; --white:#ffffff; --muted:#5b6776;
       --brand-blue:#243b86; --brand-cel:#67C8F1; --brand-green:#13b66b; --brand-gold:#F8AF40;
       --glass-bg:rgba(255,255,255,.55); --glass-brd:rgba(10,20,40,.08); --glass-shadow:0 20px 60px rgba(12,20,40,.12);
       --radius-2xl:22px; --radius-xl:16px;
     }
+
     @media (prefers-color-scheme: dark){
       :root{
         --bg:#0c0f14; --bg-2:#0f141b; --text:#dfe6ef; --muted:#9aa6b6;
@@ -348,6 +441,7 @@
 
     *{ box-sizing:border-box }
     html,body{ height:100% }
+
     body{
       margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
       color:var(--text);
@@ -358,6 +452,7 @@
       -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
       min-height:100vh;
     }
+
     .pattern{
       position:fixed; inset:0; pointer-events:none; z-index:0;
       background-image:
@@ -372,30 +467,38 @@
       background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.25));
       border-bottom:1px solid var(--glass-brd);
     }
+
     @media (prefers-color-scheme: dark){
       header{ background:linear-gradient(180deg, rgba(15,20,30,.75), rgba(15,20,30,.35)); }
     }
+
     .topbar{
       max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:14px; padding:.8rem 16px;
     }
+
     .logo-plate{
       display:inline-flex; align-items:center; gap:10px; background:var(--glass-bg);
       border:1px solid var(--glass-brd); padding:8px 14px; border-radius:16px;
       box-shadow:var(--glass-shadow); position:relative; overflow:hidden; isolation:isolate;
     }
+
     .logo-plate::after{
       content:""; position:absolute; inset:-1px;
       background:linear-gradient(120deg, transparent 0 35%, rgba(255,255,255,.55) 45%, transparent 55% 100%);
       transform:translateX(-120%); animation:plateSheen 6s linear infinite; pointer-events:none;
     }
-    @keyframes plateSheen{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
+
+    @keyframes plateSheen{
+      0%{transform:translateX(-120%)}
+      100%{transform:translateX(120%)}
+    }
+
     .logo-plate img{ height:28px; width:auto; display:block }
     .brand-name{ font-weight:800; letter-spacing:.2px; color:var(--brand-blue); }
 
-    /* Contenedor ancho para tabla */
     .container{
       position:relative; z-index:1;
-      max-width: min(95vw, 1200px);
+      max-width: min(98vw, 1500px);
       margin: 2rem auto; padding: 1.2rem;
       background:var(--glass-bg); border:1px solid var(--glass-brd);
       border-radius:var(--radius-2xl); box-shadow:var(--glass-shadow);
@@ -406,14 +509,17 @@
       font-size:clamp(1.1rem, .8vw + 1rem, 1.5rem); margin-bottom:1rem;
     }
 
-    /* Select y botones */
-    label{ color:var(--muted); font-weight:700; display:block; margin-bottom:.3rem; }
+    label{
+      color:var(--muted); font-weight:700; display:block; margin-bottom:.3rem;
+    }
+
     .input-main, select{
       width:100%; background:var(--white); color:var(--text);
       border:1px solid var(--glass-brd); border-radius:12px;
       font-size:1rem; padding:.75rem .85rem; outline:none;
       box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 6px 18px rgba(10,20,40,.06);
     }
+
     .btn{
       display:inline-flex; align-items:center; gap:.5rem;
       padding:.6rem .9rem; border-radius:12px;
@@ -421,25 +527,31 @@
       color:#fff; font-weight:800; border:none; cursor:pointer;
       box-shadow:0 14px 30px rgba(16,161,100,.18);
     }
+
     .btn i{ font-size:1rem; }
 
-    /* Tarjeta resumen */
     .card-res{
       margin-top:1rem; padding:1rem; border-radius:16px;
       background:var(--white); border:1px solid var(--glass-brd);
       box-shadow:0 10px 26px rgba(10,20,40,.08), inset 0 1px 0 rgba(255,255,255,.7);
       display:grid; grid-template-columns:repeat(2,minmax(240px,1fr)); gap:.6rem 1rem;
     }
+
     .card-res span{ color:var(--brand-blue); font-weight:800; }
     .num{ color:#8a5a00; font-weight:900; }
     .num.verde{ color:#0c8a58; }
     .num.rojo{ color:#d03838; }
     .cargando{ color:#7a4b00; text-align:center; font-weight:800; }
 
-    /* Cabecera detalle */
     .detalle-container{ margin-top:1rem; display:none; }
-    .header-detalle{ display:flex; align-items:center; justify-content:space-between; gap:.8rem; margin-bottom:.6rem; }
-    .header-detalle h2{ margin:0; font-size:1rem; color:var(--brand-blue); font-weight:900; }
+    .header-detalle{
+      display:flex; align-items:center; justify-content:space-between; gap:.8rem; margin-bottom:.6rem;
+    }
+
+    .header-detalle h2{
+      margin:0; font-size:1rem; color:var(--brand-blue); font-weight:900;
+    }
+
     .pill{
       background:linear-gradient(180deg, rgba(36,59,134,.08), rgba(103,200,241,.08));
       border:1px solid rgba(36,59,134,.15);
@@ -447,29 +559,34 @@
       box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
     }
 
-    /* Tabla a todo ancho sin doble línea */
-    .table-wrap{ width:100%; overflow:auto; }
+    .table-wrap{
+      width:100%;
+      overflow:auto;
+    }
+
     table#tabla-detalle{
       width:100%;
-      min-width:1200px;              /* aseguramos ancho amplio */
+      min-width:1800px;
       border-collapse:separate;
       border-spacing:0;
       background:var(--white);
       border:1px solid var(--glass-brd);
       border-radius:12px; overflow:hidden;
       box-shadow:0 8px 22px rgba(10,20,40,.08), inset 0 1px 0 rgba(255,255,255,.7);
-      table-layout:fixed;            /* permite elipsis consistente */
+      table-layout:fixed;
     }
 
-    /* Ajustamos proporciones de 8 columnas */
-    table#tabla-detalle colgroup col:nth-child(1){ width:14%; } /* ID Crédito */
-    table#tabla-detalle colgroup col:nth-child(2){ width:20%; } /* Cliente */
-    table#tabla-detalle colgroup col:nth-child(3){ width:14%; } /* Teléfono */
-    table#tabla-detalle colgroup col:nth-child(4){ width:10%; } /* Estado */
-    table#tabla-detalle colgroup col:nth-child(5){ width:14%; } /* Saldo Actual */
-    table#tabla-detalle colgroup col:nth-child(6){ width:14%; } /* Capital Atrasado */
-    table#tabla-detalle colgroup col:nth-child(7){ width:14%; } /* Para ponerse al día */
-    table#tabla-detalle colgroup col:nth-child(8){ width:10%; } /* Cuotas Atrasadas */
+    table#tabla-detalle colgroup col:nth-child(1){ width:14%; } /* Cliente */
+    table#tabla-detalle colgroup col:nth-child(2){ width:14%; } /* Apellido */
+    table#tabla-detalle colgroup col:nth-child(3){ width:10%; } /* Teléfono */
+    table#tabla-detalle colgroup col:nth-child(4){ width:20%; } /* Dirección */
+    table#tabla-detalle colgroup col:nth-child(5){ width:10%; } /* Frecuencia */
+    table#tabla-detalle colgroup col:nth-child(6){ width:9%; }  /* Estado */
+    table#tabla-detalle colgroup col:nth-child(7){ width:10%; } /* Saldo Actual */
+    table#tabla-detalle colgroup col:nth-child(8){ width:10%; } /* Capital Atrasado */
+    table#tabla-detalle colgroup col:nth-child(9){ width:11%; } /* Para ponerse al día */
+    table#tabla-detalle colgroup col:nth-child(10){ width:8%; } /* Cuotas atrasadas */
+    table#tabla-detalle colgroup col:nth-child(11){ width:8%; } /* Días mora */
 
     thead th{
       text-align:left; font-size:.9rem; color:var(--brand-blue);
@@ -479,16 +596,17 @@
       white-space:nowrap;
       border-bottom:1px solid rgba(10,20,40,.08);
     }
+
     tbody td{
       padding:.7rem .8rem; font-size:.95rem; color:var(--text);
       border-top:1px solid rgba(10,20,40,.08);
-      white-space:nowrap;            /* evita doble línea */
-      overflow:hidden; text-overflow:ellipsis;  /* elipsis */
+      white-space:nowrap;
+      overflow:hidden; text-overflow:ellipsis;
     }
+
     tbody tr:hover{ background:rgba(103,200,241,.05); }
     td.num{ text-align:right; }
     td.imp{ color:#c17900; font-weight:900; }
-    td.mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
     @media (max-width:800px){
       .card-res{ grid-template-columns:1fr; }
@@ -520,7 +638,6 @@
 
     <div id="resultado" style="margin-top:.6rem;"></div>
 
-    <!-- Detalle créditos en mora -->
     <div id="detalle-box" class="detalle-container">
       <div class="header-detalle">
         <h2><i class="fa-solid fa-list"></i> Créditos en mora (detalle)</h2>
@@ -532,20 +649,22 @@
 
       <div class="table-wrap">
         <table id="tabla-detalle">
-          <!-- Definimos proporciones de columnas -->
           <colgroup>
-            <col/><col/><col/><col/><col/><col/><col/><col/>
+            <col/><col/><col/><col/><col/><col/><col/><col/><col/><col/><col/>
           </colgroup>
           <thead>
             <tr>
-              <th>ID Crédito</th>
               <th>Cliente</th>
+              <th>Apellido</th>
               <th>Teléfono</th>
+              <th>Dirección</th>
+              <th>Frecuencia Pago</th>
               <th>Estado</th>
               <th class="num">Saldo Actual</th>
               <th class="num">Capital Atrasado</th>
               <th class="num">Para Ponerse al Día</th>
               <th class="num">Cuotas Atrasadas</th>
+              <th class="num">Días Mora</th>
             </tr>
           </thead>
           <tbody id="detalle-body"></tbody>
@@ -554,10 +673,6 @@
     </div>
   </div>
 
-  <!-- SheetJS para exportar a Excel -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </body>
 </html>
-
-
-
